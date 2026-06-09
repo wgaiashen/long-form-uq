@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Heavy, regenerable artifacts (never in Git)
+hf_cache/
+saved_outputs/
+features/
+*.pt
+
+# Secrets
+.env
+
+# macOS
+.DS_Store
