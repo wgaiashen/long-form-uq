@@ -6,7 +6,11 @@ __pycache__/
 hf_cache/
 saved_outputs/
 features/
+cache/
+results/
+logs/
 *.pt
+*.npz
 
 # Secrets
 .env

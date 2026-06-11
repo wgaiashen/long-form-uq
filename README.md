@@ -22,7 +22,7 @@ Baselines: MSP (unsupervised) and SAPLMA (supervised), with task-specific baseli
 
 ## Repository layout
 
-- `smoke_test.py` - minimal end-to-end check (load data, generate, reach hidden states).
+- `test.py` - minimal end-to-end check (load data, generate, reach hidden states).
 - (more code is added as the project develops.)
 
 Training and evaluation data are loaded through the ProbeDrift library, which is kept outside
@@ -30,8 +30,9 @@ this repository. Model weights, caches, and generated outputs are not tracked in
 
 ## Setup
 
-Requires Python 3.11 and a GPU. Main dependencies: PyTorch, transformers, lm-polygraph, the
-uhead repository, ProbeDrift, and scikit-learn. See the project notes for the full environment
+Requires Python 3.11 and a GPU. Uses the conda env `luq`. Main dependencies: PyTorch,
+transformers, lm-polygraph, the uhead repository (`luh`), ProbeDrift, and scikit-learn. The PRR
+scorer `robust-uq-eval` is not installed yet. See the project notes for the full environment
 setup on the Imperial Computing GPU cluster.
 
 ## Status

@@ -19,3 +19,4 @@ for i in range(10):
                          output_hidden_states=True, return_dict_in_generate=True)
     gen = tok.decode(out.sequences[0, inputs.input_ids.shape[1]:], skip_special_tokens=True)
     print(f"[{i}] gold={train_ds.y[i]!r}  gen={gen!r}")
+
