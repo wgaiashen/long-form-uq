@@ -9,6 +9,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 # Make `src/` importable when running this file directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -30,17 +32,40 @@ def main():
     model, tok = generate.load_model(cfg.model_name)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
 
-    # TODO: the extract loop.
-    #   for split, ds in [("train", train_ds), ("test", eval_ds)]:
-    #       for idx, (xb, yb, mnt) in enumerate(ds):
-    #           prompt, target, mnt = xb[0], yb[0], mnt[0]   # batch_size=1
-    #           record, pooled = generate.generate(model, tok, prompt, mnt)
-    #           record |= {"idx": idx, "split": split, "target": target}
-    #           ...collect record into records[], pooled into a list...
-    #   stack pooled -> (n, n_layers, hidden); then:
-    #   cache.save_records(records, cfg.cache_dir, key)
-    #   cache.save_features(pooled_array, cfg.cache_dir, key, method="saplma")
-    raise NotImplementedError("wire up the extract loop — follow the TODO above")
+    # Few-shot short-form QA: the answer ends at the first newline; after that the
+    # model just imitates the prompt format. Long-form output keeps its newlines.
+    truncate = cfg.dataset in data.SHORT_FORM
+
+    # One records list and one features list for BOTH splits, each example tagged
+    # with its split. Keeping them in a single file means Tier 1 and Tier 2 stay
+    # index-aligned by construction; 03_probe.py separates train/test by the tag.
+    records = []
+    pooled_list = []
+    for split, ds in [("train", train_ds), ("test", eval_ds)]:
+        for idx, (xb, yb, mnt) in enumerate(ds):
+            if args.limit is not None and idx >= args.limit:
+                break
+            prompt, target = xb[0], yb[0]  # batch_size=1: unwrap the lists
+            budget = min(int(mnt[0]), cfg.max_new_tokens_cap)
+
+            record, pooled = generate.generate(model, tok, prompt, budget,
+                                               truncate_at_newline=truncate)
+            record |= {"idx": idx, "split": split, "target": target}
+            records.append(record)
+            pooled_list.append(pooled)
+
+            if idx % 10 == 0:
+                # flush=True: Slurm buffers stdout, so unflushed prints make a
+                # healthy job look hung.
+                print(f"[{split}] {idx} done", flush=True)
+
+    # (n_examples, n_layers, hidden) — the Tier-2 array, all layers kept.
+    pooled_array = np.stack([p.numpy() for p in pooled_list])
+
+    records_path = cache.save_records(records, cfg.cache_dir, key)
+    features_path = cache.save_features(pooled_array, cfg.cache_dir, key, method="saplma")
+    print(f"saved {len(records)} records  -> {records_path}")
+    print(f"saved features {pooled_array.shape} -> {features_path}")
 
 
 if __name__ == "__main__":

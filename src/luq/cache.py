@@ -62,3 +62,21 @@ def save_features(feats: np.ndarray, cache_dir: Path, key: str, method: str) -> 
 def load_features(cache_dir: Path, key: str, method: str) -> np.ndarray:
     path = Path(cache_dir) / "features" / f"{key}__{method}.npz"
     return np.load(path)["feats"]
+
+
+# ---- method scores: per-example uncertainty on the test split ------------------
+
+def save_scores(unc: np.ndarray, cache_dir: Path, key: str, method: str, **extras) -> Path:
+    """unc: (n_test,) uncertainty scores, in test-record order. `extras` stores
+    small run facts next to the scores (e.g. layer=14) so a saved result is never
+    ambiguous about how it was produced."""
+    out = Path(cache_dir) / "scores" / f"{key}__{method}.npz"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(out, unc=unc, **{k: np.asarray(v) for k, v in extras.items()})
+    return out
+
+
+def load_scores(cache_dir: Path, key: str, method: str) -> dict:
+    path = Path(cache_dir) / "scores" / f"{key}__{method}.npz"
+    with np.load(path) as f:
+        return {k: f[k] for k in f.files}

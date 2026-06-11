@@ -6,6 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from luq import cache, probe  # noqa: E402
@@ -18,20 +20,41 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
-    ap.add_argument("--layer", type=int, default=-1, help="hidden layer index to probe")
+    ap.add_argument("--layer", type=int, default=None,
+                    help="hidden layer index to probe (default: the middle layer)")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     feats = cache.load_features(cfg.cache_dir, key, method="saplma")  # (n, n_layers, hidden)
+    records = cache.load_records(cfg.cache_dir, key)
+    assert len(records) == len(feats), "records and features are out of step — rerun 01"
 
-    # TODO:
-    #   - Split feats + labels into train / test using each record's "split" field.
-    #   - X = saplma.select_layer(feats, args.layer) for each split.
-    #   - clf = probe.train_probe(X_train, y_train)
-    #   - unc = probe.uncertainty(clf, X_test)
-    #   - Hand (test correctness, unc) to scripts/04_eval.py (or import and score here).
-    raise NotImplementedError("train + score the probe — follow the TODO above")
+    # Default to the middle layer: usually more informative than the last one.
+    layer = args.layer if args.layer is not None else feats.shape[1] // 2
+
+    # Records and features share index order, so boolean masks built from the
+    # records' "split" tags select the matching feature rows.
+    y = np.array([r["correctness"] for r in records])
+    split = np.array([r["split"] for r in records])
+    train_mask, test_mask = split == "train", split == "test"
+
+    if len(np.unique(y[train_mask] >= 0.5)) < 2:
+        sys.exit("all train labels are identical — the probe has nothing to learn "
+                 "(tiny --limit run, or a labelling bug)")
+
+    X = saplma.select_layer(feats, layer)  # (n, hidden)
+    clf = probe.train_probe(X[train_mask], y[train_mask])
+    unc = probe.uncertainty(clf, X[test_mask])
+
+    # Quick diagnostic: plain accuracy of the probe's correct/incorrect decision.
+    # A big train/test gap means the probe memorised rather than learned.
+    train_acc = clf.score(X[train_mask], (y[train_mask] >= 0.5).astype(int))
+    test_acc = clf.score(X[test_mask], (y[test_mask] >= 0.5).astype(int))
+    print(f"layer {layer}: probe accuracy train {train_acc:.3f} | test {test_acc:.3f}")
+
+    path = cache.save_scores(unc, cfg.cache_dir, key, method="saplma", layer=layer)
+    print(f"saved {len(unc)} test uncertainties -> {path}")
 
 
 if __name__ == "__main__":

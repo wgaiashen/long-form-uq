@@ -12,9 +12,15 @@ import csv
 import numpy as np
 
 
-def write_csv(path, rows: list[dict], uncertainty_col: str) -> None:
-    """rows: dicts with keys dataset, task, split, correctness, <uncertainty_col>."""
-    fields = ["dataset", "task", "split", "correctness", uncertainty_col]
+def write_csv(path, rows: list[dict], uncertainty_cols) -> None:
+    """rows: dicts with keys dataset, task, split, correctness, <uncertainty col(s)>.
+
+    uncertainty_cols: one column name or a list of them, so several methods can
+    share a CSV (same examples, same correctness, one column per method).
+    """
+    if isinstance(uncertainty_cols, str):
+        uncertainty_cols = [uncertainty_cols]
+    fields = ["dataset", "task", "split", "correctness", *uncertainty_cols]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()

@@ -27,13 +27,23 @@ def main():
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
 
-    # TODO:
-    #   if cfg.dataset in data.SHORT_FORM:
-    #       for r in records: r["correctness"] = string_match.match(r["gen_text"], r["target"])
-    #   else:
-    #       use luq.labels.llm_judge (login node) and attach the 0-1 scores.
-    #   Then re-save the records (or write a separate labels file) so 03/04 can read them.
-    raise NotImplementedError("attach correctness to records — follow the TODO above")
+    if cfg.dataset in data.SHORT_FORM:
+        # String match: does the gold answer (or any alias) appear in the output?
+        for r in records:
+            r["correctness"] = string_match.match(r["gen_text"], r["target"])
+    else:
+        # Long-form: Joe's LLM judge (login node only; needs OPENAI_API_KEY).
+        raise NotImplementedError(
+            "long-form labelling comes with luq.labels.llm_judge — fill that first"
+        )
+
+    # Re-save the records in place: correctness becomes part of the Tier-1 record,
+    # so stages 03/04 read one file and labels can never drift out of line with
+    # their examples. Relabelling is cheap (no GPU), so overwriting is safe.
+    cache.save_records(records, cfg.cache_dir, key)
+
+    scores = [r["correctness"] for r in records]
+    print(f"labelled {len(records)} records: mean correctness {sum(scores) / len(scores):.3f}")
 
 
 if __name__ == "__main__":

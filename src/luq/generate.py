@@ -19,37 +19,96 @@ def load_model(name: str):
     """Load a frozen causal LM in fp16 on the GPU. We never train the base model."""
     tok = AutoTokenizer.from_pretrained(name)
     model = AutoModelForCausalLM.from_pretrained(
-        name, torch_dtype=torch.float16, device_map="cuda"
+        name, dtype=torch.float16, device_map="cuda"
     )
     model.eval()
     return model, tok
 
 
 @torch.no_grad()
-def generate(model, tok, prompt: str, max_new_tokens: int):
+def generate(model, tok, prompt: str, max_new_tokens: int,
+             truncate_at_newline: bool = False):
     """Generate one response; return (record, pooled_all_layers).
 
-    record: dict with prompt, gen_token_ids, gen_text, token_logprobs.
+    record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
     pooled_all_layers: tensor (n_layers, hidden) = mean over the OUTPUT tokens, per layer.
 
-    TODO, step by step:
-      1. Tokenise: inputs = tok(prompt, return_tensors="pt").to(model.device).
-         Save prompt_len = inputs.input_ids.shape[1] (where the response begins).
-      2. out = model.generate(**inputs, max_new_tokens=max_new_tokens,
-                 do_sample=False, output_hidden_states=True, output_scores=True,
-                 return_dict_in_generate=True)
-      3. gen_ids = out.sequences[0, prompt_len:]; gen_text = tok.decode(gen_ids,
-         skip_special_tokens=True).
-      4. token_logprobs (for MSP): out.scores is a tuple of (1, vocab) logits, one per
-         generated step. log_softmax each and gather the chosen token's value.
-      5. hidden states: out.hidden_states is a tuple over steps. step 0 holds the prompt
-         pass (all prompt tokens); steps 1.. each hold ONE new token. For every layer,
-         collect the generated-token hidden states (steps 1..) and mean over them.
-         Stack the per-layer means -> (n_layers, hidden). (uhead's basic_hidden_states.py
-         shows the exact tuple shapes if you want a reference.)
-      6. Return the record dict and pooled.cpu().
+    truncate_at_newline: for few-shot short-form QA the answer ends at the first
+    newline; what follows is the model imitating the prompt format (inventing the
+    next question), not part of the answer. Truncating HERE means the record,
+    the logprobs, the pooled features, and the correctness label all describe the
+    same text. Long-form datasets must keep newlines, so it is off by default.
     """
-    raise NotImplementedError("fill in generate() — follow the numbered TODO above")
+    # 1. Tokenise. prompt_len marks where the response begins: generate() returns
+    #    prompt + response as one sequence, and we only ever cache the response part.
+    inputs = tok(prompt, return_tensors="pt").to(model.device)
+    prompt_len = inputs.input_ids.shape[1]
+
+    # 2. The single generate pass. Greedy decoding (do_sample=False) keeps runs
+    #    reproducible; the output_* flags make generate hand back the logits and
+    #    hidden states it computed anyway.
+    out = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        output_hidden_states=True,
+        output_scores=True,
+        return_dict_in_generate=True,
+        pad_token_id=tok.eos_token_id,
+    )
+
+    # 3. Slice off the response. n_gen is often < max_new_tokens (generation stops
+    #    early at an end-of-sequence token), so always measure the actual length.
+    gen_ids = out.sequences[0, prompt_len:]
+    if truncate_at_newline:
+        for i, tid in enumerate(gen_ids):
+            if "\n" in tok.decode([tid]):
+                gen_ids = gen_ids[: max(i, 1)]  # keep at least one token
+                break
+    gen_text = tok.decode(gen_ids, skip_special_tokens=True)
+    n_gen = len(gen_ids)
+
+    # 4. Per-token logprobs (MSP's raw material). out.scores has one (1, vocab)
+    #    logits tensor per generated token, from BEFORE the token was picked;
+    #    log_softmax turns them into log-probabilities and we keep the chosen
+    #    token's. .float() because softmax in fp16 loses precision.
+    #    Only the first n_gen entries: everything past the truncation point is
+    #    not part of the answer.
+    token_logprobs = []
+    for step, logits in enumerate(out.scores[:n_gen]):
+        logp = torch.log_softmax(logits[0].float(), dim=-1)
+        token_logprobs.append(logp[gen_ids[step]].item())
+
+    # 5. Pool the hidden states over the output tokens, per layer.
+    #    out.hidden_states is a tuple over generation steps; each step is a tuple
+    #    over layers (index 0 = embedding layer); each layer tensor is
+    #    (1, n_tokens_in_step, hidden). Step 0 covers the whole prompt; steps 1..
+    #    each cover the ONE token fed back from the previous step. So the
+    #    generated tokens' states live at steps 1.., last position. The final
+    #    generated token is never fed back in, so it has no state here; a mean
+    #    over n_gen - 1 of n_gen tokens is fine.
+    n_layers = len(out.hidden_states[0])
+    pooled = []
+    for layer in range(n_layers):
+        vecs = [out.hidden_states[s][layer][0, -1, :] for s in range(1, n_gen)]
+        if not vecs:  # degenerate one-token response: use the prompt's last position
+            vecs = [out.hidden_states[0][layer][0, -1, :]]
+        pooled.append(torch.stack(vecs).mean(dim=0))
+    # Back to float32 (numpy/sklearn-friendly) and off the GPU.
+    pooled = torch.stack(pooled).float().cpu()
+
+    # 6. The Tier-1 record. Token IDs (not just decoded text) on purpose:
+    #    re-tokenising text is not guaranteed to round-trip, and later stages
+    #    (P(True), decomposition) replay these exact IDs through recompute_states.
+    #    .tolist() because JSON cannot store tensors.
+    record = {
+        "prompt": prompt,
+        "prompt_token_ids": inputs.input_ids[0].tolist(),
+        "gen_token_ids": gen_ids.tolist(),
+        "gen_text": gen_text,
+        "token_logprobs": token_logprobs,
+    }
+    return record, pooled
 
 
 @torch.no_grad()
@@ -61,9 +120,23 @@ def recompute_states(model, tok, token_ids, layers, want_attentions: bool = Fals
     for P(True). Inputs are token IDs from a Tier-1 record, so there is no
     re-tokenisation drift. This is one forward pass, no generation.
 
-    TODO:
-      1. ids = torch.tensor(token_ids)[None].to(model.device)
-      2. out = model(ids, output_hidden_states=True, output_attentions=want_attentions)
-      3. Return [out.hidden_states[l] for l in layers] (and out.attentions if asked).
+    Returns hidden_states: list over `layers`, each (seq_len, hidden), float32 cpu.
+    If want_attentions, also returns attentions: tuple over ALL transformer blocks,
+    each (n_heads, seq_len, seq_len).
+
+    Unlike the generation-time structure, a teacher-forced pass yields the state of
+    EVERY position at once, including the last token, because here we feed the full
+    sequence in as input rather than building it one token at a time.
     """
-    raise NotImplementedError("fill in recompute_states() — follow the TODO above")
+    # [None] adds the batch dimension: (seq_len,) -> (1, seq_len).
+    ids = torch.tensor(token_ids)[None].to(model.device)
+    out = model(ids, output_hidden_states=True, output_attentions=want_attentions)
+
+    # out.hidden_states is a tuple over layers (0 = embedding layer), each
+    # (1, seq_len, hidden). Drop the batch dim and move off the GPU.
+    states = [out.hidden_states[l][0].float().cpu() for l in layers]
+    if want_attentions:
+        # out.attentions: one (1, n_heads, seq_len, seq_len) tensor per block.
+        attentions = tuple(a[0].float().cpu() for a in out.attentions)
+        return states, attentions
+    return states

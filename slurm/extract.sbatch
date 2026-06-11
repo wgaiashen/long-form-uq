@@ -1,12 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=luq-extract
-#SBATCH --partition=gpus
+#SBATCH --partition=t4
 #SBATCH --gres=gpu:1
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/extract-%j.out
 
 # GPU feature-extraction job. The model must already be downloaded on the login node
-# (compute nodes have no internet). Adjust --partition / --gres to the cluster's names.
+# (compute nodes have no internet). The partition IS the GPU type on this cluster:
+# t4 | a16 | a30 | a40 | a100. t4 suits the 1.5B dev model; use a40/a100 for 7B.
 #
 # Submit with:   sbatch slurm/extract.sbatch sciq ID
 #   $1 = dataset (default sciq)
