@@ -15,12 +15,23 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def load_model(name: str):
-    """Load a frozen causal LM in fp16 on the GPU. We never train the base model."""
+def load_model(name: str, attn_implementation: str | None = None,
+               dtype: torch.dtype = torch.float16):
+    """Load a frozen causal LM on the GPU. We never train the base model.
+
+    attn_implementation: pass "eager" when you need attention weights
+    (output_attentions=True). The default fast backend (SDPA) does not return them,
+    so Lookback Lens must load with "eager"; SAPLMA and P(True) leave this as None.
+
+    dtype: fp16 by default (fast, half the memory). Use fp32 for attention extraction:
+    eager attention in fp16 overflows to NaN in the softmax, so the attention-based
+    Lookback feature needs fp32. Hidden-state features (SAPLMA, P(True)) are fine in fp16.
+    """
     tok = AutoTokenizer.from_pretrained(name)
-    model = AutoModelForCausalLM.from_pretrained(
-        name, dtype=torch.float16, device_map="cuda"
-    )
+    kwargs = dict(dtype=dtype, device_map="cuda")
+    if attn_implementation is not None:
+        kwargs["attn_implementation"] = attn_implementation
+    model = AutoModelForCausalLM.from_pretrained(name, **kwargs)
     model.eval()
     return model, tok
 

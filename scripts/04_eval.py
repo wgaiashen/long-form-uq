@@ -41,7 +41,7 @@ def main():
     # test-record order. Load whichever have been run and skip the rest, so this
     # eval works after SAPLMA alone or after both SAPLMA and P(True).
     sup = {}  # method -> {"unc": array, "layer": int, "at": {record_pos: unc}}
-    for m in ["saplma", "ptrue"]:
+    for m in ["saplma", "ptrue", "lookback"]:
         try:
             s = cache.load_scores(cfg.cache_dir, key, method=m)
         except FileNotFoundError:
