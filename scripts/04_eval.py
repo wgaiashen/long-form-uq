@@ -34,19 +34,28 @@ def main():
     msp_mean = [msp.msp_uncertainty(r["token_logprobs"], "mean") for r in records]
     msp_min = [msp.msp_uncertainty(r["token_logprobs"], "min") for r in records]
     msp_sum = [msp.msp_uncertainty(r["token_logprobs"], "sum") for r in records]
-    sap = cache.load_scores(cfg.cache_dir, key, method="saplma")
-    sap_unc, layer = sap["unc"], int(sap["layer"])
 
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
-    assert len(sap_unc) == len(test_positions), "scores out of step — rerun 03"
-    # Map each test record's position in `records` to its SAPLMA score.
-    sap_at = dict(zip(test_positions, sap_unc))
+
+    # Supervised methods (03_probe) write one uncertainty per TEST example, in
+    # test-record order. Load whichever have been run and skip the rest, so this
+    # eval works after SAPLMA alone or after both SAPLMA and P(True).
+    sup = {}  # method -> {"unc": array, "layer": int, "at": {record_pos: unc}}
+    for m in ["saplma", "ptrue"]:
+        try:
+            s = cache.load_scores(cfg.cache_dir, key, method=m)
+        except FileNotFoundError:
+            continue
+        unc, layer = s["unc"], int(s["layer"])
+        assert len(unc) == len(test_positions), \
+            f"{m} scores out of step — rerun 03 --method {m}"
+        sup[m] = {"unc": unc, "layer": layer, "at": dict(zip(test_positions, unc))}
 
     # One CSV row per example; both methods as columns (SAPLMA blank on train
     # rows, since the probe never scores its own training data).
     rows = []
     for i, r in enumerate(records):
-        rows.append({
+        row = {
             "dataset": cfg.dataset,
             "task": data.TASK_OF[cfg.dataset],
             "split": r["split"],
@@ -54,11 +63,15 @@ def main():
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
             "msp_sum": msp_sum[i],
-            "saplma": float(sap_at[i]) if i in sap_at else "",
-        })
+        }
+        # Each supervised method is blank on train rows (the probe never scores its
+        # own training data).
+        for m in sup:
+            row[m] = float(sup[m]["at"][i]) if i in sup[m]["at"] else ""
+        rows.append(row)
     cfg.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cfg.results_dir / f"{key}.csv"
-    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "saplma"])
+    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", *sup.keys()])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
@@ -68,7 +81,9 @@ def main():
     for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min), ("MSP sum ", msp_sum)]:
         unc_test = [unc[i] for i in test_positions]
         print(f"PRR  {name}        : {results.prr(y_test, unc_test):.3f}")
-    print(f"PRR  SAPLMA (layer {layer}): {results.prr(y_test, sap_unc):.3f}")
+    for m in sup:
+        print(f"PRR  {m:8s} (layer {sup[m]['layer']}): "
+              f"{results.prr(y_test, sup[m]['unc']):.3f}")
     print(f"wrote {csv_path}")
 
 

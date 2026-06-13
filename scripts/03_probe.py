@@ -20,13 +20,15 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
+    ap.add_argument("--method", default="saplma",
+                    help="which cached feature set to probe: saplma | ptrue")
     ap.add_argument("--layer", type=int, default=None,
                     help="hidden layer index to probe (default: the middle layer)")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
-    feats = cache.load_features(cfg.cache_dir, key, method="saplma")  # (n, n_layers, hidden)
+    feats = cache.load_features(cfg.cache_dir, key, method=args.method)  # (n, n_layers, hidden)
     records = cache.load_records(cfg.cache_dir, key)
     assert len(records) == len(feats), "records and features are out of step — rerun 01"
 
@@ -53,7 +55,7 @@ def main():
     test_acc = clf.score(X[test_mask], (y[test_mask] >= 0.5).astype(int))
     print(f"layer {layer}: probe accuracy train {train_acc:.3f} | test {test_acc:.3f}")
 
-    path = cache.save_scores(unc, cfg.cache_dir, key, method="saplma", layer=layer)
+    path = cache.save_scores(unc, cfg.cache_dir, key, method=args.method, layer=layer)
     print(f"saved {len(unc)} test uncertainties -> {path}")
 
 
