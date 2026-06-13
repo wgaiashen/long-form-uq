@@ -40,8 +40,11 @@ def prr(correctness, uncertainty) -> float:
     The oracle ranks by true correctness. Model and oracle are scored the same way so
     the comparison is fair.
 
-    TODO(gaia): verify this against robust-uq-eval on one dataset before trusting it in
-    the writeup.
+    Verified against lm-polygraph's PredictionRejectionArea + oracle/random
+    normalisation on sciq ID: agrees to <0.001 on five different scores (their
+    random baseline is simulated over 1000 shuffles, ours is analytic, hence the
+    tiny residual). Still cross-check robust-uq-eval once installed, since that
+    is the project's official scorer.
     """
     correctness = np.asarray(correctness, dtype=float)
     uncertainty = np.asarray(uncertainty, dtype=float)

@@ -33,6 +33,7 @@ def main():
     # order.
     msp_mean = [msp.msp_uncertainty(r["token_logprobs"], "mean") for r in records]
     msp_min = [msp.msp_uncertainty(r["token_logprobs"], "min") for r in records]
+    msp_sum = [msp.msp_uncertainty(r["token_logprobs"], "sum") for r in records]
     sap = cache.load_scores(cfg.cache_dir, key, method="saplma")
     sap_unc, layer = sap["unc"], int(sap["layer"])
 
@@ -52,18 +53,19 @@ def main():
             "correctness": r["correctness"],
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
+            "msp_sum": msp_sum[i],
             "saplma": float(sap_at[i]) if i in sap_at else "",
         })
     cfg.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cfg.results_dir / f"{key}.csv"
-    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "saplma"])
+    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "saplma"])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
     y_test = [records[i]["correctness"] for i in test_positions]
     print(f"{cfg.dataset} {cfg.ood_setting} | test n={len(y_test)} "
           f"| mean correctness {sum(y_test) / len(y_test):.3f}")
-    for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min)]:
+    for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min), ("MSP sum ", msp_sum)]:
         unc_test = [unc[i] for i in test_positions]
         print(f"PRR  {name}        : {results.prr(y_test, unc_test):.3f}")
     print(f"PRR  SAPLMA (layer {layer}): {results.prr(y_test, sap_unc):.3f}")

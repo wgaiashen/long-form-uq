@@ -10,11 +10,18 @@ import numpy as np
 def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
     """token_logprobs: list of log p(chosen token). Returns uncertainty.
 
-    "mean": mean token probability (smooth, whole-sequence view).
-    "min" : least-confident token (closest to the original 'maximum softmax
-            probability' idea applied to the worst step).
+    "mean": 1 - mean token probability (smooth, whole-sequence view).
+    "min" : 1 - least-confident token's probability (weakest-link view).
+    "sum" : minus the sum of logprobs = -log p(sequence). This is what
+            lm-polygraph calls MaximumSequenceProbability, so use it when
+            comparing against published lm-polygraph numbers. Not length-
+            normalised, and not bounded to [0, 1] like the others (fine for
+            PRR, which only uses the ranking).
     Pick one, keep it fixed, and record which you used.
     """
-    probs = np.exp(np.asarray(token_logprobs, dtype=float))
+    lp = np.asarray(token_logprobs, dtype=float)
+    if aggregate == "sum":
+        return float(-lp.sum())
+    probs = np.exp(lp)
     conf = probs.mean() if aggregate == "mean" else probs.min()
     return float(1.0 - conf)
