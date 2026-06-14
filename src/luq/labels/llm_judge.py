@@ -1,41 +1,177 @@
 """Long-form correctness label: Joe's LLM-as-a-judge (GPT-5), run post-hoc.
 
-A thin adapter around the project's llm_as_a_judge_scoring_prompt.py. It runs on the
-LOGIN NODE (it needs internet and OPENAI_API_KEY), not on a compute node, over the
-cached Tier-1 records. The judge returns a graded 0.0-1.0 score, used as `correctness`.
+Ported faithfully from reference/llm_as_a_judge_scoring_prompt.py so our pipeline is
+self-contained and the judge stays fixed and reproducible (keep the model and prompt
+pinned, since a probe can learn one judge's biases). The judge scores the model
+output against the GOLD reference on a 0.0-1.0 scale, with the source as context.
+
+Two prompt variants, exactly as Joe's script:
+  * summarisation (xsum, cnn_dailymail): no in-context examples.
+  * QA (everything else): four in-context examples.
+
+Runs on the LOGIN NODE (needs internet + OPENAI_API_KEY) over the cached records.
+Each call costs money, so 02_label drives this resumably (skip already-scored records,
+checkpoint periodically).
 """
-import json
-from pathlib import Path
+import os
+import time
+
+from openai import OpenAI
 
 from ..data import JUDGE_NAME_MAP
 
+MODEL = "gpt-5-2025-08-07"  # pinned: keep the judge model fixed and recorded
 
-def records_to_judge_jsonl(records: list[dict], dataset: str, out_dir: Path) -> Path:
-    """Write records in the JSONL shape the judge expects, return the path.
+# Lazily created so importing this module needs no API key; only judge() does.
+_client = None
 
-    TODO:
-      - Each line needs fields: ids, input_texts, target, answer, each a SINGLE-element
-        list (the script asserts batch size 1).
-          input_texts = the prompt (it already carries the Question:/Context:/Summary:
-                        markers the judge parses)
-          answer      = record["gen_text"]
-          target      = record["target"]
-          ids         = [record["idx"]]
-      - The judge asserts the dataset name appears in the filename, so name the file
-        using JUDGE_NAME_MAP[dataset] (e.g. pubmed_qa -> pubmed).
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise RuntimeError(
+                "OPENAI_API_KEY is not set. The judge runs on the login node; "
+                "`export OPENAI_API_KEY=sk-...` in your shell first."
+            )
+        _client = OpenAI()  # reads OPENAI_API_KEY from the environment
+    return _client
+
+
+# ---- prompt templates (verbatim from Joe's script) ----------------------------
+
+def _qa_prompt(question: str, label, answer: str, caveat: str) -> str:
+    return f"""
+
+Evaluate the following answers to questions. For each question you will be given a model answer and the correct answer.
+You must rate how correct the model answer is on a scale from 0.0 to 1.0, where:
+- 1.0 means the model answer is completely correct
+- 0.0 means the model answer is completely incorrect or wrong
+- Values in between reflect answers that are partially correct but incomplete or imprecise
+
+Only respond with a number between 0.0 to 1.0. Do not write any explanation.
+
+For example:
+
+Question: who is the young guitarist who played with buddy guy?
+Ground Truth: Quinn Sullivan
+Model Answer: Ronnie Earl
+Score: 0.0
+
+Question: name of the first episode of stranger things
+Ground Truth: Chapter One: The Vanishing of Will Byers
+Model Answer: The disappearance of Will Byers
+Score: 0.0
+
+Question: What are the symptoms of diabetes?
+Ground Truth: Common symptoms include increased thirst, frequent urination, fatigue, and blurred vision.
+Model Answer: Symptoms of diabetes include increased thirst and frequent urination.
+Score: 0.6
+
+Question: What is the capital of Australia?
+Ground Truth: Canberra
+Model Answer: Canberra, which is located in the Australian Capital Territory
+Score: 1.0
+
+{question}
+Ground Truth{caveat} {label}
+Model Answer: {answer}
+Score:
+"""
+
+
+def _summary_prompt(question: str, label, answer: str) -> str:
+    return f"""
+Only respond with a number between 0.0 to 1.0. Do not write any explanation.
+
+The task below is a text summarisation task. You will see a Text, a Ground Truth Summary, and a Model Summary. Score how well the Model Summary matches the Ground Truth Summary from 0.0 to 1.0, where 1.0 means it conveys the same information, 0.0 means it is completely different or irrelevant, and scores in between reflect partial overlap in the key points covered.
+
+{question}
+Ground Truth Summary: {label}
+Model Summary: {answer}
+Score:
+"""
+
+
+# ---- per-dataset prompt trimming (verbatim from Joe's __main__) ----------------
+
+def _extract_question(prompt: str, judge_name: str):
+    """Trim the full prompt down to the question/context the judge should see, and
+    return (question, caveat). Mirrors Joe's per-dataset slicing exactly so the judge
+    sees the same text he intends."""
+    if judge_name == "sciq":
+        prompt = prompt[: prompt.rfind("Answer:")].strip("\n").strip()
+        prompt = prompt[prompt.rfind("Context"):]
+        prompt = prompt.replace("Context: \n", "")  # drop empty-context mention
+        return prompt, ":"
+    if judge_name == "triviaqa":
+        prompt = prompt[: prompt.rfind("Answer:")]
+        prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
+        return prompt, " (any of the following are correct):"
+    if judge_name == "coqa":
+        story = prompt[prompt.find("Story:"): prompt.find("Question:")].strip().strip("\n")
+        prompt = prompt[: prompt.rfind("Answer:")]
+        prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
+        return story + "\n" + prompt, ":"
+    if judge_name == "pubmed":
+        prompt = prompt[: prompt.rfind("Answer:")].strip("\n").strip()
+        prompt = prompt[prompt.rfind("Abstract:"):]
+        prompt = prompt.replace("Abstract: \n", "")  # drop empty-abstract mention
+        return prompt, ":"
+    if judge_name in ("xsum", "cnn_dailymail"):
+        prompt = prompt[: prompt.rfind("Summary")].strip("\n").strip()
+        prompt = prompt[prompt.rfind("Text:"):]
+        return prompt, None  # caveat unused for the summary template
+    raise ValueError(f"no prompt-trimming rule for judge dataset {judge_name!r}")
+
+
+# ---- the GPT call + scoring ----------------------------------------------------
+
+def _is_valid_score(text: str) -> bool:
+    try:
+        return 0.0 <= float(text.strip()) <= 1.0
+    except (ValueError, AttributeError):
+        return False
+
+
+def _gpt_response(user_prompt: str, model: str) -> str:
+    """One judge call. Retries a few times on transient API errors (rate limits,
+    network) so a long run survives the occasional hiccup."""
+    client = _get_client()
+    for attempt in range(3):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=1,
+                top_p=1,
+                logprobs=False,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            return resp.choices[0].message.content
+        except Exception:
+            if attempt == 2:
+                raise
+            time.sleep(2 * (attempt + 1))
+
+
+def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10):
+    """Score one record's gen_text against its gold target. Returns a float in
+    [0, 1], or None if the judge never returned a valid number after max_retries.
+
+    `dataset` is the ProbeDrift key (e.g. "pubmed_qa"); we map it to the judge's
+    name ("pubmed") for prompt trimming and template choice.
     """
     judge_name = JUDGE_NAME_MAP[dataset]
-    out = Path(out_dir) / f"{judge_name}_for_judge.jsonl"
-    raise NotImplementedError("write the judge JSONL — follow the TODO above")
+    question, caveat = _extract_question(record["prompt"], judge_name)
+    label, answer = record["target"], record["gen_text"]
 
+    if judge_name in ("xsum", "cnn_dailymail"):
+        user_prompt = _summary_prompt(question, label, answer)
+    else:
+        user_prompt = _qa_prompt(question, label, answer, caveat)
 
-def run_judge(jsonl_path: Path) -> list[float]:
-    """Call llm_as_a_judge_scoring_prompt.py over the JSONL and read back the scores.
-
-    TODO:
-      - Point at the project's llm_as_a_judge_scoring_prompt.py, pass the JSONL, and
-        collect the 0.0-1.0 judge_response per line. Return them in record order so
-        they line up with the cached records.
-      - Remember: login node only, OPENAI_API_KEY set, expect a per-call cost.
-    """
-    raise NotImplementedError("call the judge script — follow the TODO above")
+    for _ in range(max_retries):
+        response = _gpt_response(user_prompt, model)
+        if _is_valid_score(response):
+            return float(response.strip())
+    return None  # judge never produced a valid score; 02_label flags these
