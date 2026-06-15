@@ -11,30 +11,42 @@ uncertainty score for a whole long-form output, and to test whether a single pro
 generalises across long-form task types (factuality and faithfulness) rather than being
 tied to one.
 
-## Approach (short version)
+## Approach
 
 1. Generate long-form outputs from a frozen base model.
 2. Label each output for correctness (string match for short QA; an LLM judge for long-form).
-3. Train a probe on hidden-state features to predict correctness.
-4. Evaluate with the prediction-rejection ratio (PRR), in-distribution and out-of-distribution.
+3. Train a probe on internal features to predict correctness.
+4. Evaluate with the prediction-rejection ratio (PRR).
 
-Baselines: MSP (unsupervised) and SAPLMA (supervised), with task-specific baselines added later.
+Methods compared: MSP (unsupervised token probability), SAPLMA (hidden-state probe),
+P(True) (an appended self-verification probe), and Lookback Lens (an attention-faithfulness
+probe). A method is just a feature extractor; the rest of the pipeline is shared.
+
+## Pipeline (`scripts/`)
+
+1. `01_extract.py` - generate, then cache the records and pooled hidden-state features.
+2. `01b_ptrue.py`, `01c_lookback.py` - extra per-method features from the cached records.
+3. `02_label.py` - correctness labels.
+4. `03_probe.py` - train the probe on cached features.
+5. `04_eval.py` - PRR table.
 
 ## Repository layout
 
-- `test.py` - minimal end-to-end check (load data, generate, reach hidden states).
-- (more code is added as the project develops.)
+- `src/luq/` - the pipeline library (data, generation, features, labels, probe, eval).
+- `scripts/` - the pipeline stages above, plus `checks/` (verification scripts) and
+  `tools/` (helpers, e.g. a parallel labeller).
+- `slurm/` - batch scripts for the GPU cluster.
 
-Training and evaluation data are loaded through the ProbeDrift library, which is kept outside
-this repository. Model weights, caches, and generated outputs are not tracked in Git.
+Training and evaluation data are loaded through the ProbeDrift library, kept outside this
+repository. Model weights, caches, and generated outputs are not tracked in Git.
 
 ## Setup
 
-Requires Python 3.11 and a GPU. Uses the conda env `luq`. Main dependencies: PyTorch,
-transformers, lm-polygraph, the uhead repository (`luh`), ProbeDrift, and scikit-learn. The PRR
-scorer `robust-uq-eval` is not installed yet. See the project notes for the full environment
-setup on the Imperial Computing GPU cluster.
+Python 3.11 and a GPU, conda env `luq`. Main dependencies: PyTorch, transformers,
+lm-polygraph, the uhead library (`luh`), ProbeDrift, scikit-learn, and the OpenAI client
+(for the long-form judge).
 
 ## Status
 
-Early stage. Current milestone: a SAPLMA baseline running end-to-end on a short-form dataset.
+The four methods run end-to-end on short QA (SciQ), long QA (PubMedQA), and summarisation
+(XSum, CNN/DailyMail), in-distribution. Cross-task generalisation is the next step.
