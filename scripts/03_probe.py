@@ -41,7 +41,9 @@ def main():
     split = np.array([r["split"] for r in records])
     train_mask, test_mask = split == "train", split == "test"
 
-    if len(np.unique(y[train_mask] >= 0.5)) < 2:
+    # The probe trains on the graded label directly (no 0.5 threshold), so the only
+    # degenerate case is a train split with no variation to learn from.
+    if np.ptp(y[train_mask]) < 1e-6:
         sys.exit("all train labels are identical — the probe has nothing to learn "
                  "(tiny --limit run, or a labelling bug)")
 
@@ -49,11 +51,17 @@ def main():
     clf = probe.train_probe(X[train_mask], y[train_mask])
     unc = probe.uncertainty(clf, X[test_mask])
 
-    # Quick diagnostic: plain accuracy of the probe's correct/incorrect decision.
-    # A big train/test gap means the probe memorised rather than learned.
-    train_acc = clf.score(X[train_mask], (y[train_mask] >= 0.5).astype(int))
-    test_acc = clf.score(X[test_mask], (y[test_mask] >= 0.5).astype(int))
-    print(f"layer {layer}: probe accuracy train {train_acc:.3f} | test {test_acc:.3f}")
+    # Quick diagnostic: correlation between predicted P(correct) and the soft label.
+    # A big train/test gap means the probe memorised rather than learned. (PRR in
+    # stage 04 is the real score; this is just an at-a-glance fit/overfit check.)
+    def _corr(p, t):
+        if np.std(p) < 1e-9 or np.std(t) < 1e-9:
+            return float("nan")  # no variation -> correlation undefined
+        return float(np.corrcoef(p, t)[0, 1])
+    corr_tr = _corr(clf.p_correct(X[train_mask]), y[train_mask])
+    corr_te = _corr(clf.p_correct(X[test_mask]), y[test_mask])
+    print(f"layer {layer}: P(correct) vs soft-label corr "
+          f"train {corr_tr:.3f} | test {corr_te:.3f}")
 
     path = cache.save_scores(unc, cfg.cache_dir, key, method=args.method, layer=layer)
     print(f"saved {len(unc)} test uncertainties -> {path}")
