@@ -3,9 +3,10 @@ __pycache__/
 *.pyc
 
 # Heavy, regenerable artifacts (never in Git)
+# (cache features live in cache/ and are *.npz, so no broad "features/" pattern --
+#  that would also ignore the src/luq/features/ source code.)
 hf_cache/
 saved_outputs/
-features/
 cache/
 results/
 logs/
