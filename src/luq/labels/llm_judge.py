@@ -14,6 +14,7 @@ Each call costs money, so 02_label drives this resumably (skip already-scored re
 checkpoint periodically).
 """
 import os
+import re
 import time
 
 from openai import OpenAI
@@ -134,6 +135,25 @@ def _is_valid_score(text: str) -> bool:
         return False
 
 
+_SCORE_RE = re.compile(r"\d*\.?\d+")
+
+
+def parse_score(text):
+    """Lenient score parse: return the first number in [0, 1], else None. Open-source
+    instruct judges sometimes add a word despite 'only respond with a number', so the
+    local judge uses this; the GPT-5 path keeps the strict _is_valid_score."""
+    if text is None:
+        return None
+    for tok in _SCORE_RE.findall(text):
+        try:
+            v = float(tok)
+        except ValueError:
+            continue
+        if 0.0 <= v <= 1.0:
+            return v
+    return None
+
+
 def _gpt_response(user_prompt: str, model: str) -> str:
     """One judge call. Retries a few times on transient API errors (rate limits,
     network) so a long run survives the occasional hiccup."""
@@ -154,22 +174,28 @@ def _gpt_response(user_prompt: str, model: str) -> str:
             time.sleep(2 * (attempt + 1))
 
 
-def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10):
-    """Score one record's gen_text against its gold target. Returns a float in
-    [0, 1], or None if the judge never returned a valid number after max_retries.
-
-    `dataset` is the ProbeDrift key (e.g. "pubmed_qa"); we map it to the judge's
-    name ("pubmed") for prompt trimming and template choice.
+def build_prompt(record: dict, dataset: str) -> str:
+    """Assemble the exact judge user-prompt for one record. Backend-agnostic: the
+    GPT-5 judge and any cheaper / open-source judge both call this, so the ONLY thing
+    that varies across judges is the model, never the prompt (the fairness rule for
+    the judge-agreement check). `dataset` is the ProbeDrift key (e.g. "pubmed_qa"); we
+    map it to the judge name ("pubmed") for prompt trimming and template choice.
     """
     judge_name = JUDGE_NAME_MAP[dataset]
     question, caveat = _extract_question(record["prompt"], judge_name)
     label, answer = record["target"], record["gen_text"]
-
     if judge_name in ("xsum", "cnn_dailymail"):
-        user_prompt = _summary_prompt(question, label, answer)
-    else:
-        user_prompt = _qa_prompt(question, label, answer, caveat)
+        return _summary_prompt(question, label, answer)
+    return _qa_prompt(question, label, answer, caveat)
 
+
+def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10):
+    """Score one record's gen_text against its gold target with the OpenAI judge.
+    Returns a float in [0, 1], or None if it never returned a valid number after
+    max_retries. `model` defaults to the pinned GPT-5; pass a cheaper sibling
+    (e.g. "gpt-5-mini") to validate it against GPT-5 in scripts/checks.
+    """
+    user_prompt = build_prompt(record, dataset)
     for _ in range(max_retries):
         response = _gpt_response(user_prompt, model)
         if _is_valid_score(response):

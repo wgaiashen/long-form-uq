@@ -17,11 +17,25 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
             comparing against published lm-polygraph numbers. Not length-
             normalised, and not bounded to [0, 1] like the others (fine for
             PRR, which only uses the ranking).
+    "nll" : mean per-token negative log-likelihood = (1/L) * sum(-log p),
+            the LENGTH-NORMALISED counterpart to "sum" (= "sum" / L). This is
+            the unsupervised baseline Joe wants: "sum" is length-confounded
+            (it grows with the number of tokens), and dividing by length
+            removes that. Joe refers to this as the "entropy" baseline
+            (lm-polygraph's loose naming); precisely it is the chosen-token
+            perplexity in log form (perplexity = exp of this), NOT
+            lm-polygraph's full-distribution token entropy, which would need
+            the per-step softmax the Tier-1 cache does not store. Under PRR
+            only the ordering matters, so the exp-vs-log form and the absolute
+            scale are irrelevant. Higher = more uncertain; like "sum", not
+            bounded to [0, 1].
     Pick one, keep it fixed, and record which you used.
     """
     lp = np.asarray(token_logprobs, dtype=float)
     if aggregate == "sum":
         return float(-lp.sum())
+    if aggregate == "nll":
+        return float(-lp.mean())
     probs = np.exp(lp)
     conf = probs.mean() if aggregate == "mean" else probs.min()
     return float(1.0 - conf)

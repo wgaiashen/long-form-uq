@@ -42,11 +42,44 @@ repository. Model weights, caches, and generated outputs are not tracked in Git.
 
 ## Setup
 
-Python 3.11 and a GPU, conda env `luq`. Main dependencies: PyTorch, transformers,
-lm-polygraph, the uhead library (`luh`), ProbeDrift, scikit-learn, and the OpenAI client
-(for the long-form judge).
+Python 3.11, conda env `luq`. Heavy/GPU steps run on a real compute node via Slurm (not the
+cloud VM, which is an 8 GB CPU jump box):
+
+```bash
+conda activate luq
+export HF_HOME=/vol/gpudata/gs925-msc_project/hf_cache    # NOT ~/.cache (home is over quota)
+export OPENAI_API_KEY=...                                 # only for the long-form judge (02_label)
+salloc --partition=a30 --gres=gpu:1 --cpus-per-task=4 --mem=64G --time=01:00:00   # for GPU stages
+```
+
+Main dependencies: PyTorch, transformers, lm-polygraph, the uhead library (`luh`), ProbeDrift,
+scikit-learn, and the OpenAI client (for the long-form judge).
+
+## Reproduce the results tables
+
+From the cached features and labels (no GPU), regenerate every supervised score and PRR table:
+
+```bash
+python scripts/reproduce.py                 # all ID datasets, all methods
+python scripts/reproduce.py --dataset xsum  # one dataset
+```
+
+The printed PRRs match the tables in `../worklog.md`. Each method uses its default middle layer
+(SAPLMA/P(True) → 14, Lookback → 0).
+
+## Tests and verification
+
+```bash
+pytest    # CPU unit tests: the MSP and PRR maths, msp_nll == lm-polygraph Perplexity, score parsing
+```
+
+Method-fidelity checks against the original authors' code load the model, so they are GPU scripts
+run by hand: `check_lookback_vs_authors.py` (lookback vs `lookback-src/`, Chuang et al., to ~1e-6),
+`check_ptrue_verdict.py`, `check_msp_sign.py`, `check_determinism.py`, and `judge_agreement.py`
+(a cheap/open judge vs the GPT-5 labels).
 
 ## Status
 
-The four methods run end-to-end on short QA (SciQ), long QA (PubMedQA), and summarisation
-(XSum, CNN/DailyMail), in-distribution. Cross-task generalisation is the next step.
+The four methods run end-to-end on short QA (SciQ), long QA (PubMedQA), and summarisation (XSum),
+in-distribution. (CNN/DailyMail was dropped — only partially labelled.) Cross-task generalisation
+is the next step.

@@ -34,6 +34,10 @@ def main():
     msp_mean = [msp.msp_uncertainty(r["token_logprobs"], "mean") for r in records]
     msp_min = [msp.msp_uncertainty(r["token_logprobs"], "min") for r in records]
     msp_sum = [msp.msp_uncertainty(r["token_logprobs"], "sum") for r in records]
+    # Length-normalised MSP (mean per-token negative log-likelihood). Free from
+    # the same cached logprobs; the unsupervised baseline Joe asked for. See
+    # msp.py for why this is "sum"/L, not full-distribution entropy.
+    msp_nll = [msp.msp_uncertainty(r["token_logprobs"], "nll") for r in records]
 
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
 
@@ -63,6 +67,7 @@ def main():
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
             "msp_sum": msp_sum[i],
+            "msp_nll": msp_nll[i],
         }
         # Each supervised method is blank on train rows (the probe never scores its
         # own training data).
@@ -71,14 +76,15 @@ def main():
         rows.append(row)
     cfg.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cfg.results_dir / f"{key}.csv"
-    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", *sup.keys()])
+    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "msp_nll", *sup.keys()])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
     y_test = [records[i]["correctness"] for i in test_positions]
     print(f"{cfg.dataset} {cfg.ood_setting} | test n={len(y_test)} "
           f"| mean correctness {sum(y_test) / len(y_test):.3f}")
-    for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min), ("MSP sum ", msp_sum)]:
+    for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min),
+                      ("MSP sum ", msp_sum), ("MSP nll ", msp_nll)]:
         unc_test = [unc[i] for i in test_positions]
         print(f"PRR  {name}        : {results.prr(y_test, unc_test):.3f}")
     for m in sup:
