@@ -11,12 +11,13 @@ from luq import msp, results
 from luq.labels.llm_judge import parse_score
 
 
-def test_msp_nll_is_mean_negative_log_likelihood():
-    # msp_nll == -mean(logprob), which is exactly lm-polygraph's Perplexity estimator
-    # (`-np.mean(ll)`). Confirmed equal to the installed source by inspection; pinned here
-    # so the equivalence can't drift.
+def test_perplexity_is_mean_negative_log_likelihood():
+    # The "perplexity" aggregate == -mean(logprob), which is exactly lm-polygraph's Perplexity
+    # estimator (`-np.mean(ll)`; uhead inherits it; Joe's "Perplexity" baseline). Confirmed equal
+    # to the installed source by inspection; pinned here so the equivalence can't drift. (Name
+    # follows lm-polygraph: it returns mean NLL, not exp(mean NLL) — PRR ranking is identical.)
     lp = [-0.1, -2.0, -0.5, -1.2]
-    assert np.isclose(msp.msp_uncertainty(lp, "nll"), -np.mean(lp))
+    assert np.isclose(msp.msp_uncertainty(lp, "perplexity"), -np.mean(lp))
 
 
 def test_msp_aggregates():
@@ -25,7 +26,7 @@ def test_msp_aggregates():
     assert np.isclose(msp.msp_uncertainty(lp, "mean"), 1 - p.mean())
     assert np.isclose(msp.msp_uncertainty(lp, "min"), 1 - p.min())
     assert np.isclose(msp.msp_uncertainty(lp, "sum"), -np.sum(lp))
-    assert np.isclose(msp.msp_uncertainty(lp, "nll"), -np.mean(lp))
+    assert np.isclose(msp.msp_uncertainty(lp, "perplexity"), -np.mean(lp))
 
 
 def test_prr_oracle_is_one_and_anti_oracle_is_negative():

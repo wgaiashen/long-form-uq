@@ -28,6 +28,9 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--n", type=int, default=20)
+    ap.add_argument("--wording", default=PTRUE_SUFFIX,
+                    help="verdict suffix to validate (default: the current PTRUE_SUFFIX). Use this "
+                         "to check the yes/no mass of a candidate wording before re-extracting.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
@@ -35,7 +38,8 @@ def main():
     records = [r for r in cache.load_records(cfg.cache_dir, key) if r["split"] == "test"][:args.n]
 
     model, tok = generate.load_model(cfg.model_name)
-    suffix_ids = tok(PTRUE_SUFFIX, add_special_tokens=False).input_ids
+    print(f"wording: {args.wording!r}", flush=True)
+    suffix_ids = tok(args.wording, add_special_tokens=False).input_ids
 
     # Collect single-token ids for several yes/no surface forms (with and without a leading space).
     yesno_ids = set()

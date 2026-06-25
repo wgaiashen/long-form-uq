@@ -9,8 +9,6 @@ import argparse
 import sys
 from pathlib import Path
 
-import numpy as np
-
 # Make `src/` importable when running this file directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -36,15 +34,25 @@ def main():
     # model just imitates the prompt format. Long-form output keeps its newlines.
     truncate = cfg.dataset in data.SHORT_FORM
 
-    # One records list and one features list for BOTH splits, each example tagged
-    # with its split. Keeping them in a single file means Tier 1 and Tier 2 stay
-    # index-aligned by construction; 03_probe.py separates train/test by the tag.
-    records = []
-    pooled_list = []
+    # Resume: at 7-9B a job can hit the Slurm time limit before finishing, so we
+    # reload whatever a previous run already cached and skip those examples instead
+    # of regenerating them. `pooled_list` holds one (n_layers, hidden) array per
+    # example, in the SAME order as `records`, so Tier 1 and Tier 2 stay aligned;
+    # 03_probe.py separates train/test by each record's split tag.
+    records, pooled_list = cache.load_checkpoint(cfg.cache_dir, key)
+    done = {(r["split"], r["idx"]) for r in records}
+    if done:
+        print(f"resuming: {len(done)} examples already cached", flush=True)
+
+    # Checkpoint every CKPT_EVERY new examples. A kill loses at most this many.
+    CKPT_EVERY = 200
+    n_new = 0
     for split, ds in [("train", train_ds), ("test", eval_ds)]:
         for idx, (xb, yb, mnt) in enumerate(ds):
             if args.limit is not None and idx >= args.limit:
                 break
+            if (split, idx) in done:
+                continue  # already cached by a previous run
             prompt, target = xb[0], yb[0]  # batch_size=1: unwrap the lists
             budget = min(int(mnt[0]), cfg.max_new_tokens_cap)
 
@@ -52,20 +60,21 @@ def main():
                                                truncate_at_newline=truncate)
             record |= {"idx": idx, "split": split, "target": target}
             records.append(record)
-            pooled_list.append(pooled)
+            pooled_list.append(pooled.numpy())  # float32 array, (n_layers, hidden)
+            n_new += 1
 
-            if idx % 10 == 0:
+            if n_new % CKPT_EVERY == 0:
+                cache.save_checkpoint(records, pooled_list, cfg.cache_dir, key)
+                print(f"[{split}] {idx} done (checkpointed {len(records)})", flush=True)
+            elif idx % 10 == 0:
                 # flush=True: Slurm buffers stdout, so unflushed prints make a
                 # healthy job look hung.
                 print(f"[{split}] {idx} done", flush=True)
 
-    # (n_examples, n_layers, hidden) — the Tier-2 array, all layers kept.
-    pooled_array = np.stack([p.numpy() for p in pooled_list])
-
-    records_path = cache.save_records(records, cfg.cache_dir, key)
-    features_path = cache.save_features(pooled_array, cfg.cache_dir, key, method="saplma")
-    print(f"saved {len(records)} records  -> {records_path}")
-    print(f"saved features {pooled_array.shape} -> {features_path}")
+    records_path, features_path = cache.save_checkpoint(
+        records, pooled_list, cfg.cache_dir, key)
+    print(f"saved {len(records)} records  ({n_new} new this run) -> {records_path}")
+    print(f"saved features ({len(pooled_list)}, ...) -> {features_path}")
 
 
 if __name__ == "__main__":

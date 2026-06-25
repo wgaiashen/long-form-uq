@@ -16,17 +16,31 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def load_model(name: str, attn_implementation: str | None = None,
-               dtype: torch.dtype = torch.float16):
+               dtype: torch.dtype | None = None):
     """Load a frozen causal LM on the GPU. We never train the base model.
 
     attn_implementation: pass "eager" when you need attention weights
     (output_attentions=True). The default fast backend (SDPA) does not return them,
     so Lookback Lens must load with "eager"; SAPLMA and P(True) leave this as None.
 
-    dtype: fp16 by default (fast, half the memory). Use fp32 for attention extraction:
-    eager attention in fp16 overflows to NaN in the softmax, so the attention-based
-    Lookback feature needs fp32. Hidden-state features (SAPLMA, P(True)) are fine in fp16.
+    dtype: None = auto-select per model. Gemma-2 MUST run in bfloat16: it applies
+    soft-capping to its logits and attention scores, and in fp16 those overflow to
+    NaN. Every other model defaults to fp16 (fast, half the memory), which keeps our
+    existing Qwen runs bit-identical. Pass an explicit dtype to override -- e.g. the
+    Lookback feature forces fp32, because eager attention in fp16 overflows to NaN in
+    the softmax. Hidden-state features (SAPLMA, P(True)) are fine at the default.
+
+    Gemma-2 also defaults to the EAGER attention backend here. Gemma-2 soft-caps its
+    attention logits, and only the eager path applies that cap -- SDPA (the usual HF
+    default) silently skips it. Since we probe the hidden states, and those are
+    computed FROM the attention, SDPA would give subtly wrong internal features. So
+    for Gemma we force eager unless the caller asks for something specific.
     """
+    is_gemma = "gemma" in name.lower()
+    if dtype is None:
+        dtype = torch.bfloat16 if is_gemma else torch.float16
+    if attn_implementation is None and is_gemma:
+        attn_implementation = "eager"
     tok = AutoTokenizer.from_pretrained(name)
     kwargs = dict(dtype=dtype, device_map="cuda")
     if attn_implementation is not None:

@@ -11,8 +11,9 @@ from-scratch flow.
     python scripts/reproduce.py                  # all ID datasets, all methods
     python scripts/reproduce.py --dataset xsum   # just one
 
-Each method uses 03_probe's default middle layer (saplma/ptrue -> 14, lookback -> 0),
-which is exactly the layer the worklog reports, so the printed PRRs should match it.
+Each method uses 03_probe's default middle layer (saplma/linear/ptrue -> middle, lookback
+-> 0), which is exactly the layer the worklog reports, so the printed PRRs should match it.
+saplma is the A&M 4-layer MLP; linear is the linear-probe baseline on the same hidden states.
 """
 import argparse
 import subprocess
@@ -21,7 +22,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 DATASETS = ["sciq", "pubmed_qa", "xsum"]
-METHODS = ["saplma", "ptrue", "lookback"]
+METHODS = ["saplma", "linear", "ptrue", "lookback"]
 
 
 def run(rel_cmd):

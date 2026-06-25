@@ -15,25 +15,72 @@ from luq.config import Config  # noqa: E402
 from luq.features import saplma  # noqa: E402
 
 
+# Each reported supervised method is a (cached feature set, probe architecture, hparams) triple.
+# hparams are passed straight into the train fn, so each method carries its own recipe.
+#
+# BASELINES (anchored to their papers, NOT tuned by us — a faithful baseline that overfits is
+# still reported as-is):
+#   saplma   = mean-pooled hidden states + the 4-layer 256/128/64 MLP. Faithful Azaria & Mitchell
+#              (train_probe_mlp's defaults ARE the A&M recipe: 5 epochs, batch 32, no wd, raw),
+#              so hparams = {} (use those defaults).
+#   lookback = lookback-ratio features + logistic regression, RAW features (standardize=False),
+#              default-strength L2 — Chuang et al.'s probe. Not tuned.
+#
+# OUR OWN methods (standardised features, single linear logit = logistic regression):
+#   linear         = the SAME mean-pooled hidden states as SAPLMA — architecture ablation vs the MLP.
+#   ptrue          = P(True) verdict-position state, OLD "Is the above answer true?" wording.
+#   ptrue_accurate = same probe, NEW task-agnostic "Is the above response accurate?" wording.
+# ptrue and ptrue_accurate are kept as SEPARATE methods on purpose so the old vs new wording can be
+# compared head-to-head per dataset (each reads its own cached feature set: 'ptrue' vs 'ptrue_accurate').
+# We tried to validation-tune the linear/ptrue probes (scripts/checks/tune_probe.py, 5-fold CV) but in
+# this p>>n regime (3584 dims, 1800 examples) the CV PRR does NOT transfer to test — every "tuned"
+# config just trades sciq for pubmed and none beats the standard default. So we keep the standard
+# regularized logistic-regression default (hparams={}) and report the train/test gap honestly. (PCA-
+# before-probe is the principled p>>n lever if a real improvement is wanted later — Joe's "Linear+PCA".)
+# Score files are named by the reported method, so 04_eval prints them directly.
+METHOD_SPEC = {
+    "saplma":         ("saplma",         "mlp",    {}),                     # faithful A&M (5 ep / batch 32 / no wd / raw)
+    "linear":         ("saplma",         "linear", {}),                     # standard logistic regression
+    "ptrue":          ("ptrue",          "linear", {}),                     # P(True), OLD "is this true?" wording
+    "ptrue_accurate": ("ptrue_accurate", "linear", {}),                     # P(True), NEW "is this accurate?" wording
+    "lookback":       ("lookback",       "linear", {"standardize": False}), # faithful Chuang (raw features, default L2)
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
-    ap.add_argument("--method", default="saplma",
-                    help="which cached feature set to probe: saplma | ptrue")
+    ap.add_argument("--method", default="saplma", choices=list(METHOD_SPEC),
+                    help="supervised method: saplma (A&M MLP) | linear (linear probe on the "
+                         "same hidden states) | ptrue | lookback")
     ap.add_argument("--layer", type=int, default=None,
                     help="hidden layer index to probe (default: the middle layer)")
     args = ap.parse_args()
 
+    feature_method, arch, hparams = METHOD_SPEC[args.method]
+
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
-    feats = cache.load_features(cfg.cache_dir, key, method=args.method)  # (n, n_layers, hidden)
+    # saplma and linear share the same cached hidden-state features (feature_method).
+    feats = cache.load_features(cfg.cache_dir, key, method=feature_method)  # (n, n_layers, hidden)
     records = cache.load_records(cfg.cache_dir, key)
     assert len(records) == len(feats), "records and features are out of step — rerun 01"
 
     # Default to the middle layer: usually more informative than the last one.
-    layer = args.layer if args.layer is not None else feats.shape[1] // 2
+    n_layers = feats.shape[1]
+    layer = args.layer if args.layer is not None else n_layers // 2
+
+    # FAIL LOUDLY on a configuration this feature set cannot produce, instead of letting
+    # select_layer raise a raw IndexError mid-loop and a stale score linger downstream.
+    # (This is the lookback `--layer 21` footgun: lookback is a single combined layer.)
+    if not 0 <= layer < n_layers:
+        sys.exit(f"ERROR: --layer {layer} is out of range for method '{args.method}' "
+                 f"(features '{feature_method}' have {n_layers} layer(s): 0..{n_layers - 1}). "
+                 f"{'lookback is a single combined layer -> use --layer 0. ' if n_layers == 1 else ''}"
+                 f"Nothing was written; the previous score for this method is left untouched "
+                 f"and must NOT be treated as this configuration's result.")
 
     # Records and features share index order, so boolean masks built from the
     # records' "split" tags select the matching feature rows.
@@ -48,7 +95,11 @@ def main():
                  "(tiny --limit run, or a labelling bug)")
 
     X = saplma.select_layer(feats, layer)  # (n, hidden)
-    clf = probe.train_probe(X[train_mask], y[train_mask])
+    # Same soft-label objective either way; the method's spec fixes architecture + hparams.
+    if arch == "mlp":
+        clf = probe.train_probe_mlp(X[train_mask], y[train_mask], **hparams)
+    else:
+        clf = probe.train_probe(X[train_mask], y[train_mask], **hparams)
     unc = probe.uncertainty(clf, X[test_mask])
 
     # Quick diagnostic: correlation between predicted P(correct) and the soft label.
@@ -60,11 +111,31 @@ def main():
         return float(np.corrcoef(p, t)[0, 1])
     corr_tr = _corr(clf.p_correct(X[train_mask]), y[train_mask])
     corr_te = _corr(clf.p_correct(X[test_mask]), y[test_mask])
-    print(f"layer {layer}: P(correct) vs soft-label corr "
+    print(f"{args.method} layer {layer} [{arch}]: P(correct) vs soft-label corr "
           f"train {corr_tr:.3f} | test {corr_te:.3f}")
 
-    path = cache.save_scores(unc, cfg.cache_dir, key, method=args.method, layer=layer)
+    # Scores are named by the reported method (saplma | linear | ptrue | lookback), so
+    # 04_eval lists them directly and saplma vs linear sit side by side.
+    # Provenance stamp: record WHICH feature file (and its mtime) produced these scores, so
+    # 04_eval can refuse a score whose features have since been regenerated (stale) instead of
+    # serving it silently.
+    # Stamp BOTH provenance signals: the feature file (to catch re-extraction) AND the records
+    # file (to catch a RELABEL — the probe was trained against this label, so if correctness
+    # changes later the probe is stale even though its features didn't move).
+    feat_file = cache.features_path(cfg.cache_dir, key, feature_method)
+    rec_file = cache.records_path(cfg.cache_dir, key)
+    path = cache.save_scores(unc, cfg.cache_dir, key, method=args.method, layer=layer,
+                             feat_method=feature_method, feat_mtime=feat_file.stat().st_mtime,
+                             rec_mtime=rec_file.stat().st_mtime)
     print(f"saved {len(unc)} test uncertainties -> {path}")
+
+    # Persist the trained probe (with provenance) so it can be re-applied to another
+    # dataset's features without retraining — this is what the OOD cross-task matrix needs.
+    clf.meta = {"method": args.method, "feature_method": feature_method, "arch": arch,
+                "dataset": cfg.dataset, "ood": cfg.ood_setting, "layer": layer,
+                "hparams": hparams, "seed": 1}
+    ppath = cache.save_probe(clf, cfg.cache_dir, key, method=args.method, layer=layer)
+    print(f"saved trained probe -> {ppath}")
 
 
 if __name__ == "__main__":

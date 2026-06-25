@@ -34,18 +34,20 @@ def main():
     msp_mean = [msp.msp_uncertainty(r["token_logprobs"], "mean") for r in records]
     msp_min = [msp.msp_uncertainty(r["token_logprobs"], "min") for r in records]
     msp_sum = [msp.msp_uncertainty(r["token_logprobs"], "sum") for r in records]
-    # Length-normalised MSP (mean per-token negative log-likelihood). Free from
-    # the same cached logprobs; the unsupervised baseline Joe asked for. See
-    # msp.py for why this is "sum"/L, not full-distribution entropy.
-    msp_nll = [msp.msp_uncertainty(r["token_logprobs"], "nll") for r in records]
+    # Perplexity = length-normalised MSP (mean per-token negative log-likelihood). Free from
+    # the same cached logprobs; this is lm-polygraph's `Perplexity` estimator and Joe's
+    # "Perplexity" baseline (see msp.py for the mean-NLL-vs-exp naming note).
+    perplexity = [msp.msp_uncertainty(r["token_logprobs"], "perplexity") for r in records]
 
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
 
     # Supervised methods (03_probe) write one uncertainty per TEST example, in
     # test-record order. Load whichever have been run and skip the rest, so this
     # eval works after SAPLMA alone or after both SAPLMA and P(True).
+    # saplma = the A&M MLP; linear = the linear-probe baseline on the same hidden states.
+    # Each is loaded only if 03_probe has produced it, so the table grows as methods run.
     sup = {}  # method -> {"unc": array, "layer": int, "at": {record_pos: unc}}
-    for m in ["saplma", "ptrue", "lookback"]:
+    for m in ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback", "uhead"]:
         try:
             s = cache.load_scores(cfg.cache_dir, key, method=m)
         except FileNotFoundError:
@@ -53,6 +55,33 @@ def main():
         unc, layer = s["unc"], int(s["layer"])
         assert len(unc) == len(test_positions), \
             f"{m} scores out of step — rerun 03 --method {m}"
+
+        # Freshness/provenance guard: refuse to serve a score whose inputs changed since it was
+        # written. 03_probe stamps (a) the feature file + mtime — catches re-extraction; and
+        # (b) the records file mtime — catches a RELABEL (correctness changed but features didn't,
+        # which the feature check alone would miss; e.g. sciq string-match -> judge).
+        if "feat_method" in s and "feat_mtime" in s:
+            fp = cache.features_path(cfg.cache_dir, key, str(s["feat_method"]))
+            if not fp.exists():
+                sys.exit(f"ERROR: {m} scores reference missing features {fp.name}; "
+                         f"rerun: scripts/03_probe.py --method {m}")
+            if abs(fp.stat().st_mtime - float(s["feat_mtime"])) > 1e-6:
+                sys.exit(f"ERROR: STALE {m} scores — its features ({fp.name}) were regenerated "
+                         f"after the scores were written. Rerun: scripts/03_probe.py --method {m}")
+        else:
+            print(f"WARNING: {m} scores have no feature provenance stamp (written before this guard "
+                  f"existed); cannot verify freshness — rerun scripts/03_probe.py --method {m}.")
+
+        if "rec_mtime" in s:
+            rp = cache.records_path(cfg.cache_dir, key)
+            if abs(rp.stat().st_mtime - float(s["rec_mtime"])) > 1e-6:
+                sys.exit(f"ERROR: STALE {m} scores — the records/labels ({rp.name}) were rewritten "
+                         f"(e.g. relabelled) after the probe was trained, so the probe is fit to the "
+                         f"OLD label. Rerun: scripts/03_probe.py --method {m}")
+        else:
+            print(f"WARNING: {m} scores have no label-provenance stamp; a relabel since training "
+                  f"would go undetected — rerun scripts/03_probe.py --method {m} to stamp it.")
+
         sup[m] = {"unc": unc, "layer": layer, "at": dict(zip(test_positions, unc))}
 
     # One CSV row per example; both methods as columns (SAPLMA blank on train
@@ -67,7 +96,7 @@ def main():
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
             "msp_sum": msp_sum[i],
-            "msp_nll": msp_nll[i],
+            "perplexity": perplexity[i],
         }
         # Each supervised method is blank on train rows (the probe never scores its
         # own training data).
@@ -76,15 +105,15 @@ def main():
         rows.append(row)
     cfg.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cfg.results_dir / f"{key}.csv"
-    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "msp_nll", *sup.keys()])
+    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "perplexity", *sup.keys()])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
     y_test = [records[i]["correctness"] for i in test_positions]
     print(f"{cfg.dataset} {cfg.ood_setting} | test n={len(y_test)} "
           f"| mean correctness {sum(y_test) / len(y_test):.3f}")
-    for name, unc in [("MSP mean", msp_mean), ("MSP min ", msp_min),
-                      ("MSP sum ", msp_sum), ("MSP nll ", msp_nll)]:
+    for name, unc in [("MSP mean ", msp_mean), ("MSP min  ", msp_min),
+                      ("MSP sum  ", msp_sum), ("Perplexity", perplexity)]:
         unc_test = [unc[i] for i in test_positions]
         print(f"PRR  {name}        : {results.prr(y_test, unc_test):.3f}")
     for m in sup:

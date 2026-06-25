@@ -6,9 +6,12 @@ position. So run 01_extract FIRST, then this over the same run.
 
     python scripts/01b_ptrue.py --dataset sciq --ood ID
 
-The output is a Tier-2 feature file keyed by method="ptrue", index-aligned with the
-records (same order), so 03_probe.py --method ptrue and 04_eval.py treat it exactly
-like SAPLMA.
+The output is a Tier-2 feature file keyed by method=`--name` (default "ptrue"), index-aligned
+with the records (same order), so 03_probe.py and 04_eval.py treat it exactly like SAPLMA.
+
+The verdict wording (`--wording`) and the cache feature-set name (`--name`) are flags so a new
+wording can be extracted WITHOUT overwriting the old one — e.g. extract the unified wording under
+`--name ptrue_accurate` while the old "true"-wording `ptrue` features stay on disk for comparison.
 """
 import argparse
 import sys
@@ -29,6 +32,11 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
+    ap.add_argument("--wording", default=ptrue.PTRUE_SUFFIX,
+                    help="P(True) verification suffix (recorded hyperparameter)")
+    ap.add_argument("--name", default="ptrue",
+                    help="cache feature-set name (use a distinct name like 'ptrue_accurate' to "
+                         "keep an existing 'ptrue' feature set instead of overwriting it)")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
@@ -43,14 +51,15 @@ def main():
     # Process EVERY record, in order, so the feature rows stay aligned with the
     # records (03_probe asserts the two are the same length). A quick dev run is
     # controlled upstream by 01_extract --limit, which makes this records file small.
+    print(f"wording: {args.wording!r} -> cache name {args.name!r}", flush=True)
     vectors = []
     for i, r in enumerate(records):
-        vectors.append(ptrue.ptrue_vector(model, tok, r, layers))
+        vectors.append(ptrue.ptrue_vector(model, tok, r, layers, suffix=args.wording))
         if i % 10 == 0:
             print(f"{i}/{len(records)} done", flush=True)
 
     feats = np.stack(vectors)  # (n_examples, n_layers, hidden)
-    path = cache.save_features(feats, cfg.cache_dir, key, method="ptrue")
+    path = cache.save_features(feats, cfg.cache_dir, key, method=args.name)
     print(f"saved features {feats.shape} -> {path}")
 
 
