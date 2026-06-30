@@ -5,6 +5,7 @@ hidden state at the final position -- the state about to emit the verdict. The p
 hidden state instead of the stated word: a probe-level P(True).
 """
 import numpy as np
+import torch
 
 from .. import generate
 
@@ -36,3 +37,48 @@ def ptrue_vector(model, tok, record: dict, layers=None, suffix: str = PTRUE_SUFF
     full_ids = record["prompt_token_ids"] + record["gen_token_ids"] + suffix_ids
     states = generate.recompute_states(model, tok, full_ids, layers)
     return np.stack([s[-1].numpy() for s in states])  # (n_layers, hidden)
+
+
+def yes_no_token_ids(tok):
+    """Single-token ids for the "yes" and "no" surface forms, returned as (yes_ids, no_ids).
+
+    A verdict at the appended position is one token, so we only keep surface forms that tokenise
+    to a single id. Leading-space variants are included because after the "Answer:" cue the model
+    usually emits the word with a leading space (one BPE token). Casing variants cover Yes/yes/YES.
+    """
+    def single_ids(forms):
+        out = set()
+        for s in forms:
+            ids = tok(s, add_special_tokens=False).input_ids
+            if len(ids) == 1:
+                out.add(ids[0])
+        return sorted(out)
+
+    yes = single_ids([" yes", " Yes", " YES", "yes", "Yes", "YES"])
+    no = single_ids([" no", " No", " NO", "no", "No", "NO"])
+    return yes, no
+
+
+def ptrue_unsup_confidence(model, tok, record, suffix=PTRUE_SUFFIX, yes_ids=None, no_ids=None):
+    """Unsupervised P(True): the model's OWN P(yes) / (P(yes) + P(no)) at the verdict position.
+
+    This reads the next-token distribution the model emits, not a trained probe. Append the
+    verification question, run one forward pass, take the next-token logits at the last position,
+    and renormalise over the yes and no token ids. Returns (confidence, p_yes, p_no), where
+    confidence in [0, 1] is the model's stated probability that the response is accurate.
+    p_yes + p_no is the share of next-token mass on a yes/no verdict (a sanity signal: if it is
+    tiny, the model is not answering yes/no and the confidence is unreliable).
+    """
+    if yes_ids is None or no_ids is None:
+        yes_ids, no_ids = yes_no_token_ids(tok)
+    suffix_ids = tok(suffix, add_special_tokens=False).input_ids
+    full_ids = record["prompt_token_ids"] + record["gen_token_ids"] + suffix_ids
+    ids = torch.tensor(full_ids)[None].to(model.device)
+    with torch.no_grad():
+        logits = model(ids).logits[0, -1].float()
+    probs = torch.softmax(logits, dim=-1)
+    p_yes = float(probs[yes_ids].sum())
+    p_no = float(probs[no_ids].sum())
+    total = p_yes + p_no
+    conf = p_yes / total if total > 0 else float("nan")
+    return conf, p_yes, p_no

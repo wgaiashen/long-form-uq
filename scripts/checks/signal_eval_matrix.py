@@ -147,10 +147,15 @@ def main():
             joe = "n/a" if target is None else f"{target:.2f}"
             print(f"{ts + '->' + es:14s}{d:12s}{layer:>6}{batch:>6}{fmt(prr):>8}{joe:>7}{delta:>8}")
 
-    # Leave the cache in the keystone state: judge-trained, layer 15, default batch.
-    print("\nrestoring canonical SAPLMA scores (judge-trained, layer 15, default batch)...")
+    # Leave the cache in the keystone state: layer 15, default batch, trained on the judge
+    # label where it exists (xsum has only the AlignScore label, so restore that instead).
+    print("\nrestoring canonical SAPLMA scores (layer 15, default batch)...")
     for dataset in datasets:
-        run_probe(args.model, dataset, 15, None, "correctness")
+        key = cache.run_key(args.model, dataset, "ID")
+        recs = cache.load_records(cache_dir, key)
+        field = "correctness" if all(
+            isinstance(r.get("correctness"), (int, float)) for r in recs) else "correctness_alignscore"
+        run_probe(args.model, dataset, 15, None, field)
     print("done.")
 
 

@@ -50,6 +50,12 @@ def main():
     # "Perplexity" baseline (see msp.py for the mean-NLL-vs-exp naming note).
     perplexity = [msp.msp_uncertainty(r["token_logprobs"], "perplexity") for r in records]
 
+    # Unsupervised P(True): the model's own yes/no answer at the verdict position, written into
+    # the records by 01g_ptrue_unsup (a GPU step). Like MSP it is one score per example with no
+    # probe, so surface it here when it has been extracted, else skip it.
+    have_ptrue_unsup = all(isinstance(r.get("ptrue_unsup"), (int, float)) for r in records)
+    ptrue_unsup = [r["ptrue_unsup"] for r in records] if have_ptrue_unsup else None
+
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
 
     # Supervised methods (03_probe) write one uncertainty per TEST example, in
@@ -109,6 +115,8 @@ def main():
             "msp_sum": msp_sum[i],
             "perplexity": perplexity[i],
         }
+        if ptrue_unsup is not None:
+            row["ptrue_unsup"] = ptrue_unsup[i]
         # Each supervised method is blank on train rows (the probe never scores its
         # own training data).
         for m in sup:
@@ -116,15 +124,21 @@ def main():
         rows.append(row)
     cfg.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cfg.results_dir / f"{key}.csv"
-    results.write_csv(csv_path, rows, ["msp_mean", "msp_min", "msp_sum", "perplexity", *sup.keys()])
+    unsup_cols = ["msp_mean", "msp_min", "msp_sum", "perplexity"]
+    if ptrue_unsup is not None:
+        unsup_cols.append("ptrue_unsup")
+    results.write_csv(csv_path, rows, [*unsup_cols, *sup.keys()])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
     y_test = [records[i][lf] for i in test_positions]
     print(f"{cfg.dataset} {cfg.ood_setting} | test n={len(y_test)} "
           f"| mean correctness {sum(y_test) / len(y_test):.3f}")
-    for name, unc in [("MSP mean ", msp_mean), ("MSP min  ", msp_min),
-                      ("MSP sum  ", msp_sum), ("Perplexity", perplexity)]:
+    unsup = [("MSP mean ", msp_mean), ("MSP min  ", msp_min),
+             ("MSP sum  ", msp_sum), ("Perplexity", perplexity)]
+    if ptrue_unsup is not None:
+        unsup.append(("P(True) uns", ptrue_unsup))
+    for name, unc in unsup:
         unc_test = [unc[i] for i in test_positions]
         print(f"PRR  {name}        : {results.prr(y_test, unc_test):.3f}")
     for m in sup:

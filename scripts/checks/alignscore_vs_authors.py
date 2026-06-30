@@ -9,7 +9,8 @@ cached records. We score a handful of (output, target) pairs with both our `scor
 For Joe's side, multiple references are reduced exactly as his AggregatedMetric does for trivia:
 score each alias on its own, then take the max.
 
-Needs the AlignScore model (a GPU is faster, CPU works for ~20 records). Run from the repo root:
+Needs a GPU: Joe's literal scorer calls torch.cuda.synchronize() unconditionally (the very call
+our vendored copy guards), so it cannot instantiate on a CPU-only node. Run inside a GPU session:
 
     python scripts/checks/alignscore_vs_authors.py
     python scripts/checks/alignscore_vs_authors.py --n 30
@@ -32,11 +33,45 @@ from luq.labels.alignscore import score as our_score  # noqa: E402
 TOL = 1e-3
 
 
+def _stub_tensorflow():
+    """Register a no-op tensorflow so Joe's package imports without TF installed.
+
+    Importing his AlignScore pulls in lm_polygraph_lite, whose __init__ eagerly loads an
+    unrelated Keras SAPLMA head (luh/heads/full_seq_head_saplma.py) that does `import tensorflow`
+    + `tf.config...` + `from tensorflow.keras... import Sequential, Dense` at module load. AlignScore
+    itself uses torch, not TF, so a stub lets us run his REAL AlignScore code. No effect on scoring.
+    """
+    import types
+    import importlib.machinery
+    if "tensorflow" in sys.modules:
+        return
+    tf = types.ModuleType("tensorflow")
+    tf.config = types.SimpleNamespace(
+        optimizer=types.SimpleNamespace(set_jit=lambda *a, **k: None),
+        set_visible_devices=lambda *a, **k: None,
+    )
+    tf.__version__ = "0.0.0-stub"
+    keras = types.ModuleType("tensorflow.keras")
+    models = types.ModuleType("tensorflow.keras.models")
+    layers = types.ModuleType("tensorflow.keras.layers")
+    models.Sequential = object
+    layers.Dense = object
+    keras.models, keras.layers = models, layers
+    tf.keras = keras
+    for name, mod in [("tensorflow", tf), ("tensorflow.keras", keras),
+                      ("tensorflow.keras.models", models), ("tensorflow.keras.layers", layers)]:
+        # A real ModuleSpec so importlib.util.find_spec("tensorflow") (transformers probes for
+        # it) returns cleanly instead of raising on __spec__ == None.
+        mod.__spec__ = importlib.machinery.ModuleSpec(name, loader=None)
+        sys.modules[name] = mod
+
+
 def joe_scorer():
     """Joe's AlignScore wrapper, imported from his repo. Kept import-local so the rest of the
     file can be read without his package installed."""
     if str(JOE_REPO) not in sys.path:
         sys.path.insert(0, str(JOE_REPO))
+    _stub_tensorflow()
     from utils.alignscore import AlignScore  # noqa: E402
     return AlignScore(batch_size=1)
 
