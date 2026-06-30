@@ -56,10 +56,25 @@ def main():
                     help="supervised method: saplma (A&M MLP) | linear (linear probe on the "
                          "same hidden states) | ptrue | lookback")
     ap.add_argument("--layer", type=int, default=None,
-                    help="hidden layer index to probe (default: the middle layer)")
+                    help="hidden layer index to probe (default: the middle layer). "
+                         "NOTE: index 0 = embeddings, so for Llama-3.1-8B Joe's middle "
+                         "is 15 (ceil(32/2)-1); our default n_layers//2 is 16 — pass "
+                         "--layer 15 to match Hidden Failures Table 14.")
+    ap.add_argument("--saplma-batch", type=int, default=None,
+                    help="override the SAPLMA MLP batch size (default 32). Pass 1 to match "
+                         "Joe/Table 14 (full_seq_head_saplma.py fits batch_size=1). Only "
+                         "affects --method saplma.")
+    ap.add_argument("--label-field", default="correctness",
+                    help="which correctness field to TRAIN the probe on (e.g. "
+                         "correctness_alignscore for AlignScore-trained, or correctness for the "
+                         "judge). Pair with 04_eval --label-field for Joe's train x eval matrix.")
     args = ap.parse_args()
 
     feature_method, arch, hparams = METHOD_SPEC[args.method]
+    # Copy so we never mutate the shared METHOD_SPEC dict, then apply per-run overrides.
+    hparams = dict(hparams)
+    if args.method == "saplma" and args.saplma_batch is not None:
+        hparams["batch_size"] = args.saplma_batch
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
@@ -84,7 +99,7 @@ def main():
 
     # Records and features share index order, so boolean masks built from the
     # records' "split" tags select the matching feature rows.
-    y = np.array([r["correctness"] for r in records])
+    y = np.array([r[args.label_field] for r in records])
     split = np.array([r["split"] for r in records])
     train_mask, test_mask = split == "train", split == "test"
 
@@ -133,7 +148,7 @@ def main():
     # dataset's features without retraining — this is what the OOD cross-task matrix needs.
     clf.meta = {"method": args.method, "feature_method": feature_method, "arch": arch,
                 "dataset": cfg.dataset, "ood": cfg.ood_setting, "layer": layer,
-                "hparams": hparams, "seed": 1}
+                "hparams": hparams, "seed": 1, "label_field": args.label_field}
     ppath = cache.save_probe(clf, cfg.cache_dir, key, method=args.method, layer=layer)
     print(f"saved trained probe -> {ppath}")
 

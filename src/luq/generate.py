@@ -56,7 +56,8 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     """Generate one response; return (record, pooled_all_layers).
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
-    pooled_all_layers: tensor (n_layers, hidden) = mean over the OUTPUT tokens, per layer.
+    pooled_all_layers: tensor (n_layers, hidden) = mean over the last-prompt (pre-answer)
+    position + the output tokens, per layer (Joe's SAPLMA masked-mean; see the pooling note).
 
     truncate_at_newline: for few-shot short-form QA the answer ends at the first
     newline; what follows is the model imitating the prompt format (inventing the
@@ -115,9 +116,24 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     n_layers = len(out.hidden_states[0])
     pooled = []
     for layer in range(n_layers):
-        vecs = [out.hidden_states[s][layer][0, -1, :] for s in range(1, n_gen)]
-        if not vecs:  # degenerate one-token response: use the prompt's last position
-            vecs = [out.hidden_states[0][layer][0, -1, :]]
+        # Average the last-prompt (pre-answer) position PLUS the generated-token states,
+        # matching Joe's SAPLMA masked-mean: his output_mask aligns so the averaged window
+        # starts at the last prompt position (the state that PREDICTS the first answer
+        # token). That pre-answer state encodes the whole question and DOMINATES for short
+        # answers -- excluding it (our earlier bug) meant a 2-token answer like "friday"
+        # ['fr','iday'] was pooled from just ['fr'], and a 1-token answer from the prompt's
+        # ':' alone. The final generated token has no fed-back state in generate(), so it is
+        # dropped (Joe drops it too). Verified against compiled_features.py + full_seq_head_saplma.py.
+        vecs = [out.hidden_states[0][layer][0, -1, :]]                       # last prompt token (pre-answer)
+        # range(1, n_gen+1) -- include the LAST kept answer token's state too. We generate the
+        # full budget with NO stop criterion and truncate at EXTRACTION, so out.hidden_states
+        # extends PAST n_gen; out.hidden_states[n_gen] (the last kept answer token, whose
+        # fed-back state exists because the now-truncated continuation followed) is real. The
+        # old range(1, n_gen) dropped it -- catastrophic for short answers (trivia mean 2.9
+        # tokens; a 1-token answer pooled ZERO answer tokens). Joe includes all answer-token
+        # states. min(...) guards the rare case where generation stopped exactly at n_gen (EOS).
+        last = min(n_gen + 1, len(out.hidden_states))
+        vecs += [out.hidden_states[s][layer][0, -1, :] for s in range(1, last)]  # answer tokens 0..G-1
         pooled.append(torch.stack(vecs).mean(dim=0))
     # Back to float32 (numpy/sklearn-friendly) and off the GPU.
     pooled = torch.stack(pooled).float().cpu()

@@ -20,11 +20,22 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
+    ap.add_argument("--label-field", default="correctness",
+                    help="which correctness field to PRR against (e.g. correctness_alignscore "
+                         "for AlignScore-eval, or correctness for the judge). Lets us run Joe's "
+                         "train x eval matrix. The CSV always writes it into the 'correctness' column.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
+    # Eval ground truth = the chosen label field. Fail loudly if a test record lacks it.
+    lf = args.label_field
+    bad = [i for i, r in enumerate(records)
+           if r["split"] == "test" and not isinstance(r.get(lf), (int, float))]
+    if bad:
+        sys.exit(f"ERROR: {len(bad)} test records have no numeric '{lf}' label "
+                 f"(e.g. AlignScore/judge not run for this field). Label it first.")
 
     # MSP needs no probe: it comes straight off the cached token logprobs, for
     # every record. Both aggregates, since they can differ a lot: "mean" is the
@@ -92,7 +103,7 @@ def main():
             "dataset": cfg.dataset,
             "task": data.TASK_OF[cfg.dataset],
             "split": r["split"],
-            "correctness": r["correctness"],
+            "correctness": r[lf],
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
             "msp_sum": msp_sum[i],
@@ -109,7 +120,7 @@ def main():
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
-    y_test = [records[i]["correctness"] for i in test_positions]
+    y_test = [records[i][lf] for i in test_positions]
     print(f"{cfg.dataset} {cfg.ood_setting} | test n={len(y_test)} "
           f"| mean correctness {sum(y_test) / len(y_test):.3f}")
     for name, unc in [("MSP mean ", msp_mean), ("MSP min  ", msp_min),

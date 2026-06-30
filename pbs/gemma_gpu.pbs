@@ -1,0 +1,58 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:gpu_type=A100
+#PBS -l walltime=20:00:00
+#PBS -N luq_gemma
+#PBS -j oe
+
+# RCS/PBSPro twin of slurm/gemma_gpu.sbatch. All GPU feature extraction for the
+# Gemma-2-9B migration, all three datasets:
+#   01_extract   (generation + SAPLMA pooled features; RESUMABLE)
+#   01b_ptrue    (P(True) verdict-position features)
+#   01c_lookback (Lookback attention-ratio features)
+# Drops cache/.gpu_done__<ds>__ID after each dataset so the CPU-side orchestrator can
+# label/probe/eval that dataset.
+#
+# GPU CHOICE -- read this. The Slurm twin uses DoC's A100-80GB because Gemma-2 needs the
+# EAGER attention backend (soft-capping) and the fp32 Lookback recompute is memory-hungry.
+# RCS's A100s are only 40GB and scarce. Two honest options on RCS:
+#   1) (recommended) keep this heaviest job on DoC, and use RCS L40S for the lighter
+#      extraction/eval and the parallel OOD sweeps (extract.pbs / the OOD scripts);
+#   2) if you must run it on RCS, the A100-40GB requested above may OOM on the fp32
+#      Lookback pass for long examples -- split 01c_lookback onto its own run, or cap
+#      the recompute length. TODO(confirm on RCS): whether 40GB holds the xsum Lookback
+#      pass. The 80GB Gemma+fp32 path stays on DoC.
+#
+# Submit:  LUQ_CLUSTER=rcs ./scripts/submit.sh gemma_gpu     (or: qsub pbs/gemma_gpu.pbs)
+
+# NOTE: no `set -e` -- one dataset/step failing must not abort the rest.
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL=google/gemma-2-9b-it
+OOD=ID
+
+echo "gemma_gpu start on $(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+for DS in sciq pubmed_qa xsum; do
+  echo "================ $DS : 01_extract ================ $(date)"
+  if ! python scripts/01_extract.py --dataset "$DS" --ood "$OOD" --model "$MODEL"; then
+    echo "!!! extract $DS FAILED -- skipping rest of $DS"; continue
+  fi
+  echo "================ $DS : 01b_ptrue ================ $(date)"
+  python scripts/01b_ptrue.py --dataset "$DS" --ood "$OOD" --model "$MODEL" \
+    || echo "!!! ptrue $DS FAILED"
+  echo "================ $DS : 01c_lookback ================ $(date)"
+  python scripts/01c_lookback.py --dataset "$DS" --ood "$OOD" --model "$MODEL" \
+    || echo "!!! lookback $DS FAILED"
+
+  touch "cache/.gpu_done__${DS}__${OOD}"
+  echo "================ $DS : GPU FEATURES DONE ================ $(date)"
+done
+
+echo "gemma_gpu ALL DONE at $(date)"

@@ -22,7 +22,7 @@ from luq.config import Config  # noqa: E402
 from luq.labels import llm_judge, string_match  # noqa: E402
 
 
-def judge_into(records, field, cfg, judge_model, save_every=25):
+def judge_into(records, field, cfg, judge_model, save_every=25, strip_newlines=False):
     """Score every record with the LLM judge, writing the result into record[field].
 
     LOGIN NODE only; needs OPENAI_API_KEY; each call costs money. Resumable: skip
@@ -30,14 +30,16 @@ def judge_into(records, field, cfg, judge_model, save_every=25):
     new scores, so a crash or rate-limit partway through never re-spends on work
     already done (just rerun the command to pick up where it stopped). Each new
     label is stamped with `field`_model so we always know which judge produced it
-    (the "never mix judges within one comparison" discipline).
+    (the "never mix judges within one comparison" discipline). `strip_newlines`
+    reproduces Joe's newline-collapsed judge input (faithful Hidden Failures repro).
     """
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     new_count = n_failed = 0
     for i, r in enumerate(records):
         if r.get(field) is not None:
             continue  # already judged on a previous (possibly partial) run
-        r[field] = llm_judge.judge(r, cfg.dataset, model=judge_model)
+        r[field] = llm_judge.judge(r, cfg.dataset, model=judge_model,
+                                   strip_newlines=strip_newlines)
         new_count += 1
         if r[field] is None:
             n_failed += 1
@@ -73,6 +75,11 @@ def main():
                          "canonical `correctness`, so downstream stages are unchanged). "
                          "For comparing the two labels by hand. LOGIN NODE only; "
                          "costs money. Resumable — Ctrl-C and rerun to continue.")
+    ap.add_argument("--strip-newlines", action="store_true",
+                    help="Collapse all newlines out of the model answer before judging, "
+                         "matching Joe's Hidden Failures judge input "
+                         "(collect_llm_judge_inputs.py:92). Use ONLY for faithful "
+                         "reproduction of his labels (e.g. the Llama keystone).")
     ap.add_argument("--promote-judge", action="store_true",
                     help="STANDARDISE this short-form dataset onto the judge label: copy the "
                          "already-computed `correctness_judge` into the canonical `correctness` "
@@ -119,10 +126,12 @@ def main():
         if args.judge_short_form:
             # Also score with the judge into a separate field so the two labels
             # coexist for the disagreement study. Does NOT touch `correctness`.
-            judge_into(records, "correctness_judge", cfg, args.judge)
+            judge_into(records, "correctness_judge", cfg, args.judge,
+                       strip_newlines=args.strip_newlines)
     else:
         # Long-form: Joe's LLM judge is the only label.
-        judge_into(records, "correctness", cfg, args.judge)
+        judge_into(records, "correctness", cfg, args.judge,
+                   strip_newlines=args.strip_newlines)
 
     # Re-save the records in place: the labels become part of the Tier-1 record, so
     # stages 03/04 read one file and labels can never drift out of line with their

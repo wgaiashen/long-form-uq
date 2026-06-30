@@ -174,28 +174,36 @@ def _gpt_response(user_prompt: str, model: str) -> str:
             time.sleep(2 * (attempt + 1))
 
 
-def build_prompt(record: dict, dataset: str) -> str:
+def build_prompt(record: dict, dataset: str, strip_newlines: bool = False) -> str:
     """Assemble the exact judge user-prompt for one record. Backend-agnostic: the
     GPT-5 judge and any cheaper / open-source judge both call this, so the ONLY thing
     that varies across judges is the model, never the prompt (the fairness rule for
     the judge-agreement check). `dataset` is the ProbeDrift key (e.g. "pubmed_qa"); we
     map it to the judge name ("pubmed") for prompt trimming and template choice.
+
+    strip_newlines: collapse all newlines out of the model answer before judging,
+    matching Joe's Hidden Failures judge input (collect_llm_judge_inputs.py:92). OFF
+    by default; turn on only to reproduce his labels faithfully.
     """
     judge_name = JUDGE_NAME_MAP[dataset]
     question, caveat = _extract_question(record["prompt"], judge_name)
     label, answer = record["target"], record["gen_text"]
+    if strip_newlines:
+        answer = answer.replace("\n", "").strip()
     if judge_name in ("xsum", "cnn_dailymail"):
         return _summary_prompt(question, label, answer)
     return _qa_prompt(question, label, answer, caveat)
 
 
-def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10):
+def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10,
+          strip_newlines: bool = False):
     """Score one record's gen_text against its gold target with the OpenAI judge.
     Returns a float in [0, 1], or None if it never returned a valid number after
     max_retries. `model` defaults to the pinned GPT-5; pass a cheaper sibling
     (e.g. "gpt-5-mini") to validate it against GPT-5 in scripts/checks.
+    `strip_newlines` reproduces Joe's newline-collapsed answer (see build_prompt).
     """
-    user_prompt = build_prompt(record, dataset)
+    user_prompt = build_prompt(record, dataset, strip_newlines=strip_newlines)
     for _ in range(max_retries):
         response = _gpt_response(user_prompt, model)
         if _is_valid_score(response):

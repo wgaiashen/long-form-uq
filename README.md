@@ -53,7 +53,41 @@ salloc --partition=a30 --gres=gpu:1 --cpus-per-task=4 --mem=64G --time=01:00:00 
 ```
 
 Main dependencies: PyTorch, transformers, lm-polygraph, the uhead library (`luh`), ProbeDrift,
-scikit-learn, and the OpenAI client (for the long-form judge).
+scikit-learn, scipy, and the OpenAI client (for the long-form judge). The judge-comparison panel
+(`scripts/checks/judge_agreement.py`) additionally uses `krippendorff` and `irrCAC`
+(`pip install krippendorff irrCAC`); it degrades gracefully (those metrics print `n/a`) if they
+are not installed.
+
+## Two clusters: DoC (Slurm) and RCS (PBSPro)
+
+Jobs can run on either of two independent clusters; the Python pipeline is identical, only
+the submission wrapper and a few paths differ.
+
+- **DoC GPU cluster (CSG)** — Slurm, A100 **80GB**. The existing `slurm/*.sbatch` workflow.
+- **RCS HPC (CX3 Phase 2)** — PBSPro, a larger college pool (default **L40S 48GB**; A100 is
+  40GB and scarce). Scripts in `pbs/`, mirroring `slurm/` one-for-one.
+
+A single command submits to whichever cluster you set with `LUQ_CLUSTER` (it also
+auto-detects from the hostname):
+
+```bash
+export LUQ_CLUSTER=doc   # or rcs
+./scripts/submit.sh extract pubmed_qa ID     # -> sbatch on doc, qsub on rcs
+```
+
+The cluster-specific paths (repo root, `HF_HOME`, the python env) are resolved in one place —
+`pbs/_env.sh` for shell, `src/luq/cluster.py` for Python (`python -m luq.cluster hf_home`).
+First-time RCS setup is in **`pbs/SETUP_RCS.md`**. Keep the heaviest job (Gemma-2-9B + the
+fp32 Lookback recompute) on DoC's 80GB; use RCS for the many small parallel OOD jobs.
+
+Slurm ↔ PBS command map:
+
+| Action | DoC (Slurm) | RCS (PBSPro) |
+|---|---|---|
+| submit | `sbatch slurm/x.sbatch` | `qsub pbs/x.pbs` |
+| queue | `squeue -u $USER` | `qstat -u $USER` |
+| cancel | `scancel <id>` | `qdel <id>` |
+| interactive | `salloc --gres=gpu:1 ...` | `qsub -I -l select=1:ngpus=1:...` |
 
 ## Reproduce the results tables
 

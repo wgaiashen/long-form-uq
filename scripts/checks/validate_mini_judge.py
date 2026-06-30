@@ -47,6 +47,10 @@ def main():
                     help="print this many largest judge disagreements")
     ap.add_argument("--save", default=None,
                     help="optional CSV path to dump every (ref, cand) pair for inspection")
+    ap.add_argument("--ref-from-cache", action="store_true",
+                    help="use the cached gpt-5 `correctness` label as the reference instead of "
+                         "re-calling GPT-5 live: mini-only (halves cost, skips the pricey judge) "
+                         "and uses the EXACT paid-for labels the probe was trained/evaluated on.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
@@ -57,14 +61,19 @@ def main():
     # meaningful judge target).
     pool = [r for r in records if r.get("split") == "test" and r.get("gen_text", "").strip()]
     pool = pool[: args.n]
-    print(f"validating {args.candidate} vs {args.reference} on {len(pool)} "
+    ref_src = "cached gpt-5 correctness" if args.ref_from_cache else f"live {args.reference}"
+    print(f"validating {args.candidate} vs {ref_src} on {len(pool)} "
           f"{args.dataset} records", flush=True)
 
     # Keep the record alongside both scores so we can show WHERE they disagree, not
     # just an aggregate (a small mean-abs-diff can still hide a few bad cases).
     pairs = []  # each: (idx, ref_score, cand_score, gen_snippet)
     for i, r in enumerate(pool):
-        a = llm_judge.judge(r, cfg.dataset, model=args.reference)
+        if args.ref_from_cache:
+            a = r.get("correctness")
+            a = float(a) if isinstance(a, (int, float)) else None
+        else:
+            a = llm_judge.judge(r, cfg.dataset, model=args.reference)
         b = llm_judge.judge(r, cfg.dataset, model=args.candidate)
         if a is not None and b is not None:
             snippet = " ".join(r.get("gen_text", "").split())[:160]

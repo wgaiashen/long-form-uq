@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=12:00:00
+#PBS -N luq_extract
+#PBS -j oe
+
+# RCS/PBSPro twin of slurm/extract.sbatch. Same Python entrypoint, same resumability.
+# GPU feature-extraction job. 01_extract.py checkpoints every 200 examples and resumes
+# from cache, so if it hits the 12h wall just resubmit -- it picks up where it left off.
+#
+# Defaults run the 9B Gemma job on an L40S (48GB) -- enough for generation + SAPLMA
+# pooled features. The heavy Lookback fp32 recompute (gemma_gpu.pbs) wants more headroom;
+# see the note there.
+#
+# Args come through env vars (PBS has no positional script args). submit.sh sets them:
+#   LUQ_DATASET (default sciq)   LUQ_OOD (default ID)   LUQ_MODEL (default gemma-2-9b-it)
+# Submit directly with, e.g.:
+#   qsub -v LUQ_DATASET=pubmed_qa,LUQ_OOD=ID pbs/extract.pbs
+# or via the wrapper:
+#   LUQ_CLUSTER=rcs ./scripts/submit.sh extract pubmed_qa ID
+
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+
+export HF_HOME   # set by pbs/_env.sh, off $HOME
+
+DATASET="${LUQ_DATASET:-sciq}"
+OOD="${LUQ_OOD:-ID}"
+MODEL="${LUQ_MODEL:-google/gemma-2-9b-it}"
+
+echo "extract: dataset=$DATASET ood=$OOD model=$MODEL on $(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python scripts/01_extract.py --dataset "$DATASET" --ood "$OOD" --model "$MODEL"

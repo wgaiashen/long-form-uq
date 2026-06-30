@@ -1,0 +1,48 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:gpu_type=A100
+#PBS -l walltime=08:00:00
+#PBS -N luq_uhead
+#PBS -j oe
+
+# RCS/PBSPro twin of slurm/uhead.sbatch. UHead baseline for all three Gemma datasets:
+#   01d_uhead  (replay cached records through Gemma + the pretrained uhead head ->
+#              one uncertainty score per TEST example; trains nothing of ours)
+#   04_eval    (adds the `uhead` column to the results CSV and prints its PRR)
+#
+# Prereqs (same as the Slurm twin): 01_extract has run for these datasets, the head is
+# pre-downloaded into HF_HOME, and 02_label has run so 04_eval has correctness for PRR.
+#
+# GPU CHOICE: the head needs the EAGER attention backend (Gemma-2 soft-capping) with
+# all-layer attentions in memory -- the same headroom reason as gemma_gpu. The Slurm twin
+# uses A100-80GB; RCS A100s are 40GB/scarce, so prefer running this on DoC.
+# TODO(confirm on RCS): whether 40GB holds the all-layer attentions for xsum.
+# Idempotent: 01d overwrites its score file and 04_eval re-reads, so resubmitting is safe.
+#
+# Submit:  LUQ_CLUSTER=rcs ./scripts/submit.sh uhead     (or: qsub pbs/uhead.pbs)
+
+# No `set -e`: one dataset failing must not abort the rest.
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL=google/gemma-2-9b-it
+OOD=ID
+
+echo "uhead start on $(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+for DS in sciq pubmed_qa xsum; do
+  echo "================ $DS : 01d_uhead ================ $(date)"
+  if ! python scripts/01d_uhead.py --dataset "$DS" --ood "$OOD" --model "$MODEL"; then
+    echo "!!! 01d_uhead $DS FAILED -- skipping eval for $DS"; continue
+  fi
+  echo "================ $DS : 04_eval ================ $(date)"
+  python scripts/04_eval.py --dataset "$DS" --ood "$OOD" --model "$MODEL" \
+    || echo "!!! 04_eval $DS FAILED"
+done
+
+echo "uhead ALL DONE at $(date)"

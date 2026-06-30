@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:gpu_type=A100
+#PBS -l walltime=16:00:00
+#PBS -N luq_llama
+#PBS -j oe
+
+# RCS/PBSPro twin of slurm/llama_keystone.sbatch. Phase-1 keystone reproduction:
+# Llama-3.1-8B SAPLMA vs Hidden Failures Table 14. GPU feature extraction ONLY
+# (01_extract -> generation + SAPLMA pooled features) for the three keystone datasets.
+# fp32 + eager to match Joe. RESUMABLE: 01_extract reloads its checkpoint, so on a
+# wall-time hit just resubmit.
+#
+# fp32 8B is memory-hungry; A100 requested. On RCS the A100 is 40GB (vs DoC 80GB).
+# TODO(confirm on RCS): whether 40GB holds fp32 Llama-3.1-8B + all-layer hidden states.
+# If it OOMs, this keystone repro is best left on DoC's 80GB.
+#
+# PREREQUISITES (login node, one time): accept the meta-llama license, set HF_TOKEN, and
+# pre-download safetensors only:
+#   hf download meta-llama/Meta-Llama-3.1-8B --exclude "original/*"
+#
+# Submit:  LUQ_CLUSTER=rcs ./scripts/submit.sh llama_keystone  (or: qsub pbs/llama_keystone.pbs)
+
+# NOTE: no `set -e` -- one dataset failing must not abort the rest.
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL=meta-llama/Meta-Llama-3.1-8B
+OOD=ID
+
+echo "llama_keystone start on $(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+# sciq + pubmed_qa first (the SAPLMA-ID and PubmedQA headline cells), trivia_qa last
+# (largest/least-known raw download).
+for DS in sciq pubmed_qa trivia_qa; do
+  echo "================ $DS : 01_extract (fp32 + eager) ================ $(date)"
+  if ! python scripts/01_extract.py --dataset "$DS" --ood "$OOD" --model "$MODEL" \
+        --dtype fp32 --attn eager; then
+    echo "!!! extract $DS FAILED -- skipping rest of $DS"; continue
+  fi
+  touch "cache/.gpu_done__${DS}__${OOD}"
+  echo "================ $DS : GPU FEATURES DONE ================ $(date)"
+done
+
+echo "llama_keystone ALL DONE at $(date)"

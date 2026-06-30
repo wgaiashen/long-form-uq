@@ -9,11 +9,17 @@ import argparse
 import sys
 from pathlib import Path
 
+import torch
+
 # Make `src/` importable when running this file directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from luq import cache, data, generate  # noqa: E402
 from luq.config import Config  # noqa: E402
+
+# Map the --dtype flag to a torch dtype. "auto" -> None lets load_model pick its
+# per-model default (bf16 for Gemma, fp16 otherwise).
+_DTYPE = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
 
 
 def main():
@@ -21,18 +27,35 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
+    ap.add_argument("--dtype", default="auto", choices=["auto", "fp32", "fp16", "bf16"],
+                    help="model load dtype. auto = load_model's per-model default "
+                         "(bf16 for Gemma, fp16 otherwise). Use fp32 to match Joe's "
+                         "Hidden Failures Llama runs (he passes no torch_dtype).")
+    ap.add_argument("--attn", default="auto", choices=["auto", "eager", "sdpa"],
+                    help="attention backend. auto = load_model's default (eager for "
+                         "Gemma, HF default otherwise). Use eager to match Joe's runs.")
+    ap.add_argument("--truncate-long", action="store_true",
+                    help="ALSO truncate long-form generations at the first newline (D1). "
+                         "Matches Joe's generate_until=['\\n'] for every dataset; off by "
+                         "default since our convention leaves long-form untruncated. Use for "
+                         "the pubmed_qa keystone reproduction.")
     ap.add_argument("--limit", type=int, default=None,
                     help="optional cap on #examples for a quick run")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting, cfg.seed)
-    model, tok = generate.load_model(cfg.model_name)
+    # auto -> None so load_model keeps its per-model defaults; otherwise override.
+    dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]
+    attn = None if args.attn == "auto" else args.attn
+    model, tok = generate.load_model(cfg.model_name, attn_implementation=attn, dtype=dtype)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
 
     # Few-shot short-form QA: the answer ends at the first newline; after that the
-    # model just imitates the prompt format. Long-form output keeps its newlines.
-    truncate = cfg.dataset in data.SHORT_FORM
+    # model just imitates the prompt format. Long-form output keeps its newlines by
+    # default, UNLESS --truncate-long is set (Joe's generate_until=['\n'] for the
+    # pubmed_qa keystone reproduction; see D1 in the analysis).
+    truncate = (cfg.dataset in data.SHORT_FORM) or args.truncate_long
 
     # Resume: at 7-9B a job can hit the Slurm time limit before finishing, so we
     # reload whatever a previous run already cached and skip those examples instead

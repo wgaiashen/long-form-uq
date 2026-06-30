@@ -1,0 +1,28 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=24gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=00:20:00
+#PBS -N luq_e2e
+#PBS -j oe
+
+# Cheap end-to-end check that the RCS environment is wired up BEFORE spending real GPU
+# hours: prints the node, the GPU, and whether torch + the luq package import and see
+# CUDA. Run this first after pbs/SETUP_RCS.md.
+#
+# Submit:  qsub pbs/end_to_end.pbs      (then read the luq_e2e.o<jobid> log)
+
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+echo "=== node ===";    hostname; date
+echo "=== cluster ==="; echo "LUQ_CLUSTER=$LUQ_CLUSTER  LUQ_REPO=$LUQ_REPO  HF_HOME=$HF_HOME"
+echo "=== gpu ===";     nvidia-smi || echo "nvidia-smi unavailable"
+echo "=== python ===";  which python; python --version
+echo "=== torch ===";   python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+echo "=== luq ===";     python -c "from luq import cluster; print(cluster.get_settings())"
+echo "=== resolver ==="; python -m luq.cluster
+echo "END-TO-END OK at $(date)"
