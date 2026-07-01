@@ -68,6 +68,8 @@ def main():
                     help="which correctness field to TRAIN the probe on (e.g. "
                          "correctness_alignscore for AlignScore-trained, or correctness for the "
                          "judge). Pair with 04_eval --label-field for Joe's train x eval matrix.")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
     feature_method, arch, hparams = METHOD_SPEC[args.method]
@@ -76,7 +78,8 @@ def main():
     if args.method == "saplma" and args.saplma_batch is not None:
         hparams["batch_size"] = args.saplma_batch
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     # saplma and linear share the same cached hidden-state features (feature_method).
     feats = cache.load_features(cfg.cache_dir, key, method=feature_method)  # (n, n_layers, hidden)

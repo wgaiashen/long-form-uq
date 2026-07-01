@@ -41,9 +41,12 @@ def main():
     # (slurm/llama_keystone.sbatch, slurm/repool_fix.sbatch), so those are the defaults here.
     ap.add_argument("--dtype", default="fp32", choices=["auto", "fp32", "fp16", "bf16"])
     ap.add_argument("--attn", default="eager", choices=["auto", "eager", "sdpa"])
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
 

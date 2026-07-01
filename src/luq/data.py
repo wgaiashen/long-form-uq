@@ -30,18 +30,30 @@ TASK_OF = {
     "cnn_dailymail": "summarisation",
 }
 
+# Per-dataset generation budget. The updated ProbeDrift no longer ships max_new_tokens on
+# the Dataset, so we own these now. Values are the originals from ProbeDrift's own configs
+# (dataset_configs.py), kept identical so generations match the frozen runs.
+MAX_NEW_TOKENS = {
+    "sciq": 20,
+    "trivia_qa": 20,
+    "qa": 20,
+    "pubmed_qa": 128,
+    "xsum": 56,
+    "cnn_dailymail": 128,
+}
 
-def load(dataset: str, ood_setting: str = "ID", seed: int = 1):
+
+def load(dataset: str, ood_setting: str = "ID"):
     """Return (train_ds, eval_ds) for one ProbeDrift dataset + OOD setting.
 
-    Each Dataset exposes .x (prompts), .y (targets), .max_new_tokens (per example),
-    and iterates as `for xb, yb, mnt in ds` with batch_size=1. The eval split is
-    subsampled with a fixed seed for reproducibility; the train split uses `seed`.
+    Each Dataset exposes .x (prompts) and .y (targets) and iterates as `for xb, yb in ds`
+    with batch_size=1. The updated ProbeDrift fixes the splits at build time (no `seed`
+    argument, no per-example max_new_tokens), so the train order is deterministic and the
+    generation budget comes from MAX_NEW_TOKENS above, not the Dataset.
     """
     return get_datasets(
         eval_dataset=dataset,
         ood_setting=ood_setting,
         instruct=False,
-        seed=seed,
         batch_size=1,
     )

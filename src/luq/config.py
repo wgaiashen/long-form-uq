@@ -21,9 +21,16 @@ class Config:
     ood_setting: str = "ID"
     seed: int = 1
 
+    # Prompt regime = a namespace tag for one set of ProbeDrift prompts. Empty = the
+    # original ("frozen") cache, left exactly where it is. A non-empty tag (e.g. "pdnew"
+    # for the updated ProbeDrift, whose prompts differ) routes ALL of this run's
+    # cache/results into a SEPARATE physical directory, so two prompt regimes can never
+    # read each other's records or features. See __post_init__ and labels/.. provenance.
+    prompt_regime: str = ""
+
     # --- generation ---
-    # The real budget is per-example from ProbeDrift (train_ds.max_new_tokens). This
-    # is only a safety ceiling.
+    # We own the per-dataset generation budget now (the updated ProbeDrift no longer
+    # ships max_new_tokens); see data.MAX_NEW_TOKENS. This is only a safety ceiling.
     max_new_tokens_cap: int = 128
 
     # --- features ---
@@ -34,3 +41,14 @@ class Config:
     # --- paths ---
     cache_dir: Path = CACHE_DIR
     results_dir: Path = RESULTS_DIR
+
+    def __post_init__(self):
+        # A non-empty prompt_regime puts this run in its own cache/results namespace,
+        # but only when the paths are the defaults (an explicit cache_dir is respected).
+        # This is what keeps the frozen old-prompt cache and the new-prompt cache from
+        # silently cross-contaminating, without changing run_key or its many callers.
+        if self.prompt_regime:
+            if self.cache_dir == CACHE_DIR:
+                self.cache_dir = CACHE_DIR / self.prompt_regime
+            if self.results_dir == RESULTS_DIR:
+                self.results_dir = RESULTS_DIR / self.prompt_regime

@@ -37,9 +37,12 @@ def main():
     ap.add_argument("--name", default="ptrue",
                     help="cache feature-set name (use a distinct name like 'ptrue_accurate' to "
                          "keep an existing 'ptrue' feature set instead of overwriting it)")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
 
     # Tier-1 records from 01_extract: prompt/gen token IDs are all we need.

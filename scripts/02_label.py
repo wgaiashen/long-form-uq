@@ -87,9 +87,12 @@ def main():
                          "Use after --judge-short-form has finished EVERY record. No API calls — "
                          "this only rewrites label fields. Retrain the probe (03) afterwards, "
                          "since the cached probe was fit on the old label.")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
 

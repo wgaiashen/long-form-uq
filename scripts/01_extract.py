@@ -41,15 +41,33 @@ def main():
                          "the pubmed_qa keystone reproduction.")
     ap.add_argument("--limit", type=int, default=None,
                     help="optional cap on #examples for a quick run")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag for one ProbeDrift prompt set. Empty = the "
+                         "frozen original cache; use e.g. 'pdnew' for the updated ProbeDrift "
+                         "(different prompts) so the two never share records/features.")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
-    train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting, cfg.seed)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
+    train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting)
     # auto -> None so load_model keeps its per-model defaults; otherwise override.
     dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]
     attn = None if args.attn == "auto" else args.attn
     model, tok = generate.load_model(cfg.model_name, attn_implementation=attn, dtype=dtype)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
+
+    # Guard against silently extending a cache built from different prompts (e.g. a
+    # ProbeDrift change). Stamp the hash of the exact prompts+targets. If a stored hash
+    # exists and differs, stop loudly instead of mixing two prompt sets in one cache.
+    digest = cache.prompt_hash(list(train_ds.x) + list(eval_ds.x),
+                               list(train_ds.y) + list(eval_ds.y))
+    stored = cache.load_prompt_hash(cfg.cache_dir, key)
+    if stored is not None and stored != digest:
+        sys.exit(f"PROMPT MISMATCH for {key} in {cfg.cache_dir}:\n"
+                 f"  cached prompts hash {stored}\n  current prompts hash {digest}\n"
+                 f"The prompts changed under this cache. Use a fresh --prompt-regime "
+                 f"or clear this namespace; do not mix prompt sets.")
+    cache.save_prompt_hash(digest, cfg.cache_dir, key)
 
     # Few-shot short-form QA: the answer ends at the first newline; after that the
     # model just imitates the prompt format. Long-form output keeps its newlines by
@@ -70,14 +88,17 @@ def main():
     # Checkpoint every CKPT_EVERY new examples. A kill loses at most this many.
     CKPT_EVERY = 200
     n_new = 0
+    budget = min(data.MAX_NEW_TOKENS[cfg.dataset], cfg.max_new_tokens_cap)
     for split, ds in [("train", train_ds), ("test", eval_ds)]:
-        for idx, (xb, yb, mnt) in enumerate(ds):
+        for idx, batch in enumerate(ds):
+            # The updated ProbeDrift yields (x, y); the old one yielded (x, y, mnt). Take
+            # the first two either way, and use our own per-dataset budget (data.MAX_NEW_TOKENS).
+            xb, yb = batch[0], batch[1]
             if args.limit is not None and idx >= args.limit:
                 break
             if (split, idx) in done:
                 continue  # already cached by a previous run
             prompt, target = xb[0], yb[0]  # batch_size=1: unwrap the lists
-            budget = min(int(mnt[0]), cfg.max_new_tokens_cap)
 
             record, pooled = generate.generate(model, tok, prompt, budget,
                                                truncate_at_newline=truncate)

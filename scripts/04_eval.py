@@ -24,9 +24,12 @@ def main():
                     help="which correctness field to PRR against (e.g. correctness_alignscore "
                          "for AlignScore-eval, or correctness for the judge). Lets us run Joe's "
                          "train x eval matrix. The CSV always writes it into the 'correctness' column.")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
     # Eval ground truth = the chosen label field. Fail loudly if a test record lacks it.

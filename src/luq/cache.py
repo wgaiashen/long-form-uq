@@ -8,6 +8,7 @@ A "key" identifies a run: model + dataset + ood_setting. Tier 2 adds the method.
 This module is plain glue and is written out in full so you have a working example
 to read.
 """
+import hashlib
 import json
 import os
 import pickle
@@ -19,6 +20,43 @@ import numpy as np
 def _slug(s: str) -> str:
     """Make a string safe for a filename (model names contain '/')."""
     return s.replace("/", "_")
+
+
+# ---- prompt-content hash: detect a ProbeDrift change under an existing cache --------
+# The cache key is (model, dataset, ood) only, with no content hash, so if the prompts
+# change (e.g. a ProbeDrift upgrade) a run could silently append to / reuse a cache built
+# from different prompts. The prompt_regime namespace (Config) separates known regimes;
+# this hash is the finer guard: 01_extract stamps the hash of the exact prompts+targets it
+# used, and refuses to extend a cache whose stored hash differs. A mismatch is a loud stop,
+# not a silent reuse.
+
+def prompt_hash(prompts: list[str], targets: list) -> str:
+    """A stable sha1 over the ordered prompts and gold targets that define a run's inputs."""
+    h = hashlib.sha1()
+    for p in prompts:
+        h.update(repr(p).encode("utf-8"))
+        h.update(b"\x00")
+    h.update(b"\x01targets\x01")
+    for t in targets:
+        h.update(repr(t).encode("utf-8"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def prompt_hash_path(cache_dir: Path, key: str) -> Path:
+    return Path(cache_dir) / "meta" / f"{key}.prompthash"
+
+
+def load_prompt_hash(cache_dir: Path, key: str) -> str | None:
+    path = prompt_hash_path(cache_dir, key)
+    return path.read_text().strip() if path.exists() else None
+
+
+def save_prompt_hash(digest: str, cache_dir: Path, key: str) -> Path:
+    out = prompt_hash_path(cache_dir, key)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(digest + "\n")
+    return out
 
 
 def _atomic_replace(tmp: Path, out: Path) -> None:
