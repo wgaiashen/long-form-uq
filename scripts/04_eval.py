@@ -67,7 +67,7 @@ def main():
     # saplma = the A&M MLP; linear = the linear-probe baseline on the same hidden states.
     # Each is loaded only if 03_probe has produced it, so the table grows as methods run.
     sup = {}  # method -> {"unc": array, "layer": int, "at": {record_pos: unc}}
-    for m in ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback", "uhead"]:
+    for m in ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback", "uhead", "uhead_v2"]:
         try:
             s = cache.load_scores(cfg.cache_dir, key, method=m)
         except FileNotFoundError:

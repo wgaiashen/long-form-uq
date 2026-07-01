@@ -55,8 +55,13 @@ WEIGHT_DECAY = 1e-2          # regularises the query + head against p >> n overf
 VAL_FRAC = 0.2              # validation carved from train for temperature selection (never test)
 
 
-def load_per_token(model, dataset, layer):
-    """Per-example token states aligned POSITIONALLY to records (idx is not unique)."""
+def load_per_token(model, dataset, layer, label_field="correctness"):
+    """Per-example token states aligned POSITIONALLY to records (idx is not unique).
+
+    label_field names WHICH correctness signal to read. Do not rely on the default bare
+    `correctness` for a reported table -- it holds whatever labeller ran last and differs by
+    dataset (gpt-5 on short-form, gpt-5-mini on long-form here); pass an explicit field and stamp
+    the model. See scripts/checks/aggregation_table.py."""
     path = ROOT / "cache" / "pertok" / f"{cache._slug(model)}__{dataset}__ID__L{layer}.npz"
     if not path.exists():
         return None
@@ -68,7 +73,7 @@ def load_per_token(model, dataset, layer):
         raise SystemExit(f"{dataset}: per-token cache {len(st)} != records {len(records)}")
     states = [np.asarray(st[k], dtype=np.float32) for k in range(len(records))]
     split = np.array([r["split"] for r in records])
-    y = np.array([r.get("correctness", np.nan) for r in records], dtype=float)
+    y = np.array([r.get(label_field, np.nan) for r in records], dtype=float)
     return states, split, y, int(z["layer"]), records
 
 
@@ -246,6 +251,9 @@ def main():
     ap.add_argument("--model", default=MODEL_DEFAULT)
     ap.add_argument("--datasets", default="sciq,trivia_qa,pubmed_qa")
     ap.add_argument("--layer", type=int, default=15)
+    ap.add_argument("--label-field", default="correctness",
+                    help="which correctness signal to train/eval on (explicit, not the bare "
+                         "'correctness' default for a reported table -- see load_per_token)")
     ap.add_argument("--seeds", default="1,2,3",
                     help="seeds for the final probe; reports mean +/- std so a small margin can be "
                          "told from seed noise")
@@ -253,10 +261,10 @@ def main():
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device: {device}")
+    print(f"device: {device}  label-field: {args.label_field}")
 
     for dataset in args.datasets.split(","):
-        loaded = load_per_token(args.model, dataset, args.layer)
+        loaded = load_per_token(args.model, dataset, args.layer, args.label_field)
         if loaded is None:
             print(f"\n==== {dataset}: no per-token cache, skip ====")
             continue

@@ -39,6 +39,13 @@ def main():
                          "keep an existing 'ptrue' feature set instead of overwriting it)")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag (must match the one used by 01_extract).")
+    ap.add_argument("--store-layers", default="all",
+                    help="which layers to KEEP on disk: 'all' (default; full n_layers x hidden "
+                         "cache for a free layer-sweep) or a space/comma list of absolute layer "
+                         "indices, e.g. '15' or '13,14,15,16,17'. Unkept layers are written as NaN "
+                         "so the array stays full-height (--layer 15 still resolves) but compresses "
+                         "to a fraction of the size, and any probe of an unstored layer fails LOUDLY "
+                         "on the NaN instead of silently. dtype stays float32 (no precision change).")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
@@ -61,9 +68,26 @@ def main():
         if i % 10 == 0:
             print(f"{i}/{len(records)} done", flush=True)
 
-    feats = np.stack(vectors)  # (n_examples, n_layers, hidden)
+    feats = np.stack(vectors)  # (n_examples, n_layers, hidden), float32
+
+    # Keep only the probed layer(s) on disk. All layers are computed for free (one forward reads
+    # every layer's verdict-position state), but the probe reads a single layer (--layer 15), so
+    # storing all 33 is ~30x more than anything consumes. We NaN-out the unkept layers rather than
+    # reshaping, so the array stays full-height -- select_layer(feats, 15) still indexes L15 with no
+    # remap -- while savez_compressed shrinks the NaN runs to almost nothing. dtype is unchanged
+    # (float32): this drops unread data, it does NOT lower the precision the probe trains on.
+    if args.store_layers != "all":
+        keep = sorted({int(x) for x in args.store_layers.replace(",", " ").split()})
+        bad = [k for k in keep if not 0 <= k < feats.shape[1]]
+        if bad:
+            sys.exit(f"--store-layers {bad} out of range 0..{feats.shape[1] - 1}")
+        mask = np.ones(feats.shape[1], dtype=bool)
+        mask[keep] = False
+        feats[:, mask, :] = np.nan  # unkept layers -> NaN (loud on misuse, compresses tiny)
+        print(f"storing only layers {keep} (others NaN); array stays {feats.shape}", flush=True)
+
     path = cache.save_features(feats, cfg.cache_dir, key, method=args.name)
-    print(f"saved features {feats.shape} -> {path}")
+    print(f"saved features {feats.shape} {feats.dtype} -> {path}")
 
 
 if __name__ == "__main__":
