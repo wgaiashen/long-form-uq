@@ -37,12 +37,13 @@ METHOD_SPEC = {
 DATASETS = ["sciq", "pubmed_qa", "xsum"]
 
 
-def _split_features(cache_dir, model, dataset, ood, feature_method, memo):
-    """Return (X_train, y_train, X_test, y_test) for a dataset at this method's default
-    layer (middle layer; layer 0 for the single-layer lookback features). Memoised so each
-    big all-layer feature file is loaded once. The layer is the same across datasets for a
-    given feature_method (same model -> same layer count), matching 03_probe's default."""
-    mk = (dataset, feature_method)
+def _split_features(cache_dir, model, dataset, ood, feature_method, layer_arg, memo):
+    """Return (X_train, y_train, X_test, y_test) for a dataset at `layer_arg` (0 for the
+    single-layer lookback feature). Memoised so each big all-layer feature file is loaded once.
+    layer_arg MUST match the layer 03_probe/04_eval/the ID table used (Llama middle = 15, Joe's
+    ceil(N/2)-1), NOT n_layers//2 = 16: the ptrue_accurate feature is stored L15-ONLY (other layers
+    NaN), so layer 16 is NaN, and saplma at 16 would not be apples-to-apples with the ID table."""
+    mk = (dataset, feature_method, layer_arg)
     if mk in memo:
         return memo[mk]
     key = cache.run_key(model, dataset, ood)
@@ -50,8 +51,11 @@ def _split_features(cache_dir, model, dataset, ood, feature_method, memo):
     records = cache.load_records(cache_dir, key)
     if len(records) != len(feats):
         raise SystemExit(f"{dataset}: records and features out of step — rerun 01/03.")
-    layer = feats.shape[1] // 2  # 03_probe's default: middle layer (=> 0 for lookback's 1 layer)
+    layer = 0 if feats.shape[1] == 1 else layer_arg   # lookback = single combined layer -> 0
     X = saplma.select_layer(feats, layer)
+    if not np.isfinite(X).all():
+        raise SystemExit(f"{dataset}/{feature_method} layer {layer}: NaN/inf features -- wrong layer "
+                         f"(e.g. an L15-only feature read at 16). Pass the correct --layer.")
     split = np.array([r["split"] for r in records])
     y = np.array([r["correctness"] for r in records], dtype=float)
     tr, te = split == "train", split == "test"
@@ -66,6 +70,9 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--datasets", default=",".join(DATASETS))
     ap.add_argument("--methods", default=",".join(METHOD_SPEC))
+    ap.add_argument("--layer", type=int, default=15,
+                    help="hidden layer for the multi-layer features (Llama middle = 15, matching "
+                         "03_probe --layer 15 / the ID table; lookback's single layer is forced to 0)")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset="sciq", ood_setting=args.ood)
@@ -85,13 +92,13 @@ def main():
                 Xtr_parts, ytr_parts = [], []
                 for d in train_dss:
                     Xtr, ytr, _, _ = _split_features(
-                        cache_dir, args.model, d, args.ood, feature_method, memo)
+                        cache_dir, args.model, d, args.ood, feature_method, args.layer, memo)
                     Xtr_parts.append(Xtr)
                     ytr_parts.append(ytr)
                 X_train = np.concatenate(Xtr_parts, axis=0)
                 y_train = np.concatenate(ytr_parts, axis=0)
                 _, _, X_te, y_te = _split_features(
-                    cache_dir, args.model, held_out, args.ood, feature_method, memo)
+                    cache_dir, args.model, held_out, args.ood, feature_method, args.layer, memo)
 
                 if np.ptp(y_train) < 1e-6:
                     raise SystemExit("pooled train labels are constant — nothing to learn")

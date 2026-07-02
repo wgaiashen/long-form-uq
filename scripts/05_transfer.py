@@ -44,11 +44,23 @@ def _find_probe_layer(cache_dir, key, method):
     hits = sorted((Path(cache_dir) / "probes").glob(f"{key}__{method}__L*.pkl"))
     if not hits:
         return None
-    if len(hits) > 1:
-        # More than one cached layer for this method: ambiguous, name them so the user picks.
-        raise SystemExit(f"multiple cached probes for {key}__{method}: {[h.name for h in hits]} "
-                         "— remove the stale one so the layer is unambiguous.")
-    return int(hits[0].stem.rsplit("__L", 1)[1])
+    if len(hits) == 1:
+        return int(hits[0].stem.rsplit("__L", 1)[1])
+    # More than one cached layer (e.g. a SAPLMA layer sweep leaves L6..L28 on disk). Rather than
+    # force the user to delete artifacts, disambiguate to the SAME layer 04_eval serves — the
+    # cached score's layer — so the diagonal gate below stays self-consistent by construction.
+    layers = {int(h.stem.rsplit("__L", 1)[1]) for h in hits}
+    try:
+        score_layer = int(cache.load_scores(cache_dir, key, method)["layer"])
+    except FileNotFoundError:
+        raise SystemExit(f"multiple cached probes for {key}__{method}: {sorted(layers)}, and no "
+                         f"cached score to disambiguate — run 03_probe --method {method} so the "
+                         "reported layer is unambiguous.")
+    if score_layer not in layers:
+        raise SystemExit(f"cached {method} score is layer {score_layer} but no probe at that layer "
+                         f"exists for {key} (have {sorted(layers)}); rerun "
+                         f"03_probe --method {method} --layer {score_layer}.")
+    return score_layer
 
 
 def _test_features_and_labels(cache_dir, model, dataset, ood, feature_method, layer, memo):
