@@ -47,13 +47,17 @@ def main():
                     help="print this many largest judge disagreements")
     ap.add_argument("--save", default=None,
                     help="optional CSV path to dump every (ref, cand) pair for inspection")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache namespace tag (must match 01_extract; e.g. expertqa). "
+                         "Without it the default cache/ is read, not cache/<regime>/.")
     ap.add_argument("--ref-from-cache", action="store_true",
                     help="use the cached gpt-5 `correctness` label as the reference instead of "
                          "re-calling GPT-5 live: mini-only (halves cost, skips the pricey judge) "
                          "and uses the EXACT paid-for labels the probe was trained/evaluated on.")
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
 

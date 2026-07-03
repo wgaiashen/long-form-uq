@@ -41,6 +41,10 @@ def main():
                          "the pubmed_qa keystone reproduction.")
     ap.add_argument("--limit", type=int, default=None,
                     help="optional cap on #examples for a quick run")
+    ap.add_argument("--max-new-tokens-cap", type=int, default=None,
+                    help="override the safety ceiling on generation length (default 128 from "
+                         "Config). REQUIRED for datasets whose MAX_NEW_TOKENS exceeds 128, e.g. "
+                         "expertqa (384) — else the budget is silently clipped to 128.")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag for one ProbeDrift prompt set. Empty = the "
                          "frozen original cache; use e.g. 'pdnew' for the updated ProbeDrift "
@@ -49,6 +53,8 @@ def main():
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
                  prompt_regime=args.prompt_regime)
+    if args.max_new_tokens_cap is not None:
+        cfg.max_new_tokens_cap = args.max_new_tokens_cap
     train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting)
     # auto -> None so load_model keeps its per-model defaults; otherwise override.
     dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]

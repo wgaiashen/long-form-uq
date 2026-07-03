@@ -123,6 +123,13 @@ def _extract_question(prompt: str, judge_name: str):
         prompt = prompt[: prompt.rfind("Summary")].strip("\n").strip()
         prompt = prompt[prompt.rfind("Text:"):]
         return prompt, None  # caveat unused for the summary template
+    if judge_name == "expertqa":
+        # ExpertQA prompt = "...\n\nQuestion: {q}\nAnswer:" (no context block). Trim to the question;
+        # routes to the QA judge (scores factual correctness of the response vs the expert-revised
+        # gold, with partial credit — same QA template as pubmed).
+        prompt = prompt[: prompt.rfind("Answer:")]
+        prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
+        return prompt, ":"
     raise ValueError(f"no prompt-trimming rule for judge dataset {judge_name!r}")
 
 
