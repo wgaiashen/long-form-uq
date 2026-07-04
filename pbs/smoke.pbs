@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=24gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=00:20:00
+#PBS -N luq_smoke
+#PBS -j oe
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || { echo "luq_activate FAILED — check module/venv in pbs/_env.sh"; exit 1; }
+
+echo "=== host ===";    hostname
+echo "=== resolved ==="; echo "LUQ_CLUSTER=$LUQ_CLUSTER  LUQ_REPO=$LUQ_REPO  HF_HOME=$HF_HOME"
+echo "=== gpu ===";     nvidia-smi
+echo "=== torch ===";   python -c "import torch; print('torch', torch.__version__, '| cuda', torch.cuda.is_available(), '|', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no gpu')"
+echo "=== done ==="
