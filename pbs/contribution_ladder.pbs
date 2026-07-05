@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N contrib_ladder
+#PBS -j oe
+
+# The contribution OOD ladder: weighted-MSP vs attention/uniform vs the MSP floor across
+# ID/SameTask/LOO/DiffTask. Args via space-free env vars (qsub -v cannot pass spaces).
+# qsub -v uses commas to separate vars, so pass lists with ':' and we translate to ',' here.
+#   smoke (existing caches, 1 seed):  qsub -v LUQ_SOURCES=sciq:trivia_qa:pubmed_qa,LUQ_SEEDS=1 pbs/contribution_ladder.pbs
+#   full (once med_quad pertok lands): qsub -v LUQ_SEEDS=1:2:3 pbs/contribution_ladder.pbs   (default sources = all)
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+SEEDS="$(echo "${LUQ_SEEDS:-1:2:3}" | tr ':' ',')"
+ARGS="--seeds $SEEDS"
+if [ -n "${LUQ_SOURCES:-}" ]; then ARGS="$ARGS --sources $(echo "$LUQ_SOURCES" | tr ':' ',')"; fi
+
+echo "contribution_ladder on $(hostname) at $(date): $ARGS" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/checks/contribution_ladder.py $ARGS

@@ -1,0 +1,41 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=03:00:00
+#PBS -N eqa_repilot
+#PBS -j oe
+
+# ExpertQA STAGE-2 re-pilot: same 200 examples, but with a DECODING FIX to stop the base-model
+# repetition loops the first pilot showed (73% hit the 384 cap, ~half repetition-degenerate). We
+# add --repetition-penalty and --no-repeat-ngram-size (opt-in, default off for every frozen run).
+#
+# Kept SEPARATE from the original pilot via --prompt-regime expertqa_reppen (own cache namespace,
+# cache/expertqa_reppen/), so the two pilots can be compared side by side. NO --truncate-long
+# (ExpertQA is long-form; newlines are legitimate). max-new-tokens-cap 384 as before.
+#
+# dtype = bf16 (NOT fp32): RCS tops out at a 48GB card, and fp32 8B + hidden states over a 384-token
+# generation OOM'd a 48GB GPU on the original run (that one used a DoC A100-80GB). This go/no-go turns
+# on GENERATION QUALITY (does the penalty kill the loops?), not the probe features, so bf16 is the
+# right, sufficient choice -- a documented dtype confound vs the fp32 original. If the fix works, the
+# full-set run is regenerated in fp32 (matching the other datasets) with the SAME decoding settings.
+#
+#   qsub pbs/expertqa_repilot.pbs
+
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1   # Llama-3.1-8B fully cached; avoid an online fetch
+
+COMMON="--model meta-llama/Meta-Llama-3.1-8B --dataset expertqa --ood pilot \
+--prompt-regime expertqa_reppen --max-new-tokens-cap 384 --dtype bf16 --attn eager \
+--repetition-penalty 1.3 --no-repeat-ngram-size 3"
+
+echo "eqa re-pilot on $(hostname) at $(date): $COMMON" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+echo "---- smoke (--limit 5) ----"
+python -u scripts/01_extract.py $COMMON --limit 5
+echo "---- full 200 (resumes from smoke) ----"
+python -u scripts/01_extract.py $COMMON

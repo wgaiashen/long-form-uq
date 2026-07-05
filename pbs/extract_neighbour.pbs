@@ -1,0 +1,33 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_neighbour
+#PBS -j oe
+
+# Extract an OOD NEIGHBOUR dataset (e.g. med_quad, a same-task neighbour of pubmed_qa) with the
+# SAME config as the frozen Llama keystone runs -- fp32 + eager -- so its per-token states are
+# poolable with the other datasets' caches in the OOD ladder. Also passes --truncate-long so the
+# few-shot 'Question:/Answer:' format is cut at the first newline (the trivia-style junk fix), while
+# the dataset stays judge-labelled (it is NOT in data.SHORT_FORM).
+#
+# Generation only. Labelling (02_label, gpt-5-mini, LOGIN node, costs £) and per-token extraction
+# (01h_pertoken, a second GPU job) follow once this finishes.
+#
+#   qsub -v LUQ_DATASET=med_quad pbs/extract_neighbour.pbs
+
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+
+export HF_HOME   # set by pbs/_env.sh, off $HOME
+
+DATASET="${LUQ_DATASET:-med_quad}"
+MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
+
+echo "neighbour extract: dataset=$DATASET model=$MODEL (fp32 + eager + truncate-long) on $(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python scripts/01_extract.py --dataset "$DATASET" --ood ID --model "$MODEL" \
+    --dtype fp32 --attn eager --truncate-long

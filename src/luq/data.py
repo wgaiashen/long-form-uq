@@ -19,6 +19,7 @@ JUDGE_NAME_MAP = {
     "xsum": "xsum",
     "cnn_dailymail": "cnn_dailymail",
     "expertqa": "expertqa",   # long-form FACTUALITY QA (not a ProbeDrift dataset)
+    "med_quad": "med_quad",   # medical QA; a same-task OOD NEIGHBOUR for pubmed_qa (training source)
 }
 
 # Datasets whose correctness comes from string match (the rest use the LLM judge).
@@ -37,6 +38,7 @@ TASK_OF = {
     "xsum": "summarisation",
     "cnn_dailymail": "summarisation",
     "expertqa": "long_qa",   # PLACEHOLDER (property tag deferred)
+    "med_quad": "long_qa",   # same task family as pubmed_qa (medical QA) -> the SameTask OOD rung
 }
 
 # Per-dataset generation budget. The updated ProbeDrift no longer ships max_new_tokens on
@@ -53,6 +55,9 @@ MAX_NEW_TOKENS = {
     # GOTCHA: config.max_new_tokens_cap defaults to 128, so ExpertQA extraction MUST pass a higher
     # --max-new-tokens-cap (>=384) or the budget is silently clipped (budget = min(384, cap)).
     "expertqa": expertqa.MAX_NEW_TOKENS,  # 384
+    # med_quad answers are 1-3 free-text sentences on one line; 128 (matching its pubmed sibling) is
+    # a safe budget and the few-shot format is truncated at the first newline anyway (see load()).
+    "med_quad": 128,
 }
 
 
@@ -65,12 +70,36 @@ def load(dataset: str, ood_setting: str = "ID"):
     """
     if dataset == "expertqa":
         return _load_expertqa(ood_setting)
+    if dataset == "med_quad":
+        return _load_med_quad(ood_setting)
     return get_datasets(
         eval_dataset=dataset,
         ood_setting=ood_setting,
         instruct=False,
         batch_size=1,
     )
+
+
+def _load_med_quad(ood_setting: str):
+    """med_quad as a first-class dataset, for use as a same-task OOD NEIGHBOUR of pubmed_qa.
+
+    med_quad is train-only in ProbeDrift (no eval split), so `get_datasets(eval_dataset='med_quad')`
+    is rejected. Its examples are only reachable as the TRAINING pool of pubmed_qa's
+    OOD_ONE_DATASET_SAME_TASK setting (1800 med_quad examples, already few-shot-formatted). We pull
+    that pool and present it as the whole dataset under the key `med_quad__ID`, all in the TRAIN
+    split (there is no held-out med_quad eval; it is a training source for the pubmed SameTask rung,
+    never an eval target). The empty eval split means 01_extract generates only the 1800 train rows.
+
+    The few-shot 'Question: ... Answer: ... Question: ...' format is the same one trivia_qa uses, so
+    the model invents a next question after its answer -- extract with --truncate-long to cut at the
+    first newline (kept judge-labelled, not string-matched, since medical answers are free text)."""
+    if ood_setting != "ID":
+        raise ValueError(f"med_quad: only 'ID' is supported (it is a training source, not an eval "
+                         f"target); got {ood_setting!r}")
+    train_ds, _ = get_datasets(eval_dataset="pubmed_qa", ood_setting="OOD_ONE_DATASET_SAME_TASK",
+                               instruct=False, batch_size=1)
+    empty_eval = PDDataset([], [], batch_size=1)
+    return train_ds, empty_eval
 
 
 def _load_expertqa(ood_setting: str):

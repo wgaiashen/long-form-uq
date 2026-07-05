@@ -49,6 +49,13 @@ def main():
                     help="cache namespace tag for one ProbeDrift prompt set. Empty = the "
                          "frozen original cache; use e.g. 'pdnew' for the updated ProbeDrift "
                          "(different prompts) so the two never share records/features.")
+    ap.add_argument("--repetition-penalty", type=float, default=None,
+                    help="OPT-IN decoding penalty on repeated tokens (HF default 1.0 = off). Set "
+                         "e.g. 1.3 for open-ended prompts where the base model loops (ExpertQA). "
+                         "Leave unset for the frozen runs so generation is byte-identical.")
+    ap.add_argument("--no-repeat-ngram-size", type=int, default=None,
+                    help="OPT-IN: forbid repeating any n-gram of this size (HF default 0 = off). "
+                         "Use with --repetition-penalty to kill loops; leave unset for frozen runs.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
@@ -107,7 +114,9 @@ def main():
             prompt, target = xb[0], yb[0]  # batch_size=1: unwrap the lists
 
             record, pooled = generate.generate(model, tok, prompt, budget,
-                                               truncate_at_newline=truncate)
+                                               truncate_at_newline=truncate,
+                                               repetition_penalty=args.repetition_penalty,
+                                               no_repeat_ngram_size=args.no_repeat_ngram_size)
             record |= {"idx": idx, "split": split, "target": target}
             records.append(record)
             pooled_list.append(pooled.numpy())  # float32 array, (n_layers, hidden)

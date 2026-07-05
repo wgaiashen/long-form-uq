@@ -52,7 +52,9 @@ def load_model(name: str, attn_implementation: str | None = None,
 
 @torch.no_grad()
 def generate(model, tok, prompt: str, max_new_tokens: int,
-             truncate_at_newline: bool = False):
+             truncate_at_newline: bool = False,
+             repetition_penalty: float | None = None,
+             no_repeat_ngram_size: int | None = None):
     """Generate one response; return (record, pooled_all_layers).
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
@@ -64,6 +66,12 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     next question), not part of the answer. Truncating HERE means the record,
     the logprobs, the pooled features, and the correctness label all describe the
     same text. Long-form datasets must keep newlines, so it is off by default.
+
+    repetition_penalty / no_repeat_ngram_size: OPT-IN decoding controls, default OFF so
+    every existing frozen run is byte-identical (None => the arg is not passed, so HF uses
+    its no-op defaults 1.0 / 0). Needed only for open-ended prompts where the base model has
+    no natural stop and loops to the token budget (ExpertQA: the Stage-2 scan found 73% capped,
+    ~half repetition-degenerate). Greedy decoding is unchanged; these only forbid the loop.
     """
     # 1. Tokenise. prompt_len marks where the response begins: generate() returns
     #    prompt + response as one sequence, and we only ever cache the response part.
@@ -72,9 +80,9 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
 
     # 2. The single generate pass. Greedy decoding (do_sample=False) keeps runs
     #    reproducible; the output_* flags make generate hand back the logits and
-    #    hidden states it computed anyway.
-    out = model.generate(
-        **inputs,
+    #    hidden states it computed anyway. The two repetition controls are only added
+    #    when explicitly set, so the default call is unchanged for the frozen runs.
+    gen_kwargs = dict(
         max_new_tokens=max_new_tokens,
         do_sample=False,
         output_hidden_states=True,
@@ -82,6 +90,11 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
         return_dict_in_generate=True,
         pad_token_id=tok.eos_token_id,
     )
+    if repetition_penalty is not None:
+        gen_kwargs["repetition_penalty"] = repetition_penalty
+    if no_repeat_ngram_size is not None:
+        gen_kwargs["no_repeat_ngram_size"] = no_repeat_ngram_size
+    out = model.generate(**inputs, **gen_kwargs)
 
     # 3. Slice off the response. n_gen is often < max_new_tokens (generation stops
     #    early at an end-of-sequence token), so always measure the actual length.
