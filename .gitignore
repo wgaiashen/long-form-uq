@@ -13,6 +13,11 @@ logs/
 *.pt
 *.npz
 
+# Scheduler job logs: PBS/Slurm write <jobname>.o<jobid> / .e<jobid> stdout+stderr
+# into the submit dir. Regenerable console output, never source -- ignore them.
+*.o[0-9]*
+*.e[0-9]*
+
 # Secrets
 .env
 

@@ -1,0 +1,79 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=01:30:00
+#PBS -N luq_viz_attn
+#PBS -j oe
+
+# GPU choice: L40S (48GB) is the most abundant GPU here, so it schedules FAST, and it
+# holds Llama-8B in fp32 for short/medium sequences (sciq, trivia, pubmed all fit). A100s are
+# scarce AND on RCS are only 40GB (A100-PCIE-40GB) -- SMALLER than the L40S, not bigger.
+# HARD LIMIT (verified 2026-07-05): RCS has NO 80GB GPU, so fp32 8B (~32GB) + a forward over a
+# long SOURCE (xsum's ~5,600-token articles) OOMs on every RCS card. For faithful fp32 xsum, run
+# on the DoC cluster (has A100-80GB), NOT here. On RCS the only way to fit xsum is DTYPE1=bf16
+# (halves the model) -- viz-grade only, dtype-inconsistent with the fp32 datasets. --max-seq only
+# bounds the Increment-2 self-attention step, NOT the 01h forward, so it does not rescue 01h.
+
+# Phase-1 Increment 2: dump the ATTENTION signals for the token visualiser, then
+# rebuild the HTML with them. Three steps per dataset:
+#   01h_pertoken          cache per-token hidden states at layer 15 (needed to TRAIN and
+#                         apply the learned AttnPool; the pooler cannot run without it).
+#   dump_viz_attention    train the pooler + read its per-token weights (CPU-cheap), and do
+#                         a small eager+fp32 forward over the most-interesting test examples
+#                         for the raw model self-attention. Writes cache/viz/<key>__attn.npz.
+#   visualise_attention   CPU renderer; now finds the sidecar and adds the attention toggles.
+#
+# GPU: eager attention backend + fp32 (the fp16 attention-NaN gotcha). sciq is short and
+# safe; start there. For xsum/pubmed the self-attention forward is O(seq^2) on long sources,
+# so --max-seq bounds it (same guard as Lookback) -- raise walltime/mem there if needed.
+#
+# Prereq: 01_extract + 02_label have run for the dataset (records + correctness on disk).
+# Idempotent: every step overwrites its own output, so resubmitting is safe.
+#
+# Submit (pick the dataset):
+#   qsub -v DS=sciq   pbs/viz_attention.pbs
+#   qsub -v DS=xsum   pbs/viz_attention.pbs      # long-form; watch memory
+
+set -uo pipefail
+
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+# Reclaim reserved-but-unallocated GPU memory instead of OOMing on fragmentation (the
+# xsum 01h failure was a 4GB alloc failing with 4GB reserved-unallocated).
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+MODEL=meta-llama/Meta-Llama-3.1-8B
+OOD=ID
+DS="${DS:-sciq}"          # dataset; override with `qsub -v DS=...`
+LAYER=15
+NSELF="${NSELF:-120}"     # how many test examples get the self-attention forward
+MAXSEQ="${MAXSEQ:-2048}"  # bound the attention forward (long sources); 1024 keeps xsum on L40S
+# 01h only needs hidden states, not attention weights, so it can use the memory-efficient
+# SDPA backend -- eager materialises the full (heads,seq,seq) scores matrix and OOMs on the
+# longest xsum articles. SDPA gives identical hidden states (01h's own sanity check confirms).
+ATTN1="${ATTN1:-eager}"   # backend for the 01h per-token pass; set ATTN1=sdpa for xsum
+DTYPE1="${DTYPE1:-fp32}"  # dtype for the 01h pass; fp32 matches the other datasets. Only drop
+                          # to bf16 as a LAST resort on a small GPU (halves model memory but
+                          # makes the xsum pertok cache dtype-inconsistent -> viz-grade only)
+
+echo "viz_attention start on $(hostname) at $(date) | DS=$DS NSELF=$NSELF"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+echo "================ $DS : 01h_pertoken (per-token L$LAYER) ================ $(date)"
+python scripts/01h_pertoken.py --model "$MODEL" --dataset "$DS" --ood "$OOD" --layer "$LAYER" \
+  --attn "$ATTN1" --dtype "$DTYPE1" \
+  || { echo "!!! 01h_pertoken FAILED"; exit 1; }
+
+echo "================ $DS : dump_viz_attention ================ $(date)"
+python scripts/tools/dump_viz_attention.py --model "$MODEL" --dataset "$DS" --ood "$OOD" \
+  --layer "$LAYER" --n-self "$NSELF" --max-seq "$MAXSEQ" \
+  || { echo "!!! dump_viz_attention FAILED"; exit 1; }
+
+echo "================ $DS : visualise_attention (HTML) ================ $(date)"
+python scripts/tools/visualise_attention.py --model "$MODEL" --dataset "$DS" --ood "$OOD" \
+  --max-examples 60 \
+  || echo "!!! visualise_attention FAILED"
+
+echo "viz_attention ALL DONE at $(date)"
