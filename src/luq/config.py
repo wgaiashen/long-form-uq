@@ -16,7 +16,7 @@ RESULTS_DIR = REPO_ROOT / "results"
 @dataclass
 class Config:
     # --- what to run ---
-    model_name: str = "Qwen/Qwen2.5-1.5B-Instruct"  # small dev model for fast iteration
+    model_name: str = "meta-llama/Meta-Llama-3.1-8B"  # the one model (frozen, middle layer 15)
     dataset: str = "sciq"                            # a ProbeDrift key
     ood_setting: str = "ID"
     seed: int = 1
