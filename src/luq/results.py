@@ -12,15 +12,22 @@ import csv
 import numpy as np
 
 
-def write_csv(path, rows: list[dict], uncertainty_cols) -> None:
+def write_csv(path, rows: list[dict], uncertainty_cols, meta_cols=None) -> None:
     """rows: dicts with keys dataset, task, split, correctness, <uncertainty col(s)>.
 
     uncertainty_cols: one column name or a list of them, so several methods can
     share a CSV (same examples, same correctness, one column per method).
+
+    meta_cols: optional extra columns inserted right after `correctness` (e.g.
+    `label_field`/`label_model`). This exists to STAMP WHICH LABEL the `correctness`
+    column actually holds — the judge vs AlignScore mix-up has bitten this project more
+    than once (the per-example CSV `correctness` is whatever --label-field was passed,
+    NOT necessarily the judge). See results/README_LABELS.md.
     """
     if isinstance(uncertainty_cols, str):
         uncertainty_cols = [uncertainty_cols]
-    fields = ["dataset", "task", "split", "correctness", *uncertainty_cols]
+    meta_cols = meta_cols or []
+    fields = ["dataset", "task", "split", "correctness", *meta_cols, *uncertainty_cols]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()

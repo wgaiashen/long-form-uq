@@ -28,6 +28,22 @@ def main():
                     help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()
 
+    # Which label does the `correctness` column actually hold? Stamp it into the CSV so the
+    # judge-vs-AlignScore mix-up (a recurring gotcha) can never happen again by reading a file.
+    # See results/README_LABELS.md.
+    JUDGE_MODEL = {"sciq": "gpt-5", "trivia_qa": "gpt-5", "coqa": "gpt-5",
+                   "pubmed_qa": "gpt-5-mini", "xsum": "gpt-5-mini", "cnn_dailymail": "gpt-5-mini",
+                   "med_quad": "gpt-5-mini", "expertqa": "gpt-5-mini"}
+
+    def label_model_of(label_field, dataset):
+        if label_field == "correctness":
+            return JUDGE_MODEL.get(dataset, "gpt-5-mini(judge)")
+        if label_field == "correctness_alignscore":
+            return "yzha/AlignScore-large"
+        if label_field == "correctness_strmatch":
+            return "string-match"
+        return label_field
+
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
                  prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
@@ -113,6 +129,8 @@ def main():
             "task": data.TASK_OF[cfg.dataset],
             "split": r["split"],
             "correctness": r[lf],
+            "label_field": lf,
+            "label_model": label_model_of(lf, cfg.dataset),
             "msp_mean": msp_mean[i],
             "msp_min": msp_min[i],
             "msp_sum": msp_sum[i],
@@ -130,7 +148,8 @@ def main():
     unsup_cols = ["msp_mean", "msp_min", "msp_sum", "perplexity"]
     if ptrue_unsup is not None:
         unsup_cols.append("ptrue_unsup")
-    results.write_csv(csv_path, rows, [*unsup_cols, *sup.keys()])
+    results.write_csv(csv_path, rows, [*unsup_cols, *sup.keys()],
+                      meta_cols=["label_field", "label_model"])
 
     # PRR is computed on the test split only: SAPLMA has no train scores, and
     # MSP must be compared on the identical examples to be a fair anchor.
