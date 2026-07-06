@@ -27,13 +27,17 @@ export HF_HOME   # set by pbs/_env.sh, off $HOME
 DATASET="${LUQ_DATASET:-med_quad}"
 MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
 
-# Anti-loop decoding (the validated ExpertQA fix): open-ended neighbours have no natural stop on base
-# Llama and loop to the budget. NO --truncate-long: med_quad is tagged long_qa and must match its
-# long-form sibling pubmed_qa, which is generated UNtruncated. (History: v1 with truncate-long was a
-# no-op [0 newlines] and 67% capped / 11% loops; v2 added rep_pen but KEPT truncate-long, which then
-# cut the newline rep_pen induces as a first token -> 35% EMPTY. v3 = rep_pen, no truncation.)
-echo "neighbour extract: dataset=$DATASET model=$MODEL (fp32 + eager + rep_pen, long-form/untruncated) on $(hostname) at $(date)" >&2
+# Anti-loop decoding (v4). Open-ended neighbours have no natural stop on base Llama and loop to the
+# budget. Use --no-repeat-ngram-size 3 ALONE (no --repetition-penalty): no_repeat_ngram forbids
+# repeating a 3-gram WITHIN the generation (kills the v1 loops) without penalising the reuse of
+# context words a real answer legitimately repeats. NO --truncate-long: med_quad is tagged long_qa and
+# must match its long-form sibling pubmed_qa, generated UNtruncated.
+#   History: v1 (truncate-long, no anti-loop) = no-op truncation [0 newlines], 67% capped / 11% loops.
+#   v2 (rep_pen + truncate-long) cut the newline rep_pen emits first -> 35% EMPTY. v3 (rep_pen, no
+#   truncation) STILL 35% empty -> root cause = rep_pen penalises the long few-shot context, pushing
+#   immediate EOS. v4 drops rep_pen for no_repeat_ngram, which has no context-penalty side effect.
+echo "neighbour extract v4: dataset=$DATASET model=$MODEL (fp32 + eager + no_repeat_ngram=3, long-form/untruncated) on $(hostname) at $(date)" >&2
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 python scripts/01_extract.py --dataset "$DATASET" --ood ID --model "$MODEL" \
     --dtype fp32 --attn eager \
-    --repetition-penalty 1.3 --no-repeat-ngram-size 3
+    --no-repeat-ngram-size 3

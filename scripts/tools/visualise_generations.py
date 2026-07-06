@@ -114,11 +114,14 @@ def badge_html(flags):
 
 
 def corr_class(c):
+    if c is None:
+        return "mid"
     return "good" if c >= 0.7 else ("bad" if c < 0.3 else "mid")
 
 
 def card_html(rec, flags, glen, ratio, maxc, mspu):
-    c = float(rec["correctness"])
+    c = float(rec["correctness"]) if rec.get("correctness") is not None else None
+    corr_txt = f"{c:.2f}" if c is not None else "&mdash;"  # em-dash = not labelled yet
     q = rec.get("prompt", "")
     # trim the few-shot prompt down to the last question/context block for readability
     for mk in ("Abstract:", "Text:", "Question:"):
@@ -126,7 +129,7 @@ def card_html(rec, flags, glen, ratio, maxc, mspu):
             q = q[q.rfind(mk):]
             break
     return f"""<div class="card">
-  <div class="meta">corr <span class="num {corr_class(c)}">{c:.2f}</span> &nbsp;|&nbsp;
+  <div class="meta">corr <span class="num {corr_class(c)}">{corr_txt}</span> &nbsp;|&nbsp;
     MSP-unc <span class="num">{mspu:.2f}</span> &nbsp;|&nbsp; gen_len <span class="num">{glen}</span>
     &nbsp;|&nbsp; 4gram-rep <span class="num">{ratio:.2f}</span> (max&times;{maxc}) &nbsp; {badge_html(flags)}</div>
   <div class="q">{esc(q)[:600]}</div>
@@ -149,8 +152,15 @@ def main():
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
     recs = cache.load_records(cfg.cache_dir, cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting))
+    # A train-only neighbour (e.g. med_quad, an ID OOD source) has no 'test' split, so the default
+    # --split test would select 0 records. Fall back to all records and note it in the header.
+    split_note = ""
     if args.split != "all":
-        recs = [r for r in recs if r["split"] == args.split]
+        sel = [r for r in recs if r["split"] == args.split]
+        if not sel:
+            split_note = f" (no '{args.split}' split — showing all {len(recs)} records)"
+        else:
+            recs = sel
     mnt = data.MAX_NEW_TOKENS[cfg.dataset]
 
     # per-record quality + MSP uncertainty (higher = more uncertain, from the cached logprobs)
@@ -158,14 +168,21 @@ def main():
     for r in recs:
         f, glen, ratio, maxc = flags_for(r, mnt)
         mspu = msp.msp_uncertainty(r["token_logprobs"], "sum")
+        corr = float(r["correctness"]) if r.get("correctness") is not None else None
         rows.append({"rec": r, "flags": f, "glen": glen, "ratio": ratio, "maxc": maxc,
-                     "msp": mspu, "corr": float(r["correctness"])})
+                     "msp": mspu, "corr": corr})
 
+    # Pre-label sense-check: records generated but not yet judged carry no correctness field.
+    labelled = any(x["corr"] is not None for x in rows)
     n = len(rows)
     def rate(pred):
         return 100 * sum(1 for x in rows if pred(x)) / n
-    agg = (f"n={n} &nbsp; label=judge({data.TASK_OF[cfg.dataset]}) &nbsp; max_new_tokens={mnt} &nbsp; "
-           f"mean_corr={np.mean([x['corr'] for x in rows]):.3f}<br>"
+    label_txt = (f"judge({data.TASK_OF[cfg.dataset]})" if labelled
+                 else "UNLABELLED (pre-judge sense-check)")
+    corr_txt = (f"mean_corr={np.mean([x['corr'] for x in rows]):.3f}" if labelled
+                else "mean_corr=&mdash; (not labelled yet)")
+    agg = (f"n={n}{split_note} &nbsp; label={label_txt} &nbsp; max_new_tokens={mnt} &nbsp; "
+           f"{corr_txt}<br>"
            f"median gen_len={int(np.median([x['glen'] for x in rows]))} &nbsp; "
            f"CAPPED={rate(lambda x:'capped' in x['flags']):.1f}% &nbsp; "
            f"soft-loop={rate(lambda x:'soft-loop' in x['flags']):.1f}% &nbsp; "
@@ -186,13 +203,25 @@ def main():
          lambda x: -x["glen"]),
         ("Degenerate (soft-loop / hi-rep / junk / empty)",
          [x for x in rows if degen(x)], lambda x: -x["maxc"]),
-        ("Confident but WRONG (low MSP uncertainty, low correctness)",
-         [x for x in rows if x["mrank"] < 0.33 and x["corr"] < 0.3 and not degen(x)],
-         lambda x: x["mrank"]),
-        ("Uncertain but RIGHT (high MSP uncertainty, high correctness)",
-         [x for x in rows if x["mrank"] > 0.67 and x["corr"] > 0.7 and not degen(x)],
-         lambda x: -x["mrank"]),
     ]
+    if labelled:
+        # correctness-driven diagnostic sections (need judge labels)
+        sections += [
+            ("Confident but WRONG (low MSP uncertainty, low correctness)",
+             [x for x in rows if x["mrank"] < 0.33 and x["corr"] < 0.3 and not degen(x)],
+             lambda x: x["mrank"]),
+            ("Uncertain but RIGHT (high MSP uncertainty, high correctness)",
+             [x for x in rows if x["mrank"] > 0.67 and x["corr"] > 0.7 and not degen(x)],
+             lambda x: -x["mrank"]),
+        ]
+    else:
+        # pre-label: no correctness to sort by, so show an evenly-spread sample of clean
+        # generations so you can eyeball whether the content actually answers the gold.
+        clean = [x for x in rows if not degen(x) and "capped" not in x["flags"]]
+        step = max(len(clean) // max(args.per_section, 1), 1)
+        sections.append(
+            ("Sample — sense-check content vs gold (evenly spread, clean generations)",
+             clean[::step], lambda x: x["rec"]["idx"]))
 
     parts = [f"<style>{CSS}</style><div class='wrap'>",
              f"<h1>Generation quality — {cfg.dataset} / {cfg.ood_setting}</h1>",

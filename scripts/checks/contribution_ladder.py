@@ -49,7 +49,7 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from luq import cache, msp, results, weighted_msp  # noqa: E402
 from probe_drift.ood_settings import get_training_spec  # noqa: E402
-from aggregation_table import load_per_token, build_arrays, attn_unc  # noqa: E402
+from aggregation_table import load_per_token, build_arrays, attn_unc, paired_bootstrap  # noqa: E402
 from attn_pool import train_attn, select_temperature  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -62,9 +62,18 @@ ID_ANCHOR = {"sciq": {"uniform": 0.913, "attention": 0.932},
              "trivia_qa": {"uniform": 0.815, "attention": 0.844},
              "pubmed_qa": {"uniform": 0.683, "attention": 0.735}}
 GATE_TOL = 0.03
+# Rungs in ascending shift severity: SameTask (one same-family dataset) < LOO (everything-but-self,
+# mixed) < OneDatasetDiffTask (one opposite-family dataset) < DiffTask (the whole opposite family).
+# OneDatasetDiffTask self-skips until its single neighbour (samsum for QA evals) has a pertok cache.
 SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"),
             ("LOO", "OOD_LEAVE_ONE_OUT"),
+            ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"),
             ("DiffTask", "OOD_DIFF_TASK")]
+# Head-to-heads that get a paired test-set bootstrap CI (not just mean±std): does the contribution
+# beat the OOD-robust floor, do the poolers, and does the contribution beat the pooler?
+COMPARISONS = [("wmsp_norm_vs_floor", "weighted_msp_norm", "msp_sum"),
+               ("attention_vs_floor", "attention", "msp_sum"),
+               ("wmsp_norm_vs_attention", "weighted_msp_norm", "attention")]
 
 
 def sampled_train_idx(split, seed, cap):
@@ -121,6 +130,8 @@ def main():
         if X not in PT:
             continue
         per_method = {m: [] for m in methods}
+        unc_acc = {m: [] for m in methods}   # per-seed per-example uncertainty vectors (for the bootstrap)
+        yte_ref = None                        # test labels (identical across seeds; the bootstrap target)
         for sd in seeds:
             train_rows = [(d, i) for d, cap in spec for i in sampled_train_idx(PT[d][1], sd, cap)]
             test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
@@ -130,31 +141,35 @@ def main():
             tr_idx, te_idx = list(range(n_tr)), list(range(n_tr, n_tr + len(test_rows)))
             allrows = train_rows + test_rows
             y = np.array([PT[d][2][i] for d, i in allrows], dtype=float)
-            yte = [y[i] for i in te_idx]
+            yte = np.array([y[i] for i in te_idx], dtype=float)
+            yte_ref = yte  # identical values every seed (test rows are fixed); kept for the bootstrap
             states = [PT[d][0][i] for d, i in allrows]
             records = [PT[d][3][i] for d, i in allrows]
 
-            # poolers (uniform / attention) reuse the verified attn machinery
+            # Each method emits a per-example uncertainty VECTOR over te_idx (higher = more uncertain);
+            # we PRR it now and also stash it so the seed-averaged vector can feed a paired bootstrap.
             best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
-            res = {}
-            res["uniform"] = results.prr(yte, attn_unc(
-                train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True), states, te_idx, device))
-            res["attention"] = results.prr(yte, attn_unc(
-                train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T), states, te_idx, device))
+            vecs = {}
+            # poolers (uniform / attention) reuse the verified attn machinery
+            vecs["uniform"] = np.asarray(attn_unc(
+                train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True), states, te_idx, device), dtype=float)
+            vecs["attention"] = np.asarray(attn_unc(
+                train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T), states, te_idx, device), dtype=float)
             # weighted-MSP (contribution)
-            res["weighted_msp_norm"] = results.prr(yte, weighted_msp.weighted_msp_unc(
+            vecs["weighted_msp_norm"] = np.asarray(weighted_msp.weighted_msp_unc(
                 states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
-                length_normalise=ln, seed=sd))
-            res["weighted_msp_unc"] = results.prr(yte, weighted_msp.weighted_msp_unc(
+                length_normalise=ln, seed=sd), dtype=float)
+            vecs["weighted_msp_unc"] = np.asarray(weighted_msp.weighted_msp_unc(
                 states, records, y, tr_idx, te_idx, device, weight_mode="unconstrained",
-                length_normalise=ln, seed=sd))
+                length_normalise=ln, seed=sd), dtype=float)
             # plain MSP floor (unsupervised -> identical across seeds/rungs, computed per cell for the table)
-            res["msp_sum"] = results.prr(yte, [msp.msp_uncertainty(records[i]["token_logprobs"], "sum")
-                                               for i in te_idx])
-            res["perplexity"] = results.prr(yte, [msp.msp_uncertainty(records[i]["token_logprobs"], "perplexity")
-                                                  for i in te_idx])
-            for m, v in res.items():
-                per_method[m].append(v)
+            vecs["msp_sum"] = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "sum")
+                                          for i in te_idx], dtype=float)
+            vecs["perplexity"] = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "perplexity")
+                                             for i in te_idx], dtype=float)
+            for m, u in vecs.items():
+                per_method[m].append(results.prr(yte, u))
+                unc_acc[m].append(u)
 
         stats = {m: (float(np.mean(v)), float(np.std(v))) for m, v in per_method.items() if v}
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
@@ -173,10 +188,22 @@ def main():
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                                  "n_seeds": len(per_method[m])})
+        # Paired test-set bootstrap on the seed-averaged uncertainty vectors: turns the head-to-heads
+        # (contribution vs floor, pooler vs floor, contribution vs pooler) into CI-backed verdicts.
+        avg_unc = {m: np.mean(np.stack(unc_acc[m]), axis=0) for m in unc_acc if unc_acc[m]}
+        for vk, a, b in COMPARISONS:
+            if a in avg_unc and b in avg_unc and yte_ref is not None:
+                mg, lo, hi, p, sig = paired_bootstrap(yte_ref, avg_unc[a], avg_unc[b])
+                print(f"    [verdict] {vk:24s} margin {mg:+.3f}  95%CI [{lo:+.3f},{hi:+.3f}]  "
+                      f"p={p:.3f} -> {'SIG' if sig else 'ns'}", flush=True)
+                out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
+                                 "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
+                                 "boot_p": round(p, 4), "significant": sig, "n_seeds": len(seeds)})
 
     out = Path(args.out) if args.out else (ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds"])
+        w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
+                                           "n_seeds", "ci_lo", "ci_hi", "boot_p", "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 
