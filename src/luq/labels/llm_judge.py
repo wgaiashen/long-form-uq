@@ -130,6 +130,13 @@ def _extract_question(prompt: str, judge_name: str):
         prompt = prompt[: prompt.rfind("Answer:")]
         prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
         return prompt, ":"
+    if judge_name == "med_quad":
+        # med_quad = few-shot 'Question:/Answer:' medical QA (same prompt shape as triviaqa/expertqa).
+        # Trim to the LAST question; QA judge scores the response vs the free-text gold answer with
+        # partial credit. Used as a same-task OOD neighbour of pubmed_qa (a training source).
+        prompt = prompt[: prompt.rfind("Answer:")]
+        prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
+        return prompt, ":"
     raise ValueError(f"no prompt-trimming rule for judge dataset {judge_name!r}")
 
 

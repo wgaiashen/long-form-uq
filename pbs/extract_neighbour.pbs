@@ -27,7 +27,11 @@ export HF_HOME   # set by pbs/_env.sh, off $HOME
 DATASET="${LUQ_DATASET:-med_quad}"
 MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
 
-echo "neighbour extract: dataset=$DATASET model=$MODEL (fp32 + eager + truncate-long) on $(hostname) at $(date)" >&2
+# Anti-loop decoding (the validated ExpertQA fix): open-ended neighbours (medical QA) have no natural
+# stop on base Llama and ramble/loop to the budget (med_quad v1: 67% capped, 11% repetition-degenerate,
+# 0% newline so --truncate-long was a no-op). repetition_penalty + no_repeat_ngram fix that.
+echo "neighbour extract: dataset=$DATASET model=$MODEL (fp32 + eager + truncate-long + rep_pen) on $(hostname) at $(date)" >&2
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 python scripts/01_extract.py --dataset "$DATASET" --ood ID --model "$MODEL" \
-    --dtype fp32 --attn eager --truncate-long
+    --dtype fp32 --attn eager --truncate-long \
+    --repetition-penalty 1.3 --no-repeat-ngram-size 3
