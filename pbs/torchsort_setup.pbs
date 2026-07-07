@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=16gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_torchsort
+#PBS -j oe
+
+# Track B (Phase 4): install torchsort (Blondel differentiable soft-rank) and run the loss sanity.
+# CPU-ONLY build on purpose: we call torchsort.soft_rank on CPU tensors (batch ~32, negligible), so we
+# do NOT need the CUDA op, and forcing a CPU-only build (CUDA_HOME unset) avoids RCS's system-CUDA /
+# libcusparse conflicts and guarantees the build succeeds without nvcc. No GPU requested.
+# Submitted with `-W depend=afterany:<refresh-jobid>` so it never mutates the shared conda env while the
+# refresh_tables job is still running.
+#   qsub -W depend=afterany:3237752.pbs-7 pbs/torchsort_setup.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+
+echo "=== torchsort setup on $(hostname) at $(date) ===" >&2
+echo "--- internet reachable? ---" >&2
+curl -sSI --max-time 15 https://pypi.org/simple/torchsort/ | head -1 || echo "WARN: pypi not reachable from this node" >&2
+
+python -c "import torch, numpy; print('before: torch', torch.__version__, '| numpy', numpy.__version__)"
+
+echo "--- installing torchsort (CPU-only build: CUDA_HOME unset) ---" >&2
+# --no-build-isolation so it builds against the env's already-installed torch (torchsort imports torch
+# at build time); CUDA_HOME= forces the CPU-only extension.
+CUDA_HOME= FORCE_CUDA=0 pip install --no-build-isolation torchsort
+
+echo "--- verify torch/numpy UNCHANGED (install must not have upgraded them) ---" >&2
+python -c "import torch, numpy, torchsort; print('after : torch', torch.__version__, '| numpy', numpy.__version__, '| torchsort', torchsort.__version__)"
+
+echo "--- Blondel-vs-pairwise loss sanity ---" >&2
+python -u scripts/checks/weighted_msp_loss_sanity.py
+echo "=== torchsort setup done at $(date) ===" >&2

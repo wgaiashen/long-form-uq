@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=24gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_eqa_loco
+#PBS -j oe
+
+# ExpertQA Role-C domain-shift rung: leave-one-cluster-out SAPLMA probe vs the MSP floor, per label
+# (faithfulness, consistency). CPU only -- the SAPLMA L15 features + both judge labels are already
+# cached (cache/expertqa_rp12), so no GPU and no generation. Loads a ~965 MB feature npz + trains small
+# MLP probes, so it goes through the scheduler (not the login node).
+#   qsub pbs/expertqa_loco.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+
+echo "=== expertqa Role-C LOCO on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/expertqa_loco.py --seeds 1 2 3
+echo "=== done at $(date) ===" >&2

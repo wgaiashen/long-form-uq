@@ -119,7 +119,9 @@ def _extract_question(prompt: str, judge_name: str):
         prompt = prompt[prompt.rfind("Abstract:"):]
         prompt = prompt.replace("Abstract: \n", "")  # drop empty-abstract mention
         return prompt, ":"
-    if judge_name in ("xsum", "cnn_dailymail"):
+    if judge_name in ("xsum", "cnn_dailymail", "samsum"):
+        # samsum's dialogue-summary prompt uses the identical "Text:\n...\nSummary (one sentence):"
+        # markers as xsum, so the same trim + summary template apply verbatim.
         prompt = prompt[: prompt.rfind("Summary")].strip("\n").strip()
         prompt = prompt[prompt.rfind("Text:"):]
         return prompt, None  # caveat unused for the summary template
@@ -204,7 +206,7 @@ def build_prompt(record: dict, dataset: str, strip_newlines: bool = False) -> st
     label, answer = record["target"], record["gen_text"]
     if strip_newlines:
         answer = answer.replace("\n", "").strip()
-    if judge_name in ("xsum", "cnn_dailymail"):
+    if judge_name in ("xsum", "cnn_dailymail", "samsum"):
         return _summary_prompt(question, label, answer)
     return _qa_prompt(question, label, answer, caveat)
 

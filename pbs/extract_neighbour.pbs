@@ -36,8 +36,14 @@ MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
 #   v2 (rep_pen + truncate-long) cut the newline rep_pen emits first -> 35% EMPTY. v3 (rep_pen, no
 #   truncation) STILL 35% empty -> root cause = rep_pen penalises the long few-shot context, pushing
 #   immediate EOS. v4 drops rep_pen for no_repeat_ngram, which has no context-penalty side effect.
-echo "neighbour extract v4: dataset=$DATASET model=$MODEL (fp32 + eager + no_repeat_ngram=3, long-form/untruncated) on $(hostname) at $(date)" >&2
+# Anti-loop is opt-OUT via LUQ_NO_REPEAT_NGRAM (default 3, for open-ended QA neighbours like med_quad
+# that loop on base Llama). Set it to none/0/"" for PLAIN decoding -- e.g. samsum, which is short
+# grounded summarisation matched to xsum's original (frozen, no anti-loop) run for summ-family
+# comparability; its 56-token grounded budget is not loop-prone. fp32 + eager and untruncated always.
+NR="${LUQ_NO_REPEAT_NGRAM-3}"
+EXTRA=()
+case "$NR" in ""|none|0) DECODE="plain (no anti-loop)";; *) EXTRA+=(--no-repeat-ngram-size "$NR"); DECODE="no_repeat_ngram=$NR";; esac
+echo "neighbour extract: dataset=$DATASET model=$MODEL (fp32 + eager + $DECODE, long-form/untruncated) on $(hostname) at $(date)" >&2
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 python scripts/01_extract.py --dataset "$DATASET" --ood ID --model "$MODEL" \
-    --dtype fp32 --attn eager \
-    --no-repeat-ngram-size 3
+    --dtype fp32 --attn eager "${EXTRA[@]}"

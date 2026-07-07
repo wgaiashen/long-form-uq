@@ -44,6 +44,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
+from luq import answer_span as A  # noqa: E402
 from luq import cache, data, msp  # noqa: E402
 from luq.config import Config  # noqa: E402
 
@@ -104,6 +105,8 @@ h1{font-size:20px} h2{font-size:16px;margin-top:28px;border-bottom:1px solid #33
 .b-hirep{background:#7f1d1d;color:#fecaca} .b-junk{background:#581c87;color:#e9d5ff}
 .b-empty{background:#450a0a;color:#fca5a5}
 .num{font-variant-numeric:tabular-nums} .good{color:#22c55e} .bad{color:#f87171} .mid{color:#fbbf24}
+.cut{color:#5a6472;text-decoration:line-through;opacity:.75}
+.b-cut{background:#1e3a5f;color:#bfdbfe}
 """
 
 
@@ -119,7 +122,7 @@ def corr_class(c):
     return "good" if c >= 0.7 else ("bad" if c < 0.3 else "mid")
 
 
-def card_html(rec, flags, glen, ratio, maxc, mspu):
+def card_html(rec, flags, glen, ratio, maxc, mspu, cut, reason):
     c = float(rec["correctness"]) if rec.get("correctness") is not None else None
     corr_txt = f"{c:.2f}" if c is not None else "&mdash;"  # em-dash = not labelled yet
     q = rec.get("prompt", "")
@@ -128,13 +131,21 @@ def card_html(rec, flags, glen, ratio, maxc, mspu):
         if mk in q:
             q = q[q.rfind(mk):]
             break
+    # render the generation with the answer-span cut: KEPT text normal, discarded tail struck out
+    g = rec["gen_text"]
+    kept, tail = esc(g[:cut]), esc(g[cut:])
+    gen_html = kept or "<i>(empty)</i>"
+    if tail:
+        gen_html += f'<span class="cut">{tail}</span>'
+    cut_badge = (f'<span class="badge b-cut">cut: {esc(reason)}</span>'
+                 if not reason.startswith("no-cut") else "")
     return f"""<div class="card">
   <div class="meta">corr <span class="num {corr_class(c)}">{corr_txt}</span> &nbsp;|&nbsp;
     MSP-unc <span class="num">{mspu:.2f}</span> &nbsp;|&nbsp; gen_len <span class="num">{glen}</span>
-    &nbsp;|&nbsp; 4gram-rep <span class="num">{ratio:.2f}</span> (max&times;{maxc}) &nbsp; {badge_html(flags)}</div>
+    &nbsp;|&nbsp; 4gram-rep <span class="num">{ratio:.2f}</span> (max&times;{maxc}) &nbsp; {badge_html(flags)}{cut_badge}</div>
   <div class="q">{esc(q)[:600]}</div>
   <div class="cols">
-    <div class="col"><h4>Model generation</h4><div class="gen">{esc(rec['gen_text']) or '<i>(empty)</i>'}</div></div>
+    <div class="col"><h4>Model generation <span style="color:#5a6472">(struck = answer-span cut)</span></h4><div class="gen">{gen_html}</div></div>
     <div class="col"><h4>Gold answer</h4><div class="gold">{esc(rec['target'])}</div></div>
   </div>
 </div>"""
@@ -169,8 +180,9 @@ def main():
         f, glen, ratio, maxc = flags_for(r, mnt)
         mspu = msp.msp_uncertainty(r["token_logprobs"], "sum")
         corr = float(r["correctness"]) if r.get("correctness") is not None else None
+        _, cut, reason = A.answer_span(r["gen_text"], cfg.dataset, context=r.get("prompt"))
         rows.append({"rec": r, "flags": f, "glen": glen, "ratio": ratio, "maxc": maxc,
-                     "msp": mspu, "corr": corr})
+                     "msp": mspu, "corr": corr, "cut": cut, "reason": reason})
 
     # Pre-label sense-check: records generated but not yet judged carry no correctness field.
     labelled = any(x["corr"] is not None for x in rows)
@@ -188,7 +200,11 @@ def main():
            f"soft-loop={rate(lambda x:'soft-loop' in x['flags']):.1f}% &nbsp; "
            f"hi-rep={rate(lambda x:'hi-rep' in x['flags']):.1f}% &nbsp; "
            f"junk={rate(lambda x:'junk' in x['flags']):.1f}% &nbsp; "
-           f"empty={rate(lambda x:'empty' in x['flags']):.1f}%")
+           f"empty={rate(lambda x:'empty' in x['flags']):.1f}%<br>"
+           f"answer-span CUT={rate(lambda x:x['cut']<len(x['rec']['gen_text'])):.1f}% "
+           f"(struck-through text is removed before re-pooling)"
+           + (f" &nbsp; ECHO-flagged={rate(lambda x:'ECHO-FLAG' in x['reason']):.1f}%"
+              if cfg.dataset == 'pubmed_qa' else ""))
 
     # MSP uncertainty normalised to a rank in [0,1] so 'confident' = bottom third of uncertainty
     msp_sorted = np.argsort([x["msp"] for x in rows])
@@ -232,7 +248,8 @@ def main():
         if not items:
             parts.append("<div class='meta'>none</div>")
         for x in items:
-            parts.append(card_html(x["rec"], x["flags"], x["glen"], x["ratio"], x["maxc"], x["msp"]))
+            parts.append(card_html(x["rec"], x["flags"], x["glen"], x["ratio"], x["maxc"],
+                                   x["msp"], x["cut"], x["reason"]))
     parts.append("</div>")
 
     out = Path(args.out) if args.out else (cfg.results_dir / "viz" /

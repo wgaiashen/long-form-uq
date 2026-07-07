@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=02:00:00
+#PBS -N repool_trunc
+#PBS -j oe
+
+# Step 2 of the answer-span plan: re-pool the cached per-token L15 states over the answer span
+# (raw + truncated, side by side) and run the alignment gate. CPU-only -- pure numpy slicing of the
+# already-cached states, no model/GPU. Heavy on memory/IO (loads the ~GB pertok caches), so it must
+# run on a compute node, not the login node.
+#   default (the 4 cached datasets):  qsub pbs/repool_truncated.pbs
+#   one dataset (e.g. med_quad after its 01h lands): qsub -v LUQ_DATASETS=med_quad pbs/repool_truncated.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1   # tokenizer is already in HF_HOME; no download on the compute node
+
+DATASETS="$(echo "${LUQ_DATASETS:-sciq:trivia_qa:pubmed_qa:xsum}" | tr ':' ' ')"
+echo "repool_truncated on $(hostname) at $(date): datasets=$DATASETS" >&2
+python -u scripts/checks/repool_truncated.py --datasets $DATASETS --layer 15

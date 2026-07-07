@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=02:00:00
+#PBS -N prr_rvt
+#PBS -j oe
+
+# Step 5: PRR raw vs truncated for SAPLMA-mean/last-L15, ID + OOD pairs. Trains the cheap probe
+# (forbidden on the login node) -> compute node. Reads the step-2 pertok_trunc caches; no GPU.
+#   qsub pbs/prr_raw_vs_trunc.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+echo "prr_raw_vs_trunc on $(hostname) at $(date)" >&2
+python -u scripts/checks/prr_raw_vs_trunc.py --seeds 1 2 3

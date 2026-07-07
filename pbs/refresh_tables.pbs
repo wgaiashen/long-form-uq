@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=12:00:00
+# NOTE: CPU-ONLY on purpose. This job does NOT load the 8B LLM -- it trains small attention poolers +
+# sklearn SAPLMA probes on CACHED features, and the audit (identical workload) was CPU-bound anyway
+# (3h39 CPU-time at 99%). The GPU node set was saturated (queued >5h), so we drop the GPU entirely: the
+# scripts auto-fall-back to device="cpu", and this places on the far-less-contended CPU queue. 8 cores
+# to help the torch/sklearn loops; 12h walltime for headroom.
+#PBS -N luq_refresh
+#PBS -j oe
+
+# Promote the verified-from-cache tables to CANONICAL (moves #1b + #2):
+#   * contribution_ladder  -- now reads med_quad's PROMOTED clean label (correctness = correctness_clean),
+#     so the SameTask rung + med_quad-in-LOO mixes train on the clean labels. (move #1b)
+#   * aggregation_table     -- both label-fields (correctness + correctness_alignscore) so canonical keeps
+#     the secondary alignscore rows AND gains the paired-bootstrap significance columns (Inc-0 refresh). (move #2)
+# Both scripts write canonical ONLY after their internal gates pass (mean-pool reproduces cached SAPLMA;
+# ID anchors hold), so a bad cache aborts BEFORE the write. Old canonical CSVs are backed up first.
+# GPU (L40S): both builders train the attention pooler. NEVER on the login node.
+#   qsub pbs/refresh_tables.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+BK="results/prev/2026-07-07"
+mkdir -p "$BK"
+echo "=== refresh_tables on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+# back up the current canonical tables before overwriting
+for f in "aggregation_table__${SLUG}.csv" "contribution_ladder__${SLUG}.csv"; do
+  [ -f "results/$f" ] && cp -v "results/$f" "$BK/$f" >&2
+done
+
+echo -e "\n########## (1/2) ID table -> canonical (both label-fields, bootstrap) ##########" >&2
+python -u scripts/checks/aggregation_table.py \
+    --datasets sciq,trivia_qa,pubmed_qa,xsum \
+    --label-fields correctness,correctness_alignscore \
+    --seeds 1,2,3
+
+echo -e "\n########## (2/2) OOD ladder -> canonical (clean med_quad) ##########" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3
+
+echo -e "\n=== refresh done at $(date) ===" >&2
+echo "backups in $BK ; canonical tables in results/" >&2

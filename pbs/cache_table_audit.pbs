@@ -1,0 +1,44 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=04:00:00
+#PBS -N luq_audit
+#PBS -j oe
+
+# CACHE <-> TABLE CONSISTENCY AUDIT (read-only w.r.t. the committed tables).
+# Proves the reported ID + OOD numbers are reproducible from the caches, and settles the xsum
+# bf16-SAPLMA-feature flag. Regenerates BOTH consolidated tables FROM the caches into a throwaway
+# results/audit/ dir (so the on-disk tables are untouched and can be diffed against), then runs the
+# cache-level audit which (a) fingerprints each cache's dtype, (b) shows the reported SAPLMA-mean is
+# fp32-pertok not bf16-feature, (c) confirms labels align, (d) diffs fresh-vs-on-disk PRR cells.
+# GPU (L40S) because both table-builders train the attention pooler. NEVER run on the login node.
+#   qsub pbs/cache_table_audit.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+mkdir -p results/audit
+echo "=== cache<->table audit on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+echo -e "\n########## (1/3) regenerate ID table from cache (aggregation_table) ##########" >&2
+python -u scripts/checks/aggregation_table.py \
+    --datasets sciq,trivia_qa,pubmed_qa,xsum \
+    --label-fields correctness \
+    --seeds 1,2,3 \
+    --out results/audit/aggregation_table_fresh.csv
+
+echo -e "\n########## (2/3) regenerate OOD ladder from cache (contribution_ladder) ##########" >&2
+python -u scripts/checks/contribution_ladder.py \
+    --seeds 1,2,3 \
+    --out results/audit/contribution_ladder_fresh.csv
+
+echo -e "\n########## (3/3) cache-level audit + fresh-vs-ondisk diff ##########" >&2
+python -u scripts/checks/cache_table_audit.py \
+    --datasets sciq,trivia_qa,pubmed_qa,xsum,med_quad
+
+echo -e "\n=== audit done at $(date) ===" >&2

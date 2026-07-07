@@ -103,6 +103,44 @@ def _true_rank(incorrectness):
     return ranks
 
 
+# --- Blondel et al. 2020 differentiable soft rank (arXiv:2002.08871), the Phase-4 loss upgrade ------
+# Joe's `_soft_rank` above is a hand-rolled O(n^2) sigmoid pairwise rank. Blondel's operator is EXACT,
+# O(n log n), order-preserving, and has better-behaved gradients -- Joe pointed at it as the lever to
+# improve the underwhelming pairwise version. It ships as torchsort.soft_rank. Imported lazily+guarded
+# so this module (and the pairwise loss) still work on a node where torchsort is not built.
+try:
+    import torchsort  # noqa: E402
+    _HAVE_TORCHSORT = True
+except Exception:  # not installed / extension not built
+    torchsort = None
+    _HAVE_TORCHSORT = False
+
+
+def _blondel_soft_rank(q, eps):
+    """Blondel differentiable soft rank of a 1-D score vector q (higher q -> higher rank). `eps` is
+    torchsort's regularization_strength: smaller -> closer to the true (hard) rank but flatter
+    gradients; larger -> smoother but more biased. torchsort ranks along the last dim of a 2-D input,
+    so we add and drop a batch axis."""
+    if not _HAVE_TORCHSORT:
+        raise RuntimeError("torchsort not installed/built -> loss='blondel' unavailable. "
+                           "pip install torchsort on a compute node, or use loss='pairwise'.")
+    # Run on CPU regardless of q's device: torchsort's CUDA op only exists if the extension was built
+    # with nvcc (we force a CPU-only build to avoid RCS's system-CUDA conflicts). The batch is ~32, so
+    # the copy is negligible; .cpu()/.to() are differentiable, so gradients still flow back to q.
+    r = torchsort.soft_rank(q.cpu().unsqueeze(0), regularization_strength=eps).squeeze(0)
+    return r.to(q.device)
+
+
+def _spearman_loss(soft_r, target_rank):
+    """Negative differentiable Spearman = -Pearson(soft_r, target_rank) (Blondel section 6.3).
+    Minimising it maximises the rank correlation between the predicted scores and the true
+    incorrectness ranks -- exactly the ranking PRR rewards. Both are standardised, so the scale of the
+    soft ranks (which `eps` changes) does not matter."""
+    sr = soft_r - soft_r.mean()
+    tr = target_rank - target_rank.mean()
+    return -(sr * tr).sum() / (sr.norm() * tr.norm() + 1e-8)
+
+
 # --------------------------------------------------------------------------------------
 # Weights and the sequence score
 # --------------------------------------------------------------------------------------
@@ -139,15 +177,20 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool):
 # --------------------------------------------------------------------------------------
 
 def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="normalised",
-                       length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3):
-    """Learn the token weighter by the soft-rank loss. `y` is correctness (higher = better);
-    the target is incorrectness = 1 - y. Returns the trained model (unused for constant mode).
+                       length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3,
+                       loss="pairwise", blondel_eps=0.1):
+    """Learn the token weighter by a ranking loss. `y` is correctness (higher = better); the target is
+    incorrectness = 1 - y. Returns the trained model (unused for constant mode).
+
+    `loss` selects the ranking surrogate:
+      "pairwise"  Joe's hand-rolled O(n^2) sigmoid soft-rank MSE (the original; the fallback baseline).
+      "blondel"   Blondel 2020 differentiable Spearman via torchsort.soft_rank (exact, O(n log n)); the
+                  Phase-4 upgrade. `blondel_eps` is torchsort's regularization_strength (start small).
 
     Defaults follow Joe (AdamW, 5 epochs, batch 32, lr 1e-3, softmax `normalised`, length_normalise
-    required -> we default True as the standard convention). NOTE: which of sum vs length-normalised
-    is better is TASK-DEPENDENT, not a settled win either way -- against the judge label plain msp_sum
-    beats perplexity on pubmed (+0.20 vs -0.17) while the two tie on short-form (see msp_floor.py). So
-    length_normalise is a knob to sweep, not a fixed truth; do not assume it helps."""
+    True). NOTE: which of sum vs length-normalised is better is TASK-DEPENDENT, not a settled win either
+    way -- against the judge label plain msp_sum beats perplexity on pubmed (+0.20 vs -0.17) while the two
+    tie on short-form (see msp_floor.py). So length_normalise is a knob to sweep, not a fixed truth."""
     torch.manual_seed(seed)
     d = answer_states(states[tr_idx[0]]).shape[1]
     model = TokenWeightMLP(d).to(device)
@@ -167,11 +210,17 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
         perm = torch.randperm(n_seq, generator=g).tolist()
         for b in range(0, n_seq, batch_size):
             batch = perm[b:b + batch_size]
+            if len(batch) < 2:
+                continue  # a rank loss needs >=2 items to compare (skip a size-1 tail batch)
             q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise)
                              for j in batch])
-            loss = ((_soft_rank(q) - _true_rank(incorrect[batch])) ** 2).mean()
+            target = _true_rank(incorrect[batch])
+            if loss == "blondel":
+                loss_val = _spearman_loss(_blondel_soft_rank(q, blondel_eps), target)
+            else:  # "pairwise": Joe's hand-rolled sigmoid soft-rank MSE
+                loss_val = ((_soft_rank(q) - target) ** 2).mean()
             opt.zero_grad()
-            loss.backward()
+            loss_val.backward()
             opt.step()
     return model
 
@@ -193,11 +242,13 @@ def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="no
 
 
 def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode="normalised",
-                     length_normalise=True, seed=1):
+                     length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
-    (same shape as attn_pool.attn_unc): higher = more uncertain."""
+    (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
+    ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade)."""
     model = train_weighted_msp(states, records, y, tr_idx, device, weight_mode=weight_mode,
-                               length_normalise=length_normalise, seed=seed)
+                               length_normalise=length_normalise, seed=seed, loss=loss,
+                               blondel_eps=blondel_eps)
     return predict_weighted_msp(model, states, records, te_idx, device,
                                 weight_mode=weight_mode, length_normalise=length_normalise)
 

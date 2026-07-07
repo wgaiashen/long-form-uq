@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N ptrue_trunc
+#PBS -j oe
+
+# Step 5 (append/P(True) arm): re-extract the verdict-position L15 state over the CLEAN answer span
+# and report PRR raw vs truncated. GPU (a verdict forward per record, twice). Needs the dataset
+# judge-labelled (PRR uses correctness). med_quad/sciq/trivia/pubmed fit the L40S in fp32; xsum's
+# long sources OOM in fp32 -> DoC.
+#   qsub -v LUQ_DATASET=med_quad pbs/ptrue_truncated.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+DATASET="${LUQ_DATASET:-med_quad}"
+echo "ptrue_truncated: dataset=$DATASET (fp32+eager, L15) on $(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/checks/ptrue_truncated.py --dataset "$DATASET" --layer 15 --dtype fp32

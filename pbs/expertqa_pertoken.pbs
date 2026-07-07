@@ -1,0 +1,31 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N luq_eqa_pertok
+#PBS -j oe
+
+# B2 STRETCH: per-token L15 states for ExpertQA (2016 recs), so weighted-MSP + the attention pooler can
+# be placed on the ExpertQA domain-shift rung alongside SAPLMA. Teacher-forced fp32 + eager over the
+# cached records (cache/expertqa_rp12), writing cache/expertqa_rp12/pertok/...__L15.npz.
+#
+# fp32 on an L40S (48GB) is TRIED FIRST: ExpertQA has no long source (short question, answer <=384), so
+# it may fit despite the old xsum-driven "fp32+384 OOMs" note -- VERIFY. If it OOMs here, run the SAME
+# command on a DoC A100-80GB and rsync the pertok back (see the plan's B2 sync recipe). 01h's reload gate
+# trains a probe on `faithfulness`, so pass --label-field if needed; expertqa records are judge-labelled.
+#   qsub pbs/expertqa_pertoken.pbs
+#   # DoC fallback: same python line under salloc --partition=a100 --gres=gpu:1
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+echo "01h expertqa pertok (fp32+eager, L15) on $(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/01h_pertoken.py --model meta-llama/Meta-Llama-3.1-8B \
+    --dataset expertqa --ood ID --prompt-regime expertqa_rp12 \
+    --layer 15 --dtype fp32 --attn eager
+echo "=== done at $(date) ===" >&2

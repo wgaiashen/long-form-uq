@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N luq_pertok
+#PBS -j oe
+
+# GPU step 01h_pertoken: teacher-forced recompute of the per-token L15 states over the SAPLMA
+# window, cached to cache/pertok/<key>__L15.npz. fp32 + eager (dtype/attn-consistent with the other
+# datasets' pertok caches). Its reload sanity gate trains a probe on `correctness`, so the dataset
+# MUST be judge-labelled first. med_quad fits the 48GB L40S in fp32 (moderate prompt/answer length,
+# unlike xsum's long articles which need DoC).
+#   qsub -v LUQ_DATASET=med_quad pbs/pertoken.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+DATASET="${LUQ_DATASET:-med_quad}"
+MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
+echo "01h_pertoken: dataset=$DATASET model=$MODEL (fp32+eager, L15) on $(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DATASET" --ood ID \
+    --layer 15 --dtype fp32 --attn eager

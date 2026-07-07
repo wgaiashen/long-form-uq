@@ -20,6 +20,7 @@ JUDGE_NAME_MAP = {
     "cnn_dailymail": "cnn_dailymail",
     "expertqa": "expertqa",   # long-form FACTUALITY QA (not a ProbeDrift dataset)
     "med_quad": "med_quad",   # medical QA; a same-task OOD NEIGHBOUR for pubmed_qa (training source)
+    "samsum": "samsum",       # dialogue summarisation; xsum's same-task neighbour + a 2nd summ set for QA DiffTask
 }
 
 # Datasets whose correctness comes from string match (the rest use the LLM judge).
@@ -39,6 +40,7 @@ TASK_OF = {
     "cnn_dailymail": "summarisation",
     "expertqa": "long_qa",   # PLACEHOLDER (property tag deferred)
     "med_quad": "long_qa",   # same task family as pubmed_qa (medical QA) -> the SameTask OOD rung
+    "samsum": "summarisation",   # dialogue summarisation -> a 2nd summ set (de-degenerates QA DiffTask)
 }
 
 # Per-dataset generation budget. The updated ProbeDrift no longer ships max_new_tokens on
@@ -58,6 +60,9 @@ MAX_NEW_TOKENS = {
     # med_quad answers are 1-3 free-text sentences on one line; 128 (matching its pubmed sibling) is
     # a safe budget and the few-shot format is truncated at the first newline anyway (see load()).
     "med_quad": 128,
+    # samsum reference summaries are one sentence (prompt: "Summary (one sentence):"); 56 matches its
+    # summarisation sibling xsum so the two are budget-consistent in the QA DiffTask pool.
+    "samsum": 56,
 }
 
 
@@ -72,6 +77,8 @@ def load(dataset: str, ood_setting: str = "ID"):
         return _load_expertqa(ood_setting)
     if dataset == "med_quad":
         return _load_med_quad(ood_setting)
+    if dataset == "samsum":
+        return _load_samsum(ood_setting)
     return get_datasets(
         eval_dataset=dataset,
         ood_setting=ood_setting,
@@ -97,6 +104,30 @@ def _load_med_quad(ood_setting: str):
         raise ValueError(f"med_quad: only 'ID' is supported (it is a training source, not an eval "
                          f"target); got {ood_setting!r}")
     train_ds, _ = get_datasets(eval_dataset="pubmed_qa", ood_setting="OOD_ONE_DATASET_SAME_TASK",
+                               instruct=False, batch_size=1)
+    empty_eval = PDDataset([], [], batch_size=1)
+    return train_ds, empty_eval
+
+
+def _load_samsum(ood_setting: str):
+    """samsum (dialogue summarisation) as a first-class TRAINING source, exactly like med_quad.
+
+    Purpose: samsum is the summarisation family's second cached set. It (a) de-degenerates the QA
+    evals' OOD_DIFF_TASK rung -- their summarisation pool is {samsum, xsum, cnn_dailymail} but only
+    xsum was cached, so DiffTask collapsed to a single dataset already inside LOO -- and (b) is xsum's
+    OOD_ONE_DATASET_SAME_TASK neighbour, so it also unlocks a summarisation-eval SameTask rung.
+
+    samsum is train-only in ProbeDrift (eval_split='validation', not a keystone eval), so like med_quad
+    it is only reachable as a TRAINING pool: it is xsum's same-task neighbour, so we pull it via
+    get_datasets(eval_dataset='xsum', OOD_ONE_DATASET_SAME_TASK) -> 1800 samsum rows, already
+    few-shot-formatted, and present them under the key `samsum__ID`, all in the TRAIN split (no held-out
+    samsum eval; it is a training source only). It is long-form summarisation, so NOT string-matched --
+    the summary judge labels it (JUDGE_NAME_MAP['samsum'] -> 'samsum', routed to the summary prompt),
+    and it is never truncated."""
+    if ood_setting != "ID":
+        raise ValueError(f"samsum: only 'ID' is supported (it is a training source, not an eval "
+                         f"target); got {ood_setting!r}")
+    train_ds, _ = get_datasets(eval_dataset="xsum", ood_setting="OOD_ONE_DATASET_SAME_TASK",
                                instruct=False, batch_size=1)
     empty_eval = PDDataset([], [], batch_size=1)
     return train_ds, empty_eval
