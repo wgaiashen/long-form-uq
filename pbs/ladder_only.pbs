@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_ladder
+#PBS -j oe
+
+# Re-run the OOD contribution ladder with samsum now added as a source (de-degenerates the QA->DiffTask
+# rung {xsum}->{samsum,xsum} and enters the LOO mixture). CPU-only (the RCS GPU queue is jammed and this
+# job only trains small attention poolers on cached features). Backs up the current canonical ladder CSV
+# before overwriting it.
+#   qsub pbs/ladder_only.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+BK="results/prev/2026-07-08"; mkdir -p "$BK"
+[ -f "results/contribution_ladder__${SLUG}.csv" ] && cp -v "results/contribution_ladder__${SLUG}.csv" "$BK/" >&2
+
+echo "=== contribution ladder (with samsum) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

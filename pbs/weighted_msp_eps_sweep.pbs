@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_eps
+#PBS -j oe
+# Blondel eps (torchsort smoothing) sweep for weighted-MSP: does a smoother eps recover LOO without
+# losing the ID/DiffTask gains? Tests the overfitting hypothesis. CPU; needs torchsort.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+echo "=== weighted_msp eps sweep on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_eps_sweep.py --eps 0.03 0.1 0.3 1.0 3.0 10.0 --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

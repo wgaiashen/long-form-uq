@@ -163,12 +163,23 @@ def _weights_from_raw(raw, weight_mode: str):
     raise ValueError(f"weight_mode must be normalised|unconstrained|constant, got {weight_mode!r}")
 
 
-def _seq_q(raw, nll, weight_mode: str, length_normalise: bool):
-    """One sequence's score q = sum_t w_t * nll_t, divided by length if length_normalise."""
+def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None):
+    """One sequence's score q = sum_t w_t * nll_t, divided by length if length_normalise.
+
+    `mask` (optional, the Orgad exact-answer overlay): a 0/1 tensor over the G tokens. When given, the
+    sum is restricted to the answer-bearing tokens (non-answer tokens contribute 0), and length
+    normalisation divides by the number of answer tokens, not the full length."""
     w = _weights_from_raw(raw, weight_mode)
-    q = (w * nll).sum()
-    if length_normalise:
-        q = q / nll.shape[0]
+    wn = w * nll
+    if mask is not None:
+        wn = wn * mask
+        q = wn.sum()
+        if length_normalise:
+            q = q / torch.clamp(mask.sum(), min=1.0)
+    else:
+        q = wn.sum()
+        if length_normalise:
+            q = q / nll.shape[0]
     return q
 
 
@@ -178,7 +189,7 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool):
 
 def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="normalised",
                        length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3,
-                       loss="pairwise", blondel_eps=0.1):
+                       loss="pairwise", blondel_eps=0.1, masks=None):
     """Learn the token weighter by a ranking loss. `y` is correctness (higher = better); the target is
     incorrectness = 1 - y. Returns the trained model (unused for constant mode).
 
@@ -200,6 +211,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
 
     emb = [torch.from_numpy(answer_states(states[i])).to(device) for i in tr_idx]
     nll = [torch.from_numpy(per_token_nll(records[i])).to(device) for i in tr_idx]
+    msk = ([torch.from_numpy(masks[i]).to(device) for i in tr_idx] if masks is not None else None)
     incorrect = torch.tensor([1.0 - float(y[i]) for i in tr_idx], dtype=torch.float32, device=device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
 
@@ -212,7 +224,8 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
             batch = perm[b:b + batch_size]
             if len(batch) < 2:
                 continue  # a rank loss needs >=2 items to compare (skip a size-1 tail batch)
-            q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise)
+            q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
+                                    mask=(msk[j] if msk is not None else None))
                              for j in batch])
             target = _true_rank(incorrect[batch])
             if loss == "blondel":
@@ -226,7 +239,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
 
 
 def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="normalised",
-                         length_normalise=True):
+                         length_normalise=True, masks=None):
     """Sequence uncertainty q for each example in `idx` (higher = more uncertain)."""
     model.eval()
     out = np.zeros(len(idx))
@@ -237,20 +250,23 @@ def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="no
                 raw = torch.zeros_like(nll)          # weights are all ones; raw is ignored
             else:
                 raw = model(torch.from_numpy(answer_states(states[i])).to(device))
-            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise).item())
+            m = torch.from_numpy(masks[i]).to(device) if masks is not None else None
+            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m).item())
     return out
 
 
 def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode="normalised",
-                     length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1):
+                     length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1, masks=None):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
     (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
-    ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade)."""
+    ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
+    the Orgad exact-answer overlay: a per-record 0/1 array over the G tokens restricting the score to
+    answer-bearing tokens (build with build_answer_masks)."""
     model = train_weighted_msp(states, records, y, tr_idx, device, weight_mode=weight_mode,
                                length_normalise=length_normalise, seed=seed, loss=loss,
-                               blondel_eps=blondel_eps)
+                               blondel_eps=blondel_eps, masks=masks)
     return predict_weighted_msp(model, states, records, te_idx, device,
-                                weight_mode=weight_mode, length_normalise=length_normalise)
+                                weight_mode=weight_mode, length_normalise=length_normalise, masks=masks)
 
 
 # --------------------------------------------------------------------------------------

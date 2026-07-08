@@ -56,7 +56,9 @@ MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # Candidate training sources; each included only if its pertok cache actually loads.
-CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad"]
+# samsum (dialogue summarisation) added 2026-07-08: it is the 2nd summarisation set, so it enters the
+# QA evals' DiffTask pool ({xsum}->{samsum,xsum}, de-degenerating that rung) and the LOO mixture.
+CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum"]
 # ID anchors (judge, from the aggregation table) the ID cells must reproduce.
 ID_ANCHOR = {"sciq": {"uniform": 0.913, "attention": 0.932},
              "trivia_qa": {"uniform": 0.815, "attention": 0.844},

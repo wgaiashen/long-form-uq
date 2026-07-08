@@ -61,6 +61,8 @@ def wmsp_prr(states, records, y, tr, te, yte, device, seeds):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3])
+    ap.add_argument("--evals", nargs="+", default=EVALS,
+                    help="which QA eval sets to run (default all 3); e.g. --evals pubmed_qa to fill a gap")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     seeds = args.seeds
@@ -77,7 +79,7 @@ def main():
           f"{np.nanmean(y_clean):.3f}", flush=True)
 
     print(f"\n{'eval':10s} {'method':14s} {'raw':>8s} {'clean':>8s} {'delta':>8s}   {'floor':>8s}", flush=True)
-    for ev in EVALS:
+    for ev in args.evals:
         loaded = load_per_token(MODEL, ev, LAYER, "correctness")
         if loaded is None:
             print(f"{ev}: no pertok -> skip", flush=True); continue
