@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=24gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_mq_diff
+#PBS -j oe
+# Isolate the med_quad relabel effect: SameTask-rung probes trained on med_quad CLEAN vs RAW labels,
+# same states/evals/seeds. CPU only (cached pertok + small probes). qsub pbs/med_quad_clean_vs_raw.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+echo "=== med_quad clean-vs-raw on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/med_quad_clean_vs_raw.py --seeds 1 2 3
+echo "=== done at $(date) ===" >&2

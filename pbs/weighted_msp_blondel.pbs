@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_wmsp_bl
+#PBS -j oe
+
+# Track B (Phase 4): Blondel-vs-pairwise loss comparison for weighted-MSP, ID + OOD ladder. CPU only
+# (weighted-MSP trains small MLPs; torchsort.soft_rank runs on CPU). Needs torchsort installed first
+# (pbs/torchsort_setup.pbs). Separate from contribution_ladder.py on purpose, so it never perturbs the
+# refresh run.
+#   qsub pbs/weighted_msp_blondel.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+
+echo "=== weighted_msp blondel-vs-pairwise on $(hostname) at $(date) ===" >&2
+echo "--- (gate) synthetic loss sanity: blondel must beat untrained + be >= pairwise ---" >&2
+python -u scripts/checks/weighted_msp_loss_sanity.py || echo "WARN: sanity non-zero exit (see above); continuing to the real comparison" >&2
+echo "--- real ID+OOD comparison ---" >&2
+python -u scripts/checks/weighted_msp_blondel.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2
