@@ -64,6 +64,34 @@ def answer_states(state):
     return np.asarray(state[1:], dtype=np.float32)
 
 
+def build_answer_masks(tok, records):
+    """The Orgad exact-answer overlay: per-record 0/1 mask over the G generated tokens, True on the
+    exact-answer span (where the gold answer appears in the generation), all-ones fallback when the
+    span is not located. This is Joe's idea (his overlay only drew it; here we USE it to restrict the
+    weighted-MSP sum). Cheap, CPU-only, no GPU/API -- it reuses our gold-substring locator
+    `luq.features.orgad.locate_answer_rows`, which returns per-token-cache ROW indices over the window
+    [P-1 : P+G]; since `answer_states`/`per_token_nll` drop the row-0 anchor, cache row r -> token index
+    r-1. SHORT-FORM only (single locatable answer span); on long-form / unlocated rows it falls back to
+    all tokens, i.e. plain weighted-MSP for that example. Returns (masks, n_located)."""
+    from .features import orgad
+    masks, n_located = [], 0
+    for r in records:
+        g = len(r["gen_token_ids"])
+        m = np.zeros(g, dtype=np.float32)
+        rows, found = orgad.locate_answer_rows(tok, r["prompt_token_ids"], r["gen_token_ids"], r["target"])
+        if found:
+            for row in rows:
+                idx = row - 1                        # cache row (row 0 = anchor) -> token index
+                if 0 <= idx < g:
+                    m[idx] = 1.0
+        if m.sum() == 0:                             # not located / empty -> all tokens (plain weighted-MSP)
+            m[:] = 1.0
+        else:
+            n_located += 1
+        masks.append(m)
+    return masks, n_located
+
+
 # --------------------------------------------------------------------------------------
 # The learned per-token weighter + the soft-rank loss (both from Joe's msp_probe_uq.py)
 # --------------------------------------------------------------------------------------

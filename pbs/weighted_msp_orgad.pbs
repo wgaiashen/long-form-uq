@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_orgad
+#PBS -j oe
+# Orgad exact-answer overlay for weighted-MSP: restrict the score to answer-bearing tokens; compare vs
+# no-mask across the ladder. CPU (masks are gold substring match; weighted-MSP trains small MLPs).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME; export HF_HUB_OFFLINE=1
+echo "=== weighted_msp orgad overlay on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_orgad.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

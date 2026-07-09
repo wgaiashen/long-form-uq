@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_sar_cache
+#PBS -j oe
+# Cache SAR relevance for a dataset. CPU (cross-encoder roberta-large; GPU jammed). ~G passes/record.
+#   qsub -v LUQ_DATASET=sciq,LUQ_GRAN=token pbs/sar_cache.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+DATASET="${LUQ_DATASET:-sciq}"; GRAN="${LUQ_GRAN:-token}"
+echo "=== SAR cache $DATASET/$GRAN on $(hostname) at $(date) ===" >&2
+python -u scripts/01s_sar_relevance.py --dataset "$DATASET" --granularity "$GRAN"
+echo "=== done at $(date) ===" >&2

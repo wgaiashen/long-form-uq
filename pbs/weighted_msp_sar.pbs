@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_wmsp_sar
+#PBS -j oe
+# weighted-MSP +/- SAR soft mask (Track A), + pure TokenSAR + MSP floor, paired bootstrap. Reads the
+# cached SAR relevance (scripts/01s_sar_relevance.py). CPU (weighted-MSP trains small MLPs).
+#   qsub pbs/weighted_msp_sar.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== weighted_msp SAR comparison on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_sar.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

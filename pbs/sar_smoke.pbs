@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=16gb
+#PBS -l walltime=00:40:00
+#PBS -N luq_sar_smoke
+#PBS -j oe
+# SAR sar.py end-to-end smoke: token-level on a few sciq (short) + sentence-level on a few pubmed (long).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+echo "=== SAR smoke on $(hostname) at $(date) ===" >&2
+python -u scripts/01s_sar_relevance.py --dataset sciq      --granularity token    --limit 30
+python -u scripts/01s_sar_relevance.py --dataset pubmed_qa --granularity sentence --limit 15
+echo "=== done ===" >&2
