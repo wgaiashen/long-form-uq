@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_step3
+#PBS -j oe
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== step3 orgad located-subset on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/orgad_located_subset.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

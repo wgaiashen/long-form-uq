@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_audit
+#PBS -j oe
+# Generic CPU audit runner: qsub -v LUQ_CMD="scripts/checks/orgad_label_leak.py" pbs/audit_cpu.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+echo "=== audit: $LUQ_CMD on $(hostname) at $(date) ===" >&2
+python -u $LUQ_CMD
+echo "=== done at $(date) ===" >&2

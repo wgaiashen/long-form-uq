@@ -34,9 +34,9 @@ MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 LAYER = 15
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
-CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad"]
+CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum"]
 SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OUT"),
-            ("DiffTask", "OOD_DIFF_TASK")]
+            ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
 
 
 def sampled_train_idx(split, seed, cap):

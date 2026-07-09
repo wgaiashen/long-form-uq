@@ -22,9 +22,17 @@ REMOVAL GRANULARITY (the long-form adaptation the plan calls for):
   * "sentence" -- leave-one-SENTENCE-out (our long-form adaptation): far fewer, more meaningful removals;
                   each token inherits its sentence's relevance. ~n_sentences passes per example.
 
-Reference (verified): authors' SAR/src/get_tokenwise_importance.py; lm_polygraph token_sar.py +
-cross_encoder_similarity.py. We follow lm-polygraph's token-id leave-one-out (cleaner than the authors'
-substring-replace), prepend the prompt to both members, and force special tokens to relevance 0.
+FAITHFULNESS (backed by runnable checks, not prose):
+  * The TOKEN-level relevance is numerically verified against lm-polygraph's TokenSAR by
+    `scripts/checks/check_sar_vs_lmpolygraph.py` (worst |delta| 2.4e-8). It follows lm-polygraph's
+    token-id leave-one-out -- this is a DEVIATION from the SAR authors' LITERAL code
+    (`SAR/src/get_tokenwise_importance.py`), which uses substring-replace
+    `generated_text.replace(tokenizer.decode(token), '')`. "Faithful to SAR" is therefore only true
+    w.r.t. lm-polygraph; the deviation is recorded in the report's method section.
+  * The SENTENCE-level variant is OUR OWN invention (no reference exists); its token->sentence mapping
+    is validated by `scripts/checks/check_sar_sentence_mapping.py` (every token -> one sentence, ids
+    non-decreasing, content jaccard ~0.99 vs a regex split).
+We prepend the prompt to both members and force special tokens to relevance 0 (== lm-polygraph).
 """
 import itertools
 import re

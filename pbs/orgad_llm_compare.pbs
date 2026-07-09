@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_orgad_llm
+#PBS -j oe
+# Orgad the right way: leak re-check (LLM-located span) + the now-valid +/-mask weighted-MSP comparison.
+# Needs cache/orgad_llm/*.json (from 01o_orgad_llm_extract.py). CPU.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== orgad-llm comparison on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_orgad_llm.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2
