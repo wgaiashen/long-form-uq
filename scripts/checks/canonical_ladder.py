@@ -82,6 +82,11 @@ def main():
     ap.add_argument("--aggregators", default="meanpool,lasttoken",
                     help="which SAPLMA aggregators to compute (comma list of "
                          "meanpool,lasttoken,persentence,pertoken). per-token/per-sentence are SLOW.")
+    ap.add_argument("--skip-contrib", action="store_true",
+                    help="skip the poolers + weighted-MSP (uniform/attention/wMSP) and compute ONLY the "
+                         "SAPLMA aggregators + MSP floor. Makes the run CPU-only (no GPU needed) -- use it "
+                         "to fill just the SAPLMA-aggregator OOD cells, since the contribution rows already "
+                         "exist in contribution_ladder__*.csv / weighted_msp_blondel__*.csv.")
     ap.add_argument("--out", default=str(ROOT / "results" / f"canonical_ladder__{cache._slug(MODEL)}.csv"))
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -89,7 +94,7 @@ def main():
     agg = [a for a in args.aggregators.split(",") if a in SAPLMA_AGG]
     # Table row order: floor, the selected SAPLMA aggregators (canonical order), then the contribution.
     methods_order = (["msp_sum"] + [SAPLMA_AGG[k] for k in ("meanpool", "lasttoken", "persentence", "pertoken")
-                                    if k in agg] + CONTRIB)
+                                    if k in agg] + ([] if args.skip_contrib else CONTRIB))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(MODEL)
     have_bl = weighted_msp._HAVE_TORCHSORT
@@ -142,21 +147,22 @@ def main():
             if "pertoken" in agg:
                 per_method["per-token(mean)"].append(prr_from_conf(yte, conf_pertoken(states, tr_idx, te_idx, y, sd)))
 
-            # poolers (reuse attn machinery; T selected on a val slice of train, never test).
-            best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
-            per_method["uniform(frozen-q)"].append(results.prr(yte, attn_unc(
-                train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True), states, te_idx, device)))
-            per_method["attention"].append(results.prr(yte, attn_unc(
-                train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T), states, te_idx, device)))
-
-            # weighted-MSP (contribution).
-            per_method["weighted_msp_norm"].append(results.prr(yte, np.asarray(weighted_msp.weighted_msp_unc(
-                states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
-                length_normalise=ln, seed=sd, loss="pairwise"), float)))
-            if have_bl:
-                per_method["weighted_msp_blondel"].append(results.prr(yte, np.asarray(weighted_msp.weighted_msp_unc(
+            # poolers + weighted-MSP (the contribution rows) -- skipped with --skip-contrib because they
+            # already live in contribution_ladder__*.csv / weighted_msp_blondel__*.csv; skipping makes the
+            # run CPU-only (only the SAPLMA aggregators + floor remain, and those use a CPU MLP).
+            if not args.skip_contrib:
+                best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
+                per_method["uniform(frozen-q)"].append(results.prr(yte, attn_unc(
+                    train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True), states, te_idx, device)))
+                per_method["attention"].append(results.prr(yte, attn_unc(
+                    train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T), states, te_idx, device)))
+                per_method["weighted_msp_norm"].append(results.prr(yte, np.asarray(weighted_msp.weighted_msp_unc(
                     states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
-                    length_normalise=ln, seed=sd, loss="blondel"), float)))
+                    length_normalise=ln, seed=sd, loss="pairwise"), float)))
+                if have_bl:
+                    per_method["weighted_msp_blondel"].append(results.prr(yte, np.asarray(weighted_msp.weighted_msp_unc(
+                        states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
+                        length_normalise=ln, seed=sd, loss="blondel"), float)))
 
             # plain-MSP floor (unsupervised; identical across seeds, computed per cell for the table).
             per_method["msp_sum"].append(results.prr(yte, np.array(
@@ -194,7 +200,7 @@ def main():
                           f"SAPLMA {prr_feat:.3f} (|d|>={GATE_TOL})", flush=True)
                 else:
                     print(f"    [ID-GATE OK] mean-pool reproduces cached SAPLMA ({prr_feat:.3f})", flush=True)
-            if X in cl.ID_ANCHOR:
+            if X in cl.ID_ANCHOR and not args.skip_contrib:
                 for m, key in (("uniform(frozen-q)", "uniform"), ("attention", "attention")):
                     d = abs(stats[m][0] - cl.ID_ANCHOR[X][key])
                     flag = "OK" if d < GATE_TOL else "WARN"

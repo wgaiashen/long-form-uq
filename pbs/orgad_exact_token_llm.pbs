@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_orgad_probe
+#PBS -j oe
+# Orgad exact-answer-token probe with the LEAK-FREE LLM locator (and the old gold locator for contrast).
+# CPU only (per-token L15 cache + SAPLMA MLP + attn pooler). Needs cache/orgad_llm/*.json.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+echo "############ GOLD locator (the leaky baseline) ############"
+python -u scripts/checks/orgad_exact_token.py --datasets sciq,trivia_qa --locator gold
+echo; echo "############ LLM locator (leak-free fix) ############"
+python -u scripts/checks/orgad_exact_token.py --datasets sciq,trivia_qa --locator llm
+echo "=== done at $(date) ===" >&2

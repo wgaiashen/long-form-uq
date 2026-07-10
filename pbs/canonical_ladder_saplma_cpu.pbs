@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_canon_cpu
+#PBS -j oe
+# SAPLMA-aggregator OOD (mean-pool + last-token) on the samsum pool -- CPU ONLY (--skip-contrib skips
+# the poolers/wMSP we already have, and the SAPLMA aggregators use a CPU MLP, so no GPU is needed).
+# Writes canonical_ladder_regen__*.csv, which assemble_canonical_csv.py folds into the slides CSV.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== canonical SAPLMA-only (CPU) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/canonical_ladder.py --skip-contrib --aggregators meanpool,lasttoken --seeds 1,2,3 \
+  --out results/canonical_ladder_regen__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2

@@ -34,11 +34,38 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
-from luq import probe, results  # noqa: E402
-from luq.features import orgad  # noqa: E402
+import json  # noqa: E402
+
+from luq import cache, probe, results  # noqa: E402
+from luq.features import orgad, orgad_llm  # noqa: E402
 from attn_pool import load_per_token, pad_batch, train_attn, SEED  # noqa: E402
 
 MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
+
+
+def load_orgad_llm(model, dataset):
+    """The leak-free locator's cache: the model's OWN answer extracted by an LLM (gpt-5-mini), keyed
+    split:idx. Returns {"split:idx": extracted_string} or None."""
+    p = ROOT / "cache" / "orgad_llm" / f"{cache._slug(model)}__{dataset}__ID.json"
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def locate_rows(locator, tok, record, orgad_json):
+    """Return (rows, found) in the per-token-cache window [P-1:P+G] (row 0 = last prompt token, gen
+    token j -> row j+1), the SAME convention for both locators.
+      gold: substring-match the GOLD answer (Orgad's get_indices_of_exact_answer) -- LEAKS (located
+            tracks correctness).
+      llm:  locate the model's OWN LLM-extracted answer (exists for correct AND incorrect rows), so
+            'located' no longer tracks correctness."""
+    if locator == "gold":
+        return orgad.locate_answer_rows(tok, record["prompt_token_ids"],
+                                        record["gen_token_ids"], record.get("target"))
+    extracted = orgad_json.get(f"{record['split']}:{record['idx']}") if orgad_json else None
+    if isinstance(extracted, list):          # summarisation stores a phrase list; QA (here) is a string
+        extracted = next((s for s in extracted if isinstance(s, str) and s.strip()), None)
+    if not extracted:
+        return [], False
+    return orgad_llm.locate_extracted_rows(tok, record["gen_token_ids"], extracted)
 
 
 def main():
@@ -46,10 +73,13 @@ def main():
     ap.add_argument("--model", default=MODEL_DEFAULT)
     ap.add_argument("--datasets", default="sciq,trivia_qa")
     ap.add_argument("--layer", type=int, default=15)
+    ap.add_argument("--locator", default="llm", choices=["llm", "gold"],
+                    help="llm = leak-free model-own-answer locator (default); gold = the old "
+                         "substring locator that LEAKS (located tracks correctness).")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.model)
-    print(f"device: {device}")
+    print(f"device: {device} | locator: {args.locator}")
 
     for dataset in args.datasets.split(","):
         loaded = load_per_token(args.model, dataset, args.layer)
@@ -65,18 +95,30 @@ def main():
         ytr, yte = y[tr], [y[i] for i in te]
         print(f"\n==== {dataset} (layer {layer}, train {len(tr)}, test {len(te)}) ====")
 
-        # Locate the gold-answer span (cache rows) for every record, keeping last-token row + span.
+        orgad_json = load_orgad_llm(args.model, dataset) if args.locator == "llm" else None
+        if args.locator == "llm" and orgad_json is None:
+            print(f"  !!! no orgad_llm cache for {dataset} -- run 01o_orgad_llm_extract.py; skipping")
+            continue
+
+        # Locate the answer span (cache rows) for every record, keeping last-token row + span.
         last_rows, spans, found_flags = [], [], []
         for k, r in enumerate(records):
-            rows, found = orgad.locate_answer_rows(tok, r["prompt_token_ids"],
-                                                   r["gen_token_ids"], r.get("target"))
+            rows, found = locate_rows(args.locator, tok, r, orgad_json)
             g = len(r["gen_token_ids"])
             last_rows.append(orgad.last_token_row(rows, g, found))
             spans.append(set(rows))
             found_flags.append(found)
         found_flags = np.array(found_flags)
-        print(f"  gold answer located in {found_flags.sum()}/{len(records)} "
+        print(f"  answer located ({args.locator}) in {found_flags.sum()}/{len(records)} "
               f"({100 * found_flags.mean():.0f}%); the rest fall back to the last answer token")
+
+        # LEAK CHECK: does 'located' track correctness? (the whole reason to prefer the LLM locator).
+        corr = np.array(y) >= 0.5
+        lc = 100 * found_flags[corr].mean() if corr.any() else float("nan")
+        li = 100 * found_flags[~corr].mean() if (~corr).any() else float("nan")
+        gap = lc - li
+        print(f"  [leak check] located|correct {lc:.0f}% vs located|incorrect {li:.0f}% "
+              f"(gap {gap:+.0f}pt -- gold locator ~99 vs 0; a small gap means the probe is interpretable)")
 
         # ---- 1. PRR: mean-pool vs Orgad exact-answer-last-token ----
         Xmean = np.stack([s.mean(axis=0) for s in states])
