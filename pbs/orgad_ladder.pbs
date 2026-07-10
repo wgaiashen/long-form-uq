@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_orgad_ladder
+#PBS -j oe
+# Orgad important-token method as ONE method across ID + the full OOD ladder, all datasets.
+# Needs cache/orgad_llm/*.json (from 01o) + the per-token caches. CPU only (loss=pairwise, no torchsort).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== orgad ladder on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_orgad_ladder.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

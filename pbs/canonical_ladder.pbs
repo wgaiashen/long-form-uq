@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N luq_canon
+#PBS -j oe
+# Canonical 5-rung ladder: ALL methods on the samsum-updated pool, one consistent table for slides 8/9.
+# GPU (L40S) like contribution_ladder -- the poolers / weighted-MSP train on GPU, so the full ladder
+# fits in walltime. Default aggregators = meanpool,lasttoken (cheap); per-sentence/per-token are opt-in
+# and SLOW (they train a probe over every sentence/token), so run them best-effort separately.
+#   default (7 rows, full ladder, 3 seeds):  qsub pbs/canonical_ladder.pbs
+#   add the slow aggregators (best-effort):  qsub -v AGG=meanpool:lasttoken:persentence:pertoken pbs/canonical_ladder.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+SEEDS="$(echo "${SEEDS:-1:2:3}" | tr ':' ',')"
+AGG="$(echo "${AGG:-meanpool:lasttoken}" | tr ':' ',')"
+OUT="${OUT:-results/canonical_ladder__meta-llama_Meta-Llama-3.1-8B.csv}"
+
+echo "canonical_ladder on $(hostname) at $(date): seeds=$SEEDS agg=$AGG out=$OUT" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/checks/canonical_ladder.py --seeds "$SEEDS" --aggregators "$AGG" --out "$OUT"
+echo "=== done at $(date) ===" >&2

@@ -1,0 +1,40 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=24gb
+#PBS -l walltime=00:40:00
+#PBS -N luq_viz_verify
+#PBS -j oe
+# Quick CPU verification of the visualiser refactor (sciq only, small + fast):
+#  1. regenerate the sciq ATTENTION html with the refactored code -> a verify path, and diff it
+#     against the committed one. Only a blank line (the new optional subtitle) should differ ->
+#     proves the lift into viz_common.py is behaviour-preserving.
+#  2. run the NEW per-dataset weighted-MSP viz on sciq and report the toggles it produced.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL=meta-llama/Meta-Llama-3.1-8B
+COMMITTED=results/viz/meta-llama_Meta-Llama-3.1-8B__sciq__ID.html
+VERIFY=results/viz/_verify_attn_sciq.html
+
+echo "=== [1] regenerate sciq attention html on $(hostname) at $(date) ==="
+python -u scripts/tools/visualise_attention.py --model "$MODEL" --dataset sciq --ood ID --out "$VERIFY" \
+  || { echo "!!! attention viz FAILED (refactor broke it)"; exit 1; }
+
+echo "=== diff vs committed (ignoring blank lines; expect NO substantive diff) ==="
+if diff -B "$COMMITTED" "$VERIFY" > results/viz/_verify_attn_sciq.diff 2>&1; then
+  echo "IDENTICAL (ignoring blank lines) -- refactor is behaviour-preserving."
+else
+  echo "DIFF FOUND -- lines below (review; a subtitle blank line is expected/OK):"
+  wc -l results/viz/_verify_attn_sciq.diff
+  head -40 results/viz/_verify_attn_sciq.diff
+fi
+
+echo "=== [2] new weighted-MSP viz on sciq at $(date) ==="
+python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset sciq --ood ID \
+  || { echo "!!! weighted-MSP viz FAILED on sciq"; exit 1; }
+
+echo "=== viz_verify DONE at $(date) ==="
+ls -la results/viz/token_weights__*sciq*.html "$VERIFY" 2>/dev/null

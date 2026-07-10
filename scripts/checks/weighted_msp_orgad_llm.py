@@ -51,7 +51,7 @@ def main():
         extracted = json.loads(ex_path.read_text())
         masks, loc = [], np.zeros(len(records), bool)
         for i, r in enumerate(records):
-            rows, found = orgad_llm.locate_extracted_rows(tok, r["gen_token_ids"], extracted.get(str(r["idx"]), ""))
+            rows, found = orgad_llm.locate_extracted_rows(tok, r["gen_token_ids"], extracted.get(f"{r['split']}:{r['idx']}", ""))
             m = np.zeros(len(r["gen_token_ids"]), np.float32)
             if found:
                 for row in rows:

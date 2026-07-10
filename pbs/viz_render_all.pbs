@@ -1,0 +1,31 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_viz_all
+#PBS -j oe
+# Render BOTH visualiser families for all 4 core datasets, CPU only (no model forward -- both read
+# cached per-token states / attention sidecars). mem=48gb for the ~2GB xsum/pubmed pertok npz.
+#   - attention family: visualise_attention.py (uses the cached cache/viz/*__attn.npz sidecars)
+#   - weighted-MSP family: visualise_token_weights.py (trains wMSP MLP + frozen-q pooler on states)
+# Both now share scripts/tools/viz_common.py, so they produce matched, toggleable per-dataset HTML.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL=meta-llama/Meta-Llama-3.1-8B
+DATASETS="${DS:-sciq trivia_qa pubmed_qa xsum}"
+
+echo "=== viz render-all on $(hostname) at $(date) | datasets: $DATASETS ===" >&2
+for d in $DATASETS; do
+  echo "======== $d : attention family ======== $(date)" >&2
+  python -u scripts/tools/visualise_attention.py --model "$MODEL" --dataset "$d" --ood ID \
+    || echo "!!! attention viz FAILED for $d" >&2
+  echo "======== $d : weighted-MSP family ======== $(date)" >&2
+  python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset "$d" --ood ID \
+    || echo "!!! token-weights viz FAILED for $d" >&2
+done
+echo "=== viz render-all DONE at $(date) ===" >&2
+ls -la results/viz/token_weights__*.html results/viz/meta-llama*__ID.html 2>/dev/null | grep -v gen_quality >&2

@@ -12,6 +12,7 @@ records already extracted, checkpoints every 25. LOGIN NODE (API); costs gpt-5-m
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--extract-model", default="gpt-5-mini")
+    ap.add_argument("--workers", type=int, default=12, help="concurrent API calls (I/O-bound)")
     args = ap.parse_args()
 
     cfg = Config(model_name=MODEL, dataset=args.dataset, ood_setting="ID")
@@ -54,25 +56,33 @@ def main():
     done = json.loads(out.read_text()) if out.exists() else {}   # idx(str) -> extracted
 
     tok = AutoTokenizer.from_pretrained(MODEL)
+    todo = [r for r in recs if f"{r['split']}:{r['idx']}" not in done]
+    print(f"[{args.dataset}] {len(done)} cached, {len(todo)} to extract, {args.workers} workers", flush=True)
+
+    def work(r):
+        # split:idx is unique; idx alone collides across train/test
+        q = None if orgad_llm.is_summarisation(args.dataset) else question_of(r["prompt"])
+        val = orgad_llm.extract_important(args.dataset, q, r["gen_text"], model=args.extract_model)
+        return f"{r['split']}:{r['idx']}", val
+
     n_new = 0
-    for r in recs:
-        key = str(r["idx"])
-        if key in done:
-            continue
-        done[key] = orgad_llm.extract_model_answer(question_of(r["prompt"]), r["gen_text"],
-                                                   model=args.extract_model)
-        n_new += 1
-        if n_new % 25 == 0:
-            out.write_text(json.dumps(done))
-            print(f"extracted {n_new} (at idx {r['idx']}/{len(recs)})", flush=True)
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:      # API calls are I/O-bound
+        futs = [pool.submit(work, r) for r in todo]
+        for fut in as_completed(futs):                             # collect single-threaded -> no cache race
+            key, val = fut.result()
+            done[key] = val
+            n_new += 1
+            if n_new % 50 == 0:
+                out.write_text(json.dumps(done))
+                print(f"extracted {n_new}/{len(todo)}", flush=True)
     out.write_text(json.dumps(done))
 
     # report located rate (span found in the generation) -- this is the number that should NO LONGER
     # track correctness (the leak fix)
     n_loc = 0
     for r in recs:
-        ex = done.get(str(r["idx"]), "NO ANSWER")
-        _, found = orgad_llm.locate_extracted_rows(tok, r["gen_token_ids"], ex)
+        ex = done.get(f"{r['split']}:{r['idx']}", "NO ANSWER")
+        _, found = orgad_llm.locate_important_rows(tok, r["gen_token_ids"], ex)
         n_loc += found
     print(f"\n[{args.dataset}] extracted {len(done)}/{len(recs)} | located span {n_loc} "
           f"({100*n_loc/len(recs):.0f}%) | wrote {out}", flush=True)

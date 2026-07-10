@@ -79,6 +79,88 @@ def extract_model_answer(question, model_answer, model="gpt-5-mini", max_retries
     return "NO ANSWER"
 
 
+# --------------------------------------------------------------------------------------------------
+# Task-adaptive summarisation variant (the ONE method extended to summaries).
+# QA has a single "exact answer"; a summary has no answer, so the important-token CONCEPT becomes
+# "the key information-bearing spans" (entities/numbers/claims). Same idea, task-appropriate prompt --
+# exactly the QA-vs-summarisation split our LLM-judge already uses. Chosen by the author 2026-07-09.
+# --------------------------------------------------------------------------------------------------
+SUMMARY_DATASETS = {"xsum", "cnn_dailymail", "samsum"}
+
+SUMMARY_PROMPT = """Extract from the following summary the key fact-bearing terms: the specific names, places, organisations, numbers, and dates a reader would fact-check. Copy each term verbatim from the summary, one per line, and keep each term SHORT -- a name, place, organisation, or number, NOT a whole clause or sentence. If the summary states no specific facts, output NO ANSWER.
+
+Summary: The winning Lotto ticket was bought in Merthyr Tydfil for the Team GB-inspired Medal Draw in August 2016, the National Lottery said.
+Spans:
+Merthyr Tydfil
+Team GB
+August 2016
+National Lottery
+
+Summary: Officials have announced that new measures will be introduced in due course.
+Spans:
+NO ANSWER
+
+Summary: {summary}
+Spans:"""
+
+
+def is_summarisation(dataset):
+    return dataset in SUMMARY_DATASETS
+
+
+def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
+    """Important-token extraction for SUMMARISATION: ask the LLM for the key information-bearing spans
+    (entities/numbers/claims) in the model's summary. Returns a list of validated spans (each a
+    non-empty substring of the summary; possibly empty). Same validity rule as extract_model_answer."""
+    if not isinstance(summary, str) or not summary.strip():
+        return []
+    prompt = SUMMARY_PROMPT.format(summary=summary)
+    client = _get_client()
+    for _ in range(max_retries):
+        try:
+            resp = client.chat.completions.create(
+                model=model, temperature=1, top_p=1,
+                messages=[{"role": "user", "content": prompt}])
+            out = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            time.sleep(2)
+            continue
+        if out.upper().startswith("NO ANSWER"):
+            return []
+        spans = []
+        for line in out.splitlines():
+            s = line.strip().lstrip("-*0123456789. ").strip()
+            for junk in ("Spans:", "Exact answer:"):
+                s = s.replace(junk, "")
+            s = s.strip().strip(".").strip()
+            if s and s != "NO ANSWER" and s.lower() in summary.lower():
+                spans.append(s)
+        return spans
+    return []
+
+
+def extract_important(dataset, question, model_answer, model="gpt-5-mini"):
+    """Task-adaptive dispatch (the ONE method): QA -> the exact answer (a str); summarisation -> the
+    key spans (a list). Returns the value to cache (str for QA, list for summarisation)."""
+    if is_summarisation(dataset):
+        return extract_summary_spans(model_answer, model=model)
+    return extract_model_answer(question, model_answer, model=model)
+
+
+def locate_important_rows(tokenizer, gen_ids, cached):
+    """Locate cached important tokens -- a str (QA exact answer) OR a list (summary spans) -- as
+    per-token-cache ROW indices, unioned across spans. Returns (rows, found)."""
+    if isinstance(cached, list):
+        allrows, found = [], False
+        for span in cached:
+            rows, f = locate_extracted_rows(tokenizer, gen_ids, span)
+            if f:
+                allrows.extend(rows)
+                found = True
+        return sorted(set(allrows)), found
+    return locate_extracted_rows(tokenizer, gen_ids, cached)
+
+
 def locate_extracted_rows(tokenizer, gen_ids, extracted):
     """Locate the EXTRACTED answer's token span in the generated tokens, mapped to per-token-cache ROW
     indices (window [P-1:P+G], so gen token j -> row j+1). Faithful to Joe's get_indices_of_exact_answer

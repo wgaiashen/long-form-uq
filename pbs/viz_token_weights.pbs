@@ -1,14 +1,31 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=8:mem=24gb
-#PBS -l walltime=02:00:00
+#PBS -l select=1:ncpus=8:mem=48gb
+#PBS -l walltime=03:00:00
 #PBS -N luq_viz_tw
 #PBS -j oe
+# Per-dataset weighted-MSP-family visualiser (CPU only -- trains the wMSP MLP + frozen-query
+# pooler on the ALREADY-cached per-token states; no model forward). mem=48gb because the xsum
+# and pubmed pertok npz are ~2GB each and load into RAM.
+#
+# Renders ONE HTML per dataset: results/viz/token_weights__<key>.html, with the same toggle UI
+# as visualise_attention.py. Optional toggles (orgad, SAR) appear only where their cache exists.
+#
+# Default: loop over the 4 core datasets. Override to a single dataset with:
+#   qsub -v DS=sciq pbs/viz_token_weights.pbs
 set -uo pipefail
 cd "$PBS_O_WORKDIR"
 source pbs/_env.sh
 luq_activate || exit 1
 cd "$LUQ_REPO"
 export HF_HOME
-echo "=== visualise token weights on $(hostname) at $(date) ===" >&2
-python -u scripts/tools/visualise_token_weights.py --out results/viz/token_weights.html --per 4
+
+MODEL=meta-llama/Meta-Llama-3.1-8B
+DATASETS="${DS:-sciq trivia_qa pubmed_qa xsum}"
+
+echo "=== visualise token weights on $(hostname) at $(date) | datasets: $DATASETS ===" >&2
+for d in $DATASETS; do
+  echo "---- $d ---- $(date)" >&2
+  python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset "$d" --ood ID \
+    || echo "!!! token-weights viz FAILED for $d" >&2
+done
 echo "=== done at $(date) ===" >&2

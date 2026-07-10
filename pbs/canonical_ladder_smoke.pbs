@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_canon_smoke
+#PBS -j oe
+# Fast smoke of the canonical ladder: short-form sources only, 1 seed. Validates the merged code
+# path (SAPLMA aggregators on pooled cross-dataset rows) + the ID-diagonal gates before the full run.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== canonical ladder SMOKE on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/canonical_ladder.py --sources sciq,trivia_qa,med_quad --seeds 1 \
+  --out results/canonical_ladder_smoke__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== smoke done at $(date) ===" >&2

@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=48gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_wmsp_xsum
+#PBS -j oe
+# weighted-MSP (norm pairwise + Blondel) ID PRR on xsum -- closes the ID-table gap. CPU only
+# (trains the wMSP MLP on the cached xsum per-token L15 states; mem=48gb for the ~2GB npz).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+echo "=== wmsp xsum ID on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/wmsp_xsum_id.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2
