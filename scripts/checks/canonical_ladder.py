@@ -77,6 +77,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--sources", default=",".join(cl.CANDIDATE_SOURCES))
+    ap.add_argument("--evals", default="",
+                    help="override the eval datasets (comma list). Default = the 3 QA sets from "
+                         "contribution_ladder; pass e.g. 'xsum' to add summarisation as an OOD eval.")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--length-normalise", default="yes", choices=["yes", "no"])
     ap.add_argument("--aggregators", default="meanpool,lasttoken",
@@ -92,6 +95,9 @@ def main():
     seeds = [int(s) for s in args.seeds.split(",")]
     ln = args.length_normalise == "yes"
     agg = [a for a in args.aggregators.split(",") if a in SAPLMA_AGG]
+    if args.evals:                       # override contribution_ladder's default EVALS (adds xsum, etc.)
+        cl.EVALS = [e for e in args.evals.split(",") if e]
+        print(f"eval override -> {cl.EVALS}", flush=True)
     # Table row order: floor, the selected SAPLMA aggregators (canonical order), then the contribution.
     methods_order = (["msp_sum"] + [SAPLMA_AGG[k] for k in ("meanpool", "lasttoken", "persentence", "pertoken")
                                     if k in agg] + ([] if args.skip_contrib else CONTRIB))

@@ -108,8 +108,11 @@ def per_token_signals(record, pos, ctx):
     g = len(record["gen_token_ids"])
 
     # 1) the raw MSP signal every weighting re-weights.
+    # NOTE: signal names become HTML data-attribute keys (data-<name>), so they MUST be valid attribute
+    # names -- no '(', ')', '/'. (An earlier version used "surprisal(MSP)"/"orgad(0/1)"/"SAR(token)",
+    # which the browser could not parse, so those toggles silently coloured every token to 0.)
     surprisal = [-lp for lp in record["token_logprobs"]][:g]
-    signals = {"surprisal(MSP)": (surprisal, minmax(surprisal))}
+    signals = {"surprisal": (surprisal, minmax(surprisal))}
 
     states = ctx["states"]
     device = ctx["device"]
@@ -153,14 +156,16 @@ def per_token_signals(record, pos, ctx):
                     if 0 <= j < g:
                         mask[j] = 1.0
         if any(mask):
-            signals["orgad(0/1)"] = (mask, minmax(mask))
+            # colour by the RAW 0/1 (answer token = fully shaded), NOT min/max -- a mask that is all-1
+            # (the whole generation is the answer, common on short-form) would otherwise collapse to 0.
+            signals["orgad"] = (mask, mask)
 
     # 6) SAR relevance, indexed by full-record position.
     sar_rel = ctx["sar_rel"]
     if sar_rel is not None and pos < len(sar_rel):
         rel = np.asarray(sar_rel[pos], dtype=float)[:g]
         if len(rel) == g:
-            signals[f"SAR({ctx['gran']})"] = (list(rel), minmax(rel))
+            signals[f"SAR-{ctx['gran']}"] = (list(rel), minmax(rel))
 
     return signals
 
