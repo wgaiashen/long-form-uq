@@ -58,10 +58,11 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 import torch  # noqa: E402
 
-from luq import cache, weighted_msp  # noqa: E402
+from luq import cache, weighted_msp, weighting  # noqa: E402
 from luq.config import Config  # noqa: E402
 from luq.features import orgad_llm  # noqa: E402
 from attn_pool import load_per_token, pad_batch, train_attn  # noqa: E402
+from msp_ablations import build_masks  # noqa: E402  (P1.2 token-subset keep-masks)
 from viz_common import (  # noqa: E402
     load_tokenizer, token_pieces, method_scores, minmax,
     interestingness, render_example, render_html,
@@ -131,6 +132,18 @@ def per_token_signals(record, pos, ctx):
             w_bl = torch.softmax(ctx["wm_bl"](asx), dim=0).cpu().numpy()[:g]
             signals["wMSP-Blondel"] = (list(w_bl), minmax(w_bl))
 
+        # 3b) P1.1 smoothing/moderation variants (trained exactly as the sweep did), so the reshaped
+        #     weight distribution is visible next to the raw wMSP-pairwise:
+        #       wMSP-shrink2  trained with the shrink-to-uniform penalty (reg_lambda=2) -> flatter weights
+        #       wMSP-smooth3  trained + scored with neighbour smoothing over 3 tokens -> gentler peaks
+        if ctx.get("wm_shrink2") is not None:
+            w_shr = torch.softmax(ctx["wm_shrink2"](asx), dim=0).cpu().numpy()[:g]
+            signals["wMSP-shrink2"] = (list(w_shr), minmax(w_shr))
+        if ctx.get("wm_smooth3") is not None:
+            raw_sm = weighting.smooth_raw(ctx["wm_smooth3"](asx), 3)      # predict smooths before softmax
+            w_sm = torch.softmax(raw_sm, dim=0).cpu().numpy()[:g]
+            signals["wMSP-smooth3"] = (list(w_sm), minmax(w_sm))
+
         # 4) uniform (frozen-query pooler = mean-pool): the "no weighting" control.
         X, m, posf = pad_batch([states[pos]], device)
         _, a = ctx["unif"](X, m, posf)
@@ -167,6 +180,17 @@ def per_token_signals(record, pos, ctx):
         if len(rel) == g:
             signals[f"SAR-{ctx['gran']}"] = (list(rel), minmax(rel))
 
+    # 7) P1.2 MSP-ablation keep-masks (0/1): which tokens each ablation KEEPS. Built from the exact same
+    #    tokenizer-piece grouping the ablation battery used (msp_ablations.build_masks over the HF pieces),
+    #    so this is a direct visual check of that grouping. Coloured by raw 0/1 like orgad (an all-1 mask
+    #    must not min/max-collapse to 0).
+    if ctx.get("show_ablations"):
+        pieces = ctx["tok"].convert_ids_to_tokens(record["gen_token_ids"])
+        masks = build_masks(pieces)
+        for name in ("minus_stop", "first_of_word", "last_of_word", "content_word", "first_sentence"):
+            m = masks[name].astype(float).tolist()[:g]
+            signals[f"abl-{name}"] = (m, m)
+
     return signals
 
 
@@ -188,6 +212,9 @@ def main():
                     help="'interesting' surfaces confident-wrong / uncertain-right first.")
     ap.add_argument("--out", default="",
                     help="output HTML path (default: results/viz/token_weights__<key>.html).")
+    ap.add_argument("--no-ablations", dest="show_ablations", action="store_false",
+                    help="hide the P1.2 MSP-ablation keep-masks (shown by default).")
+    ap.set_defaults(show_ablations=True)
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -231,6 +258,13 @@ def main():
     else:
         print("  (torchsort not available -> skipping the wMSP-Blondel toggle)")
     unif = train_attn(states, y, tr, device, seed=1, freeze_query=True)
+    # P1.1 smoothing/moderation variants, trained exactly as the sweep did (cheap on CPU).
+    wm_shrink2 = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", reg=weighting.shrink_to_uniform, reg_lambda=2.0)
+    wm_smooth3 = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", smooth_n=3)
 
     # Optional weight-source caches (toggles appear only if built).
     orgad_json = load_orgad_json(cfg.model_name, args.dataset)
@@ -260,6 +294,7 @@ def main():
     shown = candidates[:args.max_examples]
 
     ctx = {"states": states, "wm_pair": wm_pair, "wm_bl": wm_bl, "unif": unif,
+           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "show_ablations": args.show_ablations,
            "device": device, "orgad_json": orgad_json, "sar_rel": sar_rel,
            "gran": gran, "tok": tok}
 
