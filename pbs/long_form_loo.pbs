@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_lf_loo
+#PBS -j oe
+# P1.5 Long-form-LOO (CPU-only; loads all per-token caches like contribution_ladder, hence 64gb).
+# Writes results/long_form_loo__*.csv.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+echo "long_form_loo on $(hostname) at $(date)" >&2
+python -u scripts/checks/long_form_loo.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

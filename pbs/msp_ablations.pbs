@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=16gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_msp_abl
+#PBS -j oe
+# P1.2 MSP ablation battery (CPU-only; reads cached logprobs). Writes results/msp_ablations__*.csv.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+echo "msp_ablations on $(hostname) at $(date)" >&2
+python -u scripts/checks/msp_ablations.py \
+    --datasets sciq,trivia_qa,pubmed_qa,xsum,med_quad,samsum --audit
+echo "=== done at $(date) ===" >&2

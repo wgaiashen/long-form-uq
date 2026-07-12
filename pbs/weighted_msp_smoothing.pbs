@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_wmsp_sm
+#PBS -j oe
+# P1.1 weighted-MSP smoothing/moderation sweep (CPU; loads all per-token caches -> 64gb). Retrains
+# weighted-MSP for 6 configs x 3 QA evals x {ID,LOO,DiffTask} x 3 seeds, so 8h walltime to be safe.
+# Writes results/weighted_msp_smoothing__*.csv. Has a baseline ID-anchor gate that aborts if the
+# smoothing wiring changed the default path.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+echo "weighted_msp_smoothing on $(hostname) at $(date)" >&2
+python -u scripts/checks/weighted_msp_smoothing.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

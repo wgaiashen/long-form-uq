@@ -46,6 +46,7 @@ import torch
 import torch.nn as nn
 
 from . import msp
+from .weighting import smooth_raw  # shared transform (P1.1 neighbour smoothing)
 
 
 # --------------------------------------------------------------------------------------
@@ -191,12 +192,19 @@ def _weights_from_raw(raw, weight_mode: str):
     raise ValueError(f"weight_mode must be normalised|unconstrained|constant, got {weight_mode!r}")
 
 
-def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None):
+def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth_n=0, return_w=False):
     """One sequence's score q = sum_t w_t * nll_t, divided by length if length_normalise.
 
     `mask` (optional, the Orgad exact-answer overlay): a 0/1 tensor over the G tokens. When given, the
     sum is restricted to the answer-bearing tokens (non-answer tokens contribute 0), and length
-    normalisation divides by the number of answer tokens, not the full length."""
+    normalisation divides by the number of answer tokens, not the full length.
+
+    `smooth_n` (P1.1 neighbour smoothing): if >1, moving-average the raw per-token logits over a window of
+    smooth_n tokens BEFORE the softmax, so the learned weights vary gently (span property, not lone
+    spikes). No effect on constant mode. `return_w` also returns the weight vector (for a penalty term).
+    Both default to the no-op, so the existing path is unchanged."""
+    if smooth_n and smooth_n > 1 and weight_mode != "constant":
+        raw = smooth_raw(raw, smooth_n)
     w = _weights_from_raw(raw, weight_mode)
     wn = w * nll
     if mask is not None:
@@ -208,7 +216,7 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None):
         q = wn.sum()
         if length_normalise:
             q = q / nll.shape[0]
-    return q
+    return (q, w) if return_w else q
 
 
 # --------------------------------------------------------------------------------------
@@ -217,7 +225,7 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None):
 
 def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="normalised",
                        length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3,
-                       loss="pairwise", blondel_eps=0.1, masks=None):
+                       loss="pairwise", blondel_eps=0.1, masks=None, smooth_n=0, reg=None, reg_lambda=0.0):
     """Learn the token weighter by a ranking loss. `y` is correctness (higher = better); the target is
     incorrectness = 1 - y. Returns the trained model (unused for constant mode).
 
@@ -252,14 +260,29 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
             batch = perm[b:b + batch_size]
             if len(batch) < 2:
                 continue  # a rank loss needs >=2 items to compare (skip a size-1 tail batch)
-            q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
-                                    mask=(msk[j] if msk is not None else None))
-                             for j in batch])
+            use_reg = reg is not None and reg_lambda > 0 and weight_mode != "constant"
+            if use_reg:
+                # collect the weight vectors too, so a moderation penalty (P1.1a) can be added
+                qs, ws = [], []
+                for j in batch:
+                    qj, wj = _seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
+                                    mask=(msk[j] if msk is not None else None), smooth_n=smooth_n,
+                                    return_w=True)
+                    qs.append(qj); ws.append(wj)
+                q = torch.stack(qs)
+                penalty = torch.stack([reg(w) for w in ws]).mean()
+            else:
+                q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
+                                        mask=(msk[j] if msk is not None else None), smooth_n=smooth_n)
+                                 for j in batch])
+                penalty = None
             target = _true_rank(incorrect[batch])
             if loss == "blondel":
                 loss_val = _spearman_loss(_blondel_soft_rank(q, blondel_eps), target)
             else:  # "pairwise": Joe's hand-rolled sigmoid soft-rank MSE
                 loss_val = ((_soft_rank(q) - target) ** 2).mean()
+            if penalty is not None:
+                loss_val = loss_val + reg_lambda * penalty      # P1.1a moderation toward uniform/MSP
             opt.zero_grad()
             loss_val.backward()
             opt.step()
@@ -267,8 +290,9 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
 
 
 def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="normalised",
-                         length_normalise=True, masks=None):
-    """Sequence uncertainty q for each example in `idx` (higher = more uncertain)."""
+                         length_normalise=True, masks=None, smooth_n=0):
+    """Sequence uncertainty q for each example in `idx` (higher = more uncertain). `smooth_n` (P1.1c) can
+    smooth the weights at scoring time even for a model trained without it (post-hoc smoothing)."""
     model.eval()
     out = np.zeros(len(idx))
     with torch.no_grad():
@@ -279,22 +303,29 @@ def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="no
             else:
                 raw = model(torch.from_numpy(answer_states(states[i])).to(device))
             m = torch.from_numpy(masks[i]).to(device) if masks is not None else None
-            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m).item())
+            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m, smooth_n=smooth_n).item())
     return out
 
 
 def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode="normalised",
-                     length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1, masks=None):
+                     length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1, masks=None,
+                     smooth_n=0, reg=None, reg_lambda=0.0):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
     (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
     ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
     the Orgad exact-answer overlay: a per-record 0/1 array over the G tokens restricting the score to
-    answer-bearing tokens (build with build_answer_masks)."""
+    answer-bearing tokens (build with build_answer_masks).
+
+    P1.1 smoothing knobs (all default to the no-op): `smooth_n` neighbour-smooths the weights (applied at
+    both train and score time); `reg` (a penalty(w) from luq.weighting, e.g. shrink_to_uniform) with
+    `reg_lambda` moderates the weight distribution toward uniform/MSP during training."""
     model = train_weighted_msp(states, records, y, tr_idx, device, weight_mode=weight_mode,
                                length_normalise=length_normalise, seed=seed, loss=loss,
-                               blondel_eps=blondel_eps, masks=masks)
+                               blondel_eps=blondel_eps, masks=masks, smooth_n=smooth_n,
+                               reg=reg, reg_lambda=reg_lambda)
     return predict_weighted_msp(model, states, records, te_idx, device,
-                                weight_mode=weight_mode, length_normalise=length_normalise, masks=masks)
+                                weight_mode=weight_mode, length_normalise=length_normalise, masks=masks,
+                                smooth_n=smooth_n)
 
 
 # --------------------------------------------------------------------------------------

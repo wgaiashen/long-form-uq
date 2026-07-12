@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb:ngpus=1:gpu_type=A40
+#PBS -l walltime=02:00:00
+#PBS -N luq_sar_a40
+#PBS -j oe
+# SAR relevance on a GPU (the cross-encoder is ~10-50x faster than CPU). 01s auto-uses cuda.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+DATASET="${LUQ_DATASET:-med_quad}"; GRAN="${LUQ_GRAN:-sentence}"
+echo "=== SAR-GPU $DATASET/$GRAN on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name --format=csv,noheader || true
+python -u scripts/01s_sar_relevance.py --dataset "$DATASET" --granularity "$GRAN"
+echo "=== done at $(date) ===" >&2
