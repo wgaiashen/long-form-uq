@@ -99,7 +99,16 @@ def main():
             continue
         te_idx_global = np.where(PT[X][1] == "test")[0]
         yte = np.array([PT[X][2][i] for i in te_idx_global], dtype=float)
+        # matched_LOO (2026-07-12 confound-killer): SAME number of training sources as longform_LOO and
+        # same total size, but with the short-form sources forced IN (replacing long-form ones). Comparing
+        # longform_LOO vs matched_LOO isolates "short-form helps" from "fewer / less-diverse sources" (the
+        # confound flagged in the overnight log: pubmed's longform pool had only 3 sources vs normal's 5).
+        long_srcs = [s for s in LONG_FORM if s != X and s in PT]
+        short_srcs = [s for s in SHORT_FORM if s != X and s in PT]
         pools = {"normal_LOO": CANDIDATES, "longform_LOO": list(LONG_FORM)}
+        if short_srcs and len(long_srcs) >= 2:
+            k_long = max(0, len(long_srcs) - len(short_srcs))          # keep count == longform count
+            pools["matched_LOO"] = short_srcs + long_srcs[:k_long]     # short forced in, same #sources
         # per (pool, method): list of per-seed PRR + per-seed uncertainty vecs (for the bootstrap)
         res = {p: {m: {"prr": [], "unc": []} for m in methods} for p in pools}
         srcs_used = {}
@@ -152,11 +161,24 @@ def main():
                     round(lo, 4), round(hi, 4), round(p_, 4), sig)
                 print(f"    {m:18s} normal {row.get('normal_LOO_prr')}  longform {row.get('longform_LOO_prr')}"
                       f"  Δ(norm-long) {mg:+.3f} [{lo:+.3f},{hi:+.3f}] {'SIG' if sig else 'ns'}", flush=True)
+            # the confound-killer: matched (same #sources, short forced in) vs longform. + => short-form
+            # helps even at fixed source COUNT -> Joe's hypothesis holds cleanly, not just a diversity effect.
+            if "matched_LOO" in res and res["matched_LOO"][m]["unc"] and res["longform_LOO"][m]["unc"]:
+                am = np.mean(np.stack(res["matched_LOO"][m]["unc"]), axis=0)
+                al2 = np.mean(np.stack(res["longform_LOO"][m]["unc"]), axis=0)
+                mg2, lo2, hi2, p2, sig2 = paired_bootstrap(yte, am, al2)
+                row["delta_matched_minus_longform"] = round(mg2, 4)
+                row["m_ci_lo"], row["m_ci_hi"], row["m_boot_p"], row["m_significant"] = (
+                    round(lo2, 4), round(hi2, 4), round(p2, 4), sig2)
+                print(f"    {'':18s} matched {row.get('matched_LOO_prr')} (srcs={srcs_used.get('matched_LOO')})"
+                      f"  Δ(match-long) {mg2:+.3f} [{lo2:+.3f},{hi2:+.3f}] {'SIG' if sig2 else 'ns'}", flush=True)
             out_rows.append(row)
 
     out = Path(args.out) if args.out else (ROOT / "results" / f"long_form_loo__{cache._slug(MODEL)}.csv")
     cols = ["eval", "method", "normal_LOO_prr", "normal_LOO_std", "longform_LOO_prr", "longform_LOO_std",
-            "delta_normal_minus_longform", "ci_lo", "ci_hi", "boot_p", "significant"]
+            "matched_LOO_prr", "matched_LOO_std",
+            "delta_normal_minus_longform", "ci_lo", "ci_hi", "boot_p", "significant",
+            "delta_matched_minus_longform", "m_ci_lo", "m_ci_hi", "m_boot_p", "m_significant"]
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=cols)
         w.writeheader()

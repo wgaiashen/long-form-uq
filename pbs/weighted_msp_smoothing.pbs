@@ -14,6 +14,7 @@ luq_activate || exit 1
 cd "$LUQ_REPO"
 export HF_HOME
 export HF_HUB_OFFLINE=1
-echo "weighted_msp_smoothing on $(hostname) at $(date)" >&2
-python -u scripts/checks/weighted_msp_smoothing.py --seeds 1,2,3
+echo "weighted_msp_smoothing (FINE lambda sweep + all rungs) on $(hostname) at $(date)" >&2
+python -u scripts/checks/weighted_msp_smoothing.py --seeds 1,2,3 \
+    --out results/weighted_msp_smoothing_fine__meta-llama_Meta-Llama-3.1-8B.csv
 echo "=== done at $(date) ===" >&2

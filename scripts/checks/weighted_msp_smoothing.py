@@ -41,15 +41,19 @@ ID_ANCHOR = {"sciq": 0.820, "trivia_qa": 0.790, "pubmed_qa": 0.557}
 GATE_TOL = 0.04
 
 # (name, kwargs to weighted_msp_unc beyond the shared ones)
+# Finer sweep (2026-07-12 follow-up): the J4 sweep found shrink is the lever and shrink@10 too strong,
+# with shrink@2 raw-improving pubmed ID (0.557->0.631) but ns. So sweep FINE around the sweet spot to see
+# if a lambda in [0.5,3] gives a SIGNIFICANT pubmed ID gain, and add the two OOD rungs J4 skipped.
 CONFIGS = [
     ("baseline", {}),
+    ("shrink@0.5", {"reg": weighting.shrink_to_uniform, "reg_lambda": 0.5}),
+    ("shrink@1", {"reg": weighting.shrink_to_uniform, "reg_lambda": 1.0}),
+    ("shrink@1.5", {"reg": weighting.shrink_to_uniform, "reg_lambda": 1.5}),
     ("shrink@2", {"reg": weighting.shrink_to_uniform, "reg_lambda": 2.0}),
-    ("shrink@10", {"reg": weighting.shrink_to_uniform, "reg_lambda": 10.0}),
-    ("kl@2", {"reg": weighting.kl_to_uniform, "reg_lambda": 2.0}),
-    ("smooth_n3", {"smooth_n": 3}),
-    ("smooth_n5", {"smooth_n": 5}),
+    ("shrink@3", {"reg": weighting.shrink_to_uniform, "reg_lambda": 3.0}),
 ]
-SETTINGS = [("LOO", "OOD_LEAVE_ONE_OUT"), ("DiffTask", "OOD_DIFF_TASK")]
+SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OUT"),
+            ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
 
 
 def sampled(split, seed, cap):

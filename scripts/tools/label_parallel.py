@@ -6,7 +6,13 @@ like 02_label; the only difference is a thread pool. Records are judged independ
 labels are identical to the sequential run -- order does not affect any label.
 
     export OPENAI_API_KEY=...
-    python scripts/label_parallel.py --dataset xsum --ood ID --workers 16
+    python scripts/label_parallel.py --dataset xsum --ood ID --workers 16 --judge gpt-5-mini
+
+The judge model MUST match the sibling long-form sets it will be compared against (xsum / samsum /
+pubmed_qa were all labelled with gpt-5-mini) -- never mix judges within one comparison. We therefore
+default --judge to gpt-5-mini and STAMP record["correctness_model"] so the provenance is recorded (this
+is what 02_label.py's judge_into does; the old parallel tool silently used the gpt-5 default and stamped
+nothing).
 """
 import argparse
 import sys
@@ -27,6 +33,9 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--workers", type=int, default=16)
+    ap.add_argument("--judge", default="gpt-5-mini",
+                    help="judge model; MUST match the sibling long-form sets "
+                         "(xsum/samsum/pubmed_qa = gpt-5-mini) -- never mix judges within one comparison")
     args = ap.parse_args()
 
     if args.dataset in data.SHORT_FORM:
@@ -45,11 +54,12 @@ def main():
         # judge() retries internally; wrap so one record's failure never kills the pool
         # (a None score is recorded and picked up by a later resume).
         try:
-            score = llm_judge.judge(r, cfg.dataset)
+            score = llm_judge.judge(r, cfg.dataset, model=args.judge)
         except Exception:
             score = None
         with lock:
             r["correctness"] = score
+            r["correctness_model"] = args.judge   # provenance: which judge produced this label
             progress["done"] += 1
             if score is None:
                 progress["failed"] += 1

@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_canon_pspt
+#PBS -j oe
+# W0 / P1.7 fold-in: per-sentence + per-token SAPLMA aggregators across the FULL 5-rung ladder for all
+# four evals (they were ID-only in canonical_ladder_slides). CPU-only via --skip-contrib (only the SAPLMA
+# aggregators + MSP floor; the poolers / weighted-MSP contribution rows already live in
+# canonical_ladder_xsum__*.csv + contribution_ladder__*.csv, so no need to recompute them here). The xsum
+# OOD rungs for the other methods are ALREADY done (canonical_ladder_xsum__*.csv has all 5 rungs).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== canonical ladder per-sentence/per-token fold-in on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/canonical_ladder.py \
+  --evals sciq,trivia_qa,pubmed_qa,xsum \
+  --sources sciq,trivia_qa,pubmed_qa,xsum,med_quad,samsum \
+  --aggregators meanpool,lasttoken,persentence,pertoken --skip-contrib --seeds 1,2,3 \
+  --out results/canonical_ladder_persent_pertok__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2
