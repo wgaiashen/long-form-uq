@@ -1,0 +1,41 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_canon_cnn
+#PBS -j oe
+# cnn_dailymail as a full 5-rung OOD eval (all methods) once its per-token L15 cache landed from DoC.
+# STEP 0 is an integrity GATE: the per-token window-mean must equal the cached SAPLMA L15 feature
+# (~1e-4, fp32) -- the strong "not truncated + right dtype + right alignment" check (CLAUDE.md). If it
+# fails, abort before the long ladder. STEP 1 runs the ladder with cnn as BOTH an eval target and a
+# source (so it also completes the QA evals' DiffTask pool to the faithful 1800 in later QA runs).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== cnn ladder on $(hostname) at $(date) ===" >&2
+
+echo "### STEP 0: integrity gate (pertok window-mean vs cached SAPLMA L15) ###" >&2
+python - <<'PY'
+import numpy as np, sys
+slug="meta-llama_Meta-Llama-3.1-8B"
+pt=np.load(f"cache/pertok/{slug}__cnn_dailymail__ID__L15.npz", allow_pickle=True)
+states=pt["states"]; idx=pt["idx"]
+sap=np.load(f"cache/features/{slug}__cnn_dailymail__ID__saplma.npz")["feats"]  # (3800,33,4096)
+# check a spread of records: window-mean at L15 == SAPLMA feats[:,15,:]
+rng=np.random.RandomState(0); sample=rng.choice(len(states), 30, replace=False)
+maxdiff=0.0
+for i in sample:
+    wm=np.asarray(states[i], dtype=np.float64).mean(axis=0)
+    ref=sap[idx[i], 15, :].astype(np.float64)
+    maxdiff=max(maxdiff, np.abs(wm-ref).max())
+print(f"integrity: n={len(states)} sampled=30 max|window_mean - SAPLMA_L15|={maxdiff:.2e}", flush=True)
+if maxdiff > 1e-3:
+    sys.exit(f"INTEGRITY GATE FAILED: maxdiff {maxdiff:.2e} > 1e-3 -> cnn pertok corrupt/misaligned")
+print("INTEGRITY GATE OK", flush=True)
+PY
+[ $? -ne 0 ] && { echo "gate failed, aborting" >&2; exit 1; }
+
+echo "### STEP 1: canonical ladder, cnn_dailymail eval (all methods, 5 rungs) ###" >&2
+python -u scripts/checks/canonical_ladder.py --evals cnn_dailymail \
+  --sources sciq,trivia_qa,pubmed_qa,xsum,med_quad,samsum,cnn_dailymail \
+  --aggregators meanpool,lasttoken,persentence,pertoken --seeds 1,2,3 \
+  --out results/canonical_ladder_cnn__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2
