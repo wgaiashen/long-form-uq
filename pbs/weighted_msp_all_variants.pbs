@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=10:00:00
+#PBS -N luq_wmsp_all
+#PBS -j oe
+# ALL weighted-MSP variants x ALL eval datasets x the 5-rung ladder, one tidy CSV. CPU-only
+# (trains the small wMSP MLP per variant on cached per-token states). mem=96gb because the cnn
+# (3.65GB) + xsum + pubmed per-token caches all load as training sources.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== all wMSP variants on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2

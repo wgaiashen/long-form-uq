@@ -70,6 +70,62 @@ from viz_common import (  # noqa: E402
 
 LAYER = 15
 
+# Short, technical "what is this + how is it computed" blurb per toggle, shown in the page's Method
+# reference panel. Keys MUST match the signal names produced by per_token_signals(). Trusted HTML
+# (we author it) -- a little <code> is fine. The point is to make the "token selection is heuristic"
+# reading legible: you can see each weighting's mechanism next to where it actually lands.
+METHOD_DOCS = {
+    "surprisal":
+        "The raw MSP signal every weighting re-weights: per-token surprisal <code>-log p(token)</code> "
+        "read straight from the cached generation logprobs. Deeper = the model was less sure of that token. "
+        "Plain MSP is the unweighted sum of these.",
+    "wMSP-pairwise":
+        "Our LEARNED weighted-MSP (primary). A 4-layer MLP (<code>4096&rarr;256&rarr;128&rarr;64&rarr;1</code>) "
+        "reads each token's layer-15 hidden state and emits one logit; a <code>softmax</code> over the "
+        "sequence (average-1 normalised) gives the weight, and the score is "
+        "<code>&Sigma; w&#7511;&middot;(-log p&#7511;)</code>. Trained on correctness with a pairwise soft-rank loss.",
+    "wMSP-Blondel":
+        "Same MLP and score as wMSP-pairwise, but trained with the Blondel differentiable soft-rank loss "
+        "(torchsort, O(n log n) exact) instead of the pairwise surrogate &mdash; it optimises the whole-batch "
+        "ranking (PRR) directly.",
+    "wMSP-shrink2":
+        "wMSP-pairwise plus a shrink-to-uniform penalty during training "
+        "(<code>+2&middot;&Sigma;(w-1)&sup2;</code>). This pulls the weight distribution back toward uniform "
+        "(= plain MSP) to stop it spiking on lone tokens &mdash; a P1.1 moderation variant.",
+    "wMSP-smooth3":
+        "wMSP-pairwise but the per-token logits are neighbour-averaged over a 3-token window "
+        "(<code>smooth_raw</code>, before the softmax) at both train and score time, encoding "
+        "&lsquo;importance is a span property, not a lone token&rsquo; &mdash; a P1.1 smoothing variant.",
+    "uniform":
+        "The mean-pool baseline: a frozen-query attention pooler, so every token gets an equal weight. "
+        "The &lsquo;no weighting&rsquo; control &mdash; if a learned weighting cannot beat this, its token "
+        "selection is not buying anything.",
+    "orgad":
+        "Orgad important-token mask (0/1). The model&rsquo;s OWN exact-answer span, located by an LLM "
+        "extraction of the answer (leak-free), mapped onto the generated tokens. QA stores one answer "
+        "string; summarisation stores a list of key phrases, each located and unioned into the mask. "
+        "Shown only where <code>cache/orgad_llm/</code> is built.",
+    "SAR-token":
+        "TokenSAR relevance <code>R&#771;</code> at the token level: remove each token, re-measure "
+        "cross-encoder semantic similarity to the full answer, <code>R=1-sim</code>, normalised over the "
+        "sequence. Higher = removing it changes the meaning more. Token-level is used for short-form.",
+    "SAR-sentence":
+        "TokenSAR relevance <code>R&#771;</code> at the sentence level (each token inherits its "
+        "sentence&rsquo;s relevance): remove each sentence, re-measure cross-encoder similarity, "
+        "<code>R=1-sim</code>, normalised. Used for long-form, where token-level removal is near-uniform.",
+    "abl-minus_stop":
+        "P1.2 MSP-ablation keep-mask (0/1): the tokens MSP would keep after dropping function/stop words. "
+        "Built by grouping BPE pieces into words via the leading-space glyph and dropping stop words.",
+    "abl-first_of_word":
+        "P1.2 keep-mask: only the FIRST sub-word piece of each word is kept (word-initial tokens).",
+    "abl-last_of_word":
+        "P1.2 keep-mask: only the LAST sub-word piece of each word is kept.",
+    "abl-content_word":
+        "P1.2 keep-mask: content words only &mdash; non-stop words, first sub-word piece.",
+    "abl-first_sentence":
+        "P1.2 keep-mask: only the tokens of the first sentence (split on <code>.!?</code>) are kept.",
+}
+
 
 # --------------------------------------------------------------------------------------
 # Optional weight-source caches (each toggle appears only if its cache exists)
@@ -316,7 +372,8 @@ def main():
     out = Path(args.out) if args.out else (cfg.results_dir / "viz" / f"token_weights__{key}.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_html(key, records, methods, args.label_field,
-                               signal_names, "\n".join(ex_html), subtitle=subtitle))
+                               signal_names, "\n".join(ex_html), subtitle=subtitle,
+                               method_docs=METHOD_DOCS))
     print(f"wrote {out}  ({len(shown)} of {len(candidates)} {args.split} examples; "
           f"toggles: {signal_names})")
 

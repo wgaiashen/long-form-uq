@@ -194,10 +194,28 @@ def render_example(record, record_pos, methods, signals, label_field, pieces):
     </div>"""
 
 
-def render_html(key, records, methods, label_field, signal_names, examples_html, subtitle=""):
+def render_html(key, records, methods, label_field, signal_names, examples_html, subtitle="",
+                method_docs=None):
     toggle_buttons = "".join(
         f'<button onclick="recolour(\'{n}\')">{n}</button>' for n in signal_names
     )
+    # Optional "Method reference" panel: one short technical blurb per toggle actually shown.
+    # method_docs maps signal_name -> a short HTML string (kept trusted; we author it, no user input).
+    # We only list signals present in signal_names, in that order, so a dataset missing orgad/SAR does
+    # not show docs for toggles it has no button for.
+    ref_html = ""
+    if method_docs:
+        items = "".join(
+            f'<div class="mref-item"><span class="mref-name">{html.escape(n)}</span>'
+            f'<span class="mref-desc">{method_docs[n]}</span></div>'
+            for n in signal_names if n in method_docs
+        )
+        if items:
+            ref_html = (
+                '<details open class="mref"><summary>Method reference &mdash; what each toggle is, '
+                'and how it is computed</summary>'
+                f'<div class="mref-grid">{items}</div></details>'
+            )
     # A tiny bit of JS: recolour every token span from a chosen signal's data-attribute.
     script = """
     function recolour(name) {
@@ -234,6 +252,15 @@ def render_html(key, records, methods, label_field, signal_names, examples_html,
   .tok {{ border-radius: 3px; padding: 0 1px; }}
   details {{ margin-top: 8px; }}
   pre {{ white-space: pre-wrap; font-size: 12px; color: #444; background: #fafafa; padding: 8px; border-radius: 6px; }}
+  .mref {{ margin: 12px 0 6px; border: 1px solid #e5e5e5; border-radius: 8px; background: #fafbfc; }}
+  .mref > summary {{ cursor: pointer; padding: 8px 12px; font-weight: 600; font-size: 13px; }}
+  .mref-grid {{ padding: 4px 12px 12px; display: grid; gap: 8px; }}
+  .mref-item {{ display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline;
+    font-size: 12.5px; border-top: 1px solid #eee; padding-top: 8px; }}
+  .mref-name {{ font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: #b91c1c; }}
+  .mref-desc {{ color: #333; line-height: 1.5; }}
+  .mref-desc code {{ font-family: ui-monospace, Menlo, Consolas, monospace; background: #eef; padding: 0 3px; border-radius: 3px; }}
+  @media (max-width: 640px) {{ .mref-item {{ grid-template-columns: 1fr; gap: 2px; }} }}
 </style></head>
 <body>
   <h1>{html.escape(key)}</h1>
@@ -247,6 +274,7 @@ def render_html(key, records, methods, label_field, signal_names, examples_html,
     </div>
     {subtitle_html}
   </div>
+  {ref_html}
   {examples_html}
   <script>{script}</script>
 </body></html>"""

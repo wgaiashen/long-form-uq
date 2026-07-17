@@ -10,8 +10,9 @@
 # Renders ONE HTML per dataset: results/viz/token_weights__<key>.html, with the same toggle UI
 # as visualise_attention.py. Optional toggles (orgad, SAR) appear only where their cache exists.
 #
-# Default: loop over the 4 core datasets. Override to a single dataset with:
+# Default: loop over the 4 core datasets (test split). Override with:
 #   qsub -v DS=sciq pbs/viz_token_weights.pbs
+#   qsub -v DS="med_quad samsum",SPLIT=train pbs/viz_token_weights.pbs   # train-only sets (no test rows)
 set -uo pipefail
 cd "$PBS_O_WORKDIR"
 source pbs/_env.sh
@@ -21,11 +22,13 @@ export HF_HOME
 
 MODEL=meta-llama/Meta-Llama-3.1-8B
 DATASETS="${DS:-sciq trivia_qa pubmed_qa xsum}"
+SPLIT="${SPLIT:-test}"
 
-echo "=== visualise token weights on $(hostname) at $(date) | datasets: $DATASETS ===" >&2
+echo "=== visualise token weights on $(hostname) at $(date) | datasets: $DATASETS | split: $SPLIT ===" >&2
 for d in $DATASETS; do
-  echo "---- $d ---- $(date)" >&2
+  echo "---- $d ($SPLIT) ---- $(date)" >&2
   python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset "$d" --ood ID \
+    --split "$SPLIT" \
     || echo "!!! token-weights viz FAILED for $d" >&2
 done
 echo "=== done at $(date) ===" >&2

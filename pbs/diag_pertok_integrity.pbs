@@ -1,0 +1,56 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=00:40:00
+#PBS -N luq_diag_pt
+#PBS -j oe
+# Calibrate the per-token integrity check: compare cnn_dailymail (the one under suspicion) against
+# xsum (KNOWN-GOOD -- its pertok drives the working ladder). For each: pertok inner dtype, and the
+# POSITIONAL window-mean vs cached SAPLMA-L15 max-abs-diff (fp16 storage + sdpa-vs-eager attention
+# make an exact match impossible; the real question is whether cnn is WORSE than the good xsum).
+# Also runs the pipeline's ACTUAL check: mean-pool PRR of the pertok == cached SAPLMA feature PRR.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+python - <<'PY'
+import numpy as np, sys
+sys.path.insert(0,"src"); sys.path.insert(0,"scripts/checks")
+from luq import cache, results, probe
+from aggregation_table import load_per_token
+slug="meta-llama_Meta-Llama-3.1-8B"; M="meta-llama/Meta-Llama-3.1-8B"
+for d in ["xsum","cnn_dailymail"]:
+    pt=np.load(f"cache/pertok/{slug}__{d}__ID__L15.npz", allow_pickle=True)
+    states=pt["states"]; idx=pt["idx"]
+    sap=np.load(f"cache/features/{slug}__{d}__ID__saplma.npz")["feats"]
+    inner_dtype=np.asarray(states[0]).dtype
+    n=len(states); ntr=int((idx[:n]==np.arange(n)).sum())  # rough
+    rng=np.random.RandomState(0)
+    samp=np.concatenate([rng.choice(1800,20,replace=False), 1800+rng.choice(n-1800,20,replace=False)])
+    md=0.0
+    for i in samp:
+        i=int(i)
+        wm=np.asarray(states[i],dtype=np.float64).mean(axis=0)
+        md=max(md, np.abs(wm - sap[i,15,:].astype(np.float64)).max())
+    print(f"[{d}] n={n} inner_dtype={inner_dtype} POSITIONAL max|wm-SAPLMA_L15|={md:.3e}", flush=True)
+    # pipeline's real check: mean-pool PRR (this pertok) vs cached SAPLMA feature PRR, at L15
+    try:
+        loaded=load_per_token(M,d,15,"correctness")
+        st,split,y,layer,recs=loaded
+        te=np.where(split=="test")[0]
+        if len(te):
+            yte=np.array([y[i] for i in te],dtype=float)
+            Xmean=np.stack([np.asarray(st[i]).mean(axis=0) for i in range(len(st))])
+            clf=probe.train_probe_mlp(Xmean[[i for i in range(len(st)) if split[i]=='train']],
+                                      np.array([y[i] for i in range(len(st)) if split[i]=='train'],float), seed=1)
+            unc_pt=probe.uncertainty(clf, Xmean[te])
+            prr_pt=results.prr(yte, unc_pt)
+            # cached SAPLMA feature PRR
+            Xsap=sap[:,15,:]
+            clf2=probe.train_probe_mlp(Xsap[[i for i in range(len(st)) if split[i]=='train']],
+                                       np.array([y[i] for i in range(len(st)) if split[i]=='train'],float), seed=1)
+            prr_sap=results.prr(yte, probe.uncertainty(clf2, Xsap[te]))
+            print(f"[{d}] mean-pool-pertok PRR={prr_pt:.4f}  vs cached-SAPLMA-feature PRR={prr_sap:.4f}  (should be close)", flush=True)
+        else:
+            print(f"[{d}] no test split -> skip PRR check", flush=True)
+    except Exception as e:
+        print(f"[{d}] PRR check error: {type(e).__name__}: {e}", flush=True)
+print("DIAG DONE", flush=True)
+PY
