@@ -15,6 +15,7 @@ Writes cache/pertok/<key>__L<layer>.npz with states (object array of (n_tokens, 
 idx (record indices), layer. Records carry already-truncated gens (pubmed D1), so no re-truncation.
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -80,8 +81,26 @@ def main():
     pdir = Path(cfg.cache_dir) / "pertok"
     pdir.mkdir(parents=True, exist_ok=True)
     ppath = pdir / f"{key}__L{L}.npz"
-    np.savez_compressed(ppath, states=np.array(pertok, dtype=object),
-                        idx=np.array(pertok_idx), layer=L)
+    # Atomic write: save to a temp file then os.replace onto the final path, so a kill or an
+    # out-of-quota error mid-save can never leave a corrupt file under the canonical name (that
+    # exact failure once left a truncated npz that only the downstream reload gate caught). Pass an
+    # open handle, not a path -- np.savez_compressed would otherwise append ".npz" to a ".tmp" name.
+    tmp_path = ppath.with_name(ppath.name + ".tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()  # clear a stale temp left by a previously killed run
+    try:
+        with open(tmp_path, "wb") as fh:
+            np.savez_compressed(fh, states=np.array(pertok, dtype=object),
+                                idx=np.array(pertok_idx), layer=L)
+        os.replace(tmp_path, ppath)
+    except BaseException:
+        # Remove the partial temp on any failure (e.g. running out of disk quota mid-write) so it
+        # does not leak gigabytes and push the project over its CephFS byte quota. BaseException so a
+        # KeyboardInterrupt/SystemExit during the write also cleans up (a hard SIGKILL cannot be
+        # caught, but the stale-temp unlink above clears that on the next run).
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
     print(f"cached per-token (L{L}) -> {ppath}")
 
     # Sanity on the PERSISTED cache (reload it, do not trust the in-memory copy): mean-pool of the
