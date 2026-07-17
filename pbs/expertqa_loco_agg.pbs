@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_eqa_agg
+#PBS -j oe
+# ExpertQA LOCO aggregation ladder: weighted-MSP + attention pooler beside SAPLMA/MSP, per label
+# (faithfulness / consistency). CPU-only; the 6.59GB per-token L15 cache loads into RAM (mem=96gb).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== expertqa loco agg on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/expertqa_loco_agg.py --labels faithfulness consistency --seeds 1 2 3
+echo "=== done at $(date) ===" >&2

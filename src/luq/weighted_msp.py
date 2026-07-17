@@ -174,30 +174,58 @@ def _spearman_loss(soft_r, target_rank):
 # Weights and the sequence score
 # --------------------------------------------------------------------------------------
 
-def _weights_from_raw(raw, weight_mode: str):
+# Llama-3 reserved/special tokens are ids >= 128000 (all_special_ids = {128000 <|begin_of_text|>,
+# 128001 <|end_of_text|>}). They must NOT carry weight: ~70% of xsum/cnn generations END in the EOS
+# token, and the learned weighter otherwise concentrates its softmax mass there (a content-free "I'm
+# done" token -- clearly visible in the token-weight visualiser). SAR already zeroes special tokens;
+# the weighted-MSP weighting now does too. Only the LEARNED modes exclude them; `constant` (= the plain
+# MSP floor) is left untouched so the constant==MSP grounding test and the floor stay invariant.
+_SPECIAL_ID_MIN = 128000
+
+
+def content_keep(record):
+    """1.0 for content tokens, 0.0 for special/reserved tokens (Llama-3 ids >= 128000), over the G
+    generated tokens -- used to drop the trailing <|end_of_text|> from the learned weighting."""
+    return np.array([0.0 if int(t) >= _SPECIAL_ID_MIN else 1.0 for t in record["gen_token_ids"]],
+                    dtype=np.float32)
+
+
+def _weights_from_raw(raw, weight_mode: str, keep=None):
     """Turn the MLP's raw per-token scalars into the weights actually used.
 
     normalised   : softmax over the sequence, times n -> positive, average 1 (a re-weighting
                    of a length-n mean; recovers plain MSP if the softmax is uniform).
     unconstrained: use the raw scalars directly (can be negative).
     constant     : all ones -> plain MSP (the built-in ablation / floor).
+
+    `keep` (optional 0/1 tensor over the G tokens): special-token exclusion. Excluded positions are set
+    to -inf BEFORE the softmax (so they get weight 0 AND do not steal softmax mass from content tokens),
+    and the average-1 scaling uses the KEPT count. Not applied to `constant` (the floor is invariant).
     """
     n = raw.shape[0]
     if weight_mode == "normalised":
-        return torch.softmax(raw, dim=0) * n
+        if keep is None:
+            return torch.softmax(raw, dim=0) * n
+        n_kept = torch.clamp(keep.sum(), min=1.0)
+        masked = raw.masked_fill(keep < 0.5, float("-inf"))
+        return torch.softmax(masked, dim=0) * n_kept            # special tokens -> 0; kept average 1
     if weight_mode == "unconstrained":
-        return raw
+        return raw if keep is None else raw * keep              # special tokens -> weight 0
     if weight_mode == "constant":
-        return torch.ones_like(raw)
+        return torch.ones_like(raw)                             # floor: unchanged (all tokens)
     raise ValueError(f"weight_mode must be normalised|unconstrained|constant, got {weight_mode!r}")
 
 
-def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth_n=0, return_w=False):
+def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth_n=0, keep=None,
+           return_w=False):
     """One sequence's score q = sum_t w_t * nll_t, divided by length if length_normalise.
 
     `mask` (optional, the Orgad exact-answer overlay): a 0/1 tensor over the G tokens. When given, the
     sum is restricted to the answer-bearing tokens (non-answer tokens contribute 0), and length
     normalisation divides by the number of answer tokens, not the full length.
+
+    `keep` (optional 0/1 tensor): special-token exclusion (see `_weights_from_raw`). Excluded tokens get
+    weight 0 (pre-softmax), and length normalisation divides by the KEPT (content) count.
 
     `smooth_n` (P1.1 neighbour smoothing): if >1, moving-average the raw per-token logits over a window of
     smooth_n tokens BEFORE the softmax, so the learned weights vary gently (span property, not lone
@@ -205,17 +233,19 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth
     Both default to the no-op, so the existing path is unchanged."""
     if smooth_n and smooth_n > 1 and weight_mode != "constant":
         raw = smooth_raw(raw, smooth_n)
-    w = _weights_from_raw(raw, weight_mode)
+    w = _weights_from_raw(raw, weight_mode, keep=keep)
     wn = w * nll
     if mask is not None:
         wn = wn * mask
-        q = wn.sum()
-        if length_normalise:
-            q = q / torch.clamp(mask.sum(), min=1.0)
-    else:
-        q = wn.sum()
-        if length_normalise:
-            q = q / nll.shape[0]
+    q = wn.sum()
+    if length_normalise:
+        if mask is not None:
+            denom = (mask * keep).sum() if keep is not None else mask.sum()
+        elif keep is not None:
+            denom = keep.sum()
+        else:
+            denom = torch.as_tensor(float(nll.shape[0]), device=wn.device)
+        q = q / torch.clamp(denom, min=1.0)
     return (q, w) if return_w else q
 
 
@@ -225,7 +255,8 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth
 
 def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="normalised",
                        length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3,
-                       loss="pairwise", blondel_eps=0.1, masks=None, smooth_n=0, reg=None, reg_lambda=0.0):
+                       loss="pairwise", blondel_eps=0.1, masks=None, smooth_n=0, reg=None, reg_lambda=0.0,
+                       exclude_special=True):
     """Learn the token weighter by a ranking loss. `y` is correctness (higher = better); the target is
     incorrectness = 1 - y. Returns the trained model (unused for constant mode).
 
@@ -248,6 +279,8 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
     emb = [torch.from_numpy(answer_states(states[i])).to(device) for i in tr_idx]
     nll = [torch.from_numpy(per_token_nll(records[i])).to(device) for i in tr_idx]
     msk = ([torch.from_numpy(masks[i]).to(device) for i in tr_idx] if masks is not None else None)
+    kep = ([torch.from_numpy(content_keep(records[i])).to(device) for i in tr_idx]
+           if exclude_special else None)
     incorrect = torch.tensor([1.0 - float(y[i]) for i in tr_idx], dtype=torch.float32, device=device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
 
@@ -267,13 +300,14 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
                 for j in batch:
                     qj, wj = _seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
                                     mask=(msk[j] if msk is not None else None), smooth_n=smooth_n,
-                                    return_w=True)
+                                    keep=(kep[j] if kep is not None else None), return_w=True)
                     qs.append(qj); ws.append(wj)
                 q = torch.stack(qs)
                 penalty = torch.stack([reg(w) for w in ws]).mean()
             else:
                 q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
-                                        mask=(msk[j] if msk is not None else None), smooth_n=smooth_n)
+                                        mask=(msk[j] if msk is not None else None), smooth_n=smooth_n,
+                                        keep=(kep[j] if kep is not None else None))
                                  for j in batch])
                 penalty = None
             target = _true_rank(incorrect[batch])
@@ -290,7 +324,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
 
 
 def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="normalised",
-                         length_normalise=True, masks=None, smooth_n=0):
+                         length_normalise=True, masks=None, smooth_n=0, exclude_special=True):
     """Sequence uncertainty q for each example in `idx` (higher = more uncertain). `smooth_n` (P1.1c) can
     smooth the weights at scoring time even for a model trained without it (post-hoc smoothing)."""
     model.eval()
@@ -303,13 +337,17 @@ def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="no
             else:
                 raw = model(torch.from_numpy(answer_states(states[i])).to(device))
             m = torch.from_numpy(masks[i]).to(device) if masks is not None else None
-            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m, smooth_n=smooth_n).item())
+            # constant mode = the plain-MSP floor: never exclude tokens (keeps constant==MSP invariant).
+            keep = (torch.from_numpy(content_keep(records[i])).to(device)
+                    if (exclude_special and weight_mode != "constant") else None)
+            out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m, smooth_n=smooth_n,
+                                  keep=keep).item())
     return out
 
 
 def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode="normalised",
                      length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1, masks=None,
-                     smooth_n=0, reg=None, reg_lambda=0.0):
+                     smooth_n=0, reg=None, reg_lambda=0.0, exclude_special=True):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
     (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
     ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
@@ -322,10 +360,10 @@ def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode=
     model = train_weighted_msp(states, records, y, tr_idx, device, weight_mode=weight_mode,
                                length_normalise=length_normalise, seed=seed, loss=loss,
                                blondel_eps=blondel_eps, masks=masks, smooth_n=smooth_n,
-                               reg=reg, reg_lambda=reg_lambda)
+                               reg=reg, reg_lambda=reg_lambda, exclude_special=exclude_special)
     return predict_weighted_msp(model, states, records, te_idx, device,
                                 weight_mode=weight_mode, length_normalise=length_normalise, masks=masks,
-                                smooth_n=smooth_n)
+                                smooth_n=smooth_n, exclude_special=exclude_special)
 
 
 # --------------------------------------------------------------------------------------

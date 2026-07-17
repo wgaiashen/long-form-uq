@@ -59,6 +59,12 @@ def main():
     ap.add_argument("--cross-encoder", default=CE_NAME)
     ap.add_argument("--limit", type=int, default=0, help="only first N records (smoke test)")
     ap.add_argument("--prompt-regime", default="")
+    ap.add_argument("--no-prepend", action="store_true",
+                    help="ABLATION: do NOT prepend the question/source to the cross-encoder pair, so "
+                         "relevance is measured on the ANSWER alone. The default prepends it (faithful to "
+                         "lm-polygraph). On long-form the prepend can dilute the signal (removing one answer "
+                         "unit is a small fraction of question+answer); this isolates that. Cached with a "
+                         "'__noprepend' suffix so it never overwrites the faithful cache.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
@@ -79,7 +85,7 @@ def main():
     tsar = np.zeros(n, dtype=float)
     t0 = time.time()
     for i, r in enumerate(records):
-        q = question_from_prompt(r["prompt"])
+        q = "" if args.no_prepend else question_from_prompt(r["prompt"])
         _, Rn = sar.relevance(ce, tok, q, r["gen_token_ids"], gen_text=r.get("gen_text"),
                               granularity=args.granularity)
         rel[i] = Rn.astype(np.float32)
@@ -90,7 +96,8 @@ def main():
 
     out_dir = ROOT / "cache" / "sar"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{cache._slug(args.model)}__{args.dataset}__{args.ood}__{args.granularity}.npz"
+    suffix = "__noprepend" if args.no_prepend else ""
+    out = out_dir / f"{cache._slug(args.model)}__{args.dataset}__{args.ood}__{args.granularity}{suffix}.npz"
     np.savez_compressed(out, relevance=rel, tokensar=tsar, granularity=args.granularity,
                         cross_encoder=args.cross_encoder)
     # sanity: relevance concentration (entropy/logG; 1=uniform, ->0 peaked) and tokensar spread

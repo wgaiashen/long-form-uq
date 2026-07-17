@@ -1,0 +1,8 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_sar_abl
+#PBS -j oe
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/sar_prepend_ablation.py --datasets pubmed_qa med_quad --n 40
