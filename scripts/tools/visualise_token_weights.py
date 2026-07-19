@@ -58,9 +58,9 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 import torch  # noqa: E402
 
-from luq import cache, weighted_msp, weighting  # noqa: E402
+from luq import cache, weighted_msp, weighting, token_subsets  # noqa: E402
 from luq.config import Config  # noqa: E402
-from luq.features import orgad_llm  # noqa: E402
+from luq.features import orgad_llm, sar  # noqa: E402
 from attn_pool import load_per_token, pad_batch, train_attn  # noqa: E402
 from msp_ablations import build_masks  # noqa: E402  (P1.2 token-subset keep-masks)
 from viz_common import (  # noqa: E402
@@ -96,6 +96,15 @@ METHOD_DOCS = {
         "wMSP-pairwise but the per-token logits are neighbour-averaged over a 3-token window "
         "(<code>smooth_raw</code>, before the softmax) at both train and score time, encoding "
         "&lsquo;importance is a span property, not a lone token&rsquo; &mdash; a P1.1 smoothing variant.",
+    "wMSP-content":
+        "wMSP-pairwise but the learned softmax is RESTRICTED to content tokens only &mdash; special "
+        "tokens, punctuation and stop-words (negation kept) get weight 0 pre-softmax, so the weighter "
+        "cannot key on filler. Joe&rsquo;s &lsquo;exclude stop words&rsquo; idea (the <code>keep=</code> "
+        "content mask).",
+    "wMSP-segment":
+        "wMSP but the MLP emits ONE weight per SENTENCE, broadcast to that sentence&rsquo;s tokens "
+        "(segment-mean of the raw logits, then softmax over sentences) &mdash; attacks the single-token "
+        "spike degeneracy structurally. Joe&rsquo;s segment-weighting idea (<code>segment_ids=</code>).",
     "uniform":
         "The mean-pool baseline: a frozen-query attention pooler, so every token gets an equal weight. "
         "The &lsquo;no weighting&rsquo; control &mdash; if a learned weighting cannot beat this, its token "
@@ -131,14 +140,17 @@ METHOD_DOCS = {
 # Optional weight-source caches (each toggle appears only if its cache exists)
 # --------------------------------------------------------------------------------------
 
-def load_sar(model, dataset, gran):
-    """TokenSAR relevance cache (cache/sar/<slug>__<ds>__ID__<gran>.npz). Indexed by full-record
-    position (01s_sar_relevance.py enumerates cache.load_records). Returns the list of length-G R~
-    arrays, or None if not built for this dataset/granularity yet."""
-    p = ROOT / "cache" / "sar" / f"{cache._slug(model)}__{dataset}__ID__{gran}.npz"
-    if not p.exists():
-        return None
-    return list(np.load(p, allow_pickle=True)["relevance"])
+def load_sar(model, dataset):
+    """TokenSAR relevance cache (cache/sar/<slug>__<ds>__ID__<gran>.npz). Auto-detect the granularity,
+    preferring the SHARPER token-level answer-only (`token__noprepend`) cache the results actually use,
+    then plain `token`, then `sentence` (near-uniform on long-form). Returns (list of length-G R~ arrays,
+    display_gran) or (None, None). Mirrors weighted_msp_sar.load_sar so the viz shows the same signal the
+    ladder scored, not the old near-uniform sentence SAR."""
+    for gran, disp in (("token__noprepend", "token"), ("token", "token"), ("sentence", "sentence")):
+        p = ROOT / "cache" / "sar" / f"{cache._slug(model)}__{dataset}__ID__{gran}.npz"
+        if p.exists():
+            return list(np.load(p, allow_pickle=True)["relevance"]), disp
+    return None, None
 
 
 def load_orgad_json(model, dataset):
@@ -178,27 +190,41 @@ def per_token_signals(record, pos, ctx):
         # generated tokens. The weight is softmax(MLP(states)) over the sequence -- exactly the
         # `normalised` weight the weighted-MSP score uses.
         asx = torch.from_numpy(weighted_msp.answer_states(states[pos])).to(device)
+        # The TRUE scored weight excludes special tokens (EOS) pre-softmax (the fix). Route every displayed
+        # weight through _weights_from_raw(keep=) so the viz shows what the score actually uses -- EOS -> 0,
+        # content tokens averaged to 1 -- instead of the old raw softmax that still lit up the EOS token.
+        keep_t = torch.from_numpy(weighted_msp.content_keep(record)).to(device)
+
+        def _wshow(raw, keep=keep_t):
+            return weighted_msp._weights_from_raw(raw, "normalised", keep=keep).cpu().numpy()[:g]
 
         # 2) wMSP-pairwise
-        w_pair = torch.softmax(ctx["wm_pair"](asx), dim=0).cpu().numpy()[:g]
+        w_pair = _wshow(ctx["wm_pair"](asx))
         signals["wMSP-pairwise"] = (list(w_pair), minmax(w_pair))
 
         # 3) wMSP-Blondel (only if trained)
         if ctx["wm_bl"] is not None:
-            w_bl = torch.softmax(ctx["wm_bl"](asx), dim=0).cpu().numpy()[:g]
-            signals["wMSP-Blondel"] = (list(w_bl), minmax(w_bl))
+            signals["wMSP-Blondel"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_bl"](asx)))
 
-        # 3b) P1.1 smoothing/moderation variants (trained exactly as the sweep did), so the reshaped
-        #     weight distribution is visible next to the raw wMSP-pairwise:
-        #       wMSP-shrink2  trained with the shrink-to-uniform penalty (reg_lambda=2) -> flatter weights
-        #       wMSP-smooth3  trained + scored with neighbour smoothing over 3 tokens -> gentler peaks
+        # 3b) P1.1 smoothing/moderation variants (shrink -> flatter; smooth -> gentler peaks).
         if ctx.get("wm_shrink2") is not None:
-            w_shr = torch.softmax(ctx["wm_shrink2"](asx), dim=0).cpu().numpy()[:g]
-            signals["wMSP-shrink2"] = (list(w_shr), minmax(w_shr))
+            signals["wMSP-shrink2"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_shrink2"](asx)))
         if ctx.get("wm_smooth3") is not None:
-            raw_sm = weighting.smooth_raw(ctx["wm_smooth3"](asx), 3)      # predict smooths before softmax
-            w_sm = torch.softmax(raw_sm, dim=0).cpu().numpy()[:g]
-            signals["wMSP-smooth3"] = (list(w_sm), minmax(w_sm))
+            raw_sm = weighting.smooth_raw(ctx["wm_smooth3"](asx), 3)      # smooth before the (keep-masked) softmax
+            signals["wMSP-smooth3"] = (lambda w: (list(w), minmax(w)))(_wshow(raw_sm))
+
+        # 3c) NEW constrained variants (Joe #4/#7): content-restricted + one-weight-per-sentence.
+        if ctx.get("wm_content") is not None:
+            pieces_c = ctx["tok"].convert_ids_to_tokens(record["gen_token_ids"])
+            keep_c = torch.from_numpy(token_subsets.keep_mask(record["gen_token_ids"], pieces_c, "content")).to(device)
+            signals["wMSP-content"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_content"](asx), keep_c))
+        if ctx.get("wm_segment") is not None:
+            sid, _ = sar._token_sentence_ids(
+                ctx["tok"], list(record["gen_token_ids"]),
+                record.get("gen_text") or ctx["tok"].decode(record["gen_token_ids"], skip_special_tokens=True))
+            seg_t = torch.from_numpy(np.asarray(sid, dtype=np.int64)).to(device)
+            raw_seg = weighted_msp._segment_mean_raw(ctx["wm_segment"](asx), seg_t)
+            signals["wMSP-segment"] = (lambda w: (list(w), minmax(w)))(_wshow(raw_seg))
 
         # 4) uniform (frozen-query pooler = mean-pool): the "no weighting" control.
         X, m, posf = pad_batch([states[pos]], device)
@@ -324,13 +350,29 @@ def main():
 
     # Optional weight-source caches (toggles appear only if built).
     orgad_json = load_orgad_json(cfg.model_name, args.dataset)
-    gran = "token" if args.dataset in ("sciq", "trivia_qa") else "sentence"
-    sar_rel = load_sar(cfg.model_name, args.dataset, gran)
+    sar_rel, gran = load_sar(cfg.model_name, args.dataset)
+    gran = gran or "token"
     print(f"  orgad cache: {'yes' if orgad_json else 'no'} | "
           f"SAR({gran}) cache: {'yes' if sar_rel else 'no'}")
 
     tok = load_tokenizer(cfg.model_name)
     pieces_by_pos = {i: token_pieces(tok, r["gen_token_ids"]) for i, r in enumerate(records)}
+
+    # NEW constrained-weighting variants (Joe #4/#7), trained like the keep-variants sweep. keep_mask needs
+    # the BPE pieces (convert_ids_to_tokens, glyph-prefixed), NOT the decoded token_pieces.
+    content_keep_list = [token_subsets.keep_mask(r["gen_token_ids"],
+                                                 tok.convert_ids_to_tokens(r["gen_token_ids"]), "content")
+                         for r in records]
+    segids = [np.asarray(sar._token_sentence_ids(
+                  tok, list(r["gen_token_ids"]),
+                  r.get("gen_text") or tok.decode(r["gen_token_ids"], skip_special_tokens=True))[0], np.int64)
+              for r in records]
+    wm_content = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", keep=content_keep_list)
+    wm_segment = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", segment_ids=segids)
 
     # Method scores + the same "interesting" sort as the attention viz.
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
@@ -350,7 +392,8 @@ def main():
     shown = candidates[:args.max_examples]
 
     ctx = {"states": states, "wm_pair": wm_pair, "wm_bl": wm_bl, "unif": unif,
-           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "show_ablations": args.show_ablations,
+           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "wm_content": wm_content,
+           "wm_segment": wm_segment, "show_ablations": args.show_ablations,
            "device": device, "orgad_json": orgad_json, "sar_rel": sar_rel,
            "gran": gran, "tok": tok}
 

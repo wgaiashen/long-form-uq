@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=09:00:00
+#PBS -N luq_contrib_summ
+#PBS -j oe
+# Pooler-vs-wMSP-vs-floor OOD ladder for the SUMMARISATION evals xsum + cnn_dailymail, using the SAME
+# verified machinery that already did sciq/trivia/pubmed. Closes the load-bearing gap: is the attention
+# pooler's OOD collapse real on xsum/cnn (so wMSP wins there), or does the pooler survive as it does on
+# samsum? All 7 sources as training pool. CPU only, cached features.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== contribution ladder (summ: xsum + cnn) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 \
+  --evals xsum,cnn_dailymail \
+  --sources sciq,trivia_qa,pubmed_qa,xsum,med_quad,samsum,cnn_dailymail \
+  --out results/contribution_ladder_summ__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

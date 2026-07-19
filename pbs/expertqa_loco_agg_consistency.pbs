@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_eqa_cons
+#PBS -j oe
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== expertqa loco agg CONSISTENCY only on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/expertqa_loco_agg.py --labels consistency --seeds 1 2 3
+echo "=== done $(date) ===" >&2

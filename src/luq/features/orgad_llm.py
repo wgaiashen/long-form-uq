@@ -139,11 +139,83 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
     return []
 
 
-def extract_important(dataset, question, model_answer, model="gpt-5-mini"):
-    """Task-adaptive dispatch (the ONE method): QA -> the exact answer (a str); summarisation -> the
-    key spans (a list). Returns the value to cache (str for QA, list for summarisation)."""
+# --------------------------------------------------------------------------------------------------
+# Refined LONG-FORM QA variant (the "broad prompt", 2026-07-19). The short-form exact-answer prompt is
+# degenerate on multi-sentence QA answers -- on pubmed it collapses to the yes/no verdict for 73% of
+# examples, on med_quad it fails (NO ANSWER) 42% of the time. A long QA answer has no single exact answer:
+# the important-token CONCEPT becomes the SET of claim-bearing spans (the verdict PLUS the findings/
+# entities/numbers), exactly like the summary variant but keeping the yes/no verdict. Returns a list.
+# --------------------------------------------------------------------------------------------------
+LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa"}
+
+LONGFORM_QA_PROMPT = """Extract from the following answer the claim-bearing terms a reader would need to verify to judge whether the answer is correct: any explicit yes/no verdict, the key findings or conclusions, and the specific entities (drugs, genes, conditions, procedures), numbers, and dates. Copy each term verbatim from the answer, one per line, and keep each term SHORT -- a word or short phrase, NOT a whole sentence. If the answer states nothing verifiable, output NO ANSWER.
+
+Question: Does dimethyl sulfoxide (DMSO) cause a reversible inhibition of telomerase activity?
+Answer: Yes, DMSO causes a reversible inhibition of telomerase activity in a Burkitt lymphoma cell line.
+Spans:
+Yes
+reversible inhibition
+telomerase activity
+Burkitt lymphoma
+
+Question: What causes ethylmalonic encephalopathy?
+Answer: Mutations in the ETHE1 gene cause ethylmalonic encephalopathy. The ETHE1 enzyme is a mitochondrial protein involved in the metabolism of sulfur-containing amino acids.
+Spans:
+ETHE1 gene
+ethylmalonic encephalopathy
+mitochondrial protein
+sulfur-containing amino acids
+
+Question: {question}
+Answer: {model_answer}
+Spans:"""
+
+
+def is_longform_qa(dataset):
+    return dataset in LONGFORM_QA_DATASETS
+
+
+def extract_longform_qa_spans(question, model_answer, model="gpt-5-mini", max_retries=4):
+    """Refined important-token extraction for LONG-FORM QA: the SET of claim-bearing spans (verdict +
+    findings + entities + numbers). Returns a list of validated spans (each a non-empty substring of the
+    model answer; possibly empty). Same validity rule as the summary/exact-answer variants."""
+    if not isinstance(model_answer, str) or not model_answer.strip():
+        return []
+    prompt = LONGFORM_QA_PROMPT.format(question=str(question), model_answer=model_answer)
+    client = _get_client()
+    for _ in range(max_retries):
+        try:
+            resp = client.chat.completions.create(
+                model=model, temperature=1, top_p=1,
+                messages=[{"role": "user", "content": prompt}])
+            out = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            time.sleep(2)
+            continue
+        if out.upper().startswith("NO ANSWER"):
+            return []
+        spans = []
+        for line in out.splitlines():
+            s = line.strip().lstrip("-*0123456789. ").strip()
+            for junk in ("Spans:", "Exact answer:", "Answer:"):
+                s = s.replace(junk, "")
+            s = s.strip().strip(".").strip()
+            if s and s != "NO ANSWER" and s.lower() in model_answer.lower():
+                spans.append(s)
+        return spans
+    return []
+
+
+def extract_important(dataset, question, model_answer, model="gpt-5-mini", variant="exact"):
+    """Task-adaptive dispatch. Returns the value to cache (str for short QA, list for the span variants).
+      * summarisation                     -> key fact-bearing spans (list)
+      * long-form QA + variant="broad"    -> the refined claim-bearing span SET (list)   [2026-07-19]
+      * short QA (or long QA, variant="exact") -> the single exact answer (str)
+    variant="exact" preserves the original behaviour; only long-form QA under variant="broad" changes."""
     if is_summarisation(dataset):
         return extract_summary_spans(model_answer, model=model)
+    if variant == "broad" and is_longform_qa(dataset):
+        return extract_longform_qa_spans(question, model_answer, model=model)
     return extract_model_answer(question, model_answer, model=model)
 
 

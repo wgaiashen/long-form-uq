@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_xl_ladder
+#PBS -j oe
+# med_quad + samsum as first-class long-form eval targets (ProbeDrift-XL breadth). CPU only:
+# everything (generation + judge labels + per-token L15) is already cached; this is a re-slice + ladder.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== xl eval ladder (med_quad + samsum) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/xl_eval_ladder.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2

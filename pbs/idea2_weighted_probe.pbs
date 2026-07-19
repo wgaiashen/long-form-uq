@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_idea2
+#PBS -j oe
+# Track 2 / Idea 2: unsupervised weights (Orgad/SAR) -> pool hidden states -> SAPLMA probe, vs mean-pool.
+# CPU-only (probes on cached L15 states). Pooler reference omitted (--with-pooler) -- those numbers already
+# exist in contribution_ladder/canonical_ladder. mem=96gb (cnn 3.65GB pertok as a source).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== idea2 weighted probe on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2

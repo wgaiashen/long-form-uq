@@ -73,24 +73,43 @@ def tv_penalty(w):
     return (w[1:] - w[:-1]).abs().sum() / w.shape[0]
 
 
+def entropy_hinge(w, threshold=0.7):
+    """Joe's SPECIFIC idea (item 1): a penalty that fires ONLY when the weight distribution gets too peaked
+    — i.e. only when its NORMALISED entropy H(p)/log n drops BELOW `threshold` (1 = uniform floor, 0 = one
+    token gets everything). Unlike `kl_to_uniform`/`entropy_penalty` (which push toward uniform on EVERY
+    batch), this is a hinge: **0 while the weights stay smooth**, and only pushes back once they cross the
+    threshold. Returns relu(threshold − H_norm)², ≥ 0, exactly 0 when H_norm ≥ threshold. Tune the threshold
+    with functools.partial(entropy_hinge, threshold=…) when passing as `reg` to train_weighted_msp."""
+    n = w.shape[0]
+    if n <= 1:
+        return torch.zeros((), device=w.device, dtype=w.dtype)
+    p = _prob(w).clamp_min(1e-12)
+    H = -(p * torch.log(p)).sum()
+    log_n = torch.log(torch.tensor(float(n), device=w.device, dtype=w.dtype))
+    H_norm = H / log_n                                   # 1 = uniform, 0 = one-hot
+    return F.relu(threshold - H_norm) ** 2
+
+
 REGULARISERS = {"kl_uniform": kl_to_uniform, "entropy": entropy_penalty,
-                "shrink": shrink_to_uniform, "tv": tv_penalty}
+                "shrink": shrink_to_uniform, "tv": tv_penalty, "entropy_hinge": entropy_hinge}
 
 
 # --------------------------------------------------------------------------------------
 # Transforms on raw scores / source weights (shared by P1.1 smoothing and P1.4 β-sharpen)
 # --------------------------------------------------------------------------------------
 
-def smooth_raw(raw, k):
-    """Symmetric moving-average of the raw per-token logits over a window of k tokens (Joe's
-    'smooth over the previous n tokens → gentle peaks/troughs'). Replicate-pads the ends so length is
-    preserved. k ≤ 1 is a no-op. Applied BEFORE the softmax so it shapes the weight distribution."""
+def smooth_raw(raw, k, causal=False):
+    """Moving-average of the raw per-token logits over a window of k tokens (Joe's 'smooth over the
+    previous n tokens → gentle peaks/troughs'). Replicate-pads the ends so length is preserved. k ≤ 1 is a
+    no-op. Applied BEFORE the softmax so it shapes the weight distribution.
+    `causal=False` (default): SYMMETRIC/centered window (uses both neighbours). `causal=True`: BACKWARD-only
+    window (each token averaged with the k−1 tokens BEFORE it) — Joe's literal 'previous n tokens'."""
     if k <= 1 or raw.numel() <= 1:
         return raw
     T = raw.shape[0]
     pad = k - 1
     x = raw.view(1, 1, -1)
-    xp = F.pad(x, (pad // 2, pad - pad // 2), mode="replicate")
+    xp = F.pad(x, (pad, 0) if causal else (pad // 2, pad - pad // 2), mode="replicate")
     ker = torch.ones(1, 1, k, device=raw.device, dtype=raw.dtype) / k
     return F.conv1d(xp, ker).view(-1)[:T]
 

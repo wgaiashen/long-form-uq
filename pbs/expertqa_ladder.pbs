@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_eqa_ladder
+#PBS -j oe
+# ExpertQA as a first-class OOD ladder eval (faithfulness). CPU. Loads ExpertQA per-token (6.5GB) +
+# other datasets as OOD sources.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== expertqa ladder on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/expertqa_ladder.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2

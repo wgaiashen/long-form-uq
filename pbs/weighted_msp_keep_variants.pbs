@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_wmsp_keep
+#PBS -j oe
+# Joe #4: constrain the learned weighting to token subsets (special / special+punct / content), across
+# the full ladder × all evals. CPU-only. mem=96gb (cnn pertok as a source).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== wMSP keep-variants on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_keep_variants.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2

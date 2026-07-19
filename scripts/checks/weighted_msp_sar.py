@@ -28,7 +28,11 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 
 from luq import cache, msp, results, weighted_msp  # noqa: E402
-from weighted_msp_blondel import cells, sampled_train_idx, CANDIDATE_SOURCES, LAB, LAYER  # noqa: E402
+from weighted_msp_blondel import sampled_train_idx, LAB, LAYER  # noqa: E402
+# use the 5-eval ladder (incl xsum + cnn_dailymail) so SAR is tested on the SUMMARISATION sets, where
+# relevance-weighting should matter most -- the light 3-eval set skipped exactly those. All 7 candidate
+# sources now have SAR caches, and this script filters cells to SAR-available sources, so this is safe.
+from weighted_msp_all_variants import cells, CANDIDATES as CANDIDATE_SOURCES  # noqa: E402
 from aggregation_table import load_per_token, paired_bootstrap  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -41,10 +45,13 @@ def load_sar(dataset, granularity=None):
     try token then sentence and take whichever exists."""
     grans = [granularity] if granularity else ["token", "sentence"]
     for g in grans:
-        p = SAR_DIR / f"{cache._slug(MODEL)}__{dataset}__ID__{g}.npz"
-        if p.exists():
-            z = np.load(p, allow_pickle=True)
-            return list(z["relevance"]), np.asarray(z["tokensar"], dtype=float), g
+        # prefer the sharper answer-only (__noprepend) caches -- the prepend dilutes long-form relevance;
+        # the DoC token-level no-prepend run cut entropy from ~0.99 to ~0.89-0.93 on the long-form sets.
+        for suf in ("__noprepend", ""):
+            p = SAR_DIR / f"{cache._slug(MODEL)}__{dataset}__ID__{g}{suf}.npz"
+            if p.exists():
+                z = np.load(p, allow_pickle=True)
+                return list(z["relevance"]), np.asarray(z["tokensar"], dtype=float), f"{g}{suf}"
     return None
 
 

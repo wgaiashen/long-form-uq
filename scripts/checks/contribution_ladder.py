@@ -97,14 +97,19 @@ def cells(sources):
 
 
 def main():
+    global EVALS
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--sources", default=",".join(CANDIDATE_SOURCES),
                     help="training sources to try; each used only if its pertok cache loads")
+    ap.add_argument("--evals", default=",".join(EVALS),
+                    help="eval targets (each needs a real ProbeDrift test split). ID_ANCHOR gate only "
+                         "runs for anchored evals (sciq/trivia/pubmed); others just skip the gate.")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--length-normalise", default="yes", choices=["yes", "no"])
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    EVALS = args.evals.split(",")
     seeds = [int(s) for s in args.seeds.split(",")]
     ln = args.length_normalise == "yes"
     device = "cuda" if torch.cuda.is_available() else "cpu"

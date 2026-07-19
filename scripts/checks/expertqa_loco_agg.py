@@ -59,9 +59,10 @@ def uniform_unc(states, y, tr, te, device, seed):
     return np.asarray(attn_unc(m, states, list(te), device), dtype=float)
 
 
-def attention_unc(states, y, tr, te, device, seed):
-    best_T, _ = select_temperature(states, y, list(tr), device, seed, False, False)
-    m = train_attn(states, y, list(tr), device, seed=seed, temperature=best_T)
+def attention_unc(states, y, tr, te, device, seed, temperature):
+    """Train the learned attention pooler at a PRE-SELECTED temperature (selected once on the ID split and
+    reused across folds -- the standard convention, and ~18x faster than per-fold selection here)."""
+    m = train_attn(states, y, list(tr), device, seed=seed, temperature=temperature)
     return np.asarray(attn_unc(m, states, list(te), device), dtype=float)
 
 
@@ -94,11 +95,15 @@ def run_label(X, states, recs, label, seeds, out_rows, device):
     if abs(prr_pt - prr_sap) > 0.05:
         print(f"  [WARN] pertok vs SAPLMA PRR diverge by {abs(prr_pt-prr_sap):.3f} -- check the per-token cache", flush=True)
 
+    # select the pooler temperature ONCE on the ID split (reused across folds -- ~18x faster than per-fold).
+    best_T, _ = select_temperature(stv, yv, list(tr0), device, seeds[0], False, False)
+    print(f"  [pooler] temperature selected once on ID: T={best_T}", flush=True)
+
     METHODS = [
         ("saplma", lambda tr, te, sd: (results.prr(yv[te], probe.uncertainty(probe.train_probe_mlp(Xv[tr], yv[tr], seed=sd), Xv[te])),
                                        probe.uncertainty(probe.train_probe_mlp(Xv[tr], yv[tr], seed=sd), Xv[te]))),
         ("uniform", lambda tr, te, sd: (lambda u: (results.prr(yv[te], u), u))(uniform_unc(stv, yv, tr, te, device, sd))),
-        ("attention", lambda tr, te, sd: (lambda u: (results.prr(yv[te], u), u))(attention_unc(stv, yv, tr, te, device, sd))),
+        ("attention", lambda tr, te, sd: (lambda u: (results.prr(yv[te], u), u))(attention_unc(stv, yv, tr, te, device, sd, best_T))),
         ("wMSP-norm", lambda tr, te, sd: (lambda u: (results.prr(yv[te], u), u))(wmsp_unc(stv, recs_v, yv, tr, te, device, sd))),
     ]
 

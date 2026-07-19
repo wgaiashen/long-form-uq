@@ -44,24 +44,28 @@ SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OU
             ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
 
 
-def build_masks(tok, records):
-    """Per-record important-token mask over the generated tokens (1.0 on located important tokens; ALL
-    tokens if nothing located, matching build_answer_masks). Returns (masks_list, located_bool)."""
+def build_masks(tok, records, variant="exact", floor=0.0):
+    """Per-record SOFT-tier important-token mask over the generated tokens: located Orgad tokens = 1.0,
+    background = `floor` (0.0 -> the hard 0/1 mask; larger -> closer to uniform). ALL tokens = 1.0 if
+    nothing located (matching build_answer_masks). variant='broad' reads the refined long-form-QA span
+    cache (__broad). Returns (masks_list, located_bool)."""
     d = records[0].get("_dataset")  # set by caller
-    ex_path = ROOT / "cache" / "orgad_llm" / f"{cache._slug(MODEL)}__{d}__ID.json"
+    suffix = "__broad" if variant == "broad" else ""
+    ex_path = ROOT / "cache" / "orgad_llm" / f"{cache._slug(MODEL)}__{d}__ID{suffix}.json"
     ex = json.loads(ex_path.read_text()) if ex_path.exists() else {}
     masks, located = [], np.zeros(len(records), bool)
     for i, r in enumerate(records):
         g = len(r["gen_token_ids"])
         val = ex.get(f"{r['split']}:{r['idx']}", "NO ANSWER")
         rows, found = orgad_llm.locate_important_rows(tok, r["gen_token_ids"], val)
-        m = np.zeros(g, np.float32)
+        m = np.full(g, np.float32(floor))
+        n_span = 0
         for row in rows:
             if 0 <= row - 1 < g:
-                m[row - 1] = 1.0
-        located[i] = found and m.sum() > 0
-        if m.sum() == 0:
-            m[:] = 1.0
+                m[row - 1] = 1.0; n_span += 1
+        located[i] = found and n_span > 0
+        if n_span == 0:
+            m[:] = 1.0                       # nothing located -> uniform (no-op mask)
         masks.append(m)
     return masks, located
 
@@ -87,6 +91,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--sources", default=",".join(CANDIDATE_SOURCES))
+    ap.add_argument("--orgad-variant", default="exact", choices=["exact", "broad"],
+                    help="broad = the refined long-form-QA claim-span cache (__broad).")
+    ap.add_argument("--orgad-floor", type=float, default=0.0,
+                    help="soft-tier background weight tau (0 = hard mask; larger -> closer to uniform).")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -103,7 +112,7 @@ def main():
             print(f"  {d}: unlabelled -> skip", flush=True); continue
         for r in records:
             r["_dataset"] = d
-        masks, located = build_masks(tok, records)
+        masks, located = build_masks(tok, records, variant=args.orgad_variant, floor=args.orgad_floor)
         PT[d] = (states, split, y, records)
         MASKS[d] = masks
         # leak re-check: does "located" still track correctness? (the gold-mask bug was 99% vs 0.2%)
@@ -172,7 +181,9 @@ def main():
                                  "prr_mean": round(m[k][0], 4), "prr_std": round(m[k][1], 4),
                                  "n_seeds": len(prr[k])})
 
-    out = ROOT / "results" / f"weighted_msp_orgad_ladder__{cache._slug(MODEL)}.csv"
+    from pathlib import Path as _Path
+    out = _Path(args.out) if args.out else (
+        ROOT / "results" / f"weighted_msp_orgad_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
                                            "n_seeds", "ci_lo", "ci_hi", "boot_p", "significant"])
