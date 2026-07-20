@@ -32,13 +32,16 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from luq import cache, msp, results, weighted_msp  # noqa: E402
 from luq.features import orgad_llm  # noqa: E402
-from probe_drift.ood_settings import get_training_spec  # noqa: E402
 from aggregation_table import load_per_token, paired_bootstrap  # noqa: E402
+import xl_rungs  # noqa: E402  (shared organic-ProbeDriftXL rung machinery)
+from xl_rungs import label_of, cross_label  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 LAYER = 15
-EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum"]
+# Organic ProbeDriftXL evals: core QA/summ + the XL long-form targets (med_quad/samsum/ExpertQA). ExpertQA
+# gets the broad-Orgad row here (with --orgad-variant broad) -- the fair long-form-QA Orgad test.
+EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
 CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum"]
 SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OUT"),
             ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
@@ -78,13 +81,8 @@ def sampled_train_idx(split, seed, cap):
 
 
 def cells(sources):
-    out = [("ID", X, [(X, None)]) for X in EVALS]
-    for X in EVALS:
-        for tag, setting in SETTINGS:
-            spec = [(s, n) for s, n in get_training_spec(X, setting) if s in sources and s != X]
-            if spec:
-                out.append((tag, X, spec))
-    return out
+    """Dispatching rungs (keystone->get_training_spec faithful, XL->family taxonomy)."""
+    return xl_rungs.cells(sources, EVALS)
 
 
 def main():
@@ -103,13 +101,18 @@ def main():
     print(f"device {device} | seeds {seeds}", flush=True)
 
     PT, MASKS = {}, {}
-    for d in args.sources.split(","):
-        loaded = load_per_token(MODEL, d, LAYER, LAB)
+    for d in sorted(set(args.sources.split(",")) | set(EVALS)):   # sources + eval targets (e.g. ExpertQA)
+        loaded = load_per_token(MODEL, d, LAYER, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True); continue
         states, split, y, _, records = loaded
-        if np.isnan(y).any():
-            print(f"  {d}: unlabelled -> skip", flush=True); continue
+        finite = np.isfinite(np.asarray(y, float))
+        if not finite.any():
+            print(f"  {d}: unlabelled ({label_of(d)}) -> skip", flush=True); continue
+        if not finite.all():                          # ExpertQA faithfulness: keep labelled rows (masks below)
+            keep_i = np.where(finite)[0]
+            states = [states[k] for k in keep_i]; records = [records[k] for k in keep_i]
+            split = split[keep_i]; y = np.asarray(y)[keep_i]
         for r in records:
             r["_dataset"] = d
         masks, located = build_masks(tok, records, variant=args.orgad_variant, floor=args.orgad_floor)
@@ -133,8 +136,7 @@ def main():
         unc = {"unmasked": [], "orgad": []}
         yte_ref = None
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled_train_idx(PT[d][1], sd, cap)]
-            test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
+            train_rows, test_rows = xl_rungs.build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows or not test_rows:
                 continue
             n_tr = len(train_rows)
@@ -163,8 +165,9 @@ def main():
             if k in m:
                 print(f"    {k:10s} {m[k][0]:+.3f} +/- {m[k][1]:.3f}", flush=True)
         avg = {k: np.mean(np.stack(unc[k]), axis=0) for k in unc if unc[k]}
+        _, X_te = xl_rungs.eval_split(PT[X][1])       # XL-aware test indices (baked core / carved XL)
         floor_vec = np.asarray([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum")
-                                for i in np.where(PT[X][1] == "test")[0]], dtype=float)
+                                for i in X_te], dtype=float)
         for tag, av, bv in [("orgad_vs_unmasked", avg.get("orgad"), avg.get("unmasked")),
                             ("orgad_vs_floor", avg.get("orgad"), floor_vec),
                             ("unmasked_vs_floor", avg.get("unmasked"), floor_vec)]:

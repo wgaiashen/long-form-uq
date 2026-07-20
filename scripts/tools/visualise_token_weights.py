@@ -114,6 +114,11 @@ METHOD_DOCS = {
         "extraction of the answer (leak-free), mapped onto the generated tokens. QA stores one answer "
         "string; summarisation stores a list of key phrases, each located and unioned into the mask. "
         "Shown only where <code>cache/orgad_llm/</code> is built.",
+    "orgad-broad":
+        "REFINED Orgad mask (0/1) from the broadened long-form-QA prompt (2026-07-19): the SET of "
+        "claim-bearing spans (yes/no verdict + findings + entities/numbers), not just the one exact answer. "
+        "Fixes the degenerate short-form prompt (on pubmed the exact version collapsed to just &lsquo;Yes&rsquo;). "
+        "Compare against <code>orgad</code> to SEE the broadening. Shown where <code>__broad.json</code> is built.",
     "SAR-token":
         "TokenSAR relevance <code>R&#771;</code> at the token level: remove each token, re-measure "
         "cross-encoder semantic similarity to the full answer, <code>R=1-sim</code>, normalised over the "
@@ -153,11 +158,12 @@ def load_sar(model, dataset):
     return None, None
 
 
-def load_orgad_json(model, dataset):
-    """Orgad LLM-extracted model-own answer cache (cache/orgad_llm/<slug>__<ds>__ID.json).
-    Keyed by f"{split}:{idx}" (idx alone collides across train/test: 2800 sciq records but 1800 unique
-    idx, so bare idx mis-joins test rows -- see the audit fix). Returns {"split:idx": extracted} or None."""
-    p = ROOT / "cache" / "orgad_llm" / f"{cache._slug(model)}__{dataset}__ID.json"
+def load_orgad_json(model, dataset, variant="exact"):
+    """Orgad LLM-extracted answer cache. variant='broad' reads the refined long-form-QA span cache (__broad),
+    so the viz can show the broadened important-token set beside the exact-answer one.
+    Keyed by f"{split}:{idx}" (idx alone collides across train/test -- see the audit fix)."""
+    suffix = "__broad" if variant == "broad" else ""
+    p = ROOT / "cache" / "orgad_llm" / f"{cache._slug(model)}__{dataset}__ID{suffix}.json"
     if not p.exists():
         return None
     return json.loads(p.read_text())
@@ -236,9 +242,8 @@ def per_token_signals(record, pos, ctx):
     # 5) orgad important-token mask (leak-free), keyed by split:idx. Only if located here.
     #    QA datasets store ONE answer string; summarisation (xsum/samsum) stores a LIST of important
     #    phrases. Normalise to a list of strings and union each located span into the mask.
-    orgad_json = ctx["orgad_json"]
-    if orgad_json is not None:
-        extracted = orgad_json.get(f"{record['split']}:{record['idx']}")
+    def _orgad_mask(oj):
+        extracted = oj.get(f"{record['split']}:{record['idx']}")
         spans = [extracted] if isinstance(extracted, str) else (extracted or [])
         mask = [0.0] * g
         for s in spans:
@@ -250,10 +255,16 @@ def per_token_signals(record, pos, ctx):
                     j = r - 1
                     if 0 <= j < g:
                         mask[j] = 1.0
-        if any(mask):
-            # colour by the RAW 0/1 (answer token = fully shaded), NOT min/max -- a mask that is all-1
-            # (the whole generation is the answer, common on short-form) would otherwise collapse to 0.
-            signals["orgad"] = (mask, mask)
+        return mask
+    # exact-answer Orgad (the original) and, where built, the refined BROAD span set (2026-07-19).
+    if ctx["orgad_json"] is not None:
+        m = _orgad_mask(ctx["orgad_json"])
+        if any(m):                        # colour by RAW 0/1 (answer token fully shaded), not min/max
+            signals["orgad"] = (m, m)
+    if ctx.get("orgad_broad_json") is not None:
+        mb = _orgad_mask(ctx["orgad_broad_json"])
+        if any(mb):
+            signals["orgad-broad"] = (mb, mb)
 
     # 6) SAR relevance, indexed by full-record position.
     sar_rel = ctx["sar_rel"]
@@ -350,10 +361,11 @@ def main():
 
     # Optional weight-source caches (toggles appear only if built).
     orgad_json = load_orgad_json(cfg.model_name, args.dataset)
+    orgad_broad_json = load_orgad_json(cfg.model_name, args.dataset, variant="broad")
     sar_rel, gran = load_sar(cfg.model_name, args.dataset)
     gran = gran or "token"
     print(f"  orgad cache: {'yes' if orgad_json else 'no'} | "
-          f"SAR({gran}) cache: {'yes' if sar_rel else 'no'}")
+          f"orgad-broad: {'yes' if orgad_broad_json else 'no'} | SAR({gran}) cache: {'yes' if sar_rel else 'no'}")
 
     tok = load_tokenizer(cfg.model_name)
     pieces_by_pos = {i: token_pieces(tok, r["gen_token_ids"]) for i, r in enumerate(records)}
@@ -394,8 +406,8 @@ def main():
     ctx = {"states": states, "wm_pair": wm_pair, "wm_bl": wm_bl, "unif": unif,
            "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "wm_content": wm_content,
            "wm_segment": wm_segment, "show_ablations": args.show_ablations,
-           "device": device, "orgad_json": orgad_json, "sar_rel": sar_rel,
-           "gran": gran, "tok": tok}
+           "device": device, "orgad_json": orgad_json, "orgad_broad_json": orgad_broad_json,
+           "sar_rel": sar_rel, "gran": gran, "tok": tok}
 
     per_example = {i: per_token_signals(records[i], i, ctx) for i in shown}
     signal_names = []

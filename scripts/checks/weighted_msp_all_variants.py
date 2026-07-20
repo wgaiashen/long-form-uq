@@ -33,12 +33,14 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 
 from luq import cache, msp, results, weighted_msp, weighting  # noqa: E402
-from probe_drift.ood_settings import get_training_spec  # noqa: E402
 from aggregation_table import load_per_token  # noqa: E402
+import xl_rungs  # noqa: E402  (shared organic-ProbeDriftXL rung machinery)
+from xl_rungs import label_of  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
-EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"]
+# Organic ProbeDriftXL: the 5 core datasets + the 3 XL long-form eval targets (med_quad/samsum/ExpertQA).
+EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
 CANDIDATES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum", "cnn_dailymail"]
 
 # wMSP-normalised ID anchors (master table) -- a soft sanity check that the wiring is unchanged.
@@ -70,38 +72,41 @@ def sampled(split, seed, cap):
 
 
 def cells(sources):
-    out = [("ID", X, [(X, None)]) for X in EVALS if X in sources]
-    for X in EVALS:
-        if X not in sources:
-            continue
-        for tag, setting in SETTINGS:
-            spec = [(s, n) for s, n in get_training_spec(X, setting) if s in sources and s != X]
-            if spec:
-                out.append((tag, X, spec))
-    return out
+    """Dispatching rung generator (keystone->get_training_spec faithful, XL->family taxonomy). Kept as a
+    thin wrapper so the ladders that `from weighted_msp_all_variants import cells` pick up the XL evals."""
+    return xl_rungs.cells(sources, EVALS)
 
 
 def main():
+    global EVALS
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--layer", type=int, default=15)
+    ap.add_argument("--evals", default=",".join(EVALS),
+                    help="restrict eval targets (e.g. med_quad,samsum,expertqa for a fast XL-only run).")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    EVALS = args.evals.split(",")
     seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     have_bl = weighted_msp._HAVE_TORCHSORT
     print(f"device {device} | seeds {seeds} | torchsort={have_bl} | variants={[c[0] for c in CONFIGS]}", flush=True)
 
     PT = {}
-    for d in CANDIDATES:
-        loaded = load_per_token(MODEL, d, args.layer, LAB)
+    for d in sorted(set(CANDIDATES) | set(EVALS)):    # load training SOURCES and EVAL TARGETS (e.g. ExpertQA)
+        loaded = load_per_token(MODEL, d, args.layer, label_of(d))   # per-target label (ExpertQA=faithfulness)
         if loaded is None:
             print(f"  {d}: no pertok -> skip"); continue
         states, split, y, _, records = loaded
-        if np.isnan(np.asarray(y, dtype=float)).any():
-            print(f"  {d}: unlabelled -> skip"); continue
+        finite = np.isfinite(np.asarray(y, dtype=float))
+        if not finite.any():
+            print(f"  {d}: unlabelled ({label_of(d)}) -> skip"); continue
+        if not finite.all():                          # ExpertQA faithfulness: keep the ~1724 labelled rows
+            keep = np.where(finite)[0]
+            states = [states[k] for k in keep]; records = [records[k] for k in keep]
+            split = split[keep]; y = np.asarray(y)[keep]
         PT[d] = (states, split, y, records)
-        print(f"  {d}: {len(states)} rows", flush=True)
+        print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
     out_rows = []
@@ -109,7 +114,7 @@ def main():
         spec = [(d, c) for d, c in spec if d in PT]
         if not spec:
             continue
-        te0 = np.where(PT[X][1] == "test")[0]
+        _, te0 = xl_rungs.eval_split(PT[X][1])         # baked-in for core; deterministic carve for XL evals
         if len(te0) == 0:
             print(f"[{rung}/{X}] no test split -> skip", flush=True); continue
         yte = np.array([PT[X][2][i] for i in te0], dtype=float)
@@ -118,10 +123,9 @@ def main():
 
         cfg_prr = {c[0]: [] for c in CONFIGS}
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled(PT[d][1], sd, cap)]
+            train_rows, test_rows = xl_rungs.build_rows(X, spec, PT, sd, sampled)
             if not train_rows:
                 continue
-            test_rows = [(X, i) for i in te0]
             n_tr = len(train_rows)
             tr_idx, te_idx = list(range(n_tr)), list(range(n_tr, n_tr + len(test_rows)))
             allrows = train_rows + test_rows

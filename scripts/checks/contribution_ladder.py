@@ -48,17 +48,19 @@ import torch  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 from luq import cache, msp, results, weighted_msp  # noqa: E402
-from probe_drift.ood_settings import get_training_spec  # noqa: E402
 from aggregation_table import load_per_token, build_arrays, attn_unc, paired_bootstrap  # noqa: E402
 from attn_pool import train_attn, select_temperature  # noqa: E402
+# Shared ProbeDriftXL rung machinery: makes med_quad/samsum/ExpertQA organic eval targets. `cells` dispatches
+# keystone->get_training_spec (faithful), XL->family taxonomy; `eval_split` carves the XL eval test set;
+# `label_of` gives the per-target label (ExpertQA=faithfulness); `cross_label` flags the ExpertQA OOD case.
+from xl_rungs import cells as xl_cells, eval_split, label_of, cross_label  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
-# Candidate training sources; each included only if its pertok cache actually loads.
-# samsum (dialogue summarisation) added 2026-07-08: it is the 2nd summarisation set, so it enters the
-# QA evals' DiffTask pool ({xsum}->{samsum,xsum}, de-degenerating that rung) and the LOO mixture.
-CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum"]
+# Candidate training sources; each included only if its pertok cache actually loads. (ExpertQA is EVAL-ONLY
+# -- excluded as a source since its faithfulness label must not mix into the correctness training pool.)
+CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum"]
 # ID anchors (judge, from the aggregation table) the ID cells must reproduce.
 ID_ANCHOR = {"sciq": {"uniform": 0.913, "attention": 0.932},
              "trivia_qa": {"uniform": 0.815, "attention": 0.844},
@@ -85,17 +87,6 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
-def cells(sources):
-    """(rung, eval, [(src, cap)]) using only sources we have a pertok cache for."""
-    out = [("ID", X, [(X, None)]) for X in EVALS]
-    for X in EVALS:
-        for tag, setting in SETTINGS:
-            spec = [(s, n) for s, n in get_training_spec(X, setting) if s in sources and s != X]
-            if spec:  # skip a rung whose sources we do not have (e.g. SameTask before med_quad lands)
-                out.append((tag, X, spec))
-    return out
-
-
 def main():
     global EVALS
     ap = argparse.ArgumentParser()
@@ -116,33 +107,53 @@ def main():
     tok = AutoTokenizer.from_pretrained(MODEL)
     print(f"device {device} | seeds {seeds} | length_normalise={ln}", flush=True)
 
-    # Load per-token states + records for every source whose cache exists (tolerant).
+    # Load per-token states + records for every SOURCE and every EVAL TARGET whose cache exists (tolerant).
+    # Each dataset is scored on its own label (label_of): correctness for the core world, faithfulness for
+    # ExpertQA. Partially-labelled sets (ExpertQA faithfulness has ~292 None) keep only their labelled rows.
     PT = {}
-    for d in args.sources.split(","):
-        loaded = load_per_token(MODEL, d, args.layer, LAB)
+    for d in sorted(set(args.sources.split(",")) | set(EVALS)):
+        loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
-            print(f"  {d}: no pertok cache -> skip as a source", flush=True)
+            print(f"  {d}: no pertok cache -> skip", flush=True)
             continue
         states, split, y, _, records = loaded
-        if np.isnan(y).any():
-            print(f"  {d}: unlabelled (NaN correctness) -> skip as a source", flush=True)
+        finite = np.isfinite(y)
+        if not finite.any():
+            print(f"  {d}: fully unlabelled ({label_of(d)}) -> skip", flush=True)
             continue
+        if not finite.all():
+            keep = np.where(finite)[0]
+            states = [states[k] for k in keep]; records = [records[k] for k in keep]
+            split = split[keep]; y = y[keep]
         PT[d] = (states, split, y, records)
-        print(f"  {d}: {len(states)} rows loaded", flush=True)
+        print(f"  {d}: {len(states)} rows loaded (label={label_of(d)}"
+              f"{'' if finite.all() else f', {int(finite.sum())}/{len(finite)} labelled'})", flush=True)
     sources = set(PT)
     methods = ["uniform", "attention", "weighted_msp_norm", "weighted_msp_unc", "msp_sum", "perplexity"]
 
     out_rows = []
-    for rung, X, spec in cells(sources):
+    for rung, X, spec in xl_cells(sources, EVALS):
         if X not in PT:
             continue
+        # The eval target's FIXED train/test split: baked-in for the core datasets, a deterministic carve
+        # for the split-less XL sets (so every method sees one stable ExpertQA/med_quad/samsum test set).
+        X_tr, X_te = eval_split(PT[X][1])
+        test_rows = [(X, int(i)) for i in X_te]
+        if not test_rows:
+            continue
+        xlbl = cross_label(X)                 # ExpertQA OOD rungs are cross-label (correctness->faithfulness)
         per_method = {m: [] for m in methods}
         unc_acc = {m: [] for m in methods}   # per-seed per-example uncertainty vectors (for the bootstrap)
         yte_ref = None                        # test labels (identical across seeds; the bootstrap target)
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled_train_idx(PT[d][1], sd, cap)]
-            test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
-            if not train_rows or not test_rows:
+            train_rows = []
+            for d, cap in spec:
+                if d == X:                    # ID cell: train on the eval target's OWN train split
+                    idx = X_tr if cap is None else np.asarray(X_tr)[:cap]
+                else:                         # OOD source: sample from its train rows (unchanged for core)
+                    idx = sampled_train_idx(PT[d][1], sd, cap)
+                train_rows += [(d, int(i)) for i in idx]
+            if not train_rows:
                 continue
             n_tr = len(train_rows)
             tr_idx, te_idx = list(range(n_tr)), list(range(n_tr, n_tr + len(test_rows)))
@@ -180,7 +191,8 @@ def main():
 
         stats = {m: (float(np.mean(v)), float(np.std(v))) for m, v in per_method.items() if v}
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
-        print(f"\n[{rung:9s}] eval={X}  train={srcs}", flush=True)
+        xflag = "  [CROSS-LABEL: train correctness -> test faithfulness]" if (xlbl and rung != "ID") else ""
+        print(f"\n[{rung:9s}] eval={X} ({label_of(X)})  train={srcs}{xflag}", flush=True)
         for m in methods:
             if m in stats:
                 print(f"    {m:18s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)
@@ -194,7 +206,8 @@ def main():
             if m in stats:
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
-                                 "n_seeds": len(per_method[m])})
+                                 "n_seeds": len(per_method[m]),
+                                 "cross_label": (xlbl and rung != "ID")})   # ExpertQA OOD = cross-label
         # Paired test-set bootstrap on the seed-averaged uncertainty vectors: turns the head-to-heads
         # (contribution vs floor, pooler vs floor, contribution vs pooler) into CI-backed verdicts.
         avg_unc = {m: np.mean(np.stack(unc_acc[m]), axis=0) for m in unc_acc if unc_acc[m]}
@@ -210,7 +223,7 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "ci_lo", "ci_hi", "boot_p", "significant"])
+                                           "n_seeds", "cross_label", "ci_lo", "ci_hi", "boot_p", "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

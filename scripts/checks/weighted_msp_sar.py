@@ -32,7 +32,8 @@ from weighted_msp_blondel import sampled_train_idx, LAB, LAYER  # noqa: E402
 # use the 5-eval ladder (incl xsum + cnn_dailymail) so SAR is tested on the SUMMARISATION sets, where
 # relevance-weighting should matter most -- the light 3-eval set skipped exactly those. All 7 candidate
 # sources now have SAR caches, and this script filters cells to SAR-available sources, so this is safe.
-from weighted_msp_all_variants import cells, CANDIDATES as CANDIDATE_SOURCES  # noqa: E402
+from weighted_msp_all_variants import cells, CANDIDATES as CANDIDATE_SOURCES  # noqa: E402  (XL-aware cells)
+import xl_rungs  # noqa: E402
 from aggregation_table import load_per_token, paired_bootstrap  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -98,8 +99,7 @@ def main():
     def wmsp(spec, X, use_mask):
         vals, uacc = [], []
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled_train_idx(PT[d][1], sd, cap)]
-            test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
+            train_rows, test_rows = xl_rungs.build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows or not test_rows:
                 return None, None
             n_tr = len(train_rows)
@@ -126,7 +126,7 @@ def main():
         sar_prr, us = wmsp(spec, X, True)
         if base is None or sar_prr is None:
             continue
-        te = np.where(PT[X][1] == "test")[0]
+        _, te = xl_rungs.eval_split(PT[X][1])          # XL-aware test indices (baked core / carved XL)
         yte = PT[X][2][te]
         floor = results.prr(yte, np.asarray(
             [msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum") for i in te], dtype=float))

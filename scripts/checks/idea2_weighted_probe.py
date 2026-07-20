@@ -39,7 +39,9 @@ from luq import cache, probe, results, weighted_msp, weighting  # noqa: E402
 from luq.features import orgad_llm  # noqa: E402
 from aggregation_table import load_per_token, attn_unc  # noqa: E402
 from attn_pool import train_attn, select_temperature  # noqa: E402
-from weighted_msp_all_variants import EVALS, CANDIDATES, cells, sampled  # reuse the exact ladder
+from weighted_msp_all_variants import EVALS, CANDIDATES, cells, sampled  # reuse the exact ladder (XL-aware)
+import xl_rungs  # noqa: E402
+from xl_rungs import label_of  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
@@ -108,18 +110,24 @@ def main():
     print(f"device {device} | seeds {seeds}", flush=True)
 
     PT, ORG, SAR = {}, {}, {}
-    for d in CANDIDATES:
-        loaded = load_per_token(MODEL, d, LAYER, LAB)
+    for d in sorted(set(CANDIDATES) | set(EVALS)):    # sources + eval targets (e.g. ExpertQA)
+        loaded = load_per_token(MODEL, d, LAYER, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok -> skip"); continue
         states, split, y, _, records = loaded
-        if np.isnan(np.asarray(y, float)).any():
-            print(f"  {d}: unlabelled -> skip"); continue
+        finite = np.isfinite(np.asarray(y, float))
+        if not finite.any():
+            print(f"  {d}: unlabelled ({label_of(d)}) -> skip"); continue
+        if not finite.all():                          # ExpertQA faithfulness: keep labelled rows
+            keep_i = np.where(finite)[0]
+            states = [states[k] for k in keep_i]; records = [records[k] for k in keep_i]
+            split = split[keep_i]; y = np.asarray(y)[keep_i]
         PT[d] = (states, split, y, records)
-        ORG[d] = load_orgad(MODEL, d, args.orgad_variant)
+        ORG[d] = load_orgad(MODEL, d, args.orgad_variant)   # keyed by split:idx -> robust to row filtering
         rel, tag = load_sar_rel(MODEL, d)
-        SAR[d] = rel
-        print(f"  {d}: {len(states)} rows | orgad {'yes' if ORG[d] else 'no'} | sar {tag or 'no'}", flush=True)
+        SAR[d] = rel if (rel is not None and len(rel) == len(states)) else None  # positional -> length-guard
+        print(f"  {d}: {len(states)} rows (label={label_of(d)}) | orgad {'yes' if ORG[d] else 'no'} | "
+              f"sar {tag if SAR[d] is not None else 'no'}", flush=True)
     sources = set(PT)
 
     # SAR weight (indexed by full-record position within a dataset) -- built per cell from SAR[d].
@@ -149,17 +157,16 @@ def main():
         spec = [(d, c) for d, c in spec if d in PT]
         if not spec:
             continue
-        te0 = np.where(PT[X][1] == "test")[0]
+        _, te0 = xl_rungs.eval_split(PT[X][1])         # baked-in for core; carved for XL evals
         if len(te0) == 0:
             continue
         yte = np.array([PT[X][2][i] for i in te0], float)
-        test_rows = [(X, i) for i in te0]
 
         # per source: probe on pooled(train) -> PRR(test), averaged over seeds
         per = {s: [] for s in SRC}
         attn_prr, unif_prr = [], []
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled(PT[d][1], sd, cap)]
+            train_rows, test_rows = xl_rungs.build_rows(X, spec, PT, sd, sampled)
             if not train_rows:
                 continue
             ytr = np.array([PT[d][2][i] for d, i in train_rows], float)

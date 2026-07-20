@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_orgad_t03
+#PBS -j oe
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+S=meta-llama_Meta-Llama-3.1-8B
+echo "=== orgad ladder broad tau=0.3 (score side) on $(hostname) $(date) ===" >&2
+python -u scripts/checks/weighted_msp_orgad_ladder.py --seeds 1,2,3 \
+  --orgad-variant broad --orgad-floor 0.3 \
+  --out results/weighted_msp_orgad_ladder__broad_tau0.3__${S}.csv
+echo "=== done $(date) ===" >&2

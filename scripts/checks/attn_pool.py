@@ -55,18 +55,30 @@ WEIGHT_DECAY = 1e-2          # regularises the query + head against p >> n overf
 VAL_FRAC = 0.2              # validation carved from train for temperature selection (never test)
 
 
+# XL datasets whose per-token cache + records live in a prompt-regime namespace (not the default cache/).
+# This is what lets ExpertQA load through the SAME interface as the core datasets (organic ProbeDriftXL).
+PROMPT_REGIME = {"expertqa": "expertqa_rp12"}
+
+
 def load_per_token(model, dataset, layer, label_field="correctness"):
     """Per-example token states aligned POSITIONALLY to records (idx is not unique).
 
-    label_field names WHICH correctness signal to read. Do not rely on the default bare
-    `correctness` for a reported table -- it holds whatever labeller ran last and differs by
-    dataset (gpt-5 on short-form, gpt-5-mini on long-form here); pass an explicit field and stamp
-    the model. See scripts/checks/aggregation_table.py."""
-    path = ROOT / "cache" / "pertok" / f"{cache._slug(model)}__{dataset}__ID__L{layer}.npz"
+    label_field names WHICH correctness signal to read (e.g. `correctness` for the core sets,
+    `faithfulness` for ExpertQA). Do not rely on the default bare `correctness` for a reported table
+    -- it holds whatever labeller ran last and differs by dataset; pass an explicit field and stamp
+    the model. See scripts/checks/aggregation_table.py.
+
+    The cache root is derived from the dataset's prompt-regime (via Config), so a regime-namespaced XL
+    dataset like ExpertQA (cache/expertqa_rp12/) loads identically to a core dataset (cache/). The XL sets
+    are split-less (ExpertQA all-`test`; med_quad/samsum all-`train`); carving a held-out EVAL split is the
+    rung layer's job (xl_rungs.eval_split), NOT here, so their use as TRAINING SOURCES stays unchanged and
+    the core-5 rung numbers do not move."""
+    cfg = Config(model_name=model, dataset=dataset, ood_setting="ID",
+                 prompt_regime=PROMPT_REGIME.get(dataset, ""))
+    path = cfg.cache_dir / "pertok" / f"{cache._slug(model)}__{dataset}__ID__L{layer}.npz"
     if not path.exists():
         return None
     z = np.load(path, allow_pickle=True)
-    cfg = Config(model_name=model, dataset=dataset, ood_setting="ID")
     records = cache.load_records(cfg.cache_dir, cache.run_key(model, dataset, "ID"))
     st = z["states"]
     if len(st) != len(records):

@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=05:00:00
+#PBS -N luq_contrib_organic
+#PBS -j oe
+# VERIFY the organic ProbeDriftXL wiring: contribution_ladder now covers the core QA evals (ID-GATE must
+# still pass -> core unchanged) AND med_quad/samsum/ExpertQA as organic eval targets (ID+OOD, one shared
+# mechanism). ExpertQA uses faithfulness + the cross-label flag on OOD. CPU, cached features.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+S=meta-llama_Meta-Llama-3.1-8B
+echo "=== contribution ladder ORGANIC on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 \
+  --evals sciq,trivia_qa,pubmed_qa,med_quad,samsum,expertqa \
+  --sources sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail,med_quad,samsum \
+  --out results/contribution_ladder_organic__${S}.csv
+echo "=== done $(date) ===" >&2

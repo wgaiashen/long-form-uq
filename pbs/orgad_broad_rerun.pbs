@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_orgad_broad
+#PBS -j oe
+# Item 5b+6: re-run the Orgad consumers with the REFINED broad long-form-QA spans (pubmed + med_quad;
+# ExpertQA broad cache is quota-blocked). floor sweep tau in {0 (hard mask), 0.3 (soft tier)}.
+# CPU, cached features. Compares the FAIR long-form-QA Orgad test vs the old (exact, hard) numbers.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+S=meta-llama_Meta-Llama-3.1-8B
+echo "=== orgad broad re-run on $(hostname) at $(date) ===" >&2
+
+# Feature side (idea-2 probe): covers pubmed + med_quad (others fall back to uniform, no __broad cache)
+for tau in 0.0 0.3; do
+  echo ">>> idea2 broad tau=$tau" >&2
+  python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 \
+    --orgad-variant broad --orgad-floor $tau \
+    --out results/idea2_weighted_probe__broad_tau${tau}__${S}.csv
+done
+
+# Score side (orgad ladder): pubmed is the long-form-QA eval that has a __broad cache
+for tau in 0.0 0.3; do
+  echo ">>> orgad ladder broad tau=$tau" >&2
+  python -u scripts/checks/weighted_msp_orgad_ladder.py --seeds 1,2,3 \
+    --orgad-variant broad --orgad-floor $tau \
+    --out results/weighted_msp_orgad_ladder__broad_tau${tau}__${S}.csv
+done
+echo "=== done $(date) ===" >&2

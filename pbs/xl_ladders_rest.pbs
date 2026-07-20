@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_xl_rest
+#PBS -j oe
+# Remaining organic ladders (idea2 feature-probe, SAR-mask, keep-variants), sequential to avoid 3x the
+# 6.5GB ExpertQA load at once. Each now covers med_quad/samsum (+ ExpertQA where applicable) for ID+OOD.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== xl ladders rest on $(hostname) $(date) ===" >&2
+echo ">>> idea2 (broad, tau=0.3)" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 --orgad-variant broad --orgad-floor 0.3   --out results/idea2_weighted_probe_organic__meta-llama_Meta-Llama-3.1-8B.csv || echo "!! idea2 FAILED" >&2
+echo ">>> keep-variants" >&2
+python -u scripts/checks/weighted_msp_keep_variants.py --seeds 1,2,3   --out results/weighted_msp_keep_variants_organic__meta-llama_Meta-Llama-3.1-8B.csv || echo "!! keep FAILED" >&2
+echo ">>> sar-mask" >&2
+python -u scripts/checks/weighted_msp_sar.py --seeds 1,2,3 || echo "!! sar FAILED" >&2
+echo "=== done $(date) ===" >&2

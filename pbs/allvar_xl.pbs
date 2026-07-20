@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_allvar_xl
+#PBS -j oe
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== all_variants XL-only $(date) ===" >&2
+python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3 --evals med_quad,samsum,expertqa   --out results/weighted_msp_all_variants_organic_XL__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

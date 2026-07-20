@@ -29,7 +29,9 @@ from transformers import AutoTokenizer  # noqa: E402
 from luq import cache, msp, results, weighted_msp, token_subsets  # noqa: E402
 from luq.features import sar  # noqa: E402  (sentence segmentation for the segment variant)
 from aggregation_table import load_per_token  # noqa: E402
-from weighted_msp_all_variants import EVALS, CANDIDATES, cells, sampled  # reuse the exact ladder
+from weighted_msp_all_variants import EVALS, CANDIDATES, cells, sampled  # reuse the exact ladder (XL-aware)
+import xl_rungs  # noqa: E402
+from xl_rungs import label_of  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
@@ -54,13 +56,18 @@ def main():
     print(f"device {device} | seeds {seeds} | modes {MODES}", flush=True)
 
     PT, KEEP = {}, {}
-    for d in CANDIDATES:
-        loaded = load_per_token(MODEL, d, args.layer, LAB)
+    for d in sorted(set(CANDIDATES) | set(EVALS)):    # sources + eval targets (e.g. ExpertQA)
+        loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok -> skip"); continue
         states, split, y, _, records = loaded
-        if np.isnan(np.asarray(y, float)).any():
-            print(f"  {d}: unlabelled -> skip"); continue
+        finite = np.isfinite(np.asarray(y, float))
+        if not finite.any():
+            print(f"  {d}: unlabelled ({label_of(d)}) -> skip"); continue
+        if not finite.all():                          # keep labelled rows (masks recomputed over them below)
+            keep_i = np.where(finite)[0]
+            states = [states[k] for k in keep_i]; records = [records[k] for k in keep_i]
+            split = split[keep_i]; y = np.asarray(y)[keep_i]
         PT[d] = (states, split, y, records)
         # precompute the keep masks + segment ids for every record
         km = {m: [] for m in ("special_punct", "content")}
@@ -84,7 +91,7 @@ def main():
         spec = [(d, c) for d, c in spec if d in PT]
         if not spec:
             continue
-        te0 = np.where(PT[X][1] == "test")[0]
+        _, te0 = xl_rungs.eval_split(PT[X][1])         # baked-in for core; carved for XL evals
         if len(te0) == 0:
             continue
         yte = np.array([PT[X][2][i] for i in te0], float)
@@ -92,10 +99,9 @@ def main():
 
         mode_prr = {m: [] for m in MODES}
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in sampled(PT[d][1], sd, cap)]
+            train_rows, test_rows = xl_rungs.build_rows(X, spec, PT, sd, sampled)
             if not train_rows:
                 continue
-            test_rows = [(X, i) for i in te0]
             allrows = train_rows + test_rows
             n_tr = len(train_rows)
             tr_idx, te_idx = list(range(n_tr)), list(range(n_tr, n_tr + len(test_rows)))
