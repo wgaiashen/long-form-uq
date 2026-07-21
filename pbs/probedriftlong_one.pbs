@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_pdl1
+#PBS -j oe
+# ProbeDriftLong for ONE eval target (3 seeds). Parallelised per-eval so 7 jobs run concurrently on the
+# CPU queue (single-core-bound driver -> wall-clock ~= one eval, not the serial sum). Distinct --out per eval.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== ProbeDriftLong[$EVAL] on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --evals "$EVAL" --seeds 1,2,3 \
+  --out "results/probedriftlong_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

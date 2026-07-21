@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_pdl_smoke
+#PBS -j oe
+# ProbeDriftLong SMOKE: 1 seed, one long_qa eval (pubmed) + one summ eval (xsum) -> validates the
+# long-only taxonomy + all KEEP methods + bootstrap before the full run. CPU.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== ProbeDriftLong SMOKE on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --evals pubmed_qa,xsum --seeds 1 \
+  --out results/probedriftlong_smoke__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

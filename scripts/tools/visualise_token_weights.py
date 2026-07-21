@@ -81,10 +81,13 @@ METHOD_DOCS = {
         "read straight from the cached generation logprobs. Deeper = the model was less sure of that token. "
         "Plain MSP is the unweighted sum of these.",
     "wMSP-pairwise":
-        "Our LEARNED weighted-MSP (primary). A 4-layer MLP (<code>4096&rarr;256&rarr;128&rarr;64&rarr;1</code>) "
-        "reads each token's layer-15 hidden state and emits one logit; a <code>softmax</code> over the "
-        "sequence (average-1 normalised) gives the weight, and the score is "
-        "<code>&Sigma; w&#7511;&middot;(-log p&#7511;)</code>. Trained on correctness with a pairwise soft-rank loss.",
+        "Our LEARNED weighted-MSP (primary), <b>with EOS/special tokens dropped</b> (the default keep-mask): a "
+        "4-layer MLP (<code>4096&rarr;256&rarr;128&rarr;64&rarr;1</code>) reads each token's layer-15 hidden "
+        "state and emits one logit; a <code>softmax</code> over the sequence (average-1 normalised, EOS forced "
+        "to weight 0 pre-softmax) gives the weight, and the score is "
+        "<code>&Sigma; w&#7511;&middot;(-log p&#7511;)</code>. Trained on correctness with a pairwise soft-rank "
+        "loss. This is the 'learnt MSP without EOS' variant; the token-selection family below drops progressively "
+        "more (special_punct = +punctuation, content = +stop-words).",
     "wMSP-Blondel":
         "Same MLP and score as wMSP-pairwise, but trained with the Blondel differentiable soft-rank loss "
         "(torchsort, O(n log n) exact) instead of the pairwise surrogate &mdash; it optimises the whole-batch "
@@ -93,6 +96,11 @@ METHOD_DOCS = {
         "wMSP-pairwise plus a shrink-to-uniform penalty during training "
         "(<code>+2&middot;&Sigma;(w-1)&sup2;</code>). This pulls the weight distribution back toward uniform "
         "(= plain MSP) to stop it spiking on lone tokens &mdash; a P1.1 moderation variant.",
+    "wMSP-shrink10":
+        "As wMSP-shrink2 but the HEAVY penalty (<code>+10&middot;&Sigma;(w-1)&sup2;</code>): weights are pulled "
+        "hard toward uniform, so this is close to plain length-normalised MSP (perplexity). Use it to SEE where "
+        "even a strongly-shrunk weighter still deviates from flat &mdash; the token-level view of the (now "
+        "fair-floor-corrected) cnn story.",
     "wMSP-smooth3":
         "wMSP-pairwise but the per-token logits are neighbour-averaged over a 3-token window "
         "(<code>smooth_raw</code>, before the softmax) at both train and score time, encoding "
@@ -102,11 +110,16 @@ METHOD_DOCS = {
         "unlike shrink, it is 0 while the weights stay smooth and only pushes back once the distribution gets "
         "too peaked (normalised entropy &lt; 0.7). Joe&rsquo;s item-1 hinge &mdash; should look like wMSP-pairwise "
         "except where it clips a spike.",
+    "wMSP-special_punct":
+        "wMSP-pairwise with EOS/special tokens AND punctuation/whitespace-only pieces dropped (weight 0 "
+        "pre-softmax) &mdash; the &lsquo;learnt MSP without punctuation&rsquo; step. Middle of the token-selection "
+        "family (pairwise = EOS only &rarr; special_punct = +punctuation &rarr; content = +stop-words); the "
+        "<code>keep=</code> special_punct mask.",
     "wMSP-content":
         "wMSP-pairwise but the learned softmax is RESTRICTED to content tokens only &mdash; special "
         "tokens, punctuation and stop-words (negation kept) get weight 0 pre-softmax, so the weighter "
-        "cannot key on filler. Joe&rsquo;s &lsquo;exclude stop words&rsquo; idea (the <code>keep=</code> "
-        "content mask).",
+        "cannot key on filler. The &lsquo;learnt MSP without stop-words&rsquo; variant &mdash; Joe&rsquo;s "
+        "&lsquo;exclude stop words&rsquo; idea (the <code>keep=</code> content mask).",
     "wMSP-segment":
         "wMSP but the MLP emits ONE weight per SENTENCE, broadcast to that sentence&rsquo;s tokens "
         "(segment-mean of the raw logits, then softmax over sentences) &mdash; attacks the single-token "
@@ -221,6 +234,8 @@ def per_token_signals(record, pos, ctx):
         # 3b) P1.1 smoothing/moderation variants (shrink -> flatter; smooth -> gentler peaks).
         if ctx.get("wm_shrink2") is not None:
             signals["wMSP-shrink2"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_shrink2"](asx)))
+        if ctx.get("wm_shrink10") is not None:
+            signals["wMSP-shrink10"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_shrink10"](asx)))
         if ctx.get("wm_smooth3") is not None:
             raw_sm = weighting.smooth_raw(ctx["wm_smooth3"](asx), 3)      # smooth before the (keep-masked) softmax
             signals["wMSP-smooth3"] = (lambda w: (list(w), minmax(w)))(_wshow(raw_sm))
@@ -228,6 +243,10 @@ def per_token_signals(record, pos, ctx):
             signals["wMSP-entropy_hinge"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_hinge"](asx)))
 
         # 3c) NEW constrained variants (Joe #4/#7): content-restricted + one-weight-per-sentence.
+        if ctx.get("wm_special_punct") is not None:
+            pieces_sp = ctx["tok"].convert_ids_to_tokens(record["gen_token_ids"])
+            keep_sp = torch.from_numpy(token_subsets.keep_mask(record["gen_token_ids"], pieces_sp, "special_punct")).to(device)
+            signals["wMSP-special_punct"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_special_punct"](asx), keep_sp))
         if ctx.get("wm_content") is not None:
             pieces_c = ctx["tok"].convert_ids_to_tokens(record["gen_token_ids"])
             keep_c = torch.from_numpy(token_subsets.keep_mask(record["gen_token_ids"], pieces_c, "content")).to(device)
@@ -406,6 +425,19 @@ def main():
     wm_segment = weighted_msp.train_weighted_msp(
         states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
         loss="pairwise", segment_ids=segids)
+    # shrink@10 -- the HEAVY moderation variant (was the cnn "headline"; kept for the token-level story of
+    # WHERE a strongly-shrunk weighter still deviates from uniform). Same recipe as the all_variants sweep.
+    wm_shrink10 = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", reg=weighting.shrink_to_uniform, reg_lambda=10.0)
+    # special_punct keep-variant: the learnt weighting with EOS + PUNCTUATION dropped (the middle rung of the
+    # token-selection family: pairwise = EOS only, special_punct = EOS+punct, content = EOS+punct+stop-words).
+    special_punct_keep_list = [token_subsets.keep_mask(r["gen_token_ids"],
+                                                       tok.convert_ids_to_tokens(r["gen_token_ids"]), "special_punct")
+                               for r in records]
+    wm_special_punct = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", keep=special_punct_keep_list)
 
     # Method scores + the same "interesting" sort as the attention viz.
     test_positions = [i for i, r in enumerate(records) if r["split"] == "test"]
@@ -425,8 +457,8 @@ def main():
     shown = candidates[:args.max_examples]
 
     ctx = {"states": states, "wm_pair": wm_pair, "wm_bl": wm_bl, "unif": unif,
-           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "wm_hinge": wm_hinge,
-           "wm_content": wm_content,
+           "wm_shrink2": wm_shrink2, "wm_shrink10": wm_shrink10, "wm_smooth3": wm_smooth3, "wm_hinge": wm_hinge,
+           "wm_content": wm_content, "wm_special_punct": wm_special_punct,
            "wm_segment": wm_segment, "show_ablations": args.show_ablations,
            "device": device, "orgad_json": orgad_json, "orgad_broad_json": orgad_broad_json,
            "sar_rel": sar_rel, "gran": gran, "tok": tok}

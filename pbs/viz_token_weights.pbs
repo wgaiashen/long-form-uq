@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=8:mem=48gb
-#PBS -l walltime=03:00:00
+#PBS -l walltime=06:00:00
 #PBS -N luq_viz_tw
 #PBS -j oe
 # Per-dataset weighted-MSP-family visualiser (CPU only -- trains the wMSP MLP + frozen-query

@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_pooler_xlc
+#PBS -j oe
+# COMPLETENESS (2026-07-21): fill the ONE remaining empty grid cell -- the POOLER rows
+# (uniform + attention, plus wMSP + floor) at ALL 5 rungs (incl. the missing 1ds-Diff /
+# OneDatasetDiffTask) for the 3 XL long-form evals med_quad / samsum / ExpertQA, on the ORGANIC carve
+# (consistent with §I.3). contribution_ladder is XL-capable (eval_split carve; ID-gate skipped for
+# non-anchor evals). Runs on GPU (L40S) so the attention temperature-selection over the 6.5GB XL cache
+# fits the wall (the earlier CPU full-ladder attempt hit the walltime). Writes a dedicated XL CSV.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== pooler-XL (med_quad,samsum,expertqa; all 5 rungs) on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 \
+  --evals med_quad,samsum,expertqa \
+  --out results/contribution_ladder_xl__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2

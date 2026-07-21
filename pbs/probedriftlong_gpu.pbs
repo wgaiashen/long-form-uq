@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=96gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_pdl_gpu
+#PBS -j oe
+# ProbeDriftLong FULL on GPU (L40S) — poolers (the bottleneck) train batched on GPU; caches are
+# RCS-resident so NO sync/DoC needed (cache-bound → stays on RCS). Falls back to CPU if no GPU.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== ProbeDriftLong FULL (GPU) on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2

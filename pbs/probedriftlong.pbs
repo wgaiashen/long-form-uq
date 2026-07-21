@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_pdl
+#PBS -j oe
+# ProbeDriftLong FULL run: all long evals (pubmed/xsum/cnn/med_quad/samsum/expertqa) + Long->Short
+# (sciq/trivia), 3 seeds, KEEP methods (fair-floor + poolers + SAPLMA + wMSP{norm,shrink@2,shrink@10,
+# Blondel}) + paired bootstrap. CPU (cache-reuse; poolers fall back to device=cpu). 96GB for the big
+# long-form pertok caches held in memory.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== ProbeDriftLong FULL on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3
+echo "=== done $(date) ===" >&2
