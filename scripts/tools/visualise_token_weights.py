@@ -47,6 +47,7 @@ the canonical records describe the same generations, and clip every signal to G 
 """
 import argparse
 import json
+import functools
 import sys
 from pathlib import Path
 
@@ -61,7 +62,7 @@ import torch  # noqa: E402
 from luq import cache, weighted_msp, weighting, token_subsets  # noqa: E402
 from luq.config import Config  # noqa: E402
 from luq.features import orgad_llm, sar  # noqa: E402
-from attn_pool import load_per_token, pad_batch, train_attn  # noqa: E402
+from attn_pool import load_per_token, pad_batch, train_attn, PROMPT_REGIME  # noqa: E402
 from msp_ablations import build_masks  # noqa: E402  (P1.2 token-subset keep-masks)
 from viz_common import (  # noqa: E402
     load_tokenizer, token_pieces, method_scores, minmax,
@@ -96,6 +97,11 @@ METHOD_DOCS = {
         "wMSP-pairwise but the per-token logits are neighbour-averaged over a 3-token window "
         "(<code>smooth_raw</code>, before the softmax) at both train and score time, encoding "
         "&lsquo;importance is a span property, not a lone token&rsquo; &mdash; a P1.1 smoothing variant.",
+    "wMSP-entropy_hinge":
+        "wMSP-pairwise plus a THRESHOLDED entropy penalty (<code>+2&middot;relu(0.7&minus;H/log&nbsp;n)&sup2;</code>): "
+        "unlike shrink, it is 0 while the weights stay smooth and only pushes back once the distribution gets "
+        "too peaked (normalised entropy &lt; 0.7). Joe&rsquo;s item-1 hinge &mdash; should look like wMSP-pairwise "
+        "except where it clips a spike.",
     "wMSP-content":
         "wMSP-pairwise but the learned softmax is RESTRICTED to content tokens only &mdash; special "
         "tokens, punctuation and stop-words (negation kept) get weight 0 pre-softmax, so the weighter "
@@ -218,6 +224,8 @@ def per_token_signals(record, pos, ctx):
         if ctx.get("wm_smooth3") is not None:
             raw_sm = weighting.smooth_raw(ctx["wm_smooth3"](asx), 3)      # smooth before the (keep-masked) softmax
             signals["wMSP-smooth3"] = (lambda w: (list(w), minmax(w)))(_wshow(raw_sm))
+        if ctx.get("wm_hinge") is not None:
+            signals["wMSP-entropy_hinge"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_hinge"](asx)))
 
         # 3c) NEW constrained variants (Joe #4/#7): content-restricted + one-weight-per-sentence.
         if ctx.get("wm_content") is not None:
@@ -311,7 +319,10 @@ def main():
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    # prompt-regime aware: a regime-namespaced XL set (ExpertQA -> cache/expertqa_rp12/) resolves its
+    # records/scores from that root, exactly as load_per_token does -- so the viz covers it like any core set.
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=PROMPT_REGIME.get(args.dataset, ""))
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     print(f"loading run: {key}  (device={device})")
 
@@ -336,8 +347,13 @@ def main():
         assert list(records[i]["gen_token_ids"]) == list(records_pt[i]["gen_token_ids"]), (
             f"pertok cache and records disagree on gen_token_ids at position {i} -- stale cache?")
 
-    tr = [i for i in range(len(states)) if split_pt[i] == "train"]
-    print(f"  {len(states)} examples, {len(tr)} train; training the weight models on CPU...")
+    # Training indices: a two-split set uses its baked train rows; a single-split XL set (ExpertQA all-"test",
+    # med_quad/samsum all-"train") has a deterministic train carve, exactly as the ladders do (xl_rungs.eval_split).
+    import xl_rungs  # noqa: E402  (shared organic-ProbeDriftXL split logic)
+    tr_idx, _ = xl_rungs.eval_split(np.asarray(split_pt))
+    tr = list(int(i) for i in tr_idx)
+    print(f"  {len(states)} examples, {len(tr)} train ({'baked' if len(set(split_pt)) > 1 else 'carved'}); "
+          f"training the weight models on CPU...")
 
     # Train the weighting models ONCE per dataset (cheap on CPU: small MLP / linear query).
     wm_pair = weighted_msp.train_weighted_msp(
@@ -358,6 +374,11 @@ def main():
     wm_smooth3 = weighted_msp.train_weighted_msp(
         states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
         loss="pairwise", smooth_n=3)
+    # entropy_hinge: the thresholded entropy penalty (Joe #1) -- fires ONLY once the weights get too peaked
+    # (normalised entropy < 0.7), so it should look like wMSP-pairwise while smooth and flatten only the spikes.
+    wm_hinge = weighted_msp.train_weighted_msp(
+        states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
+        loss="pairwise", reg=functools.partial(weighting.entropy_hinge, threshold=0.7), reg_lambda=2.0)
 
     # Optional weight-source caches (toggles appear only if built).
     orgad_json = load_orgad_json(cfg.model_name, args.dataset)
@@ -404,7 +425,8 @@ def main():
     shown = candidates[:args.max_examples]
 
     ctx = {"states": states, "wm_pair": wm_pair, "wm_bl": wm_bl, "unif": unif,
-           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "wm_content": wm_content,
+           "wm_shrink2": wm_shrink2, "wm_smooth3": wm_smooth3, "wm_hinge": wm_hinge,
+           "wm_content": wm_content,
            "wm_segment": wm_segment, "show_ablations": args.show_ablations,
            "device": device, "orgad_json": orgad_json, "orgad_broad_json": orgad_broad_json,
            "sar_rel": sar_rel, "gran": gran, "tok": tok}

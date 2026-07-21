@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_allvar_core
+#PBS -j oe
+# all_variants on the 5 CORE datasets only (sciq/trivia/pubmed/xsum/cnn), refreshed to pick up the new
+# entropy_hinge@2 variant. Core-only so ExpertQA's 6.5GB per-token cache is NOT loaded (lighter/faster);
+# the 3 XL evals are refreshed separately by allvar_xl.pbs. Writes the canonical core all_variants CSV.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== all_variants CORE (+entropy_hinge) on $(hostname) $(date) ===" >&2
+python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3 \
+  --evals sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail \
+  --out results/weighted_msp_all_variants__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

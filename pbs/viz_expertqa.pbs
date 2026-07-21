@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_viz_eqa
+#PBS -j oe
+# ExpertQA token-weight viz (re-run after the None-label render fix). mem=96gb for the 6.5GB pertok cache.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+echo "=== viz expertqa on $(hostname) $(date) ===" >&2
+python -u scripts/tools/visualise_token_weights.py --model meta-llama/Meta-Llama-3.1-8B \
+  --dataset expertqa --ood ID --split test --label-field faithfulness \
+  || echo "!!! viz FAILED for expertqa" >&2
+echo "=== done $(date) ===" >&2

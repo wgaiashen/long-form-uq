@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_viz_new
+#PBS -j oe
+# Token-weight visualiser for the NEW / STALE datasets (high value for the slides):
+#   cnn_dailymail  -> was MISSING entirely (test split)
+#   med_quad,samsum -> were 07-16 (pre the current toggle set); refresh (train split, they have no test rows)
+#   expertqa       -> was MISSING (regime cache cache/expertqa_rp12/, all-test split, faithfulness label)
+# CPU only (trains the wMSP MLP family on cached L15 states; no model forward). mem=96gb for ExpertQA's 6.5GB pertok.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
+MODEL=meta-llama/Meta-Llama-3.1-8B
+echo "=== viz NEW/STALE on $(hostname) $(date) ===" >&2
+for d in cnn_dailymail; do
+  echo "---- $d (test) $(date)" >&2
+  python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset "$d" --ood ID --split test \
+    || echo "!!! viz FAILED for $d" >&2
+done
+for d in med_quad samsum; do
+  echo "---- $d (train) $(date)" >&2
+  python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset "$d" --ood ID --split train \
+    || echo "!!! viz FAILED for $d" >&2
+done
+echo "---- expertqa (test, faithfulness) $(date)" >&2
+python -u scripts/tools/visualise_token_weights.py --model "$MODEL" --dataset expertqa --ood ID --split test \
+  --label-field faithfulness \
+  || echo "!!! viz FAILED for expertqa" >&2
+echo "=== done $(date) ===" >&2

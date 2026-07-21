@@ -66,13 +66,22 @@ def eval_split(split, seed=0, test_frac=XL_TEST_FRAC):
 
 
 # ---- rung generation -----------------------------------------------------------------------------
+# OneDatasetDiffTask preference: a SINGLE opposite-broad-family dataset, matching ProbeDrift's
+# OOD_ONE_DATASET_DIFF_TASK (a QA eval shifts to samsum; a summarisation eval shifts to med_quad).
+_ONE_DIFF_PREF = {"qa": "samsum", "summ": "med_quad"}
+
+
 def rung_sources(X):
     """Task-family rung composition for an XL eval target X (SameTask=same fine-family, DiffTask=opposite
-    broad-family, LOO=all-others), excluding X and the eval-only ExpertQA. Mirrors ProbeDrift's semantics."""
+    broad-family, LOO=all-others, OneDatasetDiffTask=ONE opposite-broad-family dataset), excluding X and the
+    eval-only ExpertQA. Mirrors ProbeDrift's semantics."""
     same = [d for d in SOURCE_POOL if d != X and FINE[d] == FINE[X]]
     diff = [d for d in SOURCE_POOL if d != X and BROAD[FINE[d]] != BROAD[FINE[X]]]
     loo = [d for d in SOURCE_POOL if d != X]
-    return {"SameTask": same, "DiffTask": diff, "LOO": loo}
+    # ordered: the ProbeDrift-canonical single opposite-family dataset first, then the rest as fallbacks
+    pref = _ONE_DIFF_PREF.get(BROAD[FINE[X]])
+    one_diff = ([pref] if pref in diff else []) + [d for d in diff if d != pref]
+    return {"SameTask": same, "DiffTask": diff, "LOO": loo, "OneDatasetDiffTask": one_diff}
 
 
 def build_rows(X, spec, PT, seed, sampled_fn):
@@ -108,9 +117,12 @@ def cells(sources, evals):
                     out.append((tag, X, spec))
         else:                                             # XL taxonomy rungs
             rs = rung_sources(X)
-            for tag in ("SameTask", "LOO", "DiffTask"):
+            for tag in ("SameTask", "LOO", "DiffTask"):    # multi-source rungs: split the budget across sources
                 srcs = [d for d in rs[tag] if d in sources]
                 if srcs:
                     cap = max(1, XL_TOTAL // len(srcs))
                     out.append((tag, X, [(d, cap) for d in srcs]))
+            one = [d for d in rs["OneDatasetDiffTask"] if d in sources]   # single opposite-family dataset, full budget
+            if one:
+                out.append(("OneDatasetDiffTask", X, [(one[0], XL_TOTAL)]))
     return out

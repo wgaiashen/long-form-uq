@@ -155,7 +155,10 @@ def render_token_spans(pieces, signals):
 
 
 def render_example(record, record_pos, methods, signals, label_field, pieces):
-    correctness = float(record.get(label_field, float("nan")))
+    # label may be explicitly None (e.g. ExpertQA's faithfulness on an unlabelled row), not just missing --
+    # coerce both to NaN so the render doesn't crash (the row shows a blank/NaN correctness, which is honest).
+    _lab = record.get(label_field, float("nan"))
+    correctness = float(_lab) if _lab is not None else float("nan")
     # Correct/incorrect badge is only a coarse colour cue; we always show the graded value.
     verdict = "correct" if correctness >= 0.5 else "wrong"
 

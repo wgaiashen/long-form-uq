@@ -21,6 +21,7 @@ Output: results/weighted_msp_all_variants__<slug>.csv  (eval, rung, variant, prr
 """
 import argparse
 import csv as _csv
+import functools
 import sys
 from pathlib import Path
 
@@ -55,6 +56,8 @@ CONFIGS = [
     ("shrink@2", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform, "reg_lambda": 2.0}),
     ("shrink@10", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform, "reg_lambda": 10.0}),
     ("kl@2", {"weight_mode": "normalised", "reg": weighting.kl_to_uniform, "reg_lambda": 2.0}),
+    ("entropy_hinge@2", {"weight_mode": "normalised",
+                         "reg": functools.partial(weighting.entropy_hinge, threshold=0.7), "reg_lambda": 2.0}),
     ("smooth_n3", {"weight_mode": "normalised", "smooth_n": 3}),
     ("smooth_n5", {"weight_mode": "normalised", "smooth_n": 5}),
 ]
