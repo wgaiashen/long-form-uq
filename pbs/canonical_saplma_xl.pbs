@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_canon_xl
+#PBS -j oe
+# COMPLETENESS (2026-07-21): SAPLMA (mean-pool+MLP) + last-token for the 3 XL evals at ALL 5 rungs
+# (incl. 1ds-Diff), the third pooler alongside uniform/attention (which come from pooler_xl_1dsdiff.pbs).
+# Uses the now-XL-aware canonical_ladder (xl_rungs.build_rows carves the XL test set; the keystone-only
+# ID-gate is skipped for XL). --skip-contrib keeps it CPU-only (SAPLMA MLP; no poolers). Writes a
+# dedicated XL SAPLMA CSV on the same organic carve as §I.3.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== canonical SAPLMA XL (med_quad,samsum,expertqa; CPU) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/canonical_ladder.py --skip-contrib \
+  --aggregators meanpool,lasttoken --seeds 1,2,3 \
+  --evals med_quad,samsum,expertqa \
+  --out results/canonical_ladder_xl__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2

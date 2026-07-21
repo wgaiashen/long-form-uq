@@ -50,6 +50,8 @@ from aggregation_table import (  # noqa: E402
     conf_meanpool, conf_lasttoken, conf_persentence, conf_pertoken,
     build_arrays, attn_unc, prr_from_conf)
 import contribution_ladder as cl  # noqa: E402
+from xl_rungs import cells as xl_cells, build_rows as xl_build_rows, KEYSTONES  # noqa: E402
+# (rung builder + XL-aware train/test row assembly; contribution_ladder no longer re-exports cells)
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
@@ -122,13 +124,16 @@ def main():
     sources = set(PT)
 
     out_rows = []
-    for rung, X, spec in cl.cells(sources):
+    for rung, X, spec in xl_cells(sources, cl.EVALS):
         if X not in PT:
             continue
         per_method = {m: [] for m in methods_order}
         for sd in seeds:
-            train_rows = [(d, i) for d, cap in spec for i in cl.sampled_train_idx(PT[d][1], sd, cap)]
-            test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
+            # XL-aware row assembly (same as contribution_ladder): eval_split gives the eval target's
+            # FIXED test set -- baked split for keystones, deterministic seed=0 carve for the split-less XL
+            # sets (med_quad/samsum all-train, ExpertQA all-test). The old np.where(split=="test") was empty
+            # for med_quad/samsum, silently skipping them; build_rows fixes that (keystone numbers unchanged).
+            train_rows, test_rows = xl_build_rows(X, spec, PT, sd, cl.sampled_train_idx)
             if not train_rows or not test_rows:
                 continue
             n_tr = len(train_rows)
@@ -193,7 +198,9 @@ def main():
         # ID-diagonal gates on the controlled rows.
         if rung == "ID":
             # mean-pool ID must reproduce the cached SAPLMA L15 PRR (only if mean-pool was computed).
-            if "mean-pool+MLP" in stats:
+            # Keystones only: the "saplma" feature cache the gate reloads exists for the core datasets,
+            # not the XL sets (whose pooled features live in a different cache path) -- skip the gate there.
+            if "mean-pool+MLP" in stats and X in KEYSTONES:
                 te_rows = np.where(PT[X][1] == "test")[0]
                 yX = PT[X][2]
                 ok, prr_feat = id_gate_meanpool(

@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_canon_saplma
+#PBS -j oe
+# AUDIT REFRESH (2026-07-21): re-run the (now-fixed) canonical_ladder for the SAPLMA aggregators on ALL
+# 5 keystone evals, so §B's "SAPLMA (mean-pool+MLP)" row is regenerable on the current tree + caches.
+# The fix: canonical_ladder called cl.cells(...), an API removed in the Jul-19 refactor -> AttributeError;
+# now it calls xl_rungs.cells(sources, cl.EVALS). --skip-contrib keeps it CPU-only (SAPLMA MLP only; the
+# poolers/wMSP rows come from contribution_ladder). This run also self-validates the fix at its first
+# cells() call (fails in the first minute if the edit is wrong). Writes canonical_ladder__*.csv.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== canonical SAPLMA (5 keystones, CPU, fixed cells) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/canonical_ladder.py --skip-contrib \
+  --aggregators meanpool,lasttoken --seeds 1,2,3 \
+  --evals sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail \
+  --out results/canonical_ladder__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done at $(date) ===" >&2

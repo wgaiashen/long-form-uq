@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_contrib_qa
+#PBS -j oe
+# AUDIT REFRESH (2026-07-21): re-run the contribution ladder for the QA evals (sciq/trivia/pubmed) on
+# the CURRENT caches. The committed contribution_ladder__*.csv predated the cnn pertok cache, so its QA
+# DiffTask pool was samsum+xsum (1200) and LOO 5-source (1000); the default sources now include cnn, so
+# QA DiffTask becomes the full samsum+xsum+cnn (1800). Refreshes §B's stale QA rows. CPU-only (the
+# scripts auto-fall-back to device=cpu; the audit run was CPU-bound anyway). Overwrites the canonical
+# contribution_ladder__*.csv (backed up to results/prev/2026-07-21_preaudit/).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== contribution_ladder QA refresh (sciq,trivia,pubmed; all current sources) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3
+echo "=== done at $(date) ===" >&2
