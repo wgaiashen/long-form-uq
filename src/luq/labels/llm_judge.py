@@ -132,6 +132,13 @@ def _extract_question(prompt: str, judge_name: str):
         prompt = prompt[: prompt.rfind("Answer:")]
         prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
         return prompt, ":"
+    if judge_name == "asqa":
+        # ASQA closed-book prompt = "...\n\nQuestion: {q}\nAnswer:" (no context block). Trim to the
+        # question; routes to the QA judge, scoring the response vs the gold disambiguating long answers
+        # (both annotators joined) with partial credit — same QA template as expertqa/pubmed.
+        prompt = prompt[: prompt.rfind("Answer:")]
+        prompt = prompt[prompt.rfind("Question:"):].strip("\n").strip()
+        return prompt, ":"
     if judge_name == "med_quad":
         # med_quad = few-shot 'Question:/Answer:' medical QA (same prompt shape as triviaqa/expertqa).
         # Trim to the LAST question; QA judge scores the response vs the free-text gold answer with

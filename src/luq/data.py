@@ -7,7 +7,7 @@ plus two small lookup tables the rest of the pipeline needs.
 from probe_drift import get_datasets
 from probe_drift.dataset import Dataset as PDDataset
 
-from . import expertqa
+from . import asqa, expertqa
 
 # ProbeDrift key -> the name Joe's llm_as_a_judge script expects.
 # The judge asserts the dataset name appears in the JSONL filename, so map before use.
@@ -19,6 +19,7 @@ JUDGE_NAME_MAP = {
     "xsum": "xsum",
     "cnn_dailymail": "cnn_dailymail",
     "expertqa": "expertqa",   # long-form FACTUALITY QA (not a ProbeDrift dataset)
+    "asqa": "asqa",           # long-form CLOSED-BOOK FACTUALITY QA (not a ProbeDrift dataset)
     "med_quad": "med_quad",   # medical QA; a same-task OOD NEIGHBOUR for pubmed_qa (training source)
     "samsum": "samsum",       # dialogue summarisation; xsum's same-task neighbour + a 2nd summ set for QA DiffTask
 }
@@ -39,6 +40,7 @@ TASK_OF = {
     "xsum": "summarisation",
     "cnn_dailymail": "summarisation",
     "expertqa": "long_qa",   # PLACEHOLDER (property tag deferred)
+    "asqa": "long_qa",       # long-form closed-book factuality (property tag deferred, as expertqa)
     "med_quad": "long_qa",   # same task family as pubmed_qa (medical QA) -> the SameTask OOD rung
     "samsum": "summarisation",   # dialogue summarisation -> a 2nd summ set (de-degenerates QA DiffTask)
 }
@@ -57,6 +59,8 @@ MAX_NEW_TOKENS = {
     # GOTCHA: config.max_new_tokens_cap defaults to 128, so ExpertQA extraction MUST pass a higher
     # --max-new-tokens-cap (>=384) or the budget is silently clipped (budget = min(384, cap)).
     "expertqa": expertqa.MAX_NEW_TOKENS,  # 384
+    # asqa gold(joined) p90=252 tokens; 256 covers ~p90 (a cap, not a target). Closed-book factuality.
+    "asqa": asqa.MAX_NEW_TOKENS,  # 256
     # med_quad answers are 1-3 free-text sentences on one line; 128 (matching its pubmed sibling) is
     # a safe budget and the few-shot format is truncated at the first newline anyway (see load()).
     "med_quad": 128,
@@ -75,6 +79,8 @@ def load(dataset: str, ood_setting: str = "ID"):
     """
     if dataset == "expertqa":
         return _load_expertqa(ood_setting)
+    if dataset == "asqa":
+        return _load_asqa(ood_setting)
     if dataset == "med_quad":
         return _load_med_quad(ood_setting)
     if dataset == "samsum":
@@ -85,6 +91,25 @@ def load(dataset: str, ood_setting: str = "ID"):
         instruct=False,
         batch_size=1,
     )
+
+
+def _load_asqa(ood_setting: str):
+    """ASQA as (train_ds, eval_ds), CLOSED-BOOK long-form factuality. Eval-only like ExpertQA: ASQA is
+    a NEW cross-task EVAL target (probes train on the existing pool, test on ASQA), so there is no ASQA
+    train split. We use the full dev split (948) in its natural order, so record idx aligns to
+    asqa.load_records() for the free Str-EM coverage cross-check (no manifest needed). The frozen prompt
+    is applied here so 01_extract's prompt_hash guard is stable; gold = both annotator long_answers
+    joined (see src/luq/asqa.py). sample_id is carried in source_ids for traceability."""
+    if ood_setting != "ID":
+        raise ValueError(f"asqa: only 'ID' is supported (it is an eval-only target; the whole dev split "
+                         f"is the eval set, no OOD re-slice yet); got {ood_setting!r}")
+    recs = asqa.load_records()
+    x = [asqa.PROMPT.format(question=r["question"]) for r in recs]
+    y = [r["gold"] for r in recs]
+    meta = [r["sample_id"] for r in recs]
+    train_ds = PDDataset([], [], batch_size=1)                   # eval-only: no training split
+    eval_ds = PDDataset(x, y, batch_size=1, source_ids=meta)
+    return train_ds, eval_ds
 
 
 def _load_med_quad(ood_setting: str):

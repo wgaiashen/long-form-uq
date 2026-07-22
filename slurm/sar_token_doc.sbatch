@@ -21,6 +21,7 @@
 # After: rsync cache/sar/*__token*.npz back DoC->RCS.
 set -uo pipefail
 export HF_HOME=/vol/gpudata/gs925-msc_project/hf_cache
+export HF_HUB_OFFLINE=1  # everything (cross-encoder + Llama tokenizer) is cached; avoids node-internet dependency
 source /vol/gpudata/gs925-msc_project/miniconda/etc/profile.d/conda.sh
 conda activate luq
 cd /vol/gpudata/gs925-msc_project/msc-project-gs925
