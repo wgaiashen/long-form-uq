@@ -51,6 +51,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
+    ap.add_argument("--prompt-regime", default="",
+                    help="cache-namespace regime for regime-scoped sets (e.g. 'asqa_rp12', 'expertqa_rp12'); "
+                         "'' = base cache/. Needed to repool the regime-namespaced XL/factuality sets.")
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--dtype", default="fp32", choices=["auto", "fp32", "fp16", "bf16"],
                     help="must match the extraction dtype for identical states (keystone = fp32)")
@@ -62,8 +65,10 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
+    print(f"repool: dataset={args.dataset} regime={args.prompt_regime or '(base)'} cache_dir={cfg.cache_dir}", flush=True)
     records = cache.load_records(cfg.cache_dir, key)
     if args.limit:
         records = records[: args.limit]

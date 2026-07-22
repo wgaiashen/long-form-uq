@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_repool_fix
+#PBS -j oe
+# FEATURE-CACHE CONSISTENCY FIX (2026-07-22): teacher-forced RE-POOL the SAPLMA FEATURE cache for the
+# un-repooled sets so it matches the (already teacher-forced) pertok cache at ~1e-6 -- closing the
+# inline-autoregressive-vs-teacher-forced gap. Feature-only (NO --cache-per-token) so the pertok cache and
+# all pertok-based ladder results (§B/§VII/§VIII) are UNTOUCHED; only §A ID SAPLMA + the ID-gate get fixed.
+# fp32 + eager for exact-match states. cnn has a LONG article prompt so it MAY OOM the 48GB L40S -> if it
+# does, the loop continues and cnn is re-pooled on DoC (A100-80GB) instead. Regime-namespaced sets
+# (expertqa/asqa) pass --prompt-regime (01e_repool is now regime-aware).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== repool feature fix on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+declare -A REGIME=( [med_quad]="" [samsum]="" [cnn_dailymail]="" [expertqa]="expertqa_rp12" [asqa]="asqa_rp12" )
+for d in med_quad samsum expertqa asqa cnn_dailymail; do   # cnn last (most likely to OOM)
+  echo "---- repool $d (regime='${REGIME[$d]}') $(date) ----" >&2
+  python -u scripts/01e_repool.py --model meta-llama/Meta-Llama-3.1-8B --dataset "$d" --ood ID \
+    --prompt-regime "${REGIME[$d]}" --dtype fp32 --attn eager \
+    && echo "  OK $d" >&2 || echo "  !!! FAILED $d (likely OOM -> route to DoC A100-80GB)" >&2
+done
+echo "=== done $(date) ===" >&2

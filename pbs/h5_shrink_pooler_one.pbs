@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=10:00:00
+#PBS -N luq_h5
+#PBS -j oe
+# H5 shrink-the-pooler, ONE eval (standard ProbeDrift ladder), 3 seeds. Parallel per-eval like ProbeDriftLong.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== H5[$EVAL] on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/h5_shrink_pooler.py --evals "$EVAL" --seeds 1,2,3 \
+  --out "results/h5_shrink_pooler_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

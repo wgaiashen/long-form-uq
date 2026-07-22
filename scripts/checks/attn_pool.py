@@ -147,7 +147,12 @@ def _mask_answer_only(mask):
 
 def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_position=False,
                answer_only=False, weight_decay=WEIGHT_DECAY, wd_query=0.0, freeze_query=False,
-               epochs=60, bs=32, lr=1e-3):
+               epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0):
+    """`shrink_lambda` > 0 = H5 (shrink-the-pooler): add a shrink-to-uniform penalty on the attention weights
+    to the BCE loss, pulling the learned attention toward mean-pool (its unsupervised prior). Tests whether
+    moderation-toward-the-unsupervised-prior — the mechanism that helps weighted-MSP — makes the ATTENTION
+    POOLER OOD-robust too. Penalty = mean over real tokens of (a_i·n − 1)² (the same avg-1 shrink as wMSP).
+    Default 0.0 = the plain pooler (unchanged), so existing callers are untouched."""
     torch.manual_seed(seed)
     d = states[0].shape[1]
     model = AttnPool(d, temperature=temperature, use_position=use_position,
@@ -171,8 +176,12 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
             if answer_only:
                 mask = _mask_answer_only(mask)
             opt.zero_grad()
-            logit, _ = model(X, mask, pos)
+            logit, a = model(X, mask, pos)
             loss = lossf(logit, yt[idx])
+            if shrink_lambda > 0:                       # H5: shrink attention toward mean-pool (avg-1 MSE)
+                n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
+                dev = ((a * n_real - 1.0) ** 2) * mask                 # only real tokens contribute
+                loss = loss + shrink_lambda * (dev.sum(1) / n_real.squeeze(1)).mean()
             loss.backward()
             opt.step()
     return model
