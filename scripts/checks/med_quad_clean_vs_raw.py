@@ -93,8 +93,9 @@ def main():
         tr = list(range(n_tr)); te = list(range(n_tr, n_tr + len(ev_te)))
         yte = ev_y[ev_te]                                   # eval's OWN label (unchanged); PRR target
 
-        floor = results.prr(yte, np.asarray(
-            [msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te], dtype=float))
+        # FAIR floor (2026-07-22): best of {msp_sum, perplexity, msp_min}; msp_sum is the weakest on all 9.
+        _fv, _fname = msp.fair_floor([records[i] for i in te], yte, results.prr)
+        floor = results.prr(yte, _fv)
 
         for name, fn in [("saplma_mean", "sap"), ("attention", "attn"), ("weighted_msp", "wmsp")]:
             row = {}

@@ -35,8 +35,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
-from luq import cache, probe, results, weighted_msp, weighting  # noqa: E402
-from luq.features import orgad_llm  # noqa: E402
+from luq import cache, probe, results, token_subsets, weighted_msp, weighting  # noqa: E402
+from luq.features import orgad_llm, sar  # noqa: E402
 from aggregation_table import load_per_token, attn_unc  # noqa: E402
 from attn_pool import train_attn, select_temperature  # noqa: E402
 from weighted_msp_all_variants import EVALS, CANDIDATES, cells, sampled  # reuse the exact ladder (XL-aware)
@@ -83,6 +83,38 @@ def orgad_w(tok, record, orgad_json, g, floor=0.0):
     return m
 
 
+# ---- FREE unsupervised weight sources (W-B2) -------------------------------------------------------
+# All computable from the CACHED record alone -- no extraction, no GPU, no API. This matters because the
+# learned pooler wins ID but not OOD, and an unsupervised weighting CANNOT overfit the training task, so if
+# one of these beats `uniform` OOD that is exactly the contribution we are looking for.
+# NOTE (verified 2026-07-22): per-token ENTROPY is NOT available -- the records store only the logprob of
+# the CHOSEN token, not the full distribution, so entropy would need a fresh GPU logits pass. Not included.
+def _nll(record, g):
+    """Per-token NLL (= -logprob of the emitted token). The model's own uncertainty signal, which is the
+    OOD-robust one -- the same quantity MSP aggregates, here used to decide WHERE to attend instead."""
+    v = -np.asarray(record["token_logprobs"], dtype=float)
+    return v[:g] if len(v) >= g else np.pad(v, (0, g - len(v)), constant_values=float(v.mean() if len(v) else 1.0))
+
+
+def _position(g, mode="lead"):
+    """Positional prior. 'lead' favours early tokens (summarisation leads carry the claim); 'tail' the end."""
+    r = np.arange(g, dtype=float) / max(g - 1, 1)
+    return (1.0 - r) if mode == "lead" else r
+
+
+def _to_sentence(w, sent_ids):
+    """Broadcast a per-token weight to its SENTENCE mean -- the per-token vs per-sentence contrast. Every
+    token in a sentence then shares one weight, so 'which unit do we weight' is separated from 'how'."""
+    w = np.asarray(w, float); sid = np.asarray(sent_ids, dtype=int)[:len(w)]
+    if len(sid) != len(w) or len(w) == 0:
+        return w
+    out = np.empty_like(w)
+    for s in np.unique(sid):
+        m = sid == s
+        out[m] = w[m].mean()
+    return out
+
+
 def normalise_avg1(w):
     """avg-1 weight over G tokens (sum = G); uniform if degenerate."""
     w = np.clip(np.asarray(w, dtype=float), 0.0, None)
@@ -102,6 +134,11 @@ def main():
                     help="broad = the refined long-form-QA claim-span cache (__broad).")
     ap.add_argument("--orgad-floor", type=float, default=0.0,
                     help="soft-tier background weight tau (0 = hard mask; larger -> closer to uniform).")
+    ap.add_argument("--weight-sources", default="",
+                    help="comma-separated subset of weight sources to run (default: all). `uniform` is "
+                         "always kept -- it is the grounding baseline every other source is judged against. "
+                         "Use this for a fast answer when the full source set + --with-pooler would not "
+                         "finish inside the walltime.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -130,6 +167,24 @@ def main():
               f"sar {tag if SAR[d] is not None else 'no'}", flush=True)
     sources = set(PT)
 
+    # ---- AVAILABILITY GUARD (added 2026-07-22 after the Orgad silent-fallback bug) ----------------
+    # Previously a MISSING weight-source cache fell through to `w = np.ones(g)`, i.e. the "orgad" or "sar"
+    # row silently BECAME the uniform row -- and still got written to the CSV. That manufactures agreement
+    # with uniform and fabricates exactly the "unsupervised weighting is a null" conclusion we were testing
+    # for. Verified damage in the committed organic run: cnn_dailymail had no orgad cache and expertqa had
+    # NEITHER, so 10/40 orgad cells and 5/40 sar cells were literally the uniform method.
+    # Now: a source with no cache is UNAVAILABLE for that dataset, and any cell touching it is SKIPPED for
+    # that source (blank field) rather than silently filled.
+    # Cache-backed sources can be missing; the FREE sources (nll/pos/content) are derived from the record
+    # itself and are therefore always available. `.get(s, True)` keeps the guard from KeyError-ing on them.
+    AVAIL = {d: {"uniform": True, "orgad": ORG.get(d) is not None, "sar": SAR.get(d) is not None}
+             for d in sources}
+    for s in ("orgad", "sar"):
+        miss = sorted(d for d in sources if not AVAIL[d][s])
+        if miss:
+            print(f"  !! WEIGHT SOURCE '{s}' UNAVAILABLE for: {', '.join(miss)} -> every cell involving "
+                  f"these datasets will be SKIPPED for '{s}' (never silently uniform)", flush=True)
+
     # SAR weight (indexed by full-record position within a dataset) -- built per cell from SAR[d].
     def build_pooled(rows, source):
         """rows: list of (dataset, idx). Pool each with `source`."""
@@ -146,13 +201,43 @@ def main():
                 rel = SAR[d][i] if (SAR[d] is not None and i < len(SAR[d])) else None
                 rel = np.asarray(rel, float)[:g] if rel is not None else None
                 w = normalise_avg1(rel) if (rel is not None and len(rel) == g) else np.ones(g)
+            elif source.startswith(("nll", "pos", "content")):
+                base, _, gran = source.partition("__")      # e.g. "nll__sent"
+                if base == "nll":
+                    w = _nll(r, g)
+                elif base == "nll_inv":
+                    v = _nll(r, g); w = v.max() - v          # weight the CONFIDENT tokens instead
+                elif base == "pos_lead":
+                    w = _position(g, "lead")
+                elif base == "pos_tail":
+                    w = _position(g, "tail")
+                elif base == "content":
+                    pieces = tok.convert_ids_to_tokens(r["gen_token_ids"])
+                    w = np.asarray(token_subsets.keep_mask(r["gen_token_ids"], pieces, "content"), float)[:g]
+                    if len(w) < g:
+                        w = np.pad(w, (0, g - len(w)), constant_values=1.0)
+                else:
+                    w = np.ones(g)
+                if gran == "sent":
+                    sid, _ = sar._token_sentence_ids(
+                        tok, list(r["gen_token_ids"]),
+                        r.get("gen_text") or tok.decode(r["gen_token_ids"], skip_special_tokens=True))
+                    w = _to_sentence(w, sid)
+                w = normalise_avg1(w)
             else:
                 w = np.ones(g)
             vecs.append((A * (w[:, None] / g)).sum(axis=0))
         return np.stack(vecs)
 
-    SRC = ["uniform", "orgad", "sar"]
+    FREE = ["nll", "nll_inv", "pos_lead", "pos_tail", "content"]
+    # every free source at BOTH granularities: per-token, and broadcast to the sentence mean
+    SRC = ["uniform", "orgad", "sar"] + [f"{b}__{g}" for b in FREE for g in ("tok", "sent")]
+    if args.weight_sources:
+        want = {x.strip() for x in args.weight_sources.split(",") if x.strip()}
+        SRC = [s_ for s_ in SRC if s_ == "uniform" or s_ in want]
+        print(f"weight-source subset -> {SRC}", flush=True)
     out_rows = []
+    skipped_src = {}      # source -> {datasets that forced a skip}, reported at the end
     for rung, X, spec in cells(sources):
         spec = [(d, c) for d, c in spec if d in PT]
         if not spec:
@@ -171,6 +256,12 @@ def main():
                 continue
             ytr = np.array([PT[d][2][i] for d, i in train_rows], float)
             for s in SRC:
+                # Never score a source whose cache is missing for ANY dataset in this cell -- it would
+                # fall back to all-ones and be reported as if the weighting had been applied.
+                unavail = sorted({d for d, _ in train_rows + test_rows if not AVAIL[d].get(s, True)})
+                if unavail:
+                    skipped_src.setdefault(s, set()).update(unavail)
+                    continue
                 Xtr = build_pooled(train_rows, s); Xte = build_pooled(test_rows, s)
                 clf = probe.train_probe_mlp(Xtr, ytr, seed=sd)
                 per[s].append(results.prr(yte, probe.uncertainty(clf, Xte)))
@@ -199,13 +290,27 @@ def main():
 
     # grounding: uniform-source (probe on mean-pool) should ~equal the uniform frozen-q pooler PRR
     out = Path(args.out) if args.out else (ROOT / "results" / f"idea2_weighted_probe__{cache._slug(MODEL)}.csv")
-    cols = ["eval", "rung", "uniform_prr", "orgad_prr", "sar_prr", "attn_pooler_prr", "uniform_pooler_prr"]
+    # Columns must be DYNAMIC. The old hardcoded 5-column list SILENTLY DROPPED every free weight-source
+    # (nll/pos/content), so a run that computed them wrote a CSV without them -- the numbers survived only
+    # in the log. Build the header from the union of keys actually present. (Fixed 2026-07-23.)
+    base = ["eval", "rung"]
+    extra = sorted({k for r in out_rows for k in r if k not in base})
+    cols = base + extra
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=cols)
         w.writeheader()
         for r in out_rows:
             w.writerow({k: r.get(k, "") for k in cols})
     print(f"\nwrote {out} ({len(out_rows)} cells)", flush=True)
+    # Make the coverage of any NULL explicit: a blank orgad/sar column is "not measured here", NOT "measured
+    # and equal to uniform". Without this line a reader cannot tell the two apart -- which is precisely how
+    # the earlier contaminated run read as a clean null.
+    if skipped_src:
+        print("\nCOVERAGE CAVEAT -- sources skipped for missing caches (NOT scored, NOT uniform):", flush=True)
+        for s, ds in sorted(skipped_src.items()):
+            print(f"   {s}: cells involving {', '.join(sorted(ds))}", flush=True)
+    else:
+        print("\nfull coverage: every source had a cache for every dataset scored", flush=True)
 
 
 if __name__ == "__main__":

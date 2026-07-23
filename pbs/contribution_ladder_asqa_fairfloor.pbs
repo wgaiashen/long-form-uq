@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=10:00:00
+#PBS -N luq_asqaFF
+#PBS -j oe
+# ASQA standard ladder re-run with the FAIR-FLOOR verdict fix (was hardcoded to msp_sum; on ASQA
+# perplexity 0.316 >> msp_sum 0.148, so the old verdicts were against less than half the honest bar).
+# Additive: writes to its own csv.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals asqa \
+  --out results/contribution_ladder_asqa__fairfloor__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_pdlseg
+#PBS -j oe
+# ITEM 4: per-segment wMSP under ProbeDriftLong (first time long-only; was standard-ladder only).
+# Adds TWO variants beside the existing wMSP set:
+#   wmsp_seg_flat    = _segment_mean_raw (constant weight per sentence, TOKEN softmax -> length confound)
+#   wmsp_seg_softmax = _segment_softmax_weights (softmax over SENTENCES, length-invariant -> confound removed)
+# Both grounding-tested (tests/test_segment_softmax.py: one-sentence->MSP, per-token->plain wMSP, length-inv).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+D="${EVAL:?set EVAL}"
+echo "=== probedriftlong+seg eval=$D on $(hostname) $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$D" \
+  --out "results/probedriftlong_seg_${D}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

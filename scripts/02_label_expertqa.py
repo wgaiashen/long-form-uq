@@ -42,8 +42,13 @@ def label_records(records, raw, judge_model, save_cb, save_every=25):
         if r.get("faithfulness_model"):
             continue                                    # already labelled (resume)
         if degeneracy.is_severe(r["gen_text"]):
-            # distrust label, not judged
-            r.update(faithfulness=0.0, uncovered=0.0, coherent=False, faithfulness_quarantined=True)
+            # Distrust label, NOT judged. faithfulness=0.0 is the deliberate uniform distrust signal (see
+            # module docstring) and stays. `uncovered` is set to None, NOT 0.0: the judge was never called
+            # for this row, so a 0.0 would be a FABRICATED measurement claiming "the reference covered every
+            # claim" -- the strongest possible coverage statement, asserted about a row nobody looked at.
+            # It also silently poisons any analysis that slices by coverage (it made mean faithfulness in
+            # the uncovered<0.3 bucket read 0.330 instead of its true 0.730). Fixed 2026-07-22.
+            r.update(faithfulness=0.0, uncovered=None, coherent=False, faithfulness_quarantined=True)
         else:
             src = raw[r["idx"]]
             q = r["prompt"].split("Question:")[-1].split("\nAnswer:")[0].strip()
@@ -53,7 +58,10 @@ def label_records(records, raw, judge_model, save_cb, save_every=25):
                 r.update(faithfulness=None, uncovered=None, coherent=None, faithfulness_parse_fail=True)
             else:
                 if not parsed["coherent"]:              # distrust: derailed marginal survivor
-                    parsed["faithfulness"], parsed["uncovered"] = 0.0, 0.0
+                    # As above: keep the 0.0 distrust faithfulness, but DISCARD the coverage number rather
+                    # than overwrite it with 0.0. The answer derailed, so its claim inventory is not a
+                    # meaningful measurement of what the reference covers.
+                    parsed["faithfulness"], parsed["uncovered"] = 0.0, None
                 r.update(faithfulness=parsed["faithfulness"], uncovered=parsed["uncovered"],
                          coherent=parsed["coherent"], faithfulness_quarantined=False)
         r["faithfulness_model"] = judge_model            # provenance stamp (also the resume marker)

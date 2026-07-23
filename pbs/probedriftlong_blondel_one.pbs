@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=16:00:00
+#PBS -N luq_pdlB
+#PBS -j oe
+# W2 — ProbeDriftLong carrying the Blondel-loss shrink variants, written to a SEPARATE csv so the committed
+# PART VII baseline is ADDED TO, never replaced (author's instruction 2026-07-22).
+# The run reproduces the baseline pools exactly (asqa reverted to eval-only), and re-scores every baseline
+# method alongside the 2 new Blondel variants -- so the OVERLAP with the committed file doubles as a
+# REPRODUCIBILITY CHECK, and the Blondel-vs-pairwise contrast is paired within this single job.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+D="${EVAL:?set EVAL=<dataset>}"
+echo "=== probedriftlong BLONDEL eval=$D on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$D" \
+  --out "results/probedriftlong_blondel_${D}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

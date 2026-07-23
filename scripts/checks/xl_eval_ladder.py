@@ -134,8 +134,9 @@ def main():
                 rc = [PT[d][2][i] for d, i in allrows]
                 yte = y_X[te_e]
 
-                per["msp_floor"].append(results.prr(yte, np.array(
-                    [msp.msp_uncertainty(rc[i]["token_logprobs"], "sum") for i in te_idx])))
+                # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum.
+                _fv, _fname = msp.fair_floor([rc[i] for i in te_idx], yte, results.prr)
+                per["msp_floor"].append(results.prr(yte, _fv))
                 Xm = np.stack([np.asarray(s).mean(axis=0) for s in st])
                 per["saplma"].append(results.prr(yte, probe.uncertainty(
                     probe.train_probe_mlp(Xm[tr_idx], y[tr_idx], seed=sd), Xm[te_idx])))

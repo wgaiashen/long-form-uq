@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=10:00:00
+#PBS -N luq_contrib_asqa
+#PBS -j oe
+# Standard ProbeDrift(XL) ladder for ASQA (mixed short+long training) — poolers/uniform/attention + wMSP
+# norm/unc + fair-floor + paired bootstrap, all 5 rungs. Uses the (correct) pertok cache. CPU.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== contribution_ladder ASQA on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals asqa \
+  --out results/contribution_ladder_asqa__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

@@ -47,6 +47,10 @@ def main():
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--modes", default=",".join(MODES),
                     help="comma-sep subset of special,special_punct,content,segment (run only these).")
+    ap.add_argument("--loss", default="pairwise", choices=["pairwise", "blondel"],
+                    help="ranking loss for the weighter. Default pairwise (what the committed keep-variant "
+                         "numbers used); 'blondel' runs the same masks under the differentiable-rank loss "
+                         "so the mask x loss interaction can be read off against those numbers (W2).")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -95,7 +99,11 @@ def main():
         if len(te0) == 0:
             continue
         yte = np.array([PT[X][2][i] for i in te0], float)
-        floor = results.prr(yte, np.array([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum") for i in te0]))
+        # FAIR floor, not bare msp_sum (fixed 2026-07-22): the `floor` column is what every keep-variant
+        # margin in the STOCKTAKE is measured against, and msp_sum is not length-normalised, so on sets
+        # where perplexity or msp_min is stronger every "beats the floor" count was overstated.
+        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te0], yte, results.prr)
+        floor = results.prr(yte, _fv)
 
         mode_prr = {m: [] for m in MODES}
         for sd in seeds:
@@ -117,7 +125,7 @@ def main():
                 # m == "special": keep=None -> the default special-token exclusion (the EOS fix)
                 u = np.asarray(weighted_msp.weighted_msp_unc(
                     states, recs, y, tr_idx, te_idx, device, weight_mode="normalised",
-                    length_normalise=True, seed=sd, keep=keep, segment_ids=seg), float)
+                    length_normalise=True, seed=sd, keep=keep, segment_ids=seg, loss=args.loss), float)
                 mode_prr[m].append(results.prr(yte, u))
 
         line = f"[{rung:18s}] {X:14s} floor {floor:+.3f}"

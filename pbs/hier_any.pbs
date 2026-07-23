@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_hier
+#PBS -j oe
+# W4 hierarchical pooler on EITHER ladder (see seg_aggregate_any.pbs). Single-sentence EVAL targets are
+# refused by the driver's guard (the hierarchy is vacuous there); single-sentence SOURCES are fine.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+D="${EVAL:?set EVAL}"; L="${LADDER:-long}"
+echo "=== hier eval=$D ladder=$L on $(hostname) $(date) ===" >&2
+python -u scripts/checks/hier_pool_ladder.py --seeds 1,2,3 --evals "$D" --ladder "$L" \
+  --out "results/hier_pool_${L}_${D}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

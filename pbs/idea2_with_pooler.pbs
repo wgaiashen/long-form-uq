@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=10:00:00
+#PBS -N luq_idea2P
+#PBS -j oe
+# W5 GAP-FILL. The committed idea2 runs omitted --with-pooler, so `attn_pooler_prr` is EMPTY in all 40
+# rows -- meaning the question "is any UNSUPERVISED way of deciding where to attend better than the
+# LEARNED attention pooler?" was never actually answered (the pooler numbers that exist elsewhere come
+# from different runs/splits, so they are not PAIRED with these cells). This run turns the flag on so
+# the unsupervised sources and the learned pooler are scored on the SAME splits/seeds/head.
+# Writes to its OWN csv so the committed idea2 numbers are untouched. CPU-only.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== idea2 WITH pooler reference on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 --with-pooler \
+  --out results/idea2_weighted_probe__withpooler__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

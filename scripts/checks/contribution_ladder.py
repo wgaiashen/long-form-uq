@@ -52,15 +52,19 @@ from aggregation_table import load_per_token, build_arrays, attn_unc, paired_boo
 from attn_pool import train_attn, select_temperature  # noqa: E402
 # Shared ProbeDriftXL rung machinery: makes med_quad/samsum/ExpertQA organic eval targets. `cells` dispatches
 # keystone->get_training_spec (faithful), XL->family taxonomy; `eval_split` carves the XL eval test set;
-# `label_of` gives the per-target label (ExpertQA=faithfulness); `cross_label` flags the ExpertQA OOD case.
-from xl_rungs import cells as xl_cells, eval_split, label_of, cross_label  # noqa: E402
+# `label_of` gives the per-target label (ExpertQA=faithfulness); `different_label_projection` flags the ExpertQA OOD case.
+from xl_rungs import cells as xl_cells, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # Candidate training sources; each included only if its pertok cache actually loads. (ExpertQA is EVAL-ONLY
 # -- excluded as a source since its faithfulness label must not mix into the correctness training pool.)
-CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum"]
+# ASQA + ExpertQA included (author's decision 2026-07-22): they are ORDINARY training sources, not
+# eval-only. Leaving them out here also silently starved canonical_ladder, which uses this as its
+# --sources default. See the loading guard added there.
+CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum",
+                     "expertqa", "asqa"]
 # ID anchors (judge, from the aggregation table) the ID cells must reproduce.
 ID_ANCHOR = {"sciq": {"uniform": 0.913, "attention": 0.932},
              "trivia_qa": {"uniform": 0.815, "attention": 0.844},
@@ -75,8 +79,16 @@ SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"),
             ("DiffTask", "OOD_DIFF_TASK")]
 # Head-to-heads that get a paired test-set bootstrap CI (not just mean±std): does the contribution
 # beat the OOD-robust floor, do the poolers, and does the contribution beat the pooler?
-COMPARISONS = [("wmsp_norm_vs_floor", "weighted_msp_norm", "msp_sum"),
-               ("attention_vs_floor", "attention", "msp_sum"),
+# The floor MUST be the FAIR floor = the best of the unsupervised baselines actually available, not the
+# bare `msp_sum`. Hard-coding msp_sum understates the bar whenever the length-normalised floor is stronger,
+# which is exactly the artefact that produced (and then killed) the cnn "win" -- see STOCKTAKE PART VI.
+# Live example: on ASQA msp_sum=0.148 but perplexity=0.316, so every vs-msp_sum verdict was measured against
+# less than half the honest bar (attention_vs_floor read +0.458 SIG at ID; against the fair floor it is
+# +0.290, and at the two hardest OOD rungs EVERY supervised method is actually BELOW the floor).
+# `fair_floor` is derived per cell below as the higher-PRR of {msp_sum, perplexity}. (Fixed 2026-07-22.)
+FLOOR_CANDIDATES = ["msp_sum", "perplexity", "msp_min"]
+COMPARISONS = [("wmsp_norm_vs_floor", "weighted_msp_norm", "fair_floor"),
+               ("attention_vs_floor", "attention", "fair_floor"),
                ("wmsp_norm_vs_attention", "weighted_msp_norm", "attention")]
 
 
@@ -129,7 +141,8 @@ def main():
         print(f"  {d}: {len(states)} rows loaded (label={label_of(d)}"
               f"{'' if finite.all() else f', {int(finite.sum())}/{len(finite)} labelled'})", flush=True)
     sources = set(PT)
-    methods = ["uniform", "attention", "weighted_msp_norm", "weighted_msp_unc", "msp_sum", "perplexity"]
+    methods = ["uniform", "attention", "weighted_msp_norm", "weighted_msp_unc",
+               "msp_sum", "perplexity", "msp_min"]
 
     out_rows = []
     for rung, X, spec in xl_cells(sources, EVALS):
@@ -141,7 +154,7 @@ def main():
         test_rows = [(X, int(i)) for i in X_te]
         if not test_rows:
             continue
-        xlbl = cross_label(X)                 # ExpertQA OOD rungs are cross-label (correctness->faithfulness)
+        xlbl = different_label_projection(X)                 # ExpertQA OOD rungs are cross-label (correctness->faithfulness)
         per_method = {m: [] for m in methods}
         unc_acc = {m: [] for m in methods}   # per-seed per-example uncertainty vectors (for the bootstrap)
         yte_ref = None                        # test labels (identical across seeds; the bootstrap target)
@@ -185,6 +198,11 @@ def main():
                                           for i in te_idx], dtype=float)
             vecs["perplexity"] = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "perplexity")
                                              for i in te_idx], dtype=float)
+            # msp_min completes the standard floor trio. It is NOT optional: on pubmed_qa msp_min (+0.371)
+            # is far the strongest floor, so a fair_floor built from {sum, perplexity} alone still
+            # understates the bar there. See probedriftlong, which has used all three from the start.
+            vecs["msp_min"] = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "min")
+                                          for i in te_idx], dtype=float)
             for m, u in vecs.items():
                 per_method[m].append(results.prr(yte, u))
                 unc_acc[m].append(u)
@@ -207,10 +225,23 @@ def main():
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                                  "n_seeds": len(per_method[m]),
-                                 "cross_label": (xlbl and rung != "ID")})   # ExpertQA OOD = cross-label
+                                 "different_label_projection": (xlbl and rung != "ID")})   # ExpertQA OOD = cross-label
         # Paired test-set bootstrap on the seed-averaged uncertainty vectors: turns the head-to-heads
         # (contribution vs floor, pooler vs floor, contribution vs pooler) into CI-backed verdicts.
         avg_unc = {m: np.mean(np.stack(unc_acc[m]), axis=0) for m in unc_acc if unc_acc[m]}
+        # Derive the FAIR floor for this cell: whichever unsupervised baseline actually scores best. Both
+        # its PRR row and its per-example vector are aliased, so the bootstrap compares against the real bar.
+        avail = [f for f in FLOOR_CANDIDATES if f in stats and f in avg_unc]
+        if avail:
+            best_floor = max(avail, key=lambda f: stats[f][0])
+            stats["fair_floor"] = stats[best_floor]
+            avg_unc["fair_floor"] = avg_unc[best_floor]
+            print(f"    fair_floor = {best_floor} ({stats[best_floor][0]:+.3f})"
+                  + ("" if len(avail) == 1 else
+                     "  [" + ", ".join(f"{f} {stats[f][0]:+.3f}" for f in avail) + "]"), flush=True)
+            out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{best_floor}",
+                             "prr_mean": round(stats[best_floor][0], 4),
+                             "prr_std": round(stats[best_floor][1], 4), "n_seeds": len(seeds)})
         for vk, a, b in COMPARISONS:
             if a in avg_unc and b in avg_unc and yte_ref is not None:
                 mg, lo, hi, p, sig = paired_bootstrap(yte_ref, avg_unc[a], avg_unc[b])
@@ -223,7 +254,7 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "cross_label", "ci_lo", "ci_hi", "boot_p", "significant"])
+                                           "n_seeds", "different_label_projection", "ci_lo", "ci_hi", "boot_p", "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

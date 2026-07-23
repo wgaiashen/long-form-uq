@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=12:00:00
+#PBS -N luq_hier
+#PBS -j oe
+# W4 — hierarchical (two-level) pooling: attend WITHIN a sentence, then ACROSS sentences, vs the flat
+# attention pooler / uniform / SAPLMA / fair floor, on the long-form ladder. Includes the two frozen-level
+# ablations (hier_seg = sentence-choice only, hier_tok = token-choice only) so a win can be attributed to a
+# level. CPU-only (cached L15 states). EVAL=<dataset> runs a single eval (parallelises the ladder).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+D="${EVAL:-}"
+if [ -n "$D" ]; then
+  ARGS="--evals $D --out results/hier_pool_ladder_${D}__meta-llama_Meta-Llama-3.1-8B.csv"
+else
+  ARGS=""
+fi
+echo "=== hier_pool_ladder $ARGS on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/hier_pool_ladder.py --seeds 1,2,3 $ARGS
+echo "=== done $(date) ===" >&2

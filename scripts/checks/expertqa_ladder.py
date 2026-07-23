@@ -134,8 +134,9 @@ def main():
             yte = E_y[te_e]                                     # always faithfulness
 
             # msp floor (label-agnostic)
-            per["msp_floor"].append(results.prr(yte, np.array(
-                [msp.msp_uncertainty(rc[i]["token_logprobs"], "sum") for i in te_idx])))
+            # FAIR floor (2026-07-22): best of {msp_sum, perplexity, msp_min}; msp_sum is weakest on all 9.
+            _fv, _fname = msp.fair_floor([rc[i] for i in te_idx], yte, results.prr)
+            per["msp_floor"].append(results.prr(yte, _fv))
             # saplma (mean-pool + MLP)
             Xm = np.stack([np.asarray(s).mean(axis=0) for s in st])
             per["saplma"].append(results.prr(yte, probe.uncertainty(

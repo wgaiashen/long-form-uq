@@ -92,7 +92,7 @@ def main():
         PT[d] = (states, split, y, records)
         print(f"  {d}: {len(states)} rows", flush=True)
 
-    methods = ["saplma", "uniform", "weighted_msp_norm", "msp_sum"]
+    methods = ["saplma", "uniform", "weighted_msp_norm", "msp_sum", "fair_floor"]
     out_rows = []
     for X in EVALS:
         if X not in PT:
@@ -137,6 +137,9 @@ def main():
                     length_normalise=True, seed=sd), dtype=float)
                 vecs["msp_sum"] = np.asarray(
                     [msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te_idx], dtype=float)
+                # ADD the fair floor beside the honestly-named msp_sum (see canonical_ladder note).
+                vecs["fair_floor"], _fname = msp.fair_floor(
+                    [records[i] for i in te_idx], np.asarray([y[i] for i in te_idx], float), results.prr)
                 for m, u in vecs.items():
                     res[pool_name][m]["prr"].append(results.prr(yte, u))
                     res[pool_name][m]["unc"].append(u)

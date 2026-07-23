@@ -5,7 +5,7 @@ Focused comparison, DELIBERATELY separate from contribution_ladder.py (which the
 nothing here can perturb that run. For each ladder cell (ID -> SameTask -> LOO -> DiffTask) it trains
 weighted-MSP (weight_mode=normalised) with loss="pairwise" and loss="blondel" on the SAME rows/seeds and
 reports PRR side by side, plus a paired test-set bootstrap (blondel - pairwise). The plain MSP floor
-(msp_sum) is carried as the reference the whole method must beat OOD.
+(fair_floor = best of msp_sum/perplexity/msp_min) is carried as the reference to beat OOD.
 
 Reuses the verified cell machinery from contribution_ladder (same get_training_spec splits, same
 per-token cache, same paired_bootstrap) -- only the loss differs. CPU only (weighted-MSP trains small
@@ -70,7 +70,10 @@ def main():
     print(f"device {device} | seeds {seeds} | length_normalise={ln} | torchsort ok", flush=True)
 
     PT = {}
-    for d in args.sources.split(","):
+    # Load EVAL TARGETS as well as sources: loading only --sources means an eval target absent from that
+    # list is never loaded, yielding zero cells while still exiting 0 (the canonical_ladder/asqa silent
+    # failure). Harmless when evals are already a subset. (2026-07-23)
+    for d in sorted(set(args.sources.split(",")) | set(EVALS)):
         loaded = load_per_token(MODEL, d, LAYER, LAB)
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True); continue
@@ -86,7 +89,7 @@ def main():
         if X not in PT:
             continue
         # per-seed PRR for each loss + per-seed test uncertainty vectors (for the paired bootstrap)
-        prr = {"pairwise": [], "blondel": [], "msp_sum": []}
+        prr = {"pairwise": [], "blondel": [], "fair_floor": []}
         unc = {"pairwise": [], "blondel": []}
         yte_ref = None
         for sd in seeds:
@@ -107,24 +110,40 @@ def main():
                     states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
                     length_normalise=ln, seed=sd, loss=loss), dtype=float)
                 prr[loss].append(results.prr(yte, u)); unc[loss].append(u)
-            floor = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te_idx])
-            prr["msp_sum"].append(results.prr(yte, floor))
+            # FAIR FLOOR (fixed 2026-07-22): the honest unsupervised bar is the BEST of the three
+            # standard floors, not the bare non-length-normalised `sum`. Comparing against `sum` alone
+            # overstates every win -- e.g. pubmed_qa sum=+0.202 but min=+0.371, and ASQA sum=+0.148 but
+            # perplexity=+0.316. That is the same artefact that produced and then killed the cnn
+            # headline (STOCKTAKE PART VI/XI). probedriftlong.py has always used all three.
+            _cands = {k: np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], k)
+                                     for i in te_idx], dtype=float)
+                      for k in ("sum", "perplexity", "min")}
+            _best = max(_cands, key=lambda k: results.prr(yte, _cands[k]))
+            floor = _cands[_best]
+            floor_name = _best
+            prr["fair_floor"].append(results.prr(yte, floor))
 
         if yte_ref is None:
             continue
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
         m = {k: (float(np.mean(v)), float(np.std(v))) for k, v in prr.items() if v}
         print(f"\n[{rung:9s}] eval={X} train={srcs}", flush=True)
-        for k in ("pairwise", "blondel", "msp_sum"):
+        for k in ("pairwise", "blondel", "fair_floor"):
             if k in m:
                 print(f"    weighted_msp[{k:8s}] {m[k][0]:+.3f} +/- {m[k][1]:.3f}", flush=True)
         # paired bootstrap: blondel vs pairwise, and each vs the floor
         avg = {k: np.mean(np.stack(unc[k]), axis=0) for k in unc if unc[k]}
-        floor_vec = np.asarray([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum")
-                                for i in np.where(PT[X][1] == "test")[0]], dtype=float)
+        # FAIR FLOOR for the BOOTSTRAP as well. This is a SECOND, INDEPENDENT floor computation from the
+        # per-seed one further up -- fixing only that one moved the reported floor PRR (pubmed 0.202 ->
+        # 0.371) while leaving EVERY verdict still compared against bare msp_sum, byte-identical to before.
+        # Caught only by diffing the new verdicts against the old ones. Both sites must use the fair floor.
+        _te = np.where(PT[X][1] == "test")[0]
+        _fc = {k: np.asarray([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], k)
+                              for i in _te], dtype=float) for k in ("sum", "perplexity", "min")}
+        floor_vec = _fc[max(_fc, key=lambda k: results.prr(yte_ref, _fc[k]))]
         for tag, a, b, av, bv in [("blondel_vs_pairwise", "blondel", "pairwise", avg.get("blondel"), avg.get("pairwise")),
-                                  ("blondel_vs_floor", "blondel", "msp_sum", avg.get("blondel"), floor_vec),
-                                  ("pairwise_vs_floor", "pairwise", "msp_sum", avg.get("pairwise"), floor_vec)]:
+                                  ("blondel_vs_floor", "blondel", "fair_floor", avg.get("blondel"), floor_vec),
+                                  ("pairwise_vs_floor", "pairwise", "fair_floor", avg.get("pairwise"), floor_vec)]:
             if av is not None and bv is not None:
                 mg, lo, hi, p, sig = paired_bootstrap(yte_ref, av, bv)
                 print(f"    [verdict] {tag:20s} margin {mg:+.3f} CI[{lo:+.3f},{hi:+.3f}] p={p:.3f} "
@@ -132,7 +151,7 @@ def main():
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{tag}",
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": sig})
-        for k in ("pairwise", "blondel", "msp_sum"):
+        for k in ("pairwise", "blondel", "fair_floor"):
             if k in m:
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"weighted_msp_{k}",
                                  "prr_mean": round(m[k][0], 4), "prr_std": round(m[k][1], 4),

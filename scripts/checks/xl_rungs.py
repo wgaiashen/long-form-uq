@@ -9,26 +9,38 @@ of them for ID+OOD just by listing them in its evals.
 Two per-target properties the ladders must respect:
   * LABEL (`label_of`): the correctness-world datasets use `correctness`; ExpertQA uses `faithfulness`
     (correctness-vs-gold was tested and rejected — its gold differs too much from the generation). So an ExpertQA
-    OOD rung (correctness-world sources -> faithfulness eval) is CROSS-LABEL — a documented factuality<->
-    faithfulness axis (`cross_label`), not a bug. ExpertQA is therefore EVAL-ONLY (never a training source: its
-    faithfulness label must not leak into a correctness training pool).
+    OOD rung (correctness-world sources -> faithfulness eval) is flagged `different_label_projection`: the
+    target is scored on CLAIM PRECISION while the pool was trained on REFERENCE AGREEMENT (see that
+    function's docstring -- the old "factuality vs faithfulness" framing was wrong).
+    UPDATE 2026-07-22 (author's decision): ExpertQA and ASQA are ORDINARY TRAINING SOURCES, not eval-only,
+    so pools are MIXED-LABEL by default and the flag is how those cells stay identifiable.
   * EVAL SPLIT (`eval_split`): the XL sets are split-less (ExpertQA all-`test`; med_quad/samsum all-`train`), so
     the eval target's held-out test set is CARVED here (fixed & deterministic), NOT baked into `load_per_token`.
     This keeps med_quad/samsum's use as TRAINING SOURCES = all their rows (so the core-5 rungs don't move).
 """
+import os
+
 import numpy as np
 
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrift's faithful rung spec)
 
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
-ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
+ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
 FINE = {"sciq": "short_qa", "trivia_qa": "short_qa", "pubmed_qa": "long_qa", "med_quad": "long_qa",
-        "expertqa": "long_qa", "xsum": "summ", "samsum": "summ", "cnn_dailymail": "summ"}
+        "expertqa": "long_qa", "asqa": "long_qa", "xsum": "summ", "samsum": "summ", "cnn_dailymail": "summ"}
 BROAD = {"short_qa": "qa", "long_qa": "qa", "summ": "summ"}
 
 KEYSTONES = {"sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"}   # -> get_training_spec (faithful)
-XL_EVALS = {"med_quad", "samsum", "expertqa"}                            # -> rung_sources (taxonomy)
-SOURCE_POOL = [d for d in ALL if d != "expertqa"]                        # ExpertQA is eval-only (see LABEL note)
+XL_EVALS = {"med_quad", "samsum", "expertqa", "asqa"}                    # -> rung_sources (taxonomy)
+# TRAINING SOURCE POOL = every dataset (author's decision 2026-07-22): ASQA and ExpertQA are treated the
+# SAME as the rest, not eval-only. Consequence to keep visible: ExpertQA carries a FAITHFULNESS label while
+# the others carry correctness, so pools that include it are MIXED-LABEL. That is deliberate -- what used to
+# be the separate `--include-expertqa` "universal" variant is now the default. Every affected cell is still
+# tagged `different_label_projection` in the CSVs, so mixed-label cells remain identifiable during analysis.
+# NOTE: this enlarges the training pool for all 10 drivers importing this module, so results computed under
+# it are NOT comparable to the pre-2026-07-22 committed numbers -- new runs write to NEW files and the
+# earlier baseline is preserved at results/_baseline_preasqa_2026-07-22/.
+SOURCE_POOL = list(ALL)
 
 SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OUT"),
             ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
@@ -37,7 +49,22 @@ XL_TEST_FRAC = 0.30      # held-out test carved from a split-less XL eval target
 
 
 # ---- per-target label ----------------------------------------------------------------------------
-_LABEL_OF = {"expertqa": "faithfulness"}
+# ExpertQA ships TWO independently-computed judge labels, and which one we score on is a real research
+# choice, so it is switchable from the environment (no per-driver flag needed -- every driver that calls
+# label_of() picks it up):
+#   faithfulness (default) -- SUPPORTED/(SUPPORTED+CONTRADICTED) over the claims the expert reference can
+#                             adjudicate. Judge-knowledge-independent, but only covers ~44% of the answer's
+#                             claims and is NULL for 292/2016 rows (all-claims-uncovered).
+#   consistency             -- the WHOLE-ANSWER judge (~0 blind spot): 2016/2016 rows labelled, harsher
+#                             (mean 0.529 vs 0.678), correlates r=0.72 / rho=0.73 with faithfulness, and is
+#                             NOT more length-biased (-0.205 vs -0.227), which was the standing objection.
+# Running both and comparing is the point: if the method ranking is stable across two independent label
+# definitions that is genuine robustness; if it flips, that is itself the finding.
+#     LUQ_EXPERTQA_LABEL=consistency python scripts/checks/<driver>.py ...
+_EXPERTQA_LABEL = os.environ.get("LUQ_EXPERTQA_LABEL", "faithfulness")
+if _EXPERTQA_LABEL not in ("faithfulness", "consistency"):
+    raise SystemExit(f"LUQ_EXPERTQA_LABEL must be faithfulness|consistency, got {_EXPERTQA_LABEL!r}")
+_LABEL_OF = {"expertqa": _EXPERTQA_LABEL}
 
 
 def label_of(dataset):
@@ -45,8 +72,23 @@ def label_of(dataset):
     return _LABEL_OF.get(dataset, "correctness")
 
 
-def cross_label(eval_dataset):
-    """True if the eval target's label differs from the correctness-world training sources (only ExpertQA)."""
+def different_label_projection(eval_dataset):
+    """True if this eval target's label measures a DIFFERENT PROJECTION of "good" than the training sources.
+
+    Renamed from `cross_label` (2026-07-22) because that name implied the old factuality-vs-faithfulness
+    story, which reading the three judge prompts showed to be wrong. The real distinction:
+
+      * QA judge (sciq/trivia/pubmed/med_quad) and SUMMARISATION judge (xsum/cnn/samsum) both score
+        REFERENCE AGREEMENT -- how much the output matches the gold answer / gold summary. Both penalise
+        incompleteness. (Note this means our summarisation label is NOT faithfulness-to-source: the article
+        is in the judge's context but the criterion is match-to-gold-summary.)
+      * ExpertQA scores CLAIM PRECISION -- SUPPORTED/(SUPPORTED+CONTRADICTED) -- and is explicitly
+        instructed NOT to reward similarity to the reference and NOT to penalise being less complete.
+
+    So the flag marks "the target is scored on a different projection than the pool was trained on", which
+    is the thing that actually matters when pooling. Extra caveats for ExpertQA specifically: its label is
+    blind to ~56% of the answer's claims (mean `uncovered`) and is absent on 14.5% of rows. See PART X.
+    """
     return label_of(eval_dataset) != "correctness"
 
 

@@ -73,7 +73,10 @@ def main():
     print(f"device {device} | seeds {seeds} | SAR granularity auto (token short / sentence long)", flush=True)
 
     PT, MASKS, TSAR = {}, {}, {}
-    for d in args.sources.split(","):
+    # Load EVAL TARGETS as well as sources: loading only --sources means an eval target absent from that
+    # list is never loaded, yielding zero cells while still exiting 0 (the canonical_ladder/asqa silent
+    # failure). Harmless when evals are already a subset. (2026-07-23)
+    for d in sorted(set(args.sources.split(",")) | set(globals().get("EVALS", []))):
         loaded = load_per_token(MODEL, d, LAYER, LAB)
         if loaded is None:
             continue
@@ -128,8 +131,9 @@ def main():
             continue
         _, te = xl_rungs.eval_split(PT[X][1])          # XL-aware test indices (baked core / carved XL)
         yte = PT[X][2][te]
-        floor = results.prr(yte, np.asarray(
-            [msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum") for i in te], dtype=float))
+        # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum.
+        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te], yte, results.prr)
+        floor = results.prr(yte, _fv)
         tsar_prr = results.prr(yte, TSAR[X][te])            # pure TokenSAR scalar (unsupervised)
         mg, lo, hi, p, sig = paired_bootstrap(yte, us, ub)  # +SAR vs no-mask
         d = sar_prr - base

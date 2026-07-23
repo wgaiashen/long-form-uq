@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=14:00:00
+#PBS -N luq_eqaL
+#PBS -j oe
+# DUAL-LABEL ExpertQA: re-score the ExpertQA cells under the OTHER judge label, so the method ranking can
+# be checked against two independently-computed targets. LUQ_EXPERTQA_LABEL selects the label; output is
+# suffixed with it so nothing is overwritten (additive, per the author's instruction).
+#   faithfulness = covered-claims ratio (~44% of claims visible, null on 292/2016 rows)
+#   consistency  = whole-answer judge (full 2016/2016 coverage, harsher, r=0.72 with faithfulness)
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_EXPERTQA_LABEL="${LUQ_EXPERTQA_LABEL:?set LUQ_EXPERTQA_LABEL=faithfulness|consistency}"
+L="$LUQ_EXPERTQA_LABEL"
+echo "=== ExpertQA dual-label ladder | label=$L | $(hostname) $(date) ===" >&2
+# long-only ladder
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals expertqa \
+  --out "results/probedriftlong_expertqa__label_${L}__meta-llama_Meta-Llama-3.1-8B.csv"
+# standard (mixed short+long) ladder
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals expertqa \
+  --out "results/contribution_ladder_expertqa__label_${L}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

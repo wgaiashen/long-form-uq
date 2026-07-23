@@ -8,7 +8,7 @@ paired_bootstrap) -- the ONLY change is we also run weighted-MSP with masks= res
 important tokens. For each ladder cell we report, mean+/-std over seeds:
   weighted_msp_pairwise            (unmasked -- the baseline being beaten)
   weighted_msp_pairwise_orgad      (masked to important tokens -- the method)
-  msp_sum                          (the unsupervised floor both must clear)
+  fair_floor   max(msp_sum, perplexity, msp_min) -- the honest unsupervised floor
 plus paired bootstraps (orgad vs unmasked, and each vs floor). Task-adaptive locate: QA exact answer
 (str) or summary key spans (list). Mask fallback when nothing is located = ALL tokens (so an unlocated
 row is just plain weighted-MSP -- matches build_answer_masks). CPU only. Needs cache/orgad_llm/*.json.
@@ -34,14 +34,15 @@ from luq import cache, msp, results, weighted_msp  # noqa: E402
 from luq.features import orgad_llm  # noqa: E402
 from aggregation_table import load_per_token, paired_bootstrap  # noqa: E402
 import xl_rungs  # noqa: E402  (shared organic-ProbeDriftXL rung machinery)
-from xl_rungs import label_of, cross_label  # noqa: E402
+from xl_rungs import label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 LAYER = 15
 # Organic ProbeDriftXL evals: core QA/summ + the XL long-form targets (med_quad/samsum/ExpertQA). ExpertQA
 # gets the broad-Orgad row here (with --orgad-variant broad) -- the fair long-form-QA Orgad test.
-EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
+EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa",
+         "asqa"]
 CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum"]
 SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"), ("LOO", "OOD_LEAVE_ONE_OUT"),
             ("OneDatasetDiffTask", "OOD_ONE_DATASET_DIFF_TASK"), ("DiffTask", "OOD_DIFF_TASK")]
@@ -55,7 +56,19 @@ def build_masks(tok, records, variant="exact", floor=0.0):
     d = records[0].get("_dataset")  # set by caller
     suffix = "__broad" if variant == "broad" else ""
     ex_path = ROOT / "cache" / "orgad_llm" / f"{cache._slug(MODEL)}__{d}__ID{suffix}.json"
-    ex = json.loads(ex_path.read_text()) if ex_path.exists() else {}
+    # FAIL LOUD on a MISSING variant cache. Previously this silently became `ex = {}`, so every record read
+    # "NO ANSWER", every mask fell back to all-ones (uniform), and the "Orgad" row was in fact the UNMASKED
+    # method -- an exact no-op that still emitted rows and looked like "Orgad ~= unmasked, no harm done".
+    # That contaminated the committed broad_tau CSVs: of {pubmed_qa, sciq, trivia_qa, xsum} only pubmed_qa
+    # has a __broad.json, so 3 of the 4 evals were silently unmasked and dragged the average margin to ~0.
+    # A missing cache is a CONFIG error (run 01o_orgad_llm_extract.py first) and must never be a quiet null.
+    if not ex_path.exists():
+        raise FileNotFoundError(
+            f"no Orgad extraction cache for dataset={d} variant={variant} at {ex_path}. "
+            f"Run: python scripts/01o_orgad_llm_extract.py --dataset {d}"
+            + (f" --variant broad" if variant == "broad" else "")
+            + "  (costs gpt-5-mini API credit). Refusing to emit a silently-uniform 'Orgad' row.")
+    ex = json.loads(ex_path.read_text())
     masks, located = [], np.zeros(len(records), bool)
     for i, r in enumerate(records):
         g = len(r["gen_token_ids"])
@@ -115,7 +128,13 @@ def main():
             split = split[keep_i]; y = np.asarray(y)[keep_i]
         for r in records:
             r["_dataset"] = d
-        masks, located = build_masks(tok, records, variant=args.orgad_variant, floor=args.orgad_floor)
+        try:
+            masks, located = build_masks(tok, records, variant=args.orgad_variant, floor=args.orgad_floor)
+        except FileNotFoundError as e:
+            # Skip this eval entirely rather than emit a fake (silently-uniform) Orgad row. One missing
+            # cache must not kill the whole multi-eval run, but it must never become a quiet result either.
+            print(f"  {d}: SKIPPED -- {e}", flush=True)
+            continue
         PT[d] = (states, split, y, records)
         MASKS[d] = masks
         # leak re-check: does "located" still track correctness? (the gold-mask bug was 99% vs 0.2%)
@@ -132,7 +151,7 @@ def main():
     for rung, X, spec in cells(sources):
         if X not in PT:
             continue
-        prr = {"unmasked": [], "orgad": [], "msp_sum": []}
+        prr = {"unmasked": [], "orgad": [], "fair_floor": []}
         unc = {"unmasked": [], "orgad": []}
         yte_ref = None
         for sd in seeds:
@@ -153,21 +172,36 @@ def main():
                     states, records, y, tr_idx, te_idx, device, weight_mode="normalised",
                     length_normalise=True, seed=sd, loss="pairwise", masks=use_mask), dtype=float)
                 prr[tag].append(results.prr(yte, u)); unc[tag].append(u)
-            floor = np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te_idx])
-            prr["msp_sum"].append(results.prr(yte, floor))
+            # FAIR FLOOR (fixed 2026-07-22): the honest unsupervised bar is the BEST of the three
+            # standard floors, not the bare non-length-normalised `sum`. Comparing against `sum` alone
+            # overstates every win -- e.g. pubmed_qa sum=+0.202 but min=+0.371, and ASQA sum=+0.148 but
+            # perplexity=+0.316. That is the same artefact that produced and then killed the cnn
+            # headline (STOCKTAKE PART VI/XI). probedriftlong.py has always used all three.
+            _cands = {k: np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], k)
+                                     for i in te_idx], dtype=float)
+                      for k in ("sum", "perplexity", "min")}
+            _best = max(_cands, key=lambda k: results.prr(yte, _cands[k]))
+            floor = _cands[_best]
+            floor_name = _best
+            prr["fair_floor"].append(results.prr(yte, floor))
 
         if yte_ref is None:
             continue
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
         m = {k: (float(np.mean(v)), float(np.std(v))) for k, v in prr.items() if v}
         print(f"\n[{rung:18s}] eval={X} train={srcs}", flush=True)
-        for k in ("unmasked", "orgad", "msp_sum"):
+        for k in ("unmasked", "orgad", "fair_floor"):
             if k in m:
                 print(f"    {k:10s} {m[k][0]:+.3f} +/- {m[k][1]:.3f}", flush=True)
         avg = {k: np.mean(np.stack(unc[k]), axis=0) for k in unc if unc[k]}
         _, X_te = xl_rungs.eval_split(PT[X][1])       # XL-aware test indices (baked core / carved XL)
-        floor_vec = np.asarray([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum")
-                                for i in X_te], dtype=float)
+        # FAIR FLOOR for the BOOTSTRAP as well. This is a SECOND, INDEPENDENT floor computation from the
+        # per-seed one further up -- fixing only that one moved the reported floor PRR (pubmed 0.202 ->
+        # 0.371) while leaving EVERY verdict still compared against bare msp_sum, byte-identical to before.
+        # Caught only by diffing the new verdicts against the old ones. Both sites must use the fair floor.
+        _fc = {k: np.asarray([msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], k)
+                              for i in X_te], dtype=float) for k in ("sum", "perplexity", "min")}
+        floor_vec = _fc[max(_fc, key=lambda k: results.prr(yte_ref, _fc[k]))]
         for tag, av, bv in [("orgad_vs_unmasked", avg.get("orgad"), avg.get("unmasked")),
                             ("orgad_vs_floor", avg.get("orgad"), floor_vec),
                             ("unmasked_vs_floor", avg.get("unmasked"), floor_vec)]:
@@ -178,7 +212,7 @@ def main():
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{tag}",
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": sig})
-        for k in ("unmasked", "orgad", "msp_sum"):
+        for k in ("unmasked", "orgad", "fair_floor"):
             if k in m:
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"weighted_msp_{k}",
                                  "prr_mean": round(m[k][0], 4), "prr_std": round(m[k][1], 4),

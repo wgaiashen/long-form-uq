@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_segagg
+#PBS -j oe
+# W-B1: decompose-and-aggregate on the long-form ladder. Per-sentence SAPLMA probe, then mean / min /
+# geomean / LEARNED power-mean aggregation (alpha fitted on TRAIN only). The learned family CONTAINS the
+# fixed rules (alpha 1=mean, 0=geomean, -inf=min), and the fitted alpha is itself the deliverable: it says
+# where a task sits on the dilution <-> weakest-link axis. EVAL=<dataset> parallelises the ladder.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+D="${EVAL:-}"
+if [ -n "$D" ]; then
+  ARGS="--evals $D --out results/seg_aggregate_ladder_${D}__meta-llama_Meta-Llama-3.1-8B.csv"
+else ARGS=""; fi
+echo "=== seg_aggregate_ladder $ARGS on $(hostname) $(date) ===" >&2
+python -u scripts/checks/seg_aggregate_ladder.py --seeds 1,2,3 $ARGS
+echo "=== done $(date) ===" >&2

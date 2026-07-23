@@ -5,9 +5,12 @@ short-form is removed). This driver removes that crutch by construction and asks
 long-only setting, does weighted-MSP / shrink overtake the probes, measured against the HONEST fair floor
 (max of msp_sum, perplexity, msp_min)?
 
-LONG UNIVERSE (correctness-labelled + cached): pubmed_qa, xsum, cnn_dailymail, med_quad, samsum.
-  ExpertQA is EVAL-ONLY (faithfulness label -> cross-label OOD, never a training source).
-  FINE families: long_qa = {pubmed_qa, med_quad, expertqa};  summ = {xsum, cnn_dailymail, samsum}.
+LONG UNIVERSE: pubmed_qa, xsum, cnn_dailymail, med_quad, samsum, expertqa, asqa.
+  UPDATE 2026-07-22 (author's decision): ExpertQA and ASQA are ORDINARY TRAINING SOURCES, so the long pool
+  is MIXED-LABEL by default (ExpertQA = claim-precision, the rest = reference-agreement). Cells are tagged
+  `different_label_projection`. `--label-homogeneous` drops ExpertQA from the sources to reproduce the
+  pre-2026-07-22 baseline as the control.
+  FINE families: long_qa = {pubmed_qa, med_quad, expertqa, asqa};  summ = {xsum, cnn_dailymail, samsum}.
 
 RUNGS (long eval X): ID | SameTask-long (other long sets in X's family) | LOO-long (all other long sets)
   | DiffTask-long (opposite long family) | 1ds-Diff-long (one opposite-family long set).
@@ -28,24 +31,40 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src")); sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 from luq import cache, msp, results, weighted_msp, probe  # noqa: E402
+from luq.features import sar  # noqa: E402  (shared sentence splitter)
+from transformers import AutoTokenizer  # noqa: E402
 from luq.weighting import shrink_to_uniform  # noqa: E402
 from aggregation_table import load_per_token, attn_unc, paired_bootstrap, conf_meanpool, prr_from_conf  # noqa: E402
 from attn_pool import train_attn, select_temperature  # noqa: E402
-from xl_rungs import build_rows, eval_split, label_of, cross_label  # noqa: E402
+from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
-LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
-LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum"]   # expertqa eval-only
+LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
+# Training sources for the long-only ladder. ASQA and ExpertQA are ordinary sources here, same as the rest
+# (author's decision 2026-07-22) -- so the long pool is MIXED-LABEL by default (ExpertQA = faithfulness,
+# the others = correctness). Cells are still tagged `different_label_projection` so they stay identifiable. A dataset is
+# always excluded from its OWN eval's sources by cells_long(), so this never leaks train into test.
+LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
 SHORT = ["sciq", "trivia_qa"]
-FINE = {"pubmed_qa": "long_qa", "med_quad": "long_qa", "expertqa": "long_qa",
+FINE = {"pubmed_qa": "long_qa", "med_quad": "long_qa", "expertqa": "long_qa", "asqa": "long_qa",
         "xsum": "summ", "cnn_dailymail": "summ", "samsum": "summ"}
 XL_TOTAL = 1800
 EVALS = LONG + SHORT
 # wMSP KEEP variants: (col name, kwargs to weighted_msp_unc)  [all length_normalise=True]
 WMSP = [("wmsp_norm", {"weight_mode": "normalised"}),
+        # per-segment (sentence) wMSP -- FIRST run under ProbeDriftLong (Joe #7; was standard-ladder
+        # only). `_seg_ids` is a sentinel: the loop replaces it with this cell's sentence ids.
+        ("wmsp_seg_flat", {"weight_mode": "normalised", "segment_ids": "_seg_ids"}),
+        ("wmsp_seg_softmax", {"weight_mode": "normalised", "segment_ids": "_seg_ids",
+                              "segment_mode": "softmax"}),
         ("wmsp_shrink2", {"weight_mode": "normalised", "reg": shrink_to_uniform, "reg_lambda": 2.0}),
         ("wmsp_shrink10", {"weight_mode": "normalised", "reg": shrink_to_uniform, "reg_lambda": 10.0}),
-        ("wmsp_blondel", {"weight_mode": "normalised", "loss": "blondel"})]
+        ("wmsp_blondel", {"weight_mode": "normalised", "loss": "blondel"}),
+        # W2: Blondel loss on the KEEP shrink variants -> paired loss-only comparison vs wmsp_shrink2/10 above.
+        ("wmsp_shrink2_blondel", {"weight_mode": "normalised", "reg": shrink_to_uniform,
+                                  "reg_lambda": 2.0, "loss": "blondel"}),
+        ("wmsp_shrink10_blondel", {"weight_mode": "normalised", "reg": shrink_to_uniform,
+                                   "reg_lambda": 10.0, "loss": "blondel"})]
 POOLERS = ["uniform", "attention"]
 FLOORS = ["floor_sum", "floor_ppl", "floor_min"]
 METHODS = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in WMSP]
@@ -95,20 +114,28 @@ def main():
     ap.add_argument("--evals", default=",".join(EVALS))
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--include-expertqa", action="store_true",
-                    help="add ExpertQA (faithfulness label) as a TRAINING source -> the UNIVERSAL mixed-label "
-                         "ProbeDriftLong (train pool spans QA + summarisation + factuality). Default off keeps the "
-                         "label-homogeneous baseline. When on, ExpertQA is still excluded from its OWN eval's sources.")
+                    help="DEPRECATED / no-op as of 2026-07-22: ExpertQA is now an ordinary training source by "
+                         "default, so the mixed-label 'universal' pool IS the default. Kept so existing job "
+                         "scripts keep working.")
+    ap.add_argument("--label-homogeneous", action="store_true",
+                    help="drop ExpertQA (faithfulness) from the TRAINING sources so every training label is "
+                         "correctness. This reproduces the pre-2026-07-22 committed PART VII baseline and is "
+                         "the control for 'does mixing label semantics help or hurt?'. ExpertQA remains an EVAL.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     global LONG_SRC
-    if args.include_expertqa and "expertqa" not in LONG_SRC:
-        LONG_SRC = LONG_SRC + ["expertqa"]
-        print("UNIVERSAL mode: ExpertQA (faithfulness) added as a training source -> mixed-label long pool", flush=True)
+    if args.label_homogeneous:
+        LONG_SRC = [d for d in LONG_SRC if d != "expertqa"]
+        print("LABEL-HOMOGENEOUS mode: ExpertQA removed from training sources (correctness labels only)",
+              flush=True)
+    else:
+        print("default MIXED-LABEL pool: ExpertQA (faithfulness) is an ordinary training source", flush=True)
     evals = args.evals.split(","); seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device {device} | seeds {seeds} | evals {evals}", flush=True)
 
-    PT = {}
+    tok = AutoTokenizer.from_pretrained(MODEL)
+    PT, SEG = {}, {}
     for d in sorted(set(LONG_SRC) | set(evals)):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
@@ -121,7 +148,16 @@ def main():
             keep = np.where(finite)[0]
             states = [states[k] for k in keep]; records = [records[k] for k in keep]
             split = split[keep]; y = y[keep]
-        PT[d] = (states, split, y, records)
+        segs = []
+        for r, st in zip(records, states):
+            sid, _ = sar._token_sentence_ids(tok, list(r['gen_token_ids']),
+                                             r.get('gen_text') or tok.decode(r['gen_token_ids'], skip_special_tokens=True))
+            sid = np.asarray(sid, dtype=np.int64)
+            g = int(np.asarray(st).shape[0])   # per-token window is G+1; wMSP uses answer_states (G) -> ids length G
+            if len(sid) == g:                  # already G (state has the +1 anchor); trim to answer tokens
+                sid = sid
+            segs.append(sid)
+        PT[d] = (states, split, y, records); SEG[d] = segs
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
@@ -132,7 +168,7 @@ def main():
         _, X_te = eval_split(PT[X][1])
         if len(X_te) == 0:
             continue
-        xlbl = cross_label(X)
+        xlbl = different_label_projection(X)
         per = {m: [] for m in METHODS}; unc_acc = {m: [] for m in METHODS}; yte_ref = None
         for sd in seeds:
             train_rows, test_rows = build_rows(X, spec, PT, sd, sampled_train_idx)
@@ -158,9 +194,13 @@ def main():
             v["attention"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T),
                                                  states, te_idx, device), float)
             # wMSP KEEP variants
+            seg_cell = [SEG[d][i] for d, i in allrows]
             for name, kw in WMSP:
+                kw2 = dict(kw)
+                if kw2.get('segment_ids') == '_seg_ids':
+                    kw2['segment_ids'] = seg_cell
                 v[name] = np.asarray(weighted_msp.weighted_msp_unc(states, records, y, tr_idx, te_idx, device,
-                                     length_normalise=True, seed=sd, **kw), float)
+                                     length_normalise=True, seed=sd, **kw2), float)
             for m in v:
                 per[m].append(results.prr(yte, v[m])); unc_acc[m].append(v[m])
         if yte_ref is None:
@@ -180,7 +220,7 @@ def main():
                 print(f"    {m:14s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
-                                 "n_seeds": len(per[m]), "cross_label": bool(xlbl and rung != "ID")})
+                                 "n_seeds": len(per[m]), "different_label_projection": bool(xlbl and rung != "ID")})
         for vk, a, b in [("bestw_vs_fairfloor", best_w, "fair_floor"),
                          ("bestw_vs_bestpooler", best_w, best_p),
                          ("attention_vs_fairfloor", "attention", "fair_floor")]:
@@ -194,7 +234,7 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"probedriftlong__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "cross_label", "ci_lo", "ci_hi", "boot_p", "significant"])
+                                           "n_seeds", "different_label_projection", "ci_lo", "ci_hi", "boot_p", "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

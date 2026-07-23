@@ -67,9 +67,19 @@ def saplma_unc(Xtr, ytr, Xte, seeds):
     return accum / len(seeds)
 
 
-def floor_unc(recs_te):
-    """MSP floor: -log p(sequence) from the cached token_logprobs; higher = more uncertain."""
-    return np.array([msp.msp_uncertainty(r["token_logprobs"], "sum") for r in recs_te], dtype=float)
+def floor_unc(recs_te, y_te=None):
+    """The unsupervised floor from the cached token_logprobs; higher = more uncertain.
+
+    With `y_te` this returns the FAIR floor -- the best-scoring of {msp_sum, perplexity, msp_min} -- because
+    bare msp_sum is not length-normalised and is the WEAKEST of the three on all 9 datasets, so comparing a
+    probe against it overstates every margin (2026-07-22). Without labels it cannot choose, so it falls back
+    to msp_sum and says so rather than pretending the bar is honest."""
+    if y_te is None:
+        print("  WARNING: floor_unc called without labels -> falling back to bare msp_sum (NOT the fair floor)",
+              flush=True)
+        return np.array([msp.msp_uncertainty(r["token_logprobs"], "sum") for r in recs_te], dtype=float)
+    vec, _name = msp.fair_floor(recs_te, y_te, results.prr)
+    return vec
 
 
 def stratified_id_split(clusters, seed, test_frac=0.2):
@@ -117,7 +127,7 @@ def run_label(X, recs, label, seeds, out_rows):
         tr, te = stratified_id_split(cl, sd)
         clf = probe.train_probe_mlp(Xv[tr], yv[tr], seed=sd)
         id_saplma.append(results.prr(yv[te], probe.uncertainty(clf, Xv[te])))
-        id_floor.append(results.prr(yv[te], floor_unc([recs_v[i] for i in te])))
+        id_floor.append(results.prr(yv[te], floor_unc([recs_v[i] for i in te], yv[te])))
     # shuffled-label control: SAPLMA on shuffled y should give PRR ~ 0 (sanity that the pipeline is honest)
     tr, te = stratified_id_split(cl, seeds[0])
     yshuf = yv[tr].copy(); np.random.RandomState(0).shuffle(yshuf)
@@ -139,7 +149,7 @@ def run_label(X, recs, label, seeds, out_rows):
             print(f"  [LOCO {C}] only {len(te)} test rows -> skip", flush=True)
             continue
         s_m, s_sd, s_unc = prr_over_seeds_saplma(Xv, yv, tr, te, seeds)
-        f_unc = floor_unc([recs_v[i] for i in te])
+        f_unc = floor_unc([recs_v[i] for i in te], yv[te])
         f_prr = results.prr(yv[te], f_unc)
         mg, lo, hi, p, sig = paired_bootstrap(yv[te], s_unc, f_unc)   # SAPLMA vs floor, per cluster
         loco_s.append(s_m); loco_f.append(f_prr)

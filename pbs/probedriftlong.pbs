@@ -1,5 +1,7 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
 #PBS -l walltime=16:00:00
 #PBS -N luq_pdl
 #PBS -j oe

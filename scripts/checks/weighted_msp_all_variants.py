@@ -41,7 +41,8 @@ from xl_rungs import label_of  # noqa: E402
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 # Organic ProbeDriftXL: the 5 core datasets + the 3 XL long-form eval targets (med_quad/samsum/ExpertQA).
-EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
+EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa",
+         "asqa"]
 CANDIDATES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "med_quad", "samsum", "cnn_dailymail"]
 
 # wMSP-normalised ID anchors (master table) -- a soft sanity check that the wiring is unchanged.
@@ -55,6 +56,13 @@ CONFIGS = [
     ("wMSP-Blondel", {"weight_mode": "normalised", "loss": "blondel"}),
     ("shrink@2", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform, "reg_lambda": 2.0}),
     ("shrink@10", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform, "reg_lambda": 10.0}),
+    # W2: the Blondel differentiable-rank loss applied to the KEEP-and-develop shrink variants (it was
+    # previously wired ONLY for plain `normalised`). Paired against shrink@2 / shrink@10 above, which are
+    # identical except loss="pairwise" -> a clean loss-only comparison.
+    ("shrink@2-blondel", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform,
+                          "reg_lambda": 2.0, "loss": "blondel"}),
+    ("shrink@10-blondel", {"weight_mode": "normalised", "reg": weighting.shrink_to_uniform,
+                           "reg_lambda": 10.0, "loss": "blondel"}),
     ("kl@2", {"weight_mode": "normalised", "reg": weighting.kl_to_uniform, "reg_lambda": 2.0}),
     ("entropy_hinge@2", {"weight_mode": "normalised",
                          "reg": functools.partial(weighting.entropy_hinge, threshold=0.7), "reg_lambda": 2.0}),
@@ -121,8 +129,10 @@ def main():
         if len(te0) == 0:
             print(f"[{rung}/{X}] no test split -> skip", flush=True); continue
         yte = np.array([PT[X][2][i] for i in te0], dtype=float)
-        floor_prr = results.prr(yte, np.array(
-            [msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum") for i in te0]))
+        # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum, which
+        # is the WEAKEST floor on all 9 datasets (cnn: sum -0.085 vs perplexity +0.410).
+        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te0], yte, results.prr)
+        floor_prr = results.prr(yte, _fv)
 
         cfg_prr = {c[0]: [] for c in CONFIGS}
         for sd in seeds:

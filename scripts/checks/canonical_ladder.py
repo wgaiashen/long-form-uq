@@ -101,7 +101,7 @@ def main():
         cl.EVALS = [e for e in args.evals.split(",") if e]
         print(f"eval override -> {cl.EVALS}", flush=True)
     # Table row order: floor, the selected SAPLMA aggregators (canonical order), then the contribution.
-    methods_order = (["msp_sum"] + [SAPLMA_AGG[k] for k in ("meanpool", "lasttoken", "persentence", "pertoken")
+    methods_order = (["msp_sum", "fair_floor"] + [SAPLMA_AGG[k] for k in ("meanpool", "lasttoken", "persentence", "pertoken")
                                     if k in agg] + ([] if args.skip_contrib else CONTRIB))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(MODEL)
@@ -110,7 +110,10 @@ def main():
 
     # Per-token states + records for every source whose cache exists and is labelled (tolerant).
     PT = {}
-    for d in args.sources.split(","):
+    # Load the EVAL TARGETS as well as the sources. This driver previously loaded ONLY --sources, so an
+    # eval target absent from that list was never loaded, produced zero cells, and still exited 0 with a
+    # header-only CSV (exactly how the asqa run silently wrote 0 rows). Fixed 2026-07-23.
+    for d in sorted(set(args.sources.split(",")) | set(cl.EVALS)):
         loaded = load_per_token(MODEL, d, args.layer, LAB)
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True)
@@ -128,6 +131,9 @@ def main():
         if X not in PT:
             continue
         per_method = {m: [] for m in methods_order}
+        floor_which = []   # which floor aggregate won per seed. Deliberately NOT in per_method:
+                           # that dict is np.mean'd wholesale, so a string entry there crashes the
+                           # run (it did: UFuncNoLoopError on dtype <U10). Provenance, not a PRR.
         for sd in seeds:
             # XL-aware row assembly (same as contribution_ladder): eval_split gives the eval target's
             # FIXED test set -- baked split for keystones, deterministic seed=0 carve for the split-less XL
@@ -178,6 +184,12 @@ def main():
             # plain-MSP floor (unsupervised; identical across seeds, computed per cell for the table).
             per_method["msp_sum"].append(results.prr(yte, np.array(
                 [msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te_idx])))
+            # `msp_sum` is honestly named, so it STAYS as-is; we ADD the other two standard floors and the
+            # fair floor, because msp_sum is the WEAKEST of the three on all 9 datasets and every
+            # `beats_floor` flag below was therefore computed against too low a bar (2026-07-22).
+            _fv, _fname = msp.fair_floor([records[i] for i in te_idx], yte, results.prr)
+            per_method["fair_floor"].append(results.prr(yte, _fv))
+            floor_which.append(_fname)
             print(f"    [{rung}/{X}] seed {sd} done", flush=True)
 
         stats = {m: (float(np.mean(v)), float(np.std(v))) for m, v in per_method.items() if v}
@@ -221,6 +233,12 @@ def main():
                           f"(|d|={d:.3f})", flush=True)
 
     out = Path(args.out)
+    # FAIL LOUD on an empty result. A header-only CSV exiting 0 is indistinguishable from a real
+    # run until someone opens it -- which is how the asqa run looked successful while loading no
+    # eval target at all. An empty grid is a CONFIG error, not a result. (2026-07-23)
+    if not out_rows:
+        raise SystemExit(f"ABORT: no cells produced for evals={cl.EVALS}. Nothing was written. "
+                         f"Check the eval target has a per-token cache and a usable label.")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["eval", "rung", "train", "method", "prr_mean", "prr_std",
                                            "beats_floor", "n_seeds"])

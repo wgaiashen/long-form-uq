@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=20:00:00
+#PBS -N luq_asqafill
+#PBS -j oe
+# Fill ASQA on the STANDARD ProbeDrift(XL) ladder -- it had only 7 methods vs 20+ for every other eval.
+# DRIVER=all_variants -> the 11 wMSP variants; DRIVER=canonical -> the SAPLMA aggregation family.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+case "${DRIVER:?set DRIVER}" in
+  all_variants) python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3 --evals asqa \
+                  --out results/weighted_msp_all_variants_asqa__meta-llama_Meta-Llama-3.1-8B.csv ;;
+  canonical)    python -u scripts/checks/canonical_ladder.py --seeds 1,2,3 --evals asqa \
+                  --out results/canonical_ladder_asqa__meta-llama_Meta-Llama-3.1-8B.csv ;;
+esac
+echo "=== done $(date) ===" >&2

@@ -59,6 +59,11 @@ def main():
     perpl = np.array([msp.msp_uncertainty(records[i]["token_logprobs"], "perplexity") for i in te_idx])
     prr_floor_sum = results.prr(yte, msp_sum)
     prr_floor_ppl = results.prr(yte, perpl)
+    # the honest bar is the best of the three (msp_min was missing here); report which one won.
+    _fv, _fname = msp.fair_floor([records[i] for i in te_idx], yte, results.prr)
+    prr_floor_fair = results.prr(yte, _fv)
+    print(f"  fair_floor = {_fname} {prr_floor_fair:+.3f}  (sum {prr_floor_sum:+.3f}, ppl {prr_floor_ppl:+.3f})",
+          flush=True)
 
     # weighted-MSP, two losses, over the seeds.
     prr = {"weighted_msp_norm_pairwise": [], "weighted_msp_blondel": []}

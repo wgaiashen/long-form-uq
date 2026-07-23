@@ -229,8 +229,48 @@ def _segment_mean_raw(raw, sid):
     return seg_mean[sid]
 
 
+def _segment_softmax_weights(raw, sid, keep=None):
+    """SENTENCE-level softmax weighting (segment_mode='softmax'), the length-confound-free alternative to
+    `_segment_mean_raw`.
+
+    THE CONFOUND IT FIXES. The flat segment weight (`_segment_mean_raw` + token softmax) gives sentence s a
+    TOTAL weight proportional to len(s) x exp(score_s): softmax is over TOKENS, so a longer sentence with the
+    same learned score gets more total mass. In a project where length is the dominant lever on this family
+    (PART XV), that baked-in length term is a confound.
+
+    THIS instead: one score per sentence (mean of its tokens' raw) -> softmax OVER SENTENCES -> distribute
+    each sentence's mass uniformly across its tokens, length-normalised. So sentence s contributes exactly
+    p_s to the (length-normalised) score regardless of how many tokens it has.
+
+        seg_mean_s = mean_{t in s} raw_t ;  p = softmax(seg_mean) over the S sentences (sums to 1)
+        w_t = p_s / len(s) * n            (so sum_t w_t = n -> average 1, same convention as the token path)
+
+    TWO exact reduction limits (unit-tested):
+      * ONE sentence (whole response)      -> p=[1], w_t = 1/n * n = 1  => plain MSP.
+      * EVERY token its own sentence       -> seg_mean = raw, len=1, w = softmax(raw)*n => plain per-token wMSP.
+    Under UNIFORM raw it reduces to the sentence-BALANCED mean NLL (each sentence weighted equally), which is
+    the intended length-free baseline, not plain MSP.
+    """
+    n_seg = int(sid.max().item()) + 1
+    # `keep` (1 on kept tokens, 0 on excluded specials/EOS) makes special tokens contribute NOTHING to the
+    # per-sentence mean, the length count, or the output weight -- the same exclude-special behaviour the flat
+    # path gets from _weights_from_raw's -inf masking. Default (all-ones) = every token kept.
+    if keep is None:
+        keep = torch.ones_like(raw)
+    kraw = raw * keep
+    sums = torch.zeros(n_seg, dtype=raw.dtype, device=raw.device).index_add_(0, sid, kraw)
+    counts = torch.zeros(n_seg, dtype=raw.dtype, device=raw.device).index_add_(0, sid, keep)  # KEPT count/segment
+    seg_mean = sums / torch.clamp(counts, min=1.0)
+    # a sentence with zero kept tokens must not steal softmax mass -> push it to -inf before the softmax.
+    seg_mean = torch.where(counts > 0, seg_mean, torch.full_like(seg_mean, float("-inf")))
+    p = torch.softmax(seg_mean, dim=0)                       # over sentences with >=1 kept token, sums to 1
+    n_kept = keep.sum()
+    w = (p[sid] / torch.clamp(counts[sid], min=1.0)) * n_kept
+    return w * keep                                         # excluded tokens -> weight 0; sum(w) = n_kept
+
+
 def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth_n=0, keep=None,
-           segment_ids=None, return_w=False, smooth_causal=False):
+           segment_ids=None, return_w=False, smooth_causal=False, segment_mode="mean"):
     """One sequence's score q = sum_t w_t * nll_t, divided by length if length_normalise.
 
     `mask` (optional, the Orgad exact-answer overlay): a 0/1 tensor over the G tokens. When given, the
@@ -246,9 +286,14 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth
     Both default to the no-op, so the existing path is unchanged."""
     if smooth_n and smooth_n > 1 and weight_mode != "constant":
         raw = smooth_raw(raw, smooth_n, causal=smooth_causal)   # causal=Joe's literal "previous n tokens"
-    if segment_ids is not None and weight_mode != "constant":
-        raw = _segment_mean_raw(raw, segment_ids)          # one weight per sentence (Joe #7)
-    w = _weights_from_raw(raw, weight_mode, keep=keep)
+    if segment_ids is not None and weight_mode != "constant" and segment_mode == "softmax":
+        # sentence-softmax path produces FINAL avg-1 weights directly (skip _weights_from_raw). It handles
+        # `keep` itself (excludes specials from the per-sentence mean, length count, and output weight).
+        w = _segment_softmax_weights(raw, segment_ids, keep=keep)
+    else:
+        if segment_ids is not None and weight_mode != "constant":
+            raw = _segment_mean_raw(raw, segment_ids)      # one weight per sentence, flat (Joe #7)
+        w = _weights_from_raw(raw, weight_mode, keep=keep)
     wn = w * nll
     if mask is not None:
         wn = wn * mask
@@ -271,7 +316,8 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth
 def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="normalised",
                        length_normalise=True, seed=1, n_epochs=5, batch_size=32, lr=1e-3,
                        loss="pairwise", blondel_eps=0.1, masks=None, smooth_n=0, reg=None, reg_lambda=0.0,
-                       exclude_special=True, keep=None, segment_ids=None, smooth_causal=False):
+                       exclude_special=True, keep=None, segment_ids=None, smooth_causal=False,
+                       segment_mode="mean"):
     """Learn the token weighter by a ranking loss. `y` is correctness (higher = better); the target is
     incorrectness = 1 - y. Returns the trained model (unused for constant mode).
 
@@ -325,14 +371,14 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
                                     mask=(msk[j] if msk is not None else None), smooth_n=smooth_n,
                                     keep=(kep[j] if kep is not None else None),
                                     segment_ids=(seg[j] if seg is not None else None), return_w=True,
-                                    smooth_causal=smooth_causal)
+                                    smooth_causal=smooth_causal, segment_mode=segment_mode)
                     qs.append(qj); ws.append(wj)
                 q = torch.stack(qs)
                 penalty = torch.stack([reg(w) for w in ws]).mean()
             else:
                 q = torch.stack([_seq_q(model(emb[j]), nll[j], weight_mode, length_normalise,
                                         mask=(msk[j] if msk is not None else None), smooth_n=smooth_n,
-                                        keep=(kep[j] if kep is not None else None),
+                                        keep=(kep[j] if kep is not None else None), segment_mode=segment_mode,
                                         segment_ids=(seg[j] if seg is not None else None),
                                         smooth_causal=smooth_causal)
                                  for j in batch])
@@ -352,7 +398,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
 
 def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="normalised",
                          length_normalise=True, masks=None, smooth_n=0, exclude_special=True, keep=None,
-                         segment_ids=None, smooth_causal=False):
+                         segment_ids=None, smooth_causal=False, segment_mode="mean"):
     """Sequence uncertainty q for each example in `idx` (higher = more uncertain). `smooth_n` (P1.1c) can
     smooth the weights at scoring time even for a model trained without it (post-hoc smoothing)."""
     model.eval()
@@ -377,14 +423,15 @@ def predict_weighted_msp(model, states, records, idx, device, *, weight_mode="no
             smask = (torch.from_numpy(np.asarray(segment_ids[i])).long().to(device)
                      if (segment_ids is not None and weight_mode != "constant") else None)
             out[k] = float(_seq_q(raw, nll, weight_mode, length_normalise, mask=m, smooth_n=smooth_n,
-                                  keep=kmask, segment_ids=smask, smooth_causal=smooth_causal).item())
+                                  keep=kmask, segment_ids=smask, smooth_causal=smooth_causal,
+                                  segment_mode=segment_mode).item())
     return out
 
 
 def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode="normalised",
                      length_normalise=True, seed=1, loss="pairwise", blondel_eps=0.1, masks=None,
                      smooth_n=0, reg=None, reg_lambda=0.0, exclude_special=True, keep=None,
-                     segment_ids=None, smooth_causal=False):
+                     segment_ids=None, smooth_causal=False, segment_mode="mean"):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
     (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
     ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
@@ -398,11 +445,13 @@ def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode=
                                length_normalise=length_normalise, seed=seed, loss=loss,
                                blondel_eps=blondel_eps, masks=masks, smooth_n=smooth_n,
                                reg=reg, reg_lambda=reg_lambda, exclude_special=exclude_special, keep=keep,
-                               segment_ids=segment_ids, smooth_causal=smooth_causal)
+                               segment_ids=segment_ids, smooth_causal=smooth_causal,
+                               segment_mode=segment_mode)
     return predict_weighted_msp(model, states, records, te_idx, device,
                                 weight_mode=weight_mode, length_normalise=length_normalise, masks=masks,
                                 smooth_n=smooth_n, exclude_special=exclude_special, keep=keep,
-                                segment_ids=segment_ids, smooth_causal=smooth_causal)
+                                segment_ids=segment_ids, smooth_causal=smooth_causal,
+                                segment_mode=segment_mode)
 
 
 # --------------------------------------------------------------------------------------

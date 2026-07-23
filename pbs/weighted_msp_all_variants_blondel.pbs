@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+# Right-sized 2026-07-22 from MEASURED usage: these drivers run at CPU Percent 99% (single-threaded)
+# and peak ~15.6GB, so the old 8cpu/96gb request just made them wait for a slot they never used.
+#PBS -l walltime=20:00:00
+#PBS -N luq_wmspB
+#PBS -j oe
+# W2 — standard ladder with the Blondel-loss shrink variants ADDED. Writes to its OWN csv so the committed
+# §C table is added to, not replaced. Pools match the committed baseline (asqa is eval-only again), so the
+# overlapping variants double as a reproducibility check on the committed numbers.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== wMSP all-variants +Blondel on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3 \
+  --out results/weighted_msp_all_variants__blondel__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

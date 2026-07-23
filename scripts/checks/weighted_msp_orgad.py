@@ -45,7 +45,10 @@ def main():
     print(f"device {device} | seeds {seeds}", flush=True)
 
     PT, MASKS = {}, {}
-    for d in args.sources.split(","):
+    # Load EVAL TARGETS as well as sources: loading only --sources means an eval target absent from that
+    # list is never loaded, yielding zero cells while still exiting 0 (the canonical_ladder/asqa silent
+    # failure). Harmless when evals are already a subset. (2026-07-23)
+    for d in sorted(set(args.sources.split(",")) | set(globals().get("EVALS", []))):
         loaded = load_per_token(MODEL, d, LAYER, LAB)
         if loaded is None:
             continue
@@ -91,8 +94,9 @@ def main():
             continue
         te = np.where(PT[X][1] == "test")[0]
         yte = PT[X][2][te]
-        floor = results.prr(yte, np.asarray(
-            [msp.msp_uncertainty(PT[X][3][i]["token_logprobs"], "sum") for i in te], dtype=float))
+        # FAIR floor (2026-07-22): best of {msp_sum, perplexity, msp_min}; msp_sum is the weakest on all 9.
+        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te], yte, results.prr)
+        floor = results.prr(yte, _fv)
         mg, lo, hi, p, sig = paired_bootstrap(yte, uo, ub)     # +orgad vs no-mask
         d = org[0] - base[0]
         print(f"{rung:9s} {X:10s} {base[0]:+9.3f} {org[0]:+9.3f} {d:+8.3f} {floor:+7.3f}  "

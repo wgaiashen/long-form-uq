@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_idea2F
+#PBS -j oe
+# W-B2: better UNSUPERVISED ways to decide where to attend, each at TOKEN and SENTENCE granularity.
+# Sources (all FREE from the cached records -- no extraction/GPU/API): nll, nll_inv, pos_lead, pos_tail,
+# content-word mask; plus the existing orgad/sar and the uniform grounding baseline, and --with-pooler so
+# every source is paired against the LEARNED attention pooler on identical splits/seeds/head.
+# Rationale: the learned pooler wins ID but not OOD; an unsupervised weighting cannot overfit the training
+# task, so any source that beats uniform OOD is the contribution.
+# CAVEAT to carry: xsum summaries are frequently ONE sentence, so its *_sent variants degenerate to uniform.
+# Larger source set than before (13 vs 3) -> 24h walltime. Own output file (additive).
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== idea2 FREE unsupervised sources on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 --with-pooler \
+  --out results/idea2_free_sources__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

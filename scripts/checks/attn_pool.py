@@ -57,7 +57,7 @@ VAL_FRAC = 0.2              # validation carved from train for temperature selec
 
 # XL datasets whose per-token cache + records live in a prompt-regime namespace (not the default cache/).
 # This is what lets ExpertQA load through the SAME interface as the core datasets (organic ProbeDriftXL).
-PROMPT_REGIME = {"expertqa": "expertqa_rp12"}
+PROMPT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12"}
 
 
 def load_per_token(model, dataset, layer, label_field="correctness"):

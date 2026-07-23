@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_idea2H
+#PBS -j oe
+# W-B2 HEDGE. The full run (3401725: 13 sources + --with-pooler, per-cell temperature selection) is at 17h
+# against a 24h wall and may be killed with nothing written. This is the same science minus the two
+# expensive parts: only the NEW free sources (no orgad/sar cache lookups) and NO --with-pooler. It still
+# answers the core question -- does any unsupervised weighting beat uniform mean-pooling, and does token vs
+# sentence granularity matter -- just without the learned-pooler reference column.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== idea2 HEDGE (free sources, no pooler) on $(hostname) $(date) ===" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 \
+  --weight-sources "nll__tok,nll__sent,nll_inv__tok,nll_inv__sent,pos_lead__tok,pos_lead__sent,pos_tail__tok,pos_tail__sent,content__tok,content__sent" \
+  --out results/idea2_free_sources_hedge__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2
