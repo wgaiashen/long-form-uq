@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=14:00:00
+#PBS -N luq_idea2P2
+#PBS -j oe
+# ITEM 4: close the unsupervised-vs-LEARNED-pooler gap (the one open W-B2 question, = Joe's steer as posed).
+# 2 evals only (expertqa: pooler strong OOD; cnn: pooler collapses) x 5 free sentence sources x --with-pooler.
+# Driver now writes INCREMENTALLY (per cell), so a wall-kill still leaves a usable partial table.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== idea2 pooler-gap on $(hostname) $(date) ===" >&2
+python -u scripts/checks/idea2_weighted_probe.py --seeds 1,2,3 --with-pooler \
+  --evals expertqa,cnn_dailymail --weight-sources "nll__sent,nll_inv__sent,pos_lead__sent,pos_tail__sent,content__sent" \
+  --out results/idea2_pooler_gap__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

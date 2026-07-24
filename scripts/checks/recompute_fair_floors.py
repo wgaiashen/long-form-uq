@@ -65,7 +65,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("csvs", nargs="*", help="results CSVs to audit")
     ap.add_argument("--all", action="store_true", help="audit every csv in results/")
+    ap.add_argument("--i-understand-wrong-population", action="store_true",
+                    help="required acknowledgement: this tool reads the standalone RECORDS file, which is a "
+                         "DIFFERENT test population from the one the drivers score on (load_per_token + "
+                         "eval_split). Its floors DO NOT match the drivers (pubmed: this tool −0.210 vs driver "
+                         "+0.371 -- a sign flip). See STOCKTAKE PART XX.1 / XXIV. Do NOT use these numbers to "
+                         "judge any method. Only for a rough sanity sweep, and only with this flag.")
     args = ap.parse_args()
+    if not args.i_understand_wrong_population:
+        raise SystemExit(
+            "REFUSING TO RUN. recompute_fair_floors.py computes floors on the RECORDS-file population, NOT the\n"
+            "eval_split/pertok population the drivers actually score methods on. The two disagree (pubmed:\n"
+            "−0.210 here vs +0.371 in every driver -- a sign flip), so these numbers must NEVER be used to\n"
+            "judge a method (that was the PART XX bug). The authoritative floors are `luq.msp.fair_floor` as\n"
+            "called inside the drivers (they pass it the eval_split records). If you only want a rough sweep\n"
+            "and understand the caveat, pass --i-understand-wrong-population. See STOCKTAKE PART XX.1 / XXIV.")
     files = args.csvs or (sorted(glob.glob(str(ROOT / "results" / "*.csv"))) if args.all else [])
     if not files:
         ap.error("give CSV paths or --all")

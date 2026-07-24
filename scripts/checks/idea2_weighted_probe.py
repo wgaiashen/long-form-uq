@@ -139,6 +139,10 @@ def main():
                          "always kept -- it is the grounding baseline every other source is judged against. "
                          "Use this for a fast answer when the full source set + --with-pooler would not "
                          "finish inside the walltime.")
+    ap.add_argument("--evals", default="",
+                    help="restrict eval TARGETS (comma-sep), e.g. expertqa,cnn_dailymail for a small "
+                         "--with-pooler run. Training SOURCES for the OOD rungs are still the full pool. "
+                         "Default = the full eval set.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -147,7 +151,12 @@ def main():
     print(f"device {device} | seeds {seeds}", flush=True)
 
     PT, ORG, SAR = {}, {}, {}
-    for d in sorted(set(CANDIDATES) | set(EVALS)):    # sources + eval targets (e.g. ExpertQA)
+    if args.evals:
+        import weighted_msp_all_variants as _wmav       # cells() reads this module global at call time
+        _wmav.EVALS = [e.strip() for e in args.evals.split(",") if e.strip()]
+        print(f"eval targets restricted to {_wmav.EVALS}", flush=True)
+    for d in sorted(set(CANDIDATES) | set(EVALS) | set(args.evals.split(",") if args.evals else [])):
+
         loaded = load_per_token(MODEL, d, LAYER, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok -> skip"); continue
@@ -238,6 +247,21 @@ def main():
         print(f"weight-source subset -> {SRC}", flush=True)
     out_rows = []
     skipped_src = {}      # source -> {datasets that forced a skip}, reported at the end
+    out = Path(args.out) if args.out else (ROOT / "results" / f"idea2_weighted_probe__{cache._slug(MODEL)}.csv")
+
+    def _flush():
+        # Columns are DYNAMIC (the old hardcoded 5-column list silently dropped every free source). Rewrite
+        # the whole CSV after EACH cell so a wall-kill still leaves a usable partial table -- the full run
+        # died at the 24h wall with nothing written precisely because it only wrote at the end (2026-07-23).
+        base = ["eval", "rung"]
+        extra = sorted({k for r in out_rows for k in r if k not in base})
+        cols = base + extra
+        with open(out, "w", newline="") as f:
+            w = _csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for r in out_rows:
+                w.writerow({k: r.get(k, "") for k in cols})
+
     for rung, X, spec in cells(sources):
         spec = [(d, c) for d, c in spec if d in PT]
         if not spec:
@@ -287,20 +311,8 @@ def main():
             line += f"  | attn {np.mean(attn_prr):+.3f} unifpool {np.mean(unif_prr):+.3f}"
         print(line, flush=True)
         out_rows.append(row)
+        _flush()                 # incremental: persist after EVERY cell (wall-kill leaves a usable partial)
 
-    # grounding: uniform-source (probe on mean-pool) should ~equal the uniform frozen-q pooler PRR
-    out = Path(args.out) if args.out else (ROOT / "results" / f"idea2_weighted_probe__{cache._slug(MODEL)}.csv")
-    # Columns must be DYNAMIC. The old hardcoded 5-column list SILENTLY DROPPED every free weight-source
-    # (nll/pos/content), so a run that computed them wrote a CSV without them -- the numbers survived only
-    # in the log. Build the header from the union of keys actually present. (Fixed 2026-07-23.)
-    base = ["eval", "rung"]
-    extra = sorted({k for r in out_rows for k in r if k not in base})
-    cols = base + extra
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=cols)
-        w.writeheader()
-        for r in out_rows:
-            w.writerow({k: r.get(k, "") for k in cols})
     print(f"\nwrote {out} ({len(out_rows)} cells)", flush=True)
     # Make the coverage of any NULL explicit: a blank orgad/sar column is "not measured here", NOT "measured
     # and equal to uniform". Without this line a reader cannot tell the two apart -- which is precisely how

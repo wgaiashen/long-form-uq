@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_lengthdiag
+#PBS -j oe
+# OVERNIGHT: extend the headline PART XV asymmetry (MSP decays with length, the probe does not) from
+# sciq+cnn+xsum to every dataset with a pooled feature cache, ID, by length quartile. CPU, cached features.
+# mem=48gb because the pooled feature caches are (n, 33, 4096) fp32.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== probe_vs_msp_length on $(hostname) $(date) ===" >&2
+python -u scripts/checks/probe_vs_msp_length.py
+echo "=== done $(date) ===" >&2
