@@ -7,7 +7,7 @@ plus two small lookup tables the rest of the pipeline needs.
 from probe_drift import get_datasets
 from probe_drift.dataset import Dataset as PDDataset
 
-from . import asqa, expertqa
+from . import asqa, expertqa, factscore
 
 # ProbeDrift key -> the name Joe's llm_as_a_judge script expects.
 # The judge asserts the dataset name appears in the JSONL filename, so map before use.
@@ -22,6 +22,7 @@ JUDGE_NAME_MAP = {
     "asqa": "asqa",           # long-form CLOSED-BOOK FACTUALITY QA (not a ProbeDrift dataset)
     "med_quad": "med_quad",   # medical QA; a same-task OOD NEIGHBOUR for pubmed_qa (training source)
     "samsum": "samsum",       # dialogue summarisation; xsum's same-task neighbour + a 2nd summ set for QA DiffTask
+    "factscore": "factscore", # FActScore-Bio: long-form FACTUALITY (ExpertQA's same-task partner); custom judge
 }
 
 # Datasets whose correctness comes from string match (the rest use the LLM judge).
@@ -43,6 +44,7 @@ TASK_OF = {
     "asqa": "long_qa",       # long-form closed-book factuality (property tag deferred, as expertqa)
     "med_quad": "long_qa",   # same task family as pubmed_qa (medical QA) -> the SameTask OOD rung
     "samsum": "summarisation",   # dialogue summarisation -> a 2nd summ set (de-degenerates QA DiffTask)
+    "factscore": "long_qa",  # FActScore-Bio factuality (CSV column tag; factuality-family split is a pending decision)
 }
 
 # Per-dataset generation budget. The updated ProbeDrift no longer ships max_new_tokens on
@@ -67,6 +69,9 @@ MAX_NEW_TOKENS = {
     # samsum reference summaries are one sentence (prompt: "Summary (one sentence):"); 56 matches its
     # summarisation sibling xsum so the two are budget-consistent in the QA DiffTask pool.
     "samsum": 56,
+    # FActScore-Bio paragraph bios ~150-250 words; 256 covers a paragraph (a cap, not a target). Generate
+    # with --repetition-penalty 1.2 + --max-new-tokens-cap >=256 (as asqa/expertqa).
+    "factscore": factscore.MAX_NEW_TOKENS,  # 256
 }
 
 
@@ -85,6 +90,8 @@ def load(dataset: str, ood_setting: str = "ID"):
         return _load_med_quad(ood_setting)
     if dataset == "samsum":
         return _load_samsum(ood_setting)
+    if dataset == "factscore":
+        return _load_factscore(ood_setting)
     return get_datasets(
         eval_dataset=dataset,
         ood_setting=ood_setting,
@@ -174,5 +181,24 @@ def _load_expertqa(ood_setting: str):
     y = [r["gold"] for r in recs]
     meta = [f"{r['field']}||{r['cluster']}" for r in recs]
     train_ds = PDDataset([], [], batch_size=1)                   # pilot has no training split
+    eval_ds = PDDataset(x, y, batch_size=1, source_ids=meta)
+    return train_ds, eval_ds
+
+
+def _load_factscore(ood_setting: str):
+    """FActScore-Bio as (train_ds, eval_ds), CLOSED-BOOK long-form FACTUALITY (ExpertQA's same-task partner).
+    Eval-only like ExpertQA/ASQA: a NEW cross-task factuality eval target (probes train on the existing pool,
+    test on FActScore-Bio), so there is no train split. The 500 unlabeled entities are used in file order so
+    record idx aligns to factscore.load_records(); the frozen "Tell me a bio of <entity>" prompt is applied
+    here so 01_extract's prompt_hash guard is stable. gold = the entity (the judge fetches the Wikipedia
+    reference by this title at label time, factscore.wiki_reference). The entity is carried in source_ids."""
+    if ood_setting != "ID":
+        raise ValueError(f"factscore: only 'ID' is supported (it is an eval-only factuality target; the "
+                         f"whole 500-entity set is the eval set); got {ood_setting!r}")
+    recs = factscore.load_records()
+    x = [factscore.PROMPT.format(entity=r["entity"]) for r in recs]
+    y = [r["gold"] for r in recs]
+    meta = [r["sample_id"] for r in recs]
+    train_ds = PDDataset([], [], batch_size=1)                   # eval-only: no training split
     eval_ds = PDDataset(x, y, batch_size=1, source_ids=meta)
     return train_ds, eval_ds
