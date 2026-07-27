@@ -33,7 +33,7 @@ from luq import msp, results  # noqa: E402
 
 MODEL_SLUG = "meta-llama_Meta-Llama-3.1-8B"
 # regime-namespaced sets live under their own cache root
-REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12"}
+REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
 
 
 def records_for(dataset):
@@ -41,6 +41,11 @@ def records_for(dataset):
     hits = list((root / "records").glob(f"*__{dataset}__ID.jsonl"))
     if not hits:
         return None
+    # GUARD (V1 fix, 2026-07-27): meta-llama/Llama-3.1-8B is the ONLY model. A model-agnostic glob once
+    # silently picked the dropped Qwen cache for PART A. Pin to Llama and FAIL LOUD on any ambiguity.
+    hits = [h for h in hits if "Meta-Llama-3.1-8B" in h.name]
+    if len(hits) != 1:
+        raise SystemExit(f"{dataset}: expected exactly ONE Llama record file, got {[h.name for h in hits]}")
     return [json.loads(l) for l in open(hits[0])]
 
 

@@ -26,7 +26,7 @@ from luq.config import Config  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # known regime-namespaced sets (so --datasets can list them without a per-dataset --prompt-regime)
-REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12"}
+REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
 TOL = 1e-4          # max abs Δ that still counts as "teacher-forced consistent" (fp32 match is ~1e-6)
 
 

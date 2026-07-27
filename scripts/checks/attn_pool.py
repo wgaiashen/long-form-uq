@@ -57,7 +57,7 @@ VAL_FRAC = 0.2              # validation carved from train for temperature selec
 
 # XL datasets whose per-token cache + records live in a prompt-regime namespace (not the default cache/).
 # This is what lets ExpertQA load through the SAME interface as the core datasets (organic ProbeDriftXL).
-PROMPT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12"}
+PROMPT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
 
 
 def load_per_token(model, dataset, layer, label_field="correctness"):
@@ -84,6 +84,12 @@ def load_per_token(model, dataset, layer, label_field="correctness"):
     if len(st) != len(records):
         raise SystemExit(f"{dataset}: per-token cache {len(st)} != records {len(records)}")
     states = [np.asarray(st[k], dtype=np.float32) for k in range(len(records))]
+    # RUNTIME MODEL GUARD (2026-07-27): the ONLY model is Llama-3.1-8B (hidden dim 4096). Fail loud if a
+    # cache from another model slipped in (Qwen=1536, Gemma=3584) — protects the CURRENT numbers, not just
+    # future sessions (the doc rule in CLAUDE.md does the latter).
+    d = states[0].shape[-1] if len(states) else 4096
+    if d != 4096:
+        raise SystemExit(f"{dataset}: per-token cache hidden dim {d} != 4096 (Llama). Wrong-model cache?")
     split = np.array([r["split"] for r in records])
     y = np.array([r.get(label_field, np.nan) for r in records], dtype=float)
     return states, split, y, int(z["layer"]), records
