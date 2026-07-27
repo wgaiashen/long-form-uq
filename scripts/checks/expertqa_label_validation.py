@@ -1,4 +1,4 @@
-"""Validate the ExpertQA faithfulness-over-covered label before trusting Role-C (field/cluster
+"""Validate the ExpertQA factuality-over-covered label before trusting Role-C (field/cluster
 domain-shift OOD). Read-only over the existing expertqa_rp12 labelled records + ExpertQA's native
 expert annotations. No regeneration.
 
@@ -47,7 +47,7 @@ def load_labelled_with_group():
 
 def is_real_coverage(r):
     """True if `uncovered` is a genuine judge measurement (not a distrust artifact)."""
-    if r.get("faithfulness_quarantined"):               # SEVERE: uncovered force-set 0.0
+    if r.get("factuality_quarantined"):               # SEVERE: uncovered force-set 0.0
         return False
     if r.get("coherent") is False:                      # incoherent marginal: uncovered force-set 0.0
         return False
@@ -198,7 +198,7 @@ def check23():
         "",
         "  => The native expert labels annotate `answer_string` (the ORIGINAL system's answer,",
         "     e.g. BingChat/GPT-4), NOT our Llama generation. A per-instance join of our",
-        "     faithfulness label to them compares labels of DIFFERENT texts that share only a",
+        "     factuality label to them compares labels of DIFFERENT texts that share only a",
         "     question -> uninterpretable, so it is NOT run. Same reason blocks 'AlignScore vs",
         "     expert' as a direct join (AlignScore is on our gen, expert is on the original answer).",
         "",
@@ -209,7 +209,7 @@ def check23():
         "  GPT-4/BingChat answers, a different distribution from Llama outputs.",
         "",
         "=" * 78,
-        "CHECK 3 — can native gold REPLACE our faithfulness-over-covered label?",
+        "CHECK 3 — can native gold REPLACE our factuality-over-covered label?",
         "=" * 78,
         f"native instance-level CORRECTNESS (expert factuality, mean over ~5.8 claims/answer):",
         f"  available for {len(corr)}/{len(native)} instances ({len(corr)/len(native):.0%})  "

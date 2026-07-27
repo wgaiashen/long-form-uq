@@ -135,7 +135,7 @@ def main():
 
             # msp floor (label-agnostic)
             # FAIR floor (2026-07-22): best of {msp_sum, perplexity, msp_min}; msp_sum is weakest on all 9.
-            _fv, _fname = msp.fair_floor([rc[i] for i in te_idx], yte, results.prr)
+            _fv, _fname = msp.primary_floor([rc[i] for i in te_idx])  # PRE-REGISTERED msp_min bar (2026-07-24)
             per["msp_floor"].append(results.prr(yte, _fv))
             # saplma (mean-pool + MLP)
             Xm = np.stack([np.asarray(s).mean(axis=0) for s in st])

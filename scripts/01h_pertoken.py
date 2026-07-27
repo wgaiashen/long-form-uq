@@ -44,6 +44,9 @@ def main():
     ap.add_argument("--attn", default="eager", choices=["auto", "eager", "sdpa"])
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag (must match the one used by 01_extract).")
+    ap.add_argument("--label-field", default="correctness",
+                    help="record field the pertok sanity gate scores on (correctness | factuality | "
+                         "consistency). Non-correctness sets (factscore/expertqa) MUST pass this.")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
@@ -107,7 +110,7 @@ def main():
     # reloaded per-token states must reproduce the cached SAPLMA feature's PRR. Reloading is what
     # catches a corrupt write (e.g. a dangling numpy view) that an in-memory check would miss.
     split = np.array([r["split"] for r in records])
-    y = np.array([r["correctness"] for r in records], dtype=float)
+    y = np.array([r[args.label_field] for r in records], dtype=float)
     tr, te = split == "train", split == "test"
     z = np.load(ppath, allow_pickle=True)
     # Align POSITIONALLY: the cache is written in record order and the record "idx" field is NOT

@@ -8,7 +8,7 @@ paired_bootstrap) -- the ONLY change is we also run weighted-MSP with masks= res
 important tokens. For each ladder cell we report, mean+/-std over seeds:
   weighted_msp_pairwise            (unmasked -- the baseline being beaten)
   weighted_msp_pairwise_orgad      (masked to important tokens -- the method)
-  fair_floor   max(msp_sum, perplexity, msp_min) -- the honest unsupervised floor
+  fair_floor   the PRE-REGISTERED msp_min bar (2026-07-24 meeting; all three variants still computed)
 plus paired bootstraps (orgad vs unmasked, and each vs floor). Task-adaptive locate: QA exact answer
 (str) or summary key spans (list). Mask fallback when nothing is located = ALL tokens (so an unlocated
 row is just plain weighted-MSP -- matches build_answer_masks). CPU only. Needs cache/orgad_llm/*.json.
@@ -180,9 +180,9 @@ def main():
             _cands = {k: np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], k)
                                      for i in te_idx], dtype=float)
                       for k in ("sum", "perplexity", "min")}
-            _best = max(_cands, key=lambda k: results.prr(yte, _cands[k]))
-            floor = _cands[_best]
-            floor_name = _best
+            # PRE-REGISTERED msp_min bar (2026-07-24 meeting) -- replaces the rejected max-of-three.
+            floor = _cands[msp.PRIMARY_FLOOR_AGG]
+            floor_name = f"msp_{msp.PRIMARY_FLOOR_AGG}"
             prr["fair_floor"].append(results.prr(yte, floor))
 
         if yte_ref is None:

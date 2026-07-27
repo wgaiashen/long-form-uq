@@ -2,19 +2,19 @@
 2016 spend. Does quadruple duty on ~50 examples:
 
   1. UNCOVERED fraction  — the "measure the blind spot first" number. How much of the model's output
-     does faithfulness-to-evidence not see? If small (~few %), uncovered can collapse to correct
+     does factuality-to-evidence not see? If small (~few %), uncovered can collapse to correct
      (justified option 1); if large (~40%), we need a coverage-extension workstream before ExpertQA
      can carry the OOD claim. This is the number the whole not-1-not-2 plan turns on.
   2. DERAILMENT rate     — luq.degeneracy on the same sample (should be ~0 on a clean regenerated set).
-  3. mini-vs-gpt-5       — agreement on faithfulness/uncovered/coherent, on THIS prompt (the old
+  3. mini-vs-gpt-5       — agreement on factuality/uncovered/coherent, on THIS prompt (the old
      r=0.83 was on the old gold-matching prompt; it does not transfer). Decides the judge model.
-  4. AlignScore-vs-judge — EXPLICIT: if a similarity metric (AlignScore) and the faithfulness judge
+  4. AlignScore-vs-judge — EXPLICIT: if a similarity metric (AlignScore) and the factuality judge
      disagree a lot, that is evidence the projection choice matters (justifies not just using
      AlignScore). Low correlation here is a RESULT, not noise.
 
 Applies the STAMPED distrust rule uniformly (luq.labels.expertqa_judge_draft): a SEVERE generation
-(detector) is faithfulness=0.0 and is NOT sent to the judge; a coherent=false judge verdict forces
-faithfulness=0.0. Both are distrust labels, kept not dropped.
+(detector) is factuality=0.0 and is NOT sent to the judge; a coherent=false judge verdict forces
+factuality=0.0. Both are distrust labels, kept not dropped.
 
 Run (judge needs OPENAI_API_KEY + internet; --alignscore needs the GPU roberta model):
     python scripts/checks/expertqa_label_gate.py --n 50 --judges gpt-5-mini,gpt-5 --alignscore
@@ -118,17 +118,17 @@ def main():
         for jm in judges:
             if severe:
                 # STAMPED rule: quarantined-severe is a distrust label, not sent to the judge.
-                row[jm] = {"faithfulness": 0.0, "uncovered": 0.0, "coherent": False, "quarantined": True}
+                row[jm] = {"factuality": 0.0, "uncovered": 0.0, "coherent": False, "quarantined": True}
                 continue
             prompt = judge.fill(q, reference, r["gen_text"])
             raw_out = llm_judge._gpt_response(prompt, jm)
             parsed = judge.parse(raw_out)
             if parsed is None:
-                row[jm] = {"faithfulness": None, "uncovered": None, "coherent": None, "parse_fail": True}
+                row[jm] = {"factuality": None, "uncovered": None, "coherent": None, "parse_fail": True}
             else:
                 # coherent=false forces the distrust label (belt-and-braces vs the prompt rule).
                 if not parsed["coherent"]:
-                    parsed["faithfulness"], parsed["uncovered"] = 0.0, 0.0
+                    parsed["factuality"], parsed["uncovered"] = 0.0, 0.0
                 row[jm] = parsed
         if args.alignscore:
             from luq.labels import alignscore
@@ -153,8 +153,8 @@ def report(rows, judges, args):
     print("\n[1] UNCOVERED fraction (the benchmark blind spot):")
     print(f"    mean {np.mean(unc):.2f}  median {np.median(unc):.2f}  "
           f">0.3: {np.mean(np.array(unc) > 0.3):.0%}  >0.5: {np.mean(np.array(unc) > 0.5):.0%}")
-    allunc = np.mean([row[primary].get("faithfulness") is None for row in rows])
-    print(f"    ALL-uncovered (faithfulness undefined, no covered claims to score): {allunc:.0%}")
+    allunc = np.mean([row[primary].get("factuality") is None for row in rows])
+    print(f"    ALL-uncovered (factuality undefined, no covered claims to score): {allunc:.0%}")
     print("    -> small => uncovered can collapse to correct; large => coverage-extension needed first.")
 
     # READ 2 — derailment on the sample
@@ -164,24 +164,24 @@ def report(rows, judges, args):
 
     # READ 3 — mini vs gpt-5 (on THIS prompt)
     if len(judges) >= 2:
-        a = [row[judges[0]]["faithfulness"] for row in rows if row[judges[0]]["faithfulness"] is not None
-             and row[judges[1]]["faithfulness"] is not None]
-        b = [row[judges[1]]["faithfulness"] for row in rows if row[judges[0]]["faithfulness"] is not None
-             and row[judges[1]]["faithfulness"] is not None]
-        print(f"\n[3] {judges[0]} vs {judges[1]} on faithfulness (n={len(a)}):")
+        a = [row[judges[0]]["factuality"] for row in rows if row[judges[0]]["factuality"] is not None
+             and row[judges[1]]["factuality"] is not None]
+        b = [row[judges[1]]["factuality"] for row in rows if row[judges[0]]["factuality"] is not None
+             and row[judges[1]]["factuality"] is not None]
+        print(f"\n[3] {judges[0]} vs {judges[1]} on factuality (n={len(a)}):")
         print(f"    Pearson {pearson(a,b):.2f}  Spearman {spearman(a,b):.2f}  MAD {np.mean(np.abs(np.array(a)-np.array(b))):.3f}")
         print("    -> high => adopt the cheaper judge; low => the projection needs the stronger judge.")
 
     # READ 4 — AlignScore vs judge (EXPLICIT: low corr = projection matters)
     if args.alignscore:
         al = [row.get("alignscore") for row in rows]
-        fa = [row[primary]["faithfulness"] for row in rows]
+        fa = [row[primary]["factuality"] for row in rows]
         pairs = [(x, y) for x, y in zip(al, fa) if x is not None and y is not None]
         if len(pairs) >= 3:
             ax, fy = zip(*pairs)
-            print(f"\n[4] AlignScore vs {primary} faithfulness (n={len(pairs)}):")
+            print(f"\n[4] AlignScore vs {primary} factuality (n={len(pairs)}):")
             print(f"    Pearson {pearson(ax,fy):.2f}  Spearman {spearman(ax,fy):.2f}")
-            print("    -> LOW correlation is a RESULT: the faithfulness projection differs from")
+            print("    -> LOW correlation is a RESULT: the factuality projection differs from")
             print("       gold-similarity, justifying why we did not just use AlignScore.")
 
     out = Path(args.out)

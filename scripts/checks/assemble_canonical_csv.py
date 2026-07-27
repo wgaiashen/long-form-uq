@@ -45,7 +45,7 @@ def read_csv(name):
 def main():
     # cell[(eval, rung, label)] = (prr_mean, prr_std)
     cell = {}
-    floor = {}  # (eval, rung) -> msp_sum prr
+    floor = {}  # (eval, rung) -> msp_min prr (the pre-registered bar, 2026-07-24)
 
     def take(rows, method_field="method", want=None):
         for r in rows:
@@ -54,13 +54,16 @@ def main():
                 continue
             if want is not None and m not in want:
                 continue
-            ev, rung, lab = r.get("eval"), r.get("rung"), LABEL.get(m)
+            ev, rung = r.get("eval"), r.get("rung")
+            # PRE-REGISTERED msp_min floor (2026-07-24 meeting) -- capture BEFORE the label filter, since
+            # msp_min has no LABEL entry (it is the bar, not a displayed method row). Replaces bare msp_sum.
+            if m in ("msp_min", "weighted_msp_msp_min") and ev in EVALS:
+                floor[(ev, rung)] = float(r["prr_mean"])
+            lab = LABEL.get(m)
             if lab is None or ev not in EVALS:
                 continue
             mean = float(r["prr_mean"]); std = float(r.get("prr_std") or 0.0)
             cell[(ev, rung, lab)] = (mean, std)
-            if m in ("msp_sum", "weighted_msp_msp_sum"):
-                floor[(ev, rung)] = mean
 
     take(read_csv(f"contribution_ladder__{SLUG}.csv"))
     take(read_csv(f"weighted_msp_blondel__{SLUG}.csv"))

@@ -3,7 +3,7 @@
 Runs, on the long-form ladder (ID + the ProbeDriftLong long-only rungs), the same head/optimiser/seeds/
 splits for every row so the ONLY thing that varies is the pooling:
 
-    fair_floor   max(msp_sum, perplexity, msp_min)   -- the honest unsupervised bar
+    fair_floor   the PRE-REGISTERED msp_min bar (2026-07-24 meeting; all three variants still computed)
     saplma       mean-pool + MLP                     -- the standard supervised probe
     uniform      frozen-q pooler                     -- mean-pool through the SAME torch head
     attention    flat learned pooler                 -- the current best aggregator (the thing to beat)
@@ -172,7 +172,7 @@ def main():
         if yte_ref is None:
             continue
         stats = {m: (float(np.mean(per[m])), float(np.std(per[m]))) for m in per if per[m]}
-        fair = max(FLOORS, key=lambda f: stats[f][0])
+        fair = "floor_min" if "floor_min" in stats else max(FLOORS, key=lambda f: stats[f][0])  # PRE-REGISTERED msp_min bar (2026-07-24)
         stats["fair_floor"] = stats[fair]
         avg = {m: np.mean(np.stack(unc_acc[m]), 0) for m in unc_acc if unc_acc[m]}
         avg["fair_floor"] = avg[fair]

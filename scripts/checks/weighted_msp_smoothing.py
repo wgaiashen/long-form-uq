@@ -106,7 +106,7 @@ def main():
         te0 = np.where(PT[X][1] == "test")[0]
         yte = np.array([PT[X][2][i] for i in te0], dtype=float)
         # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum.
-        floor_unc, _fname = msp.fair_floor([PT[X][3][i] for i in te0], yte, results.prr)
+        floor_unc, _fname = msp.primary_floor([PT[X][3][i] for i in te0])  # PRE-REGISTERED msp_min bar (2026-07-24)
         floor_prr = results.prr(yte, floor_unc)
 
         cfg_prr = {c[0]: [] for c in CONFIGS}

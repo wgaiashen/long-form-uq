@@ -1,15 +1,15 @@
 """AlignScore-vs-judge read on the labelled ExpertQA set (the 4th gate read, at full scale).
 
 Computes AlignScore(gen, gold) per record and correlates it with the stored three-state judge
-`faithfulness`. The point (Gaia's ask): if a similarity-flavoured metric (AlignScore) and the
-faithfulness judge disagree a lot, that is EVIDENCE the faithfulness projection differs from
+`factuality`. The point (Gaia's ask): if a similarity-flavoured metric (AlignScore) and the
+factuality judge disagree a lot, that is EVIDENCE the factuality projection differs from
 gold-similarity — i.e. why we did not just use AlignScore. Low correlation is a RESULT, not noise.
 Also correlates AlignScore with `uncovered` (an answer that diverges from the gold should be both
 low-AlignScore and high-uncovered).
 
 Runs on GPU (AlignScore = roberta-large). Reads the labels already in the records; does NOT re-judge.
 
-    python scripts/checks/alignscore_vs_faithfulness.py --prompt-regime expertqa_rp12
+    python scripts/checks/alignscore_vs_factuality.py --prompt-regime expertqa_rp12
 """
 import argparse
 import sys
@@ -45,7 +45,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B")
     ap.add_argument("--prompt-regime", default="expertqa_rp12")
-    ap.add_argument("--out", default="results/expertqa/alignscore_vs_faithfulness.txt")
+    ap.add_argument("--out", default="results/expertqa/alignscore_vs_factuality.txt")
     args = ap.parse_args()
 
     cfg = Config(dataset="expertqa", ood_setting="ID", model_name=args.model, prompt_regime=args.prompt_regime)
@@ -58,10 +58,10 @@ def main():
         if (i + 1) % 200 == 0:
             print(f"  {i+1}/{len(recs)}", flush=True)
 
-    # faithfulness vs AlignScore: use records with a DEFINED faithfulness that were NOT quarantined
-    # (quarantined=0.0 is a distrust label, not a judged faithfulness — including it would conflate).
-    fj = [(r["_align"], r["faithfulness"]) for r in recs
-          if r.get("faithfulness") is not None and not r.get("faithfulness_quarantined")
+    # factuality vs AlignScore: use records with a DEFINED factuality that were NOT quarantined
+    # (quarantined=0.0 is a distrust label, not a judged factuality — including it would conflate).
+    fj = [(r["_align"], r["factuality"]) for r in recs
+          if r.get("factuality") is not None and not r.get("factuality_quarantined")
           and r.get("_align") is not None]
     au = [(r["_align"], r["uncovered"]) for r in recs
           if r.get("uncovered") is not None and r.get("_align") is not None]
@@ -71,8 +71,8 @@ def main():
         al, fa = zip(*fj)
         lines += [f"AlignScore vs FAITHFULNESS (judged, non-quarantined, n={len(fj)}):",
                   f"  Pearson {pearson(al,fa):.2f}  Spearman {spearman(al,fa):.2f}",
-                  f"  AlignScore mean {np.mean(al):.2f} | faithfulness mean {np.mean(fa):.2f}",
-                  "  -> LOW corr = the faithfulness projection differs from gold-similarity (why not just AlignScore).", ""]
+                  f"  AlignScore mean {np.mean(al):.2f} | factuality mean {np.mean(fa):.2f}",
+                  "  -> LOW corr = the factuality projection differs from gold-similarity (why not just AlignScore).", ""]
     if au:
         al, uu = zip(*au)
         lines += [f"AlignScore vs UNCOVERED (n={len(au)}): Pearson {pearson(al,uu):.2f}  Spearman {spearman(al,uu):.2f}",

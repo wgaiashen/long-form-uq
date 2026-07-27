@@ -129,9 +129,10 @@ def main():
         if len(te0) == 0:
             print(f"[{rung}/{X}] no test split -> skip", flush=True); continue
         yte = np.array([PT[X][2][i] for i in te0], dtype=float)
-        # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum, which
-        # is the WEAKEST floor on all 9 datasets (cnn: sum -0.085 vs perplexity +0.410).
-        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te0], yte, results.prr)
+        # PRIMARY floor (2026-07-24 meeting): the PRE-REGISTERED msp_min bar, fixed across datasets
+        # (replaces the rejected max-of-three). Dual-report vs the strongest free score is done at the
+        # stocktake layer from the 3-variant rows.
+        _fv, _fname = msp.primary_floor([PT[X][3][i] for i in te0])
         floor_prr = results.prr(yte, _fv)
 
         cfg_prr = {c[0]: [] for c in CONFIGS}

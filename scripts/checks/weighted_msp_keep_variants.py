@@ -102,7 +102,7 @@ def main():
         # FAIR floor, not bare msp_sum (fixed 2026-07-22): the `floor` column is what every keep-variant
         # margin in the STOCKTAKE is measured against, and msp_sum is not length-normalised, so on sets
         # where perplexity or msp_min is stronger every "beats the floor" count was overstated.
-        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te0], yte, results.prr)
+        _fv, _fname = msp.primary_floor([PT[X][3][i] for i in te0])  # PRE-REGISTERED msp_min bar (2026-07-24)
         floor = results.prr(yte, _fv)
 
         mode_prr = {m: [] for m in MODES}

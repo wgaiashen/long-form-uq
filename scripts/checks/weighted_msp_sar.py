@@ -132,7 +132,7 @@ def main():
         _, te = xl_rungs.eval_split(PT[X][1])          # XL-aware test indices (baked core / carved XL)
         yte = PT[X][2][te]
         # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum.
-        _fv, _fname = msp.fair_floor([PT[X][3][i] for i in te], yte, results.prr)
+        _fv, _fname = msp.primary_floor([PT[X][3][i] for i in te])   # PRE-REGISTERED msp_min bar (2026-07-24)
         floor = results.prr(yte, _fv)
         tsar_prr = results.prr(yte, TSAR[X][te])            # pure TokenSAR scalar (unsupervised)
         mg, lo, hi, p, sig = paired_bootstrap(yte, us, ub)  # +SAR vs no-mask

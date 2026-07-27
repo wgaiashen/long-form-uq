@@ -5,7 +5,7 @@ sentence -> train the SAPLMA MLP on sentence vectors (each carrying its response
 P(correct) per sentence -> AGGREGATE to one instance score.
 
 Rows (identical probe, identical splits/seeds -- only the aggregation differs):
-    fair_floor    max(msp_sum, perplexity, msp_min)          the honest unsupervised bar
+    fair_floor    the PRE-REGISTERED msp_min bar (2026-07-24 meeting; all three variants still computed)
     saplma        mean-pool over ALL tokens + MLP            the no-decomposition reference
     seg_mean      per-sentence probe, MEAN aggregation       the existing fixed rule
     seg_min       per-sentence probe, MIN  (weakest-link)    the existing fixed rule
@@ -139,7 +139,7 @@ def main():
             recs = [PT[d][3][i] for d, i in allrows]
             sv = [SENT[d][i] for d, i in allrows]
             v = {}
-            v["fair_floor"], _fname = msp.fair_floor([recs[i] for i in te_i], yte, results.prr)
+            v["fair_floor"], _fname = msp.primary_floor([recs[i] for i in te_i])  # PRE-REGISTERED msp_min bar (2026-07-24)
             Xmean = np.stack([np.asarray(PT[d][0][i]).mean(axis=0) for d, i in allrows])
             v["saplma"] = 1.0 - conf_meanpool(Xmean, tr_i, te_i, y, sd)
 

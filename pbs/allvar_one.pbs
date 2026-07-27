@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=09:00:00
+#PBS -N luq_allvar_one
+#PBS -j oe
+# One XL eval per job for weighted_msp_all_variants (avoids the 6h walltime kill on 3425122). Pass EVAL via -v.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== weighted_msp_all_variants single eval=$EVAL on $(hostname) at $(date) ==="
+python -u scripts/checks/weighted_msp_all_variants.py --seeds 1,2,3 --evals "$EVAL" \
+  --out "results/weighted_msp_all_variants_xl_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done eval=$EVAL at $(date) ==="

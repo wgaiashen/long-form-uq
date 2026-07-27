@@ -138,8 +138,8 @@ def main():
                 vecs["msp_sum"] = np.asarray(
                     [msp.msp_uncertainty(records[i]["token_logprobs"], "sum") for i in te_idx], dtype=float)
                 # ADD the fair floor beside the honestly-named msp_sum (see canonical_ladder note).
-                vecs["fair_floor"], _fname = msp.fair_floor(
-                    [records[i] for i in te_idx], np.asarray([y[i] for i in te_idx], float), results.prr)
+                vecs["fair_floor"], _fname = msp.primary_floor(
+                    [records[i] for i in te_idx])  # PRE-REGISTERED msp_min bar (2026-07-24)
                 for m, u in vecs.items():
                     res[pool_name][m]["prr"].append(results.prr(yte, u))
                     res[pool_name][m]["unc"].append(u)

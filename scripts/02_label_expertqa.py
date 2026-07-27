@@ -1,8 +1,8 @@
 """ExpertQA three-state factuality labelling — the "ship now, partial label" decision (2026-07-06).
 
-Produces, per record, the PARTIAL faithfulness-to-gold label from the three-state judge:
-  - faithfulness : SUPPORTED / (SUPPORTED + CONTRADICTED) over COVERED claims; None if all-uncovered
-                   (no covered claims to score) -> that instance has no faithfulness signal.
+Produces, per record, the PARTIAL factuality-to-gold label from the three-state judge:
+  - factuality : SUPPORTED / (SUPPORTED + CONTRADICTED) over COVERED claims; None if all-uncovered
+                   (no covered claims to score) -> that instance has no factuality signal.
   - uncovered    : fraction of the answer's substantive claims the gold+citations do not address.
   - coherent     : False if the generation collapsed (word-salad/code/etc).
 Downgraded claim (stamped): the label is blind to ~58% of the output (the uncovered fraction), so
@@ -10,12 +10,12 @@ ExpertQA leans on its Role-C domain-shift role; retrieval-based coverage extensi
 deferred. Judge = gpt-5-mini (validated vs gpt-5: r=0.86 / MAD 0.084 on well-defined cases).
 
 DISTRUST rule (uniform, per the stamped decision): a detector-SEVERE generation OR a judge
-coherent=false verdict => faithfulness=0.0 (a distrust label, KEPT not dropped). SEVERE is not sent
+coherent=false verdict => factuality=0.0 (a distrust label, KEPT not dropped). SEVERE is not sent
 to the judge (saves the call); coherent=false is forced to 0.0 after the call.
 
-Writes an EXPLICIT label field (`faithfulness`, stamped `faithfulness_model`) — never the shared
-`correctness` field (which is last-labeller-wins; the probe selects --label-field faithfulness).
-Resumable: skips records already stamped with faithfulness_model.
+Writes an EXPLICIT label field (`factuality`, stamped `factuality_model`) — never the shared
+`correctness` field (which is last-labeller-wins; the probe selects --label-field factuality).
+Resumable: skips records already stamped with factuality_model.
 
 Run (needs OPENAI_API_KEY + internet; login node / VM, no GPU):
     source /vol/gpudata/gs925-msc_project/.openai_key
@@ -39,32 +39,32 @@ def label_records(records, raw, judge_model, save_cb, save_every=25):
     """Label every unlabelled record in place; call save_cb() periodically for crash-safety."""
     n_new = 0
     for i, r in enumerate(records):
-        if r.get("faithfulness_model"):
+        if r.get("factuality_model"):
             continue                                    # already labelled (resume)
         if degeneracy.is_severe(r["gen_text"]):
-            # Distrust label, NOT judged. faithfulness=0.0 is the deliberate uniform distrust signal (see
+            # Distrust label, NOT judged. factuality=0.0 is the deliberate uniform distrust signal (see
             # module docstring) and stays. `uncovered` is set to None, NOT 0.0: the judge was never called
             # for this row, so a 0.0 would be a FABRICATED measurement claiming "the reference covered every
             # claim" -- the strongest possible coverage statement, asserted about a row nobody looked at.
-            # It also silently poisons any analysis that slices by coverage (it made mean faithfulness in
+            # It also silently poisons any analysis that slices by coverage (it made mean factuality in
             # the uncovered<0.3 bucket read 0.330 instead of its true 0.730). Fixed 2026-07-22.
-            r.update(faithfulness=0.0, uncovered=None, coherent=False, faithfulness_quarantined=True)
+            r.update(factuality=0.0, uncovered=None, coherent=False, factuality_quarantined=True)
         else:
             src = raw[r["idx"]]
             q = r["prompt"].split("Question:")[-1].split("\nAnswer:")[0].strip()
             reference = judge.build_reference(src["gold"], src["evidence"], max_ev_chars=4000)
             parsed = judge.parse(llm_judge._gpt_response(judge.fill(q, reference, r["gen_text"]), judge_model))
             if parsed is None:
-                r.update(faithfulness=None, uncovered=None, coherent=None, faithfulness_parse_fail=True)
+                r.update(factuality=None, uncovered=None, coherent=None, factuality_parse_fail=True)
             else:
                 if not parsed["coherent"]:              # distrust: derailed marginal survivor
-                    # As above: keep the 0.0 distrust faithfulness, but DISCARD the coverage number rather
+                    # As above: keep the 0.0 distrust factuality, but DISCARD the coverage number rather
                     # than overwrite it with 0.0. The answer derailed, so its claim inventory is not a
                     # meaningful measurement of what the reference covers.
-                    parsed["faithfulness"], parsed["uncovered"] = 0.0, None
-                r.update(faithfulness=parsed["faithfulness"], uncovered=parsed["uncovered"],
-                         coherent=parsed["coherent"], faithfulness_quarantined=False)
-        r["faithfulness_model"] = judge_model            # provenance stamp (also the resume marker)
+                    parsed["factuality"], parsed["uncovered"] = 0.0, None
+                r.update(factuality=parsed["factuality"], uncovered=parsed["uncovered"],
+                         coherent=parsed["coherent"], factuality_quarantined=False)
+        r["factuality_model"] = judge_model            # provenance stamp (also the resume marker)
         n_new += 1
         if n_new % save_every == 0:
             save_cb()
@@ -89,7 +89,7 @@ def main():
     assert len(raw) >= max(r["idx"] for r in records) + 1, "raw pool / record idx misaligned"
     todo = records if args.limit is None else records[:args.limit]
     print(f"labelling {len(todo)}/{len(records)} records with {args.judge} "
-          f"(already done: {sum(1 for r in todo if r.get('faithfulness_model'))})", flush=True)
+          f"(already done: {sum(1 for r in todo if r.get('factuality_model'))})", flush=True)
 
     def save():
         cache.save_records(records, cfg.cache_dir, key)
@@ -97,14 +97,14 @@ def main():
     n_new = label_records(todo, raw, args.judge, save)
     save()
     # summary
-    lab = [r for r in todo if r.get("faithfulness_model")]
-    fdef = [r["faithfulness"] for r in lab if r.get("faithfulness") is not None]
-    n_alluncov = sum(1 for r in lab if r.get("faithfulness") is None and not r.get("faithfulness_parse_fail"))
-    n_quar = sum(1 for r in lab if r.get("faithfulness_quarantined"))
+    lab = [r for r in todo if r.get("factuality_model")]
+    fdef = [r["factuality"] for r in lab if r.get("factuality") is not None]
+    n_alluncov = sum(1 for r in lab if r.get("factuality") is None and not r.get("factuality_parse_fail"))
+    n_quar = sum(1 for r in lab if r.get("factuality_quarantined"))
     import numpy as np
     print(f"\nDONE: {n_new} newly labelled -> {cache.records_path(cfg.cache_dir, key)}")
-    print(f"  faithfulness defined: {len(fdef)} (mean {np.mean(fdef):.2f})" if fdef else "  no defined faithfulness")
-    print(f"  all-uncovered (no faithfulness signal): {n_alluncov} | distrust-quarantined: {n_quar}")
+    print(f"  factuality defined: {len(fdef)} (mean {np.mean(fdef):.2f})" if fdef else "  no defined factuality")
+    print(f"  all-uncovered (no factuality signal): {n_alluncov} | distrust-quarantined: {n_quar}")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 Extends expertqa_loco.py now that the per-token L15 cache exists
 (cache/expertqa_rp12/pertok/...__L15.npz). Same domain-shift design: train on N-1 expert clusters, test on
-the held-out cluster, per label (faithfulness / consistency, never merged). Adds, per fold:
+the held-out cluster, per label (factuality / consistency, never merged). Adds, per fold:
   saplma       probe on the cached mean-pooled SAPLMA-L15 feature      (as in expertqa_loco)
   msp_floor    -log p(sequence)                                        (unsupervised floor, every table)
   uniform      frozen-query pooler on the per-token states (= mean-pool, the no-weighting control)
@@ -15,7 +15,7 @@ an element-wise match (fp32 sdpa-vs-eager attention differs ~0.2 element-wise; s
 
 CPU only. Reuses expertqa_loco's loaders + LOCO folds.
 
-    python scripts/checks/expertqa_loco_agg.py --labels faithfulness consistency --seeds 1 2 3
+    python scripts/checks/expertqa_loco_agg.py --labels factuality consistency --seeds 1 2 3
 """
 import argparse
 import csv as _csv
@@ -151,7 +151,7 @@ def run_label(X, states, recs, label, seeds, out_rows, device):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--labels", nargs="+", default=["faithfulness", "consistency"])
+    ap.add_argument("--labels", nargs="+", default=["factuality", "consistency"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3])
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"

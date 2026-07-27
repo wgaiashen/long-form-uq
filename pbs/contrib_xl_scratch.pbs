@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_xl_scr
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# ENOSPC-safe: writes BOTH the .o log (-o above) AND the CSV (--out below) to EPHEMERAL scratch, which is a
+# separate allocation that has stayed writable while the home OST flaps (2026-07-25). Pass EVAL via -v.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+OUT=/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results
+mkdir -p "$OUT"
+echo "=== contribution_ladder XL-std (scratch out) eval=$EVAL on $(hostname) at $(date) ==="
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals "$EVAL" \
+  --out "$OUT/contribution_ladder_xlstd_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done eval=$EVAL at $(date) ==="

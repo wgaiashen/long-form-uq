@@ -1,9 +1,9 @@
 """FActScore-Bio factuality labelling — three-state judge vs the entity's Wikipedia article.
 
-Same three-state judge as ExpertQA (commensurable): faithfulness = SUPPORTED/(SUPPORTED+CONTRADICTED) =
+Same three-state judge as ExpertQA (commensurable): factuality = SUPPORTED/(SUPPORTED+CONTRADICTED) =
 factual PRECISION, reference = the person's enwiki page (fetched by entity title). Writes an explicit
-`faithfulness` field (stamped `faithfulness_model`), NEVER the shared `correctness`. Resumable (skips rows
-already stamped). The SEVERE-degeneracy distrust rule matches ExpertQA (faithfulness=0.0, not judged).
+`factuality` field (stamped `factuality_model`), NEVER the shared `correctness`. Resumable (skips rows
+already stamped). The SEVERE-degeneracy distrust rule matches ExpertQA (factuality=0.0, not judged).
 
 Run on DoC (has the master enwiki db + API/internet; no GPU needed for labelling):
     source /vol/gpudata/gs925-msc_project/.openai_key            # OPENAI_API_KEY
@@ -27,30 +27,30 @@ def label_records(records, entities, judge_model, save_cb, save_every=25):
     """Label every unlabelled record in place (three-state judge vs the enwiki reference)."""
     n_new = 0
     for i, r in enumerate(records):
-        if r.get("faithfulness_model"):
+        if r.get("factuality_model"):
             continue                                      # already labelled (resume)
         if degeneracy.is_severe(r["gen_text"]):
             # Distrust label, NOT judged (same as ExpertQA). uncovered=None (not 0.0): the judge was never
             # called, so a 0.0 coverage number would be a fabricated measurement about an unlooked-at row.
-            r.update(faithfulness=0.0, uncovered=None, coherent=False, faithfulness_quarantined=True)
+            r.update(factuality=0.0, uncovered=None, coherent=False, factuality_quarantined=True)
         else:
             entity = entities[r["idx"]]["entity"]         # idx aligns to file order (eval-only design)
             reference = factscore.wiki_reference(entity)
             if reference is None:                          # title not in the enwiki db -> no reference, no score
-                r.update(faithfulness=None, uncovered=None, coherent=None, faithfulness_no_reference=True)
-                r["faithfulness_model"] = judge_model
+                r.update(factuality=None, uncovered=None, coherent=None, factuality_no_reference=True)
+                r["factuality_model"] = judge_model
                 n_new += 1
                 continue
             parsed = judge.parse(llm_judge._gpt_response(
                 judge.fill(entity, reference, r["gen_text"]), judge_model))
             if parsed is None:
-                r.update(faithfulness=None, uncovered=None, coherent=None, faithfulness_parse_fail=True)
+                r.update(factuality=None, uncovered=None, coherent=None, factuality_parse_fail=True)
             else:
                 if not parsed["coherent"]:                 # derailed marginal survivor -> distrust
-                    parsed["faithfulness"], parsed["uncovered"] = 0.0, None
-                r.update(faithfulness=parsed["faithfulness"], uncovered=parsed["uncovered"],
-                         coherent=parsed["coherent"], faithfulness_quarantined=False)
-        r["faithfulness_model"] = judge_model              # provenance stamp + resume marker
+                    parsed["factuality"], parsed["uncovered"] = 0.0, None
+                r.update(factuality=parsed["factuality"], uncovered=parsed["uncovered"],
+                         coherent=parsed["coherent"], factuality_quarantined=False)
+        r["factuality_model"] = judge_model              # provenance stamp + resume marker
         n_new += 1
         if n_new % save_every == 0:
             save_cb()
@@ -75,20 +75,20 @@ def main():
     assert len(entities) >= max(r["idx"] for r in records) + 1, "entities / record idx misaligned"
     todo = records if args.limit is None else records[:args.limit]
     print(f"labelling {len(todo)}/{len(records)} factscore records with {args.judge} "
-          f"(already done: {sum(1 for r in todo if r.get('faithfulness_model'))})", flush=True)
+          f"(already done: {sum(1 for r in todo if r.get('factuality_model'))})", flush=True)
 
     def save():
         cache.save_records(records, cfg.cache_dir, key)
 
     n_new = label_records(todo, entities, args.judge, save)
     save()
-    lab = [r for r in todo if r.get("faithfulness_model")]
-    fdef = [r["faithfulness"] for r in lab if r.get("faithfulness") is not None]
-    n_noref = sum(1 for r in lab if r.get("faithfulness_no_reference"))
-    n_quar = sum(1 for r in lab if r.get("faithfulness_quarantined"))
+    lab = [r for r in todo if r.get("factuality_model")]
+    fdef = [r["factuality"] for r in lab if r.get("factuality") is not None]
+    n_noref = sum(1 for r in lab if r.get("factuality_no_reference"))
+    n_quar = sum(1 for r in lab if r.get("factuality_quarantined"))
     import numpy as np
     print(f"\nDONE: {n_new} newly labelled -> {cache.records_path(cfg.cache_dir, key)}")
-    print(f"  faithfulness defined: {len(fdef)}" + (f" (mean {np.mean(fdef):.3f})" if fdef else ""))
+    print(f"  factuality defined: {len(fdef)}" + (f" (mean {np.mean(fdef):.3f})" if fdef else ""))
     print(f"  no-reference (title absent from enwiki): {n_noref} | distrust-quarantined: {n_quar}")
 
 

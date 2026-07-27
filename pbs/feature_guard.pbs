@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_feat_guard
+#PBS -j oe
+# Teacher-forced feature-cache guard (2026-07-24): confirms the re-pooled SAPLMA feature caches match the
+# pertok caches at ~1e-6 (exits 1 if any is inline-only). asqa carries its rp12 prompt-regime.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== feature/pertok consistency guard on $(hostname) at $(date) ==="
+# asqa lives in the asqa_rp12 regime (checked on its own so the regime override applies only to it).
+python -u scripts/checks/feature_pertok_consistency.py --datasets asqa --prompt-regime asqa_rp12 --full
+echo "--- now the non-regime refreshed sets ---"
+python -u scripts/checks/feature_pertok_consistency.py --datasets med_quad,samsum,cnn_dailymail --full
+echo "--- expertqa (its own regime) ---"
+python -u scripts/checks/feature_pertok_consistency.py --datasets expertqa --prompt-regime expertqa_rp12 --full

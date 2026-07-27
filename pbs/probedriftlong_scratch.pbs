@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=18:00:00
+#PBS -N luq_pdl_scr
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# ENOSPC-safe ProbeDriftLong: BOTH the .o log and the CSV go to EPHEMERAL scratch (home OST flaps / lost the
+# 07-25 pdl run 3425053 entirely, exit -29). Longer walltime (18h) than the 16h that risked a tail-kill.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+OUT=/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results
+mkdir -p "$OUT"
+echo "=== ProbeDriftLong (scratch out) on $(hostname) at $(date) ==="
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 \
+  --out "$OUT/probedriftlong__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done at $(date) ==="

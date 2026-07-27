@@ -7,11 +7,11 @@ task-family taxonomy (`rung_sources`). `cells()` DISPATCHES per eval target, so 
 of them for ID+OOD just by listing them in its evals.
 
 Two per-target properties the ladders must respect:
-  * LABEL (`label_of`): the correctness-world datasets use `correctness`; ExpertQA uses `faithfulness`
+  * LABEL (`label_of`): the correctness-world datasets use `correctness`; ExpertQA uses `factuality`
     (correctness-vs-gold was tested and rejected — its gold differs too much from the generation). So an ExpertQA
-    OOD rung (correctness-world sources -> faithfulness eval) is flagged `different_label_projection`: the
+    OOD rung (correctness-world sources -> factuality eval) is flagged `different_label_projection`: the
     target is scored on CLAIM PRECISION while the pool was trained on REFERENCE AGREEMENT (see that
-    function's docstring -- the old "factuality vs faithfulness" framing was wrong).
+    function's docstring -- the old "factuality vs factuality" framing was wrong).
     UPDATE 2026-07-22 (author's decision): ExpertQA and ASQA are ORDINARY TRAINING SOURCES, not eval-only,
     so pools are MIXED-LABEL by default and the flag is how those cells stay identifiable.
   * EVAL SPLIT (`eval_split`): the XL sets are split-less (ExpertQA all-`test`; med_quad/samsum all-`train`), so
@@ -52,35 +52,35 @@ XL_TEST_FRAC = 0.30      # held-out test carved from a split-less XL eval target
 # ExpertQA ships TWO independently-computed judge labels, and which one we score on is a real research
 # choice, so it is switchable from the environment (no per-driver flag needed -- every driver that calls
 # label_of() picks it up):
-#   faithfulness (default) -- SUPPORTED/(SUPPORTED+CONTRADICTED) over the claims the expert reference can
+#   factuality (default) -- SUPPORTED/(SUPPORTED+CONTRADICTED) over the claims the expert reference can
 #                             adjudicate. Judge-knowledge-independent, but only covers ~44% of the answer's
 #                             claims and is NULL for 292/2016 rows (all-claims-uncovered).
 #   consistency             -- the WHOLE-ANSWER judge (~0 blind spot): 2016/2016 rows labelled, harsher
-#                             (mean 0.529 vs 0.678), correlates r=0.72 / rho=0.73 with faithfulness, and is
+#                             (mean 0.529 vs 0.678), correlates r=0.72 / rho=0.73 with factuality, and is
 #                             NOT more length-biased (-0.205 vs -0.227), which was the standing objection.
 # Running both and comparing is the point: if the method ranking is stable across two independent label
 # definitions that is genuine robustness; if it flips, that is itself the finding.
 #     LUQ_EXPERTQA_LABEL=consistency python scripts/checks/<driver>.py ...
-_EXPERTQA_LABEL = os.environ.get("LUQ_EXPERTQA_LABEL", "faithfulness")
-if _EXPERTQA_LABEL not in ("faithfulness", "consistency"):
-    raise SystemExit(f"LUQ_EXPERTQA_LABEL must be faithfulness|consistency, got {_EXPERTQA_LABEL!r}")
-_LABEL_OF = {"expertqa": _EXPERTQA_LABEL}
+_EXPERTQA_LABEL = os.environ.get("LUQ_EXPERTQA_LABEL", "factuality")
+if _EXPERTQA_LABEL not in ("factuality", "consistency"):
+    raise SystemExit(f"LUQ_EXPERTQA_LABEL must be factuality|consistency, got {_EXPERTQA_LABEL!r}")
+_LABEL_OF = {"expertqa": _EXPERTQA_LABEL, "factscore": "factuality"}   # factscore = ExpertQA's factuality partner
 
 
 def label_of(dataset):
-    """The correctness signal to score `dataset` on (default `correctness`; ExpertQA -> `faithfulness`)."""
+    """The correctness signal to score `dataset` on (default `correctness`; ExpertQA -> `factuality`)."""
     return _LABEL_OF.get(dataset, "correctness")
 
 
 def different_label_projection(eval_dataset):
     """True if this eval target's label measures a DIFFERENT PROJECTION of "good" than the training sources.
 
-    Renamed from `cross_label` (2026-07-22) because that name implied the old factuality-vs-faithfulness
+    Renamed from `cross_label` (2026-07-22) because that name implied the old factuality-vs-factuality
     story, which reading the three judge prompts showed to be wrong. The real distinction:
 
       * QA judge (sciq/trivia/pubmed/med_quad) and SUMMARISATION judge (xsum/cnn/samsum) both score
         REFERENCE AGREEMENT -- how much the output matches the gold answer / gold summary. Both penalise
-        incompleteness. (Note this means our summarisation label is NOT faithfulness-to-source: the article
+        incompleteness. (Note this means our summarisation label is NOT factuality-to-source: the article
         is in the judge's context but the criterion is match-to-gold-summary.)
       * ExpertQA scores CLAIM PRECISION -- SUPPORTED/(SUPPORTED+CONTRADICTED) -- and is explicitly
         instructed NOT to reward similarity to the reference and NOT to penalise being less complete.

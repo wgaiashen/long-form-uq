@@ -102,7 +102,7 @@ def main():
         if yte_ref is None:
             continue
         stats = {m: (float(np.mean(per[m])), float(np.std(per[m]))) for m in per if per[m]}
-        fair_name = max(("floor_sum", "floor_ppl", "floor_min"), key=lambda f: stats[f][0])
+        fair_name = "floor_min" if "floor_min" in stats else max(("floor_sum", "floor_ppl", "floor_min"), key=lambda f: stats[f][0])  # PRE-REGISTERED msp_min bar (2026-07-24)
         stats["fair_floor"] = stats[fair_name]
         avg = {m: np.mean(np.stack(unc_acc[m]), 0) for m in unc_acc if unc_acc[m]}
         avg["fair_floor"] = avg[fair_name]

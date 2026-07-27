@@ -43,6 +43,44 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
 # ---- the FAIR unsupervised floor -------------------------------------------------------------------
 FLOOR_AGGREGATES = ("sum", "perplexity", "min")
 
+# ---- the PRE-REGISTERED primary floor (2026-07-24 meeting decision) ---------------------------------
+# Joe rejected max-of-three ("gives the baseline three shots; one may look good by chance"). Instead we
+# FIX ONE aggregate in advance and use it as the bar on EVERY dataset. `min` is chosen because it is the
+# strongest averaged ACROSS datasets (cross-dataset mean PRR: min ~0.28 > perplexity ~0.21 > sum ~0.20),
+# and because pre-committing to one aggregate with no per-dataset hindsight is the deployment-honest choice.
+# Report the three-variant row per dataset regardless, and where a DIFFERENT variant is the strongest free
+# score on a dataset (cnn/samsum -> perplexity) DUAL-REPORT against it too (see STOCKTAKE_post24July).
+PRIMARY_FLOOR_AGG = "min"
+
+
+def all_floors(records_te, prr_fn=None, y_te=None, aggregates=FLOOR_AGGREGATES):
+    """Every floor variant's per-example uncertainty vector, keyed by aggregate name (`msp_<agg>`).
+
+    This is what feeds the per-dataset THREE-VARIANT floor table (sum / perplexity / min), which we always
+    show. If `prr_fn` and `y_te` are given, also returns a dict of each variant's PRR. Read-only over the
+    cached logprobs -- deterministic, CPU-only.
+    """
+    cands = {f"msp_{a}": np.asarray([msp_uncertainty(r["token_logprobs"], a) for r in records_te],
+                                    dtype=float)
+             for a in aggregates}
+    if prr_fn is not None and y_te is not None:
+        prrs = {name: prr_fn(y_te, vec) for name, vec in cands.items()}
+        return cands, prrs
+    return cands
+
+
+def primary_floor(records_te, agg: str = PRIMARY_FLOOR_AGG):
+    """The PRE-REGISTERED primary unsupervised bar, FIXED across all datasets (default = msp_min).
+
+    Use THIS for every 'beats the floor' verdict going forward (replaces the rejected max-of-three
+    `fair_floor` for the verdict). `fair_floor` is retained only where the max-of-three view is explicitly
+    wanted, and `all_floors` for the per-dataset three-variant table.
+
+    Returns (vector, name) e.g. (..., "msp_min") -- carry the name so the bar is unambiguous in the CSV.
+    """
+    vec = np.asarray([msp_uncertainty(r["token_logprobs"], agg) for r in records_te], dtype=float)
+    return vec, f"msp_{agg}"
+
 
 def fair_floor(records_te, y_te, prr_fn, aggregates=FLOOR_AGGREGATES):
     """The honest unsupervised bar for a cell: the BEST-scoring of the standard MSP floors.

@@ -21,7 +21,7 @@ It REUSES the verified building blocks -- it does not reimplement any estimator:
 Rows: msp_sum (floor), mean-pool+MLP, last-token, per-sentence(mean), per-token(mean),
       uniform(frozen-q), attention, weighted_msp_norm (pairwise), weighted_msp_blondel.
 Cols (rungs): ID, SameTask, LOO, OneDatasetDiffTask, DiffTask.  Evals: sciq, trivia_qa, pubmed_qa.
-Each cell = 3-seed mean +/- std, and beats_floor = (mean PRR > that cell's msp_sum PRR).
+Each cell = 3-seed mean +/- std, and beats_floor = (mean PRR > that cell's PRE-REGISTERED msp_min bar).
 
 ID-diagonal gates (same discipline as the parents): mean-pool ID must reproduce the cached SAPLMA
 L15 PRR, and the poolers must reproduce the aggregation-table ID anchors.
@@ -187,7 +187,9 @@ def main():
             # `msp_sum` is honestly named, so it STAYS as-is; we ADD the other two standard floors and the
             # fair floor, because msp_sum is the WEAKEST of the three on all 9 datasets and every
             # `beats_floor` flag below was therefore computed against too low a bar (2026-07-22).
-            _fv, _fname = msp.fair_floor([records[i] for i in te_idx], yte, results.prr)
+            # PRE-REGISTERED msp_min bar (2026-07-24 meeting) -- replaces the rejected max-of-three; the
+            # `beats_floor` flag below now compares against THIS, not bare msp_sum.
+            _fv, _fname = msp.primary_floor([records[i] for i in te_idx])
             per_method["fair_floor"].append(results.prr(yte, _fv))
             floor_which.append(_fname)
             print(f"    [{rung}/{X}] seed {sd} done", flush=True)
@@ -195,7 +197,7 @@ def main():
         stats = {m: (float(np.mean(v)), float(np.std(v))) for m, v in per_method.items() if v}
         if not stats:
             continue
-        floor = stats.get("msp_sum", (float("nan"), 0.0))[0]
+        floor = stats.get("fair_floor", stats.get("msp_sum", (float("nan"), 0.0)))[0]   # msp_min bar (2026-07-24)
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
         print(f"\n[{rung:18s}] eval={X}  train={srcs}", flush=True)
         for m in methods_order:

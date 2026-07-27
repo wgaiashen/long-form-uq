@@ -86,7 +86,7 @@ def main():
         te = np.where(PT[X][1] == "test")[0]
         yte = PT[X][2][te]
         # FAIR floor (2026-07-22): best of {msp_sum, perplexity, msp_min}; msp_sum is the weakest on all 9.
-        u, _fname = msp.fair_floor([PT[X][3][i] for i in te], yte, results.prr)
+        u, _fname = msp.primary_floor([PT[X][3][i] for i in te])  # PRE-REGISTERED msp_min bar (2026-07-24)
         return float(results.prr(yte, u))
 
     eps_hdr = "".join(f" bl@{e:<5g}" for e in args.eps)

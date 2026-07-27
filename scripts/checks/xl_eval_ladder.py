@@ -135,7 +135,7 @@ def main():
                 yte = y_X[te_e]
 
                 # FAIR floor (fixed 2026-07-22): best of {msp_sum, perplexity, msp_min}, not bare msp_sum.
-                _fv, _fname = msp.fair_floor([rc[i] for i in te_idx], yte, results.prr)
+                _fv, _fname = msp.primary_floor([rc[i] for i in te_idx])   # PRE-REGISTERED msp_min bar (2026-07-24)
                 per["msp_floor"].append(results.prr(yte, _fv))
                 Xm = np.stack([np.asarray(s).mean(axis=0) for s in st])
                 per["saplma"].append(results.prr(yte, probe.uncertainty(

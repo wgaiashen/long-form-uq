@@ -1,10 +1,10 @@
-"""Whole-answer faithfulness label for ExpertQA — evaluate a proposed UPGRADE of the current
-covered-claims label. Instead of faithfulness over only the ~36% of Llama's answer the gold can
+"""Whole-answer factuality label for ExpertQA — evaluate a proposed UPGRADE of the current
+covered-claims label. Instead of factuality over only the ~36% of Llama's answer the gold can
 adjudicate (three-state judge, abstains on UNCOVERED), score Llama's WHOLE answer against the
 expert-revised reference (xsum-style consistency), so there is ~0 blind spot.
 
 FRAMING (Gaia's, kept honest): this is FAITHFULNESS to an expert reference, NOT factuality. It does
-not turn ExpertQA into a factuality task; it makes the existing faithfulness label whole-answer
+not turn ExpertQA into a factuality task; it makes the existing factuality label whole-answer
 instead of 36%-visible. Reuse the mini judge (r=0.86 vs gpt-5). No regeneration.
 
 Claude's reservation (see worklog 2026-07-07): the blind spot is a real property (Llama answers
@@ -74,7 +74,7 @@ def step1():
 
     L = [
         "=" * 78,
-        "STEP 1 — reference coverage gate (whole-answer faithfulness label)",
+        "STEP 1 — reference coverage gate (whole-answer factuality label)",
         "=" * 78,
         f"records: {len(recs)} | join: positional idx (no 'split' dim, all ID), "
         f"{collisions} question mismatches (0 = clean 1:1, no key collisions).",
@@ -127,9 +127,9 @@ Score:
 
 
 def category(r):
-    if r.get("faithfulness_quarantined") or r.get("coherent") is False:
+    if r.get("factuality_quarantined") or r.get("coherent") is False:
         return "distrust"
-    if r.get("faithfulness") is None:
+    if r.get("factuality") is None:
         return "all_uncovered"
     return "covered"
 
@@ -178,10 +178,10 @@ def step2(judge_model="gpt-5-mini"):
         score = llm_judge.parse_score(llm_judge._gpt_response(prompt, judge_model))
         out[str(i)] = {
             "idx": i, "category": category(r),
-            "new_label": score,                      # whole-answer match faithfulness (None if unparseable)
-            "old_faithfulness": r.get("faithfulness"),
+            "new_label": score,                      # whole-answer match factuality (None if unparseable)
+            "old_factuality": r.get("factuality"),
             "old_uncovered": r.get("uncovered"),
-            "old_quarantined": bool(r.get("faithfulness_quarantined")),
+            "old_quarantined": bool(r.get("factuality_quarantined")),
             "old_coherent": r.get("coherent"),
             "gen_len": len(r["gen_text"].strip()),
             "ref_len": len(s["reference"]),
@@ -242,13 +242,13 @@ def step3():
           f"{np.mean([d['new_label'] for d in dt if d['new_label'] is not None]):.3f} "
           f"(should be LOW — a derailed answer isn't faithful either)"]
 
-    # Spearman new vs old covered-claims faithfulness (both defined, covered subset)
-    pairs = [(d["new_label"], d["old_faithfulness"]) for d in cov
-             if d["new_label"] is not None and d["old_faithfulness"] is not None]
+    # Spearman new vs old covered-claims factuality (both defined, covered subset)
+    pairs = [(d["new_label"], d["old_factuality"]) for d in cov
+             if d["new_label"] is not None and d["old_factuality"] is not None]
     if pairs:
         a, b = zip(*pairs)
         p, s = _corr(a, b)
-        L += ["", f"NEW vs OLD covered-claims faithfulness (covered subset, n={len(pairs)}): "
+        L += ["", f"NEW vs OLD covered-claims factuality (covered subset, n={len(pairs)}): "
                   f"Pearson {p:.2f} Spearman {s:.2f}  (agreement where both see the answer)"]
 
     # ---- THE GATE: breadth-bias diagnostics ----
@@ -273,14 +273,14 @@ def step3():
           "    strong NEGATIVE => longer answers penalised regardless of quality (breadth artifact)."]
 
     # (3) eyeball: low-new / high-old-covered — bias (correct-but-different) or real (bad answer)?
-    susp = sorted([d for d in cov if d["new_label"] is not None and d["old_faithfulness"] is not None
-                   and d["new_label"] <= 0.3 and d["old_faithfulness"] >= 0.7],
+    susp = sorted([d for d in cov if d["new_label"] is not None and d["old_factuality"] is not None
+                   and d["new_label"] <= 0.3 and d["old_factuality"] >= 0.7],
                   key=lambda d: d["new_label"])
     L += ["", f"(3) low-new(<=0.3) but high-old-covered(>=0.7): {len(susp)} cases "
               "(each = old covered-claims judged the answer faithful, new match judged it unfaithful)."]
     for d in susp[:4]:
         i = d["idx"]
-        L += [f"    [idx {i}] new {d['new_label']:.2f} / old {d['old_faithfulness']:.2f} / "
+        L += [f"    [idx {i}] new {d['new_label']:.2f} / old {d['old_factuality']:.2f} / "
               f"uncov {d['old_uncovered']:.2f} | Q: {src[i]['question'][:80]}",
               f"        LLAMA: {recs[i]['gen_text'].strip()[:150].replace(chr(10),' ')}",
               f"        REF  : {src[i]['reference'][:150].replace(chr(10),' ')}"]
@@ -375,10 +375,10 @@ def step5():
           f"DISTRUST subset under consistency: n={len(dt)} mean {np.mean([d['cons_label'] for d in dt]):.3f} "
           "(should still be LOW — a derailed/off-topic answer is inconsistent/incorrect)"]
 
-    # agreement with old covered-claims faithfulness (should stay POSITIVE — still catches errors)
-    pc = [(d["cons_label"], d["old_faithfulness"]) for d in cov if d["old_faithfulness"] is not None]
+    # agreement with old covered-claims factuality (should stay POSITIVE — still catches errors)
+    pc = [(d["cons_label"], d["old_factuality"]) for d in cov if d["old_factuality"] is not None]
     a, b = zip(*pc); p, s = _corr(a, b)
-    L += ["", f"CONSISTENCY vs OLD covered-claims faithfulness (n={len(pc)}): Pearson {p:.2f} Spearman {s:.2f} "
+    L += ["", f"CONSISTENCY vs OLD covered-claims factuality (n={len(pc)}): Pearson {p:.2f} Spearman {s:.2f} "
               "(want POSITIVE — both should flag genuine errors)"]
 
     # THE GATE — breadth-bias must now be ~0 (not negative like the match label's -0.27)
@@ -391,15 +391,15 @@ def step5():
           f"(2) consistency vs answer LENGTH (n={len(bl)}): Pearson {p2:.2f} Spearman {s2:.2f}"]
 
     # did the match label's 24 correct-but-different flips get rescued?
-    flips = [d for d in cov if d.get("new_label") is not None and d["old_faithfulness"] is not None
-             and d["new_label"] <= 0.3 and d["old_faithfulness"] >= 0.7]
+    flips = [d for d in cov if d.get("new_label") is not None and d["old_factuality"] is not None
+             and d["new_label"] <= 0.3 and d["old_factuality"] >= 0.7]
     resc = [d for d in flips if d["cons_label"] >= 0.6]
     L += ["", f"MATCH's correct-but-different flips ({len(flips)}): now {len(resc)} score >=0.6 under consistency "
               "(rescued = no longer wrongly penalised for being different)."]
     for d in sorted(flips, key=lambda d: d["cons_label"], reverse=True)[:4]:
         i = d["idx"]
         L += [f"    [idx {i}] match {d['new_label']:.2f} -> consistency {d['cons_label']:.2f} | "
-              f"old-covered {d['old_faithfulness']:.2f} | Q: {src[i]['question'][:70]}"]
+              f"old-covered {d['old_factuality']:.2f} | Q: {src[i]['question'][:70]}"]
 
     def verdict(bias_s, hi_frac, agree_s):
         if bias_s == bias_s and bias_s <= -0.20:
@@ -422,7 +422,7 @@ def step5():
 
 def step6(judge_model="gpt-5-mini"):
     """Write `consistency` (+ consistency_model, consistency_quarantined) into the records cache for
-    ALL 2016, as a SECONDARY whole-answer label ALONGSIDE the covered-claims `faithfulness` (never
+    ALL 2016, as a SECONDARY whole-answer label ALONGSIDE the covered-claims `factuality` (never
     overwrites it). Same distrust rule as covered-claims (SEVERE or coherent=false -> 0, skip judge)
     so both labels quarantine the identical set. Reuses the 200-sample non-distrust scores. Resumable
     via the `consistency_model` stamp."""
@@ -479,8 +479,8 @@ def step7():
     quar = [r for r in lab if r.get("consistency_quarantined")]
     # non-quarantined, genuinely judged (for the bias check we need real judge scores)
     judged = [r for r in lab if not r.get("consistency_quarantined") and r.get("consistency") is not None]
-    # recovered: previously all-uncovered (old faithfulness None, not quarantined) now have consistency
-    recovered = [r for r in judged if r.get("faithfulness") is None]
+    # recovered: previously all-uncovered (old factuality None, not quarantined) now have consistency
+    recovered = [r for r in judged if r.get("factuality") is None]
 
     def _corr(a, b):
         a, b = np.asarray(a, float), np.asarray(b, float)
@@ -492,9 +492,9 @@ def step7():
     # breadth bias on the full set: consistency vs old-uncovered, over records with a defined uncovered
     bu = [(r["consistency"], r["uncovered"]) for r in judged if r.get("uncovered") is not None]
     a, b = zip(*bu); p1, s1 = _corr(a, b)
-    # agreement with covered-claims faithfulness where both defined & not quarantined
-    fj = [(r["consistency"], r["faithfulness"]) for r in judged
-          if r.get("faithfulness") is not None and not r.get("faithfulness_quarantined")]
+    # agreement with covered-claims factuality where both defined & not quarantined
+    fj = [(r["consistency"], r["factuality"]) for r in judged
+          if r.get("factuality") is not None and not r.get("factuality_quarantined")]
     a, b = zip(*fj); p2, s2 = _corr(a, b)
     cons = np.array([r["consistency"] for r in defd])
 
@@ -508,11 +508,11 @@ def step7():
          "",
          f"breadth bias (consistency vs old-uncovered, judged n={len(bu)}): Pearson {p1:.2f} Spearman {s1:.2f} "
          f"(want ~0; sample was -0.07)",
-         f"agreement w/ covered-claims faithfulness (n={len(fj)}): Pearson {p2:.2f} Spearman {s2:.2f} "
+         f"agreement w/ covered-claims factuality (n={len(fj)}): Pearson {p2:.2f} Spearman {s2:.2f} "
          f"(sample was 0.67/0.63)",
          "",
          "SECONDARY label stamped as `consistency` (+consistency_model, consistency_quarantined); the",
-         "covered-claims `faithfulness` is untouched. Both quarantine the identical distrust set.",
+         "covered-claims `factuality` is untouched. Both quarantine the identical distrust set.",
          "-" * 78]
     text = "\n".join(L)
     with open(OUT, "a") as f:

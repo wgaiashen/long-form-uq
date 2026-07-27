@@ -118,9 +118,9 @@ def main():
             _cands = {k: np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], k)
                                      for i in te_idx], dtype=float)
                       for k in ("sum", "perplexity", "min")}
-            _best = max(_cands, key=lambda k: results.prr(yte, _cands[k]))
-            floor = _cands[_best]
-            floor_name = _best
+            # PRE-REGISTERED msp_min bar (2026-07-24 meeting) -- replaces the rejected max-of-three.
+            floor = _cands[msp.PRIMARY_FLOOR_AGG]
+            floor_name = f"msp_{msp.PRIMARY_FLOOR_AGG}"
             prr["fair_floor"].append(results.prr(yte, floor))
 
         if yte_ref is None:

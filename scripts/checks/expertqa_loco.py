@@ -5,7 +5,7 @@ on N-1 expert clusters, test on the held-out cluster -- a topic shift MILDER tha
 the SAPLMA L15 features and both judge labels are already cached (cache/expertqa_rp12), no generation.
 
 TWO LABELS, side by side, NEVER merged into `correctness`, never mixed (both gpt-5-mini):
-  faithfulness  covered-claims three-state judge. 292 all-uncovered rows are None (no signal -> DROPPED).
+  factuality  covered-claims three-state judge. 292 all-uncovered rows are None (no signal -> DROPPED).
                 ~64% blind spot but cleaner. 237 SEVERE-derailed rows are quarantined to 0.0 (kept: a
                 derailed answer IS untrustworthy).
   consistency   whole-answer non-contradiction judge. Defined for all 2016 (recovers the 292). Bimodal /
@@ -22,7 +22,7 @@ Lihu's note), plus an ID reference (a stratified random pooled split) so the ID-
 domain-shift penalty. A paired test-set bootstrap gives a CI on SAPLMA-vs-floor per cluster.
 
     python scripts/checks/expertqa_loco.py                 # both labels, seeds 1,2,3
-    python scripts/checks/expertqa_loco.py --labels faithfulness --seeds 1
+    python scripts/checks/expertqa_loco.py --labels factuality --seeds 1
 """
 import argparse
 import csv as _csv
@@ -78,7 +78,7 @@ def floor_unc(recs_te, y_te=None):
         print("  WARNING: floor_unc called without labels -> falling back to bare msp_sum (NOT the fair floor)",
               flush=True)
         return np.array([msp.msp_uncertainty(r["token_logprobs"], "sum") for r in recs_te], dtype=float)
-    vec, _name = msp.fair_floor(recs_te, y_te, results.prr)
+    vec, _name = msp.primary_floor(recs_te)  # PRE-REGISTERED msp_min bar (2026-07-24)
     return vec
 
 
@@ -175,7 +175,7 @@ def run_label(X, recs, label, seeds, out_rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--labels", nargs="+", default=["faithfulness", "consistency"])
+    ap.add_argument("--labels", nargs="+", default=["factuality", "consistency"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3])
     args = ap.parse_args()
     X, recs = load_data()

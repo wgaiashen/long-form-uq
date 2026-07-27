@@ -13,26 +13,26 @@ scored correct):
   - UNCOVERED   : the reference neither states nor implies it (plausible-but-unaddressed).
 
 Outputs, as JSON:
-  - faithfulness : SUPPORTED / (SUPPORTED + CONTRADICTED) — a PURE PROPORTION, every claim weighted
+  - factuality : SUPPORTED / (SUPPORTED + CONTRADICTED) — a PURE PROPORTION, every claim weighted
                    equally, NO severity weighting (severity is a second axis the judge applies
                    inconsistently across expert domains; add it later with data if proportion misses
                    catastrophic-error-buried-in-trivial-truths). Different denominator from uncovered
                    (covered claims only). Judge-knowledge-INDEPENDENT — it never asks the judge to
                    know the truth of an uncovered claim, so it stays robust on the expert long tail.
-  - uncovered    : UNCOVERED / (all substantive claims). RECORDED, not folded into faithfulness — it
+  - uncovered    : UNCOVERED / (all substantive claims). RECORDED, not folded into factuality — it
                    quantifies the benchmark's blind spot (how much of the model's output that
-                   faithfulness-to-evidence cannot see). Different denominator, do not co-normalise.
+                   factuality-to-evidence cannot see). Different denominator, do not co-normalise.
   - coherent     : false if the answer collapses into incoherent / non-language text, word-salad,
                    list-spam, or code (the degenerate-tail rule). coherent=false FORCES
-                   faithfulness=0.0 and uncovered=0.0, regardless of a good opening.
+                   factuality=0.0 and uncovered=0.0, regardless of a good opening.
 
 STAMPED downstream label decision (uniform, so no discontinuity in the trust signal the probe learns):
 degenerate generations are a DISTRUST LABEL, NOT dropped. Both severities get the same treatment:
-  - SEVERE (detector-quarantined pre-judge, luq.degeneracy.is_severe): faithfulness=0.0, not judged.
-  - coherent=false (marginal survivor that opened clean then derailed on a hard question): faithfulness=0.0.
+  - SEVERE (detector-quarantined pre-judge, luq.degeneracy.is_severe): factuality=0.0, not judged.
+  - coherent=false (marginal survivor that opened clean then derailed on a hard question): factuality=0.0.
 Quarantined-severe and coherent-false-marginal are the SAME failure mode at different severities;
 dropping one and distrust-labelling the other would put a discontinuity into exactly the region of
-the trust signal the probe is learning. So both -> distrust label (faithfulness=0.0), uniformly.
+the trust signal the probe is learning. So both -> distrust label (factuality=0.0), uniformly.
 
 Judge model: re-validate gpt-5-mini vs gpt-5 on THIS prompt before adopting (the old r=0.83 was on
 the old gold-matching prompt); use one judge for both train and eval.
@@ -63,17 +63,17 @@ reference claims and citations only.
 
 If the model answer collapses into incoherent or non-language text, word-salad, list-spam, or code —
 even after a coherent opening — mark it not coherent: such an answer is untrustworthy as a whole. If
-coherent is false, faithfulness must be 0.0 and uncovered must be 0.0, regardless of the answer's opening.
+coherent is false, factuality must be 0.0 and uncovered must be 0.0, regardless of the answer's opening.
 
-Compute faithfulness as a PURE PROPORTION: SUPPORTED / (SUPPORTED + CONTRADICTED), weighting every
+Compute factuality as a PURE PROPORTION: SUPPORTED / (SUPPORTED + CONTRADICTED), weighting every
 claim equally with no severity weighting. For example, an answer with one supported and one
-contradicted claim scores 1 / (1 + 1) = 0.5. Faithfulness is computed ONLY over SUPPORTED +
+contradicted claim scores 1 / (1 + 1) = 0.5. Factuality is computed ONLY over SUPPORTED +
 CONTRADICTED claims; uncovered is computed over ALL substantive claims. These are different
 denominators — do not normalise them together. If there are NO supported and NO contradicted claims
-(every substantive claim is uncovered), faithfulness is undefined — set it to null.
+(every substantive claim is uncovered), factuality is undefined — set it to null.
 
 Respond with ONLY a JSON object, no explanation:
-{"faithfulness": <0.0-1.0 = SUPPORTED / (SUPPORTED + CONTRADICTED); null if no covered claims>,
+{"factuality": <0.0-1.0 = SUPPORTED / (SUPPORTED + CONTRADICTED); null if no covered claims>,
  "uncovered": <0.0-1.0 = UNCOVERED / (all substantive claims)>,
  "coherent": <true|false>}
 
@@ -84,13 +84,13 @@ Reference: Early-stage Hodgkin lymphoma is usually treated with combination chem
 ABVD) together with involved-site radiotherapy; the number of cycles depends on risk group. [Evidence: treatment guideline excerpt]
 Model Answer: Early-stage Hodgkin lymphoma is generally managed with ABVD chemotherapy, often
 followed by radiation to the involved region. The exact number of cycles is chosen by risk group.
-{"faithfulness": 1.0, "uncovered": 0.0, "coherent": true}
+{"factuality": 1.0, "uncovered": 0.0, "coherent": true}
 
 Question: What are the main functions of the liver?
 Reference: The liver detoxifies metabolites, synthesises proteins such as albumin and clotting
 factors, and produces bile that aids digestion. [Evidence: physiology textbook excerpt]
 Model Answer: The liver produces bile that helps digestion. It plays no role in protein synthesis.
-{"faithfulness": 0.5, "uncovered": 0.0, "coherent": true}
+{"factuality": 0.5, "uncovered": 0.0, "coherent": true}
 
 Question: What factors drive antibiotic resistance in hospital settings?
 Reference: Antibiotic resistance in hospitals is driven mainly by over-prescription of broad-spectrum
@@ -98,14 +98,14 @@ antibiotics and by poor hand-hygiene compliance enabling transmission. [Evidence
 Model Answer: Hospital antibiotic resistance is driven by over-prescription of broad-spectrum agents.
 It is also caused primarily by contaminated hospital water systems, which are the single largest
 reservoir of resistant organisms in most hospitals.
-{"faithfulness": 1.0, "uncovered": 0.5, "coherent": true}
+{"factuality": 1.0, "uncovered": 0.5, "coherent": true}
 
 Question: How does the Coriolis effect influence large-scale weather systems?
 Reference: The Coriolis effect deflects moving air to the right in the Northern Hemisphere and to the
 left in the Southern Hemisphere, giving cyclones their rotation. [Evidence: atmospheric-science text]
 Model Answer: The Coriolis effect deflects moving air and shapes cyclone rotation refrigerators
 washing machines dishwashers ovens toasters kettles blenders microwaves freezers.
-{"faithfulness": 0.0, "uncovered": 0.0, "coherent": false}
+{"factuality": 0.0, "uncovered": 0.0, "coherent": false}
 
 Question: %%QUESTION%%
 Reference: %%REFERENCE%%
@@ -115,7 +115,7 @@ Model Answer: %%ANSWER%%
 
 def fill(question: str, reference: str, answer: str) -> str:
     """Fill the template. Uses str.replace (NOT str.format) because the prompt contains literal
-    JSON braces {"faithfulness": ...} in its examples, which str.format would misparse as fields."""
+    JSON braces {"factuality": ...} in its examples, which str.format would misparse as fields."""
     return (PROMPT.replace("%%QUESTION%%", question)
                   .replace("%%REFERENCE%%", reference)
                   .replace("%%ANSWER%%", answer))
@@ -145,7 +145,7 @@ def parse(text: str):
     except json.JSONDecodeError:
         return None
     try:
-        fraw = d["faithfulness"]
+        fraw = d["factuality"]
         f = None if fraw is None else float(fraw)   # null = undefined (all claims uncovered)
         u = float(d["uncovered"]); c = bool(d["coherent"])
     except (KeyError, ValueError, TypeError):
@@ -154,4 +154,4 @@ def parse(text: str):
         return None
     if not (0.0 <= u <= 1.0):
         return None
-    return {"faithfulness": f, "uncovered": u, "coherent": c}
+    return {"factuality": f, "uncovered": u, "coherent": c}

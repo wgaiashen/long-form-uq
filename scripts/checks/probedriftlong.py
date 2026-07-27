@@ -10,7 +10,8 @@ LONG UNIVERSE: pubmed_qa, xsum, cnn_dailymail, med_quad, samsum, expertqa, asqa.
   is MIXED-LABEL by default (ExpertQA = claim-precision, the rest = reference-agreement). Cells are tagged
   `different_label_projection`. `--label-homogeneous` drops ExpertQA from the sources to reproduce the
   pre-2026-07-22 baseline as the control.
-  FINE families: long_qa = {pubmed_qa, med_quad, expertqa, asqa};  summ = {xsum, cnn_dailymail, samsum}.
+  FINE families: correctness_qa = {pubmed_qa, med_quad, asqa};  factuality = {expertqa, factscore};
+  summ = {xsum, cnn_dailymail, samsum}.  (factuality split from correctness_qa on 2026-07-27.)
 
 RUNGS (long eval X): ID | SameTask-long (other long sets in X's family) | LOO-long (all other long sets)
   | DiffTask-long (opposite long family) | 1ds-Diff-long (one opposite-family long set).
@@ -39,14 +40,21 @@ from attn_pool import train_attn, select_temperature  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
-LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
+LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
 # Training sources for the long-only ladder. ASQA and ExpertQA are ordinary sources here, same as the rest
 # (author's decision 2026-07-22) -- so the long pool is MIXED-LABEL by default (ExpertQA = faithfulness,
 # the others = correctness). Cells are still tagged `different_label_projection` so they stay identifiable. A dataset is
 # always excluded from its OWN eval's sources by cells_long(), so this never leaks train into test.
-LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
+LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
 SHORT = ["sciq", "trivia_qa"]
-FINE = {"pubmed_qa": "long_qa", "med_quad": "long_qa", "expertqa": "long_qa", "asqa": "long_qa",
+# FINE families (2026-07-27 FACTUALITY-FAMILY SPLIT): correctness-QA (correctness vs a gold answer) is kept
+# SEPARATE from factuality (claim-support vs an external reference), so SameTask means same PROPERTY. asqa
+# stays with pubmed/med_quad (correctness QA, per author); expertqa pairs with factscore (factuality).
+# ⚠️ The factuality family is {expertqa, factscore}, so a factuality eval's SameTask-long is EMPTY until
+# factscore's cache lands on RCS (post-DoC-rsync). Re-run §C.3 for the affected long evals (pubmed/med_quad/
+# asqa lose expertqa from SameTask; expertqa/factscore gain each other) once factscore is cached.
+FINE = {"pubmed_qa": "correctness_qa", "med_quad": "correctness_qa", "asqa": "correctness_qa",
+        "expertqa": "factuality", "factscore": "factuality",
         "xsum": "summ", "cnn_dailymail": "summ", "samsum": "summ"}
 XL_TOTAL = 1800
 EVALS = LONG + SHORT
@@ -206,15 +214,23 @@ def main():
         if yte_ref is None:
             continue
         stats = {m: (float(np.mean(per[m])), float(np.std(per[m]))) for m in per if per[m]}
-        # fair floor = the best of the three unsupervised floors (by mean PRR)
-        fair_name = max(FLOORS, key=lambda f: stats[f][0]); stats["fair_floor"] = stats[fair_name]
+        # PRE-REGISTERED primary bar = floor_min (msp_min), FIXED across datasets (2026-07-24 meeting);
+        # replaces the rejected max-of-three ("three shots for the baseline"). All three floors are still
+        # persisted (METHODS) for the 3-variant table. `strongest` is tracked only for the DUAL-REPORT note
+        # on datasets where a different variant is the strongest free score (cnn/samsum -> floor_ppl).
+        _FLOOR_KEY = {"sum": "floor_sum", "perplexity": "floor_ppl", "min": "floor_min"}
+        primary_name = _FLOOR_KEY[msp.PRIMARY_FLOOR_AGG]
+        fair_name = primary_name if primary_name in stats else max(FLOORS, key=lambda f: stats[f][0])
+        strongest = max(FLOORS, key=lambda f: stats[f][0])
+        stats["fair_floor"] = stats[fair_name]
         avg = {m: np.mean(np.stack(unc_acc[m]), 0) for m in unc_acc if unc_acc[m]}
         avg["fair_floor"] = avg[fair_name]
         best_w = max((w[0] for w in WMSP), key=lambda m: stats[m][0])
         best_p = max(POOLERS, key=lambda m: stats[m][0])
         srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
         xf = "  [CROSS-LABEL]" if (xlbl and rung != "ID") else ""
-        print(f"\n[{rung:14s}] eval={X} ({label_of(X)}) train={srcs}{xf}  fair_floor={fair_name} {stats['fair_floor'][0]:+.3f}", flush=True)
+        dual = "" if strongest == fair_name else f"  (strongest free = {strongest} {stats[strongest][0]:+.3f}; DUAL-REPORT)"
+        print(f"\n[{rung:14s}] eval={X} ({label_of(X)}) train={srcs}{xf}  primary_floor={fair_name} {stats['fair_floor'][0]:+.3f}{dual}", flush=True)
         for m in METHODS:
             if m in stats:
                 print(f"    {m:14s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)

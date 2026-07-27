@@ -233,15 +233,24 @@ def main():
         # its PRR row and its per-example vector are aliased, so the bootstrap compares against the real bar.
         avail = [f for f in FLOOR_CANDIDATES if f in stats and f in avg_unc]
         if avail:
-            best_floor = max(avail, key=lambda f: stats[f][0])
-            stats["fair_floor"] = stats[best_floor]
-            avg_unc["fair_floor"] = avg_unc[best_floor]
-            print(f"    fair_floor = {best_floor} ({stats[best_floor][0]:+.3f})"
-                  + ("" if len(avail) == 1 else
-                     "  [" + ", ".join(f"{f} {stats[f][0]:+.3f}" for f in avail) + "]"), flush=True)
-            out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{best_floor}",
-                             "prr_mean": round(stats[best_floor][0], 4),
-                             "prr_std": round(stats[best_floor][1], 4), "n_seeds": len(seeds)})
+            # PRE-REGISTERED primary bar = msp_min, FIXED across every dataset (2026-07-24 meeting). This
+            # replaces the rejected max-of-three (Joe: "three shots for the baseline"). We still compute +
+            # persist all three variants (methods list) so the per-dataset 3-variant table stays available,
+            # and where a DIFFERENT variant is the strongest free score (cnn/samsum -> perplexity) we print a
+            # DUAL-REPORT note so the honest "also clears the strongest free score" claim can be made.
+            primary = f"msp_{msp.PRIMARY_FLOOR_AGG}"
+            bar = primary if primary in avail else max(avail, key=lambda f: stats[f][0])
+            strongest = max(avail, key=lambda f: stats[f][0])
+            stats["fair_floor"] = stats[bar]
+            avg_unc["fair_floor"] = avg_unc[bar]
+            note = ("" if len(avail) == 1 else
+                    "  [" + ", ".join(f"{f} {stats[f][0]:+.3f}" for f in avail) + "]")
+            if strongest != bar:
+                note += f"  (strongest free = {strongest} {stats[strongest][0]:+.3f}; DUAL-REPORT)"
+            print(f"    primary_floor = {bar} ({stats[bar][0]:+.3f}){note}", flush=True)
+            out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{bar}",
+                             "prr_mean": round(stats[bar][0], 4),
+                             "prr_std": round(stats[bar][1], 4), "n_seeds": len(seeds)})
         for vk, a, b in COMPARISONS:
             if a in avg_unc and b in avg_unc and yte_ref is not None:
                 mg, lo, hi, p, sig = paired_bootstrap(yte_ref, avg_unc[a], avg_unc[b])

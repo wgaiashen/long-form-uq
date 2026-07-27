@@ -45,8 +45,9 @@ DATASETS = ["sciq", "trivia_qa", "pubmed_qa", "xsum"]
 # The judge model behind the bare `correctness` field, per dataset (for the stamp), matching the
 # ladder / aggregation_table label_model column.
 LABEL_MODEL = {"sciq": "gpt-5", "trivia_qa": "gpt-5", "pubmed_qa": "gpt-5-mini", "xsum": "gpt-5-mini"}
-# The MSP-family variants that define the "MSP floor" a trained probe must beat.
-FLOOR_OF = ["msp_sum", "perplexity"]
+# The PRE-REGISTERED floor a trained probe must beat (2026-07-24 meeting): the SINGLE msp_min bar, fixed
+# across datasets (replaces the rejected max-of-three). All variant rows are still persisted for the table.
+FLOOR_OF = ["msp_min"]
 
 
 def test_records(d):
@@ -95,7 +96,7 @@ def main():
     grid = ladder()
 
     verdicts = []
-    print("\n\n=== Supervised best vs the MSP floor, per rung (floor = best of msp_sum/perplexity) ===")
+    print("\n\n=== Supervised best vs the MSP floor, per rung (floor = PRE-REGISTERED msp_min bar) ===")
     for (setting, ev) in sorted(k for k in grid if k[1] in DATASETS):
         fl = floor.get(ev, {})
         best_floor = max(fl.get(m, -9.0) for m in FLOOR_OF)

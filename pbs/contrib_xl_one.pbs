@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_xl_one
+#PBS -j oe
+# One XL-standard eval per job (avoids the 3-eval walltime kill seen on 3425119). Pass EVAL via -v.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== contribution_ladder XL-std single eval=$EVAL on $(hostname) at $(date) ==="
+# NO --sources override: use the default CANDIDATE_SOURCES (all 9), so the eval's OOD pool is canonical
+# (the 7-source override dropped expertqa+asqa and gave wrong OOD pools — corrected 2026-07-25).
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals "$EVAL" \
+  --out "results/contribution_ladder_xlstd_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done eval=$EVAL at $(date) ==="

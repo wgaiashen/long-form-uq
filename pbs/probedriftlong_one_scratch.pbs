@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_pdl1_scr
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# ENOSPC-safe PER-EVAL ProbeDriftLong: one long eval per job (the full 7-eval job walltime-kills at 18h;
+# one eval ~= 5h). BOTH log (-o) and CSV (--out) go to ephemeral scratch. Pass EVAL via -v.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+OUT=/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results
+mkdir -p "$OUT"
+echo "=== ProbeDriftLong[$EVAL] (scratch out) on $(hostname) at $(date) ==="
+python -u scripts/checks/probedriftlong.py --evals "$EVAL" --seeds 1,2,3 \
+  --out "$OUT/probedriftlong_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done eval=$EVAL at $(date) ==="

@@ -31,7 +31,7 @@ def labeller_running():
 
 def counts():
     recs = cache.load_records(CDIR, KEY)
-    done = [r for r in recs if r.get("faithfulness_model")]
+    done = [r for r in recs if r.get("factuality_model")]
     return recs, done
 
 
@@ -39,11 +39,11 @@ def summarise(recs, done, status):
     import numpy as np
     lines = [f"ExpertQA label summary  —  status: {status}",
              f"records: {len(recs)} | labelled: {len(done)}", ""]
-    fdef = [r["faithfulness"] for r in done if r.get("faithfulness") is not None]
-    n_alluncov = sum(1 for r in done if r.get("faithfulness") is None and not r.get("faithfulness_parse_fail"))
-    n_quar = sum(1 for r in done if r.get("faithfulness_quarantined"))
-    n_incoh = sum(1 for r in done if r.get("coherent") is False and not r.get("faithfulness_quarantined"))
-    n_pf = sum(1 for r in done if r.get("faithfulness_parse_fail"))
+    fdef = [r["factuality"] for r in done if r.get("factuality") is not None]
+    n_alluncov = sum(1 for r in done if r.get("factuality") is None and not r.get("factuality_parse_fail"))
+    n_quar = sum(1 for r in done if r.get("factuality_quarantined"))
+    n_incoh = sum(1 for r in done if r.get("coherent") is False and not r.get("factuality_quarantined"))
+    n_pf = sum(1 for r in done if r.get("factuality_parse_fail"))
     unc = [r["uncovered"] for r in done if r.get("uncovered") is not None]
     if fdef:
         fa = np.array(fdef)
@@ -56,11 +56,11 @@ def summarise(recs, done, status):
                       f">0.5: {np.mean(u>0.5):.0%}"]
     n = len(done) or 1
     lines += ["",
-              f"ALL-uncovered (no faithfulness signal, excluded from probe): {n_alluncov} ({n_alluncov/n:.0%})",
-              f"distrust-quarantined SEVERE (faithfulness=0): {n_quar} ({n_quar/n:.0%})",
-              f"coherent=false marginal (faithfulness=0): {n_incoh} ({n_incoh/n:.0%})",
+              f"ALL-uncovered (no factuality signal, excluded from probe): {n_alluncov} ({n_alluncov/n:.0%})",
+              f"distrust-quarantined SEVERE (factuality=0): {n_quar} ({n_quar/n:.0%})",
+              f"coherent=false marginal (factuality=0): {n_incoh} ({n_incoh/n:.0%})",
               f"judge parse failures: {n_pf} ({n_pf/n:.0%})",
-              "", "judge = gpt-5-mini | label field = `faithfulness` (+ uncovered, coherent, faithfulness_quarantined)",
+              "", "judge = gpt-5-mini | label field = `factuality` (+ uncovered, coherent, factuality_quarantined)",
               "caveats to report: ~12% base-model derailment floor + this ~58%-scale blind spot; ExpertQA -> Role-C."]
     if status != "COMPLETE":
         lines += ["", "RESUME (single writer only):",
