@@ -53,16 +53,21 @@ def mean_norm_entropy(sidecar, records):
     return float(np.mean(vals)), len(vals)
 
 
+WIDENED_DIR = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+
+
 def csv_rows(dataset):
     """{(rung,method): (prr_mean, n_seeds)} from the ONE probedriftlong CSV for this dataset (provenance:
-    attention & uniform therefore come from the same file / same run / same seeds -- asserted in main)."""
-    f = ROOT / "results" / f"probedriftlong_{dataset}__{SLUG}.csv"
+    attention & uniform therefore come from the same file / same run / same seeds -- asserted in main).
+    PREFERS the WIDENED §C.3 CSV (2026-07-28) when present (cnn/pubmed/xsum/expertqa), else the narrow one."""
+    wf = WIDENED_DIR / f"probedriftlong_{dataset}_widened__{SLUG}.csv"
+    f = wf if wf.exists() else (ROOT / "results" / f"probedriftlong_{dataset}__{SLUG}.csv")
     if not f.exists():
-        return {}
+        return {}, "none"
     out = {}
     for r in _csv.DictReader(open(f)):
         out[(r["rung"], r["method"])] = (float(r["prr_mean"]), int(r.get("n_seeds", 0) or 0))
-    return out
+    return out, ("widened" if wf.exists() else "narrow")
 
 
 def records_for(ds):
@@ -85,7 +90,8 @@ def main():
         if not idsc.exists():
             print(f"  {ds}: no ID sidecar -> skip"); continue
         ent_id, _ = mean_norm_entropy(idsc, recs)
-        rows = csv_rows(ds)
+        rows, src = csv_rows(ds)
+        print(f"  [{ds}: §C.3 source = {src}]")
         unif_id = rows.get(("ID", "uniform"), (float("nan"), 0))[0]
         for rung in OOD_LONG:
             sc = viz / f"{cache.run_key(MODEL, ds, 'ID')}__attn__{rung}.npz"

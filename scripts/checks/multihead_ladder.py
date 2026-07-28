@@ -43,6 +43,16 @@ SLUG = "meta-llama_Meta-Llama-3.1-8B"
 DEFAULT_EVALS = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa"]
 
 
+def git_commit():
+    """The exact code version this run used -- stamped on every row so a later join can ASSERT code-match."""
+    try:
+        import subprocess
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(ROOT),
+                                       stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return "unknown"
+
+
 def s3_armA_prr(eval_, rung):
     """arm A (K=1) PRR from the S3 fixed_prior_ladder CSV — the reused baseline (honors 'don't retrain arm A')."""
     f = ROOT / "results" / f"fixed_prior_ladder__{SLUG}.csv"
@@ -92,6 +102,11 @@ def main():
     ap.add_argument("--K", type=int, default=4)
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--rungs", default="", help="base-rung filter; '' = all long OOD + ID")
+    ap.add_argument("--defer-baseline", action="store_true",
+                    help="do NOT read arm A from the S3 CSV as a precondition (S6 training is self-contained). "
+                         "Leaves the K=1 comparison columns EMPTY + stamps baseline_deferred=True, so a blank is "
+                         "never misread as a zero/loss; fill it later with join_arma_baseline.py. Unblocks S6 to "
+                         "run in parallel with S3.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     evals = args.evals.split(","); seeds = [int(s) for s in args.seeds.split(",")]
@@ -100,7 +115,11 @@ def main():
     host = socket.gethostname()
     cluster = "RCS" if (host.startswith("login-") or "cx3" in host) else ("DoC" if ("cloud-vm" in host or host.startswith("gpu")) else host)
     env_hash = hashlib.sha1(f"{sys.version.split()[0]}|torch{torch.__version__}|np{np.__version__}".encode()).hexdigest()[:8]
-    print(f"device {device} | host {host} | cluster {cluster} | env {env_hash} | K={K}", flush=True)
+    commit = git_commit()
+    prov = {"cluster": cluster, "env_hash": env_hash, "commit": commit, "seeds": args.seeds,
+            "baseline_deferred": bool(args.defer_baseline)}   # stamped on EVERY row for the later join's asserts
+    print(f"device {device} | host {host} | cluster {cluster} | env {env_hash} | commit {commit[:12]} | "
+          f"K={K} | defer_baseline={args.defer_baseline}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)  # noqa: F841 (kept for parity / future token diagnostics)
     PT = {}
@@ -157,12 +176,13 @@ def main():
         stats = {m: (float(np.mean(per[m])), float(np.std(per[m]))) for m in per if per[m]}
         avg = {m: np.mean(np.stack(acc[m]), 0) for m in acc if acc[m]}
         bar = stats["floor_min"][0]
-        k1 = s3_armA_prr(X, rung)          # reused K=1 baseline (arm A from S3)
+        # K=1 baseline: DEFERRED (self-contained S6) leaves it EMPTY + baseline_deferred=True; else reuse arm A.
+        k1 = None if args.defer_baseline else s3_armA_prr(X, rung)
         _real = {}
         for _d, _i in train_rows:
             _real[_d] = _real.get(_d, 0) + 1
         srcs = "+".join(f"{d}:{_real.get(d, 0)}" for d in dict.fromkeys(d for d, _c in spec))
-        k1s = f"{k1:+.3f}" if k1 is not None else "n/a"
+        k1s = "deferred" if args.defer_baseline else (f"{k1:+.3f}" if k1 is not None else "n/a")
         print(f"\n[{rung:14s}] eval={X} ({label_of(X)}) train={srcs}  BAR=msp_min {bar:+.3f}  K1(armA,S3)={k1s}", flush=True)
         print(f"    head-diversity: query-cosine {np.mean(div_cos):+.3f}  attn-corr {np.mean(div_corr):+.3f}"
               f"  (high = collapsed)", flush=True)
@@ -173,29 +193,31 @@ def main():
                              "n_seeds": len(per[m]), "bar_msp_min": round(bar, 4),
                              "k1_armA_s3": round(k1, 4) if k1 is not None else "",
                              "query_cosine": round(float(np.mean(div_cos)), 4),
-                             "attn_corr": round(float(np.mean(div_corr)), 4),
-                             "cluster": cluster, "env_hash": env_hash})
-        # paired verdicts: MH vs ABLATION (the control), MH vs floor
+                             "attn_corr": round(float(np.mean(div_corr)), 4), **prov})
+        # paired verdicts: MH vs ABLATION (the control -- self-contained, NO S3), MH vs floor
         for vk, a, b in [("mh_vs_ablation", "mh", "ablation"), ("mh_vs_floor", "mh", "floor_min"),
                          ("ablation_vs_floor", "ablation", "floor_min")]:
             mg, lo, hi, pv, sig = paired_bootstrap(yte_ref, avg[a], avg[b])
             print(f"    [verdict] {vk:20s} margin {mg:+.3f} CI[{lo:+.3f},{hi:+.3f}] {'SIG' if sig else 'ns'}", flush=True)
             out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
                              "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
-                             "boot_p": round(pv, 4), "significant": bool(sig), "n_seeds": len(seeds),
-                             "cluster": cluster, "env_hash": env_hash})
+                             "boot_p": round(pv, 4), "significant": bool(sig), "n_seeds": len(seeds), **prov})
 
-    # headline paired count: MH beats K=1 (arm A from S3) on k/N cells (per-cell, unpaired at example level)
-    mh_cells = [r for r in out_rows if r["method"] == "mh" and isinstance(r.get("k1_armA_s3"), float)]
-    if mh_cells:
-        wins = sum(1 for r in mh_cells if r["prr_mean"] > r["k1_armA_s3"])
-        print(f"\nMH beats K=1 (arm A, S3) on {wins}/{len(mh_cells)} cells", flush=True)
+    # headline paired count: MH beats K=1 (arm A from S3) on k/N cells (per-cell). Skipped when deferred.
+    if args.defer_baseline:
+        print("\nK=1 baseline DEFERRED -> fill with join_arma_baseline.py after S3 lands (columns left blank).", flush=True)
+    else:
+        mh_cells = [r for r in out_rows if r["method"] == "mh" and isinstance(r.get("k1_armA_s3"), float)]
+        if mh_cells:
+            wins = sum(1 for r in mh_cells if r["prr_mean"] > r["k1_armA_s3"])
+            print(f"\nMH beats K=1 (arm A, S3) on {wins}/{len(mh_cells)} cells", flush=True)
 
     out = Path(args.out) if args.out else (ROOT / "results" / f"multihead_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
                                            "bar_msp_min", "k1_armA_s3", "query_cosine", "attn_corr",
-                                           "ci_lo", "ci_hi", "boot_p", "significant", "cluster", "env_hash"])
+                                           "ci_lo", "ci_hi", "boot_p", "significant",
+                                           "cluster", "env_hash", "commit", "seeds", "baseline_deferred"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

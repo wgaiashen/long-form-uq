@@ -74,7 +74,15 @@ def main():
     host = socket.gethostname()
     cluster = "RCS" if (host.startswith("login-") or "cx3" in host) else ("DoC" if ("cloud-vm" in host or host.startswith("gpu")) else host)
     env_hash = hashlib.sha1(f"{sys.version.split()[0]}|torch{torch.__version__}|np{np.__version__}".encode()).hexdigest()[:8]
-    print(f"device {device} | host {host} | cluster {cluster} | env {env_hash} | priors {priors} | beta {args.beta}", flush=True)
+    try:
+        import subprocess
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(ROOT),
+                                         stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        commit = "unknown"
+    prov = {"cluster": cluster, "env_hash": env_hash, "commit": commit, "seeds": args.seeds}  # for the join's asserts
+    print(f"device {device} | host {host} | cluster {cluster} | env {env_hash} | commit {commit[:12]} | "
+          f"priors {priors} | beta {args.beta}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)
     special_ids = set(getattr(tok, "all_special_ids", []))
@@ -162,8 +170,7 @@ def main():
                 print(f"    {m:18s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
-                                 "n_seeds": len(per[m]), "bar_msp_min": round(bar, 4),
-                                 "cluster": cluster, "env_hash": env_hash})
+                                 "n_seeds": len(per[m]), "bar_msp_min": round(bar, 4), **prov})
         # verdicts: each prior arm vs the floor bar, vs arm A, vs arm B
         for p in priors:
             for arm in (f"armC_{p}", f"armD_{p}"):
@@ -173,8 +180,7 @@ def main():
                     print(f"    [verdict] {vk:26s} margin {mg:+.3f} CI[{lo:+.3f},{hi:+.3f}] {'SIG' if sig else 'ns'}", flush=True)
                     out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
                                      "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
-                                     "boot_p": round(pv, 4), "significant": bool(sig), "n_seeds": len(seeds),
-                                     "cluster": cluster, "env_hash": env_hash})
+                                     "boot_p": round(pv, 4), "significant": bool(sig), "n_seeds": len(seeds), **prov})
 
     print("\n=== ARM-A REPRODUCTION GATE (arm A vs §C.3 attention, tol " + f"{GATE_TOL}) ===", flush=True)
     allok = True
@@ -187,7 +193,7 @@ def main():
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
                                            "bar_msp_min", "ci_lo", "ci_hi", "boot_p", "significant",
-                                           "cluster", "env_hash"])
+                                           "cluster", "env_hash", "commit", "seeds"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 
