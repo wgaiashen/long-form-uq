@@ -134,12 +134,12 @@ class AttnPool(nn.Module):
     """
 
     def __init__(self, d, temperature=1.0, use_position=False, freeze_query=False,
-                 frozen_prior=False, beta=1.0):
+                 frozen_prior=False, beta=1.0, n_query=1, n_head=1):
         super().__init__()
-        self.q = nn.Parameter(torch.zeros(d))       # learned query (init 0 => starts at mean-pool)
+        self.q = nn.Parameter(torch.zeros(d))       # primary learned query (init 0 => starts at mean-pool)
         if freeze_query or frozen_prior:
             self.q.requires_grad_(False)            # q stays 0 (uniform), or is unused (frozen prior)
-        self.head = nn.Linear(d, 1)
+        self.head = nn.Linear(d, 1)                 # primary head
         self.scale = d ** 0.5
         self.temperature = temperature
         self.use_position = use_position
@@ -150,6 +150,15 @@ class AttnPool(nn.Module):
         #     (arm D, Joe's "start from a distribution, then learn away"; beta scales the prior's pull).
         self.frozen_prior = frozen_prior
         self.beta = beta
+        # S6 (Joe idea 2 — multi-head): ADDITIONAL queries/heads beyond the primary, created ONLY when K>1, so
+        # the default single-head pooler (n_query=n_head=1) is BYTE-IDENTICAL to before — same self.q/self.head,
+        # same forward path, same RNG draw order -> arm A reproduced <1e-6. Extra queries init small-random (not
+        # 0) to break symmetry so the heads CAN diverge (else all-zero queries share a gradient and collapse by
+        # construction, which would fake Joe's "do they converge" test).
+        self.n_query = n_query
+        self.n_head = n_head
+        self.q_rest = nn.Parameter(torch.randn(n_query - 1, d) * 0.02) if n_query > 1 else None
+        self.heads_rest = nn.ModuleList([nn.Linear(d, 1) for _ in range(n_head - 1)]) if n_head > 1 else None
 
     def forward(self, X, mask, posfeat, prior=None):
         # arm C (frozen prior): attention IS the renormalised prior over real tokens; the query is unused.
@@ -158,15 +167,33 @@ class AttnPool(nn.Module):
             a = a / a.sum(dim=1, keepdim=True).clamp(min=1e-9)      # renormalise over real tokens
             pooled = (a.unsqueeze(-1) * X).sum(dim=1)
             return self.head(pooled).squeeze(-1), a
-        scores = (X @ self.q) / (self.scale * self.temperature)     # (B, T)
+        # SINGLE-HEAD fast path (arms A/B/D, K=1) — unchanged, bit-identical to the pre-S6 pooler.
+        if self.n_query == 1 and self.n_head == 1:
+            scores = (X @ self.q) / (self.scale * self.temperature)     # (B, T)
+            if self.use_position:
+                scores = scores + self.pos(posfeat).squeeze(-1)
+            if prior is not None:                                       # arm D: annealed additive log-prior tilt
+                scores = scores + self.beta * torch.log(prior.clamp(min=1e-9))
+            scores = scores.masked_fill(mask == 0, float("-inf"))
+            a = torch.softmax(scores, dim=1)                            # (B, T)
+            pooled = (a.unsqueeze(-1) * X).sum(dim=1)                    # (B, d)
+            return self.head(pooled).squeeze(-1), a
+        # MULTI-HEAD path (S6): Q queries -> Q attention distributions -> Q pooled vectors -> H classifier heads,
+        # each ensembled. MH: Q=H=K, head k reads query k's pooled. ABLATION: Q=1, H=K, all heads share one
+        # attention/pooled (isolates "more classifiers" from "attention diversity" — Joe's mandatory control).
+        q_all = self.q.unsqueeze(0) if self.n_query == 1 else torch.cat([self.q.unsqueeze(0), self.q_rest], 0)
+        scores = (X @ q_all.t()) / (self.scale * self.temperature)     # (B, T, Q)
         if self.use_position:
-            scores = scores + self.pos(posfeat).squeeze(-1)
-        if prior is not None:                                       # arm D: annealed additive log-prior tilt
-            scores = scores + self.beta * torch.log(prior.clamp(min=1e-9))
-        scores = scores.masked_fill(mask == 0, float("-inf"))
-        a = torch.softmax(scores, dim=1)                            # (B, T)
-        pooled = (a.unsqueeze(-1) * X).sum(dim=1)                    # (B, d)
-        return self.head(pooled).squeeze(-1), a
+            scores = scores + self.pos(posfeat)                         # (B, T, 1) broadcast over Q
+        scores = scores.masked_fill(mask.unsqueeze(-1) == 0, float("-inf"))
+        a = torch.softmax(scores, dim=1)                                # (B, T, Q)
+        pooled = torch.einsum("btq,btd->bqd", a, X)                     # (B, Q, d)
+        heads_all = [self.head] + (list(self.heads_rest) if self.heads_rest is not None else [])
+        logits = []
+        for k in range(self.n_head):
+            src = pooled[:, k] if self.n_query > 1 else pooled[:, 0]     # MH: own query; ABLATION: shared pooled
+            logits.append(heads_all[k](src).squeeze(-1))
+        return torch.stack(logits, dim=1), a                           # (B, H), (B, T, Q)
 
 
 def _mask_answer_only(mask):
@@ -179,7 +206,9 @@ def _mask_answer_only(mask):
 def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_position=False,
                answer_only=False, weight_decay=WEIGHT_DECAY, wd_query=0.0, freeze_query=False,
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
-               prior_list=None, frozen_prior=False, beta=1.0):
+               prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1):
+    """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
+    (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
     frozen_prior=True the attention IS the renormalised prior and only the head trains (arm C); with
     frozen_prior=False it is an annealed additive log-prior tilt on the learned query (arm D). prior_list=None
@@ -193,14 +222,16 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     d = states[0].shape[1]
     model = AttnPool(d, temperature=temperature, use_position=use_position,
                      freeze_query=freeze_query or frozen_prior,
-                     frozen_prior=frozen_prior, beta=beta).to(device)
-    # Separate param groups: the head (and positional bias) get weight decay against p >> n, but the
-    # query is left UN-decayed (wd_query=0) so it can actually move off zero -- with decay on it, the
+                     frozen_prior=frozen_prior, beta=beta, n_query=n_query, n_head=n_head).to(device)
+    # Separate param groups: the heads (and positional bias) get weight decay against p >> n, but the
+    # queries are left UN-decayed (wd_query=0) so they can actually move off zero -- with decay on them, the
     # query collapsed to 0 and the attention stayed uniform (the first run's diagnostic showed this).
+    # `q`-prefixed = the query params (q + the S6 extra queries q_rest); everything else = heads + pos.
     head_params = [p for n, p in model.named_parameters() if not n.startswith("q")]
+    query_params = [p for n, p in model.named_parameters() if n.startswith("q")]
     groups = [{"params": head_params, "weight_decay": weight_decay}]
     if not (freeze_query or frozen_prior):
-        groups.append({"params": [model.q], "weight_decay": wd_query})
+        groups.append({"params": query_params, "weight_decay": wd_query})
     opt = torch.optim.Adam(groups, lr=lr)
     lossf = nn.BCEWithLogitsLoss()
     yt = torch.tensor(y, dtype=torch.float32, device=device)
@@ -216,11 +247,14 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                        if prior_list is not None else None)
             opt.zero_grad()
             logit, a = model(X, mask, pos, prior=prior_b)
-            loss = lossf(logit, yt[idx])
-            if shrink_lambda > 0:                       # H5: shrink attention toward mean-pool (avg-1 MSE)
-                n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
-                dev = ((a * n_real - 1.0) ** 2) * mask                 # only real tokens contribute
-                loss = loss + shrink_lambda * (dev.sum(1) / n_real.squeeze(1)).mean()
+            if logit.dim() == 2:                        # S6 multi-head (B,H): mean of the per-head BCE losses
+                loss = sum(lossf(logit[:, k], yt[idx]) for k in range(logit.shape[1])) / logit.shape[1]
+            else:
+                loss = lossf(logit, yt[idx])
+                if shrink_lambda > 0:                   # H5: shrink attention toward mean-pool (avg-1 MSE; single-head)
+                    n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
+                    dev = ((a * n_real - 1.0) ** 2) * mask                 # only real tokens contribute
+                    loss = loss + shrink_lambda * (dev.sum(1) / n_real.squeeze(1)).mean()
             loss.backward()
             opt.step()
     return model
@@ -236,7 +270,10 @@ def attn_prr(model, states, y, te_idx, device, answer_only=False, bs=64):
             if answer_only:
                 mask = _mask_answer_only(mask)
             logit, _ = model(X, mask, pos)
-            preds[b: b + len(idx)] = torch.sigmoid(logit).cpu().numpy()
+            p = torch.sigmoid(logit)
+            if p.dim() == 2:                     # S6 multi-head: ensemble by mean-of-sigmoids
+                p = p.mean(dim=1)
+            preds[b: b + len(idx)] = p.cpu().numpy()
     unc = 1.0 - preds
     return results.prr([y[i] for i in te_idx], unc)
 

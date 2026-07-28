@@ -80,7 +80,7 @@ def main():
     print(f"device {device} | seeds {seeds} | evals {evals} | wmsp={'off' if args.skip_wmsp else 'on'}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)
-    PT, SEG = {}, {}
+    PT = {}
     for d in sorted(set(pdl.LONG_SRC) | set(evals)):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
@@ -93,12 +93,7 @@ def main():
             keep = np.where(finite)[0]
             states = [states[k] for k in keep]; records = [records[k] for k in keep]
             split = split[keep]; y = y[keep]
-        segs = []
-        for r, st in zip(records, states):
-            sid, _ = sar._token_sentence_ids(tok, list(r['gen_token_ids']),
-                                             r.get('gen_text') or tok.decode(r['gen_token_ids'], skip_special_tokens=True))
-            segs.append(np.asarray(sid, dtype=np.int64))
-        PT[d] = (states, split, y, records); SEG[d] = segs
+        PT[d] = (states, split, y, records)   # (wMSP uses plain wmsp_norm now — no segment ids needed)
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
@@ -146,9 +141,11 @@ def main():
                 v["attention"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T),
                                                      states, te_idx, device), float)
             if not args.skip_wmsp:
-                seg_cell = [SEG[d][i] for d, i in allrows]
+                # BUGFIX (2026-07-28): plain wmsp_norm (Joe's "wMSP"), NOT the segmented variant. The earlier
+                # `segment_ids=seg_cell` made this wmsp_seg_flat, which was broken (pubmed ID 0.023 vs
+                # wmsp_norm's 0.537) and produced a spurious −0.42 ensemble. weight_mode default is normalised.
                 v["wmsp"] = np.asarray(weighted_msp.weighted_msp_unc(states, records, y, tr_idx, te_idx, device,
-                                       length_normalise=True, seed=sd, segment_ids=seg_cell), float)
+                                       weight_mode="normalised", length_normalise=True, seed=sd), float)
             # ensembles (label-free combination of the two component vectors)
             for name, a, b, mode in ENS:
                 v[name] = rankavg(v[a], v[b]) if mode == "rank" else zavg(v[a], v[b])

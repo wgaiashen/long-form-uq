@@ -114,7 +114,10 @@ def attn_unc(model, states, te_idx, device, answer_only=False, bs=64, prior_list
         prior_b = (pad_prior([prior_list[i] for i in idx], X.shape[1], device)
                    if prior_list is not None else None)
         logit, _ = model(X, mask, pos, prior=prior_b)
-        preds[b: b + len(idx)] = torch.sigmoid(logit).cpu().numpy()
+        p = torch.sigmoid(logit)
+        if p.dim() == 2:                     # S6 multi-head: ensemble by mean-of-sigmoids
+            p = p.mean(dim=1)
+        preds[b: b + len(idx)] = p.cpu().numpy()
     return 1.0 - preds
 
 
