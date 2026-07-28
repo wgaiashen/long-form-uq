@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_ens_wmsp
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# S2b (Joe idea 4): {MSP-floor, SAPLMA} + {wMSP, SAPLMA} ensembles. wMSP trains per cell (the bottleneck);
+# attention pooler still OFF (that variant is DoC-GPU-bound). CPU.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)"
+python -u scripts/checks/ensemble_ladder.py --probes saplma --seeds 1,2,3 \
+  --evals pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa \
+  --out /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/ensemble_wmsp_saplma__meta-llama_Meta-Llama-3.1-8B.csv

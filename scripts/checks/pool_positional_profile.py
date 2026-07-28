@@ -81,9 +81,9 @@ def main():
                 print(f"  {d}: no sidecar -> skip"); continue
             rec_dir = cache_dir / REGIME[d] if d in REGIME else cache_dir
             recs = cache.load_records(rec_dir, cache.run_key(MODEL, d, "ID"))
-            for rung in ("ID", "LOO", "DiffTask"):
-                if rung not in scs:
-                    continue
+            # rung-family-agnostic (S1/P0 fix): iterate the sidecars present, ID first, so the honest
+            # "-long" OOD names are used instead of the old stripped "LOO"/"DiffTask".
+            for rung in (["ID"] if "ID" in scs else []) + sorted(k for k in scs if k != "ID"):
                 curve, n = profile(scs[rung], recs)
                 curves[f"{d}/{rung}"] = curve
                 wr.writerow([d, rung, n] + [f"{v:.4f}" for v in curve])

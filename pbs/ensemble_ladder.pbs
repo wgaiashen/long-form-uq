@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_ens
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# S2 (Joe idea 4) ensemble ladder. Pass args via -v ARGS="...". CPU job.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)  ARGS=$ARGS"
+python -u scripts/checks/ensemble_ladder.py $ARGS

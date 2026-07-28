@@ -126,11 +126,21 @@ def main():
         record_pos_all = np.array([int(PT[X][4][i]) for _d, i in test_rows])
 
         key = cache.run_key(MODEL, X, "ID")
-        suffix = "" if base_rung == "ID" else f"__{base_rung}"
+        # S1/P0 FIX (2026-07-28): DO NOT strip "-long". The pool is built from the LONG ladder
+        # (cells_long/LONG_SRC), so a stripped "LOO" suffix asserted a STANDARD rung that was never trained --
+        # any join then silently mixed a long-pool quantity with a standard-pool one. Keep the TRUE rung name
+        # in BOTH the filename and the metadata, and stamp `ladder_family` so a consumer can tell the family
+        # without re-parsing the name.
+        ladder_family = "ID" if base_rung == "ID" else ("LONG" if rung.endswith("-long") else "STANDARD")
+        if any(c in rung for c in ">/\\"):     # e.g. "Long->Short" -- would make a malformed filename
+            raise SystemExit(f"unsafe rung name for a filename: {rung!r}; add a sanitised mapping first "
+                             "(short-set OOD is out of scope for this dump)")
+        suffix = "" if base_rung == "ID" else f"__{rung}"          # full rung, e.g. "__LOO-long" (was "__LOO")
         out = viz / f"{key}__attn{suffix}.npz"
         np.savez_compressed(out, record_pos_all=record_pos_all,
                             pool_w=np.array(pool_w, dtype=object),
-                            rung=base_rung, seed=sd, layer=args.layer, best_T=float(best_T),
+                            rung=rung, base_rung=base_rung, ladder_family=ladder_family,
+                            seed=sd, layer=args.layer, best_T=float(best_T),
                             pool_config="post-TaskA-widened", n_train=n_tr)
         # reproduction gate on ID cells
         yte = np.array([y[i] for i in te_idx], float)
@@ -139,10 +149,11 @@ def main():
             d = abs(prr - ID_TARGET[X]); ok = d < GATE_TOL
             gate_rows.append((X, prr, ID_TARGET[X], d, ok))
         if args.save_pooler:
-            pk = probes / f"{cache._slug(MODEL)}__{X}__ID__attnpool_{base_rung}_s{sd}__L{args.layer}.pkl"
+            pk = probes / f"{cache._slug(MODEL)}__{X}__ID__attnpool_{rung}_s{sd}__L{args.layer}.pkl"
             with open(pk, "wb") as f:
-                pickle.dump({"model": pooler, "best_T": float(best_T), "rung": base_rung, "seed": sd,
-                             "eval": X, "layer": args.layer, "pool_config": "post-TaskA-widened"}, f)
+                pickle.dump({"model": pooler, "best_T": float(best_T), "rung": rung, "base_rung": base_rung,
+                             "ladder_family": ladder_family, "seed": sd, "eval": X, "layer": args.layer,
+                             "pool_config": "post-TaskA-widened"}, f)
         print(f"  [{rung:14s}] {X}: n_tr={n_tr} T*={best_T} PRR={prr:+.3f} -> {out.name}"
               f"{'  [+pooler]' if args.save_pooler else ''}", flush=True)
 

@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_ens_fast
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# S2a (Joe idea 4) FAST first pass: {MSP-floor, SAPLMA} ensembles across long-form evals+rungs.
+# No wMSP training, no pooler temperature sweep -> minutes on CPU. Doubles as the smoke test.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)"
+python -u scripts/checks/ensemble_ladder.py --probes saplma --skip-wmsp --seeds 1,2,3 \
+  --evals pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa \
+  --out /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/ensemble_saplma_fast__meta-llama_Meta-Llama-3.1-8B.csv

@@ -170,11 +170,12 @@ def main():
             continue
         rec_dir = cache_dir / REGIME[ds] if ds in REGIME else cache_dir     # regime-namespaced records
         records = cache.load_records(rec_dir, cache.run_key(args.model, ds, "ID"))
-        for rung in ("ID", "LOO", "DiffTask", "SameTask"):                  # ID first, then OOD rungs present
-            if rung in scs:
-                r = analyse(ds, rung, scs[rung], records, tok, special_ids)
-                if r:
-                    rows.append(r)
+        # rung-family-agnostic: iterate whatever sidecars exist (ID first), so the honest "-long" OOD names
+        # (S1/P0 fix) are picked up instead of the old stripped "LOO"/"DiffTask".
+        for rung in (["ID"] if "ID" in scs else []) + sorted(k for k in scs if k != "ID"):
+            r = analyse(ds, rung, scs[rung], records, tok, special_ids)
+            if r:
+                rows.append(r)
 
     if args.csv and rows:
         import csv
