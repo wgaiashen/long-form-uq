@@ -57,7 +57,7 @@ from luq import cache, probe, results  # noqa: E402
 from luq.config import Config  # noqa: E402
 # Reuse the existing aggregator implementations -- do NOT reimplement them here.
 from attn_pool import (  # noqa: E402
-    load_per_token, train_attn, attn_prr, select_temperature, pad_batch, _mask_answer_only)
+    load_per_token, train_attn, attn_prr, select_temperature, pad_batch, pad_prior, _mask_answer_only)
 from aggregators import window_token_ids, sentence_ids  # noqa: E402
 
 MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
@@ -99,9 +99,11 @@ def paired_bootstrap(yte, unc_a, unc_b, b=BOOT_B):
 
 
 @torch.no_grad()
-def attn_unc(model, states, te_idx, device, answer_only=False, bs=64):
+def attn_unc(model, states, te_idx, device, answer_only=False, bs=64, prior_list=None):
     """Per-example uncertainty vector (1 - sigmoid(logit)) for a trained AttnPool on te_idx -- the
-    same computation as attn_pool.attn_prr but returning the predictions (needed for the bootstrap)."""
+    same computation as attn_pool.attn_prr but returning the predictions (needed for the bootstrap).
+    `prior_list` (S3): per-example prior weight vectors aligned to `states`; passed to forward for the
+    frozen/annealed-prior arms. None = the plain learned/frozen-query pooler (unchanged)."""
     model.eval()
     preds = np.zeros(len(te_idx))
     for b in range(0, len(te_idx), bs):
@@ -109,7 +111,9 @@ def attn_unc(model, states, te_idx, device, answer_only=False, bs=64):
         X, mask, pos = pad_batch([states[i] for i in idx], device)
         if answer_only:
             mask = _mask_answer_only(mask)
-        logit, _ = model(X, mask, pos)
+        prior_b = (pad_prior([prior_list[i] for i in idx], X.shape[1], device)
+                   if prior_list is not None else None)
+        logit, _ = model(X, mask, pos, prior=prior_b)
         preds[b: b + len(idx)] = torch.sigmoid(logit).cpu().numpy()
     return 1.0 - preds
 

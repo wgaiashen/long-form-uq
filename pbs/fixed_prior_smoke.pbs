@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_fps_smoke
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# S3 SMOKE: one eval (pubmed), both priors, all arms A/B/C/D, 1 seed — validates the pipeline +
+# freeze-froze guard + arm-A gate before the full run / DoC. CPU.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)"
+python -u scripts/checks/fixed_prior_ladder.py --evals pubmed_qa --priors content_mass,nll \
+  --rungs DiffTask,LOO --seeds 1 \
+  --out /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/fixed_prior_smoke__meta-llama_Meta-Llama-3.1-8B.csv

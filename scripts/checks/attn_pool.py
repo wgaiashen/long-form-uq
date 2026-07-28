@@ -95,6 +95,16 @@ def load_per_token(model, dataset, layer, label_field="correctness"):
     return states, split, y, int(z["layer"]), records
 
 
+def pad_prior(priors_list, tmax, device):
+    """Pad per-example prior weight vectors (each length = that example's token count, G+1) to (B, tmax),
+    matching pad_batch's padding so the prior aligns with X/mask. Zeros in the pad region."""
+    P = torch.zeros(len(priors_list), tmax, dtype=torch.float32)
+    for i, p in enumerate(priors_list):
+        p = np.asarray(p, dtype=np.float32)
+        P[i, :len(p)] = torch.from_numpy(p)
+    return P.to(device)
+
+
 def pad_batch(states_list, device):
     """Pad to (B, Tmax, d); return X, mask (1=real token), and positional features (B, Tmax, 2):
     [relative position in the response, inverse response length]."""
@@ -123,21 +133,36 @@ class AttnPool(nn.Module):
     forward returns (logit, attention_weights) so the weights can be inspected.
     """
 
-    def __init__(self, d, temperature=1.0, use_position=False, freeze_query=False):
+    def __init__(self, d, temperature=1.0, use_position=False, freeze_query=False,
+                 frozen_prior=False, beta=1.0):
         super().__init__()
         self.q = nn.Parameter(torch.zeros(d))       # learned query (init 0 => starts at mean-pool)
-        if freeze_query:
-            self.q.requires_grad_(False)            # q stays 0 => uniform weights => mean-pool
+        if freeze_query or frozen_prior:
+            self.q.requires_grad_(False)            # q stays 0 (uniform), or is unused (frozen prior)
         self.head = nn.Linear(d, 1)
         self.scale = d ** 0.5
         self.temperature = temperature
         self.use_position = use_position
         self.pos = nn.Linear(2, 1) if use_position else None
+        # S3 (prior-init pooling): a per-token PRIOR weight can replace / seed the learned query.
+        #   frozen_prior=True  -> attention IS the renormalised prior; head-only training (arm C, ours).
+        #   frozen_prior=False + prior given -> annealed additive log-prior: scores = X@q + beta*log(prior)
+        #     (arm D, Joe's "start from a distribution, then learn away"; beta scales the prior's pull).
+        self.frozen_prior = frozen_prior
+        self.beta = beta
 
-    def forward(self, X, mask, posfeat):
+    def forward(self, X, mask, posfeat, prior=None):
+        # arm C (frozen prior): attention IS the renormalised prior over real tokens; the query is unused.
+        if prior is not None and self.frozen_prior:
+            a = prior * mask                                        # zero the padded/masked tokens
+            a = a / a.sum(dim=1, keepdim=True).clamp(min=1e-9)      # renormalise over real tokens
+            pooled = (a.unsqueeze(-1) * X).sum(dim=1)
+            return self.head(pooled).squeeze(-1), a
         scores = (X @ self.q) / (self.scale * self.temperature)     # (B, T)
         if self.use_position:
             scores = scores + self.pos(posfeat).squeeze(-1)
+        if prior is not None:                                       # arm D: annealed additive log-prior tilt
+            scores = scores + self.beta * torch.log(prior.clamp(min=1e-9))
         scores = scores.masked_fill(mask == 0, float("-inf"))
         a = torch.softmax(scores, dim=1)                            # (B, T)
         pooled = (a.unsqueeze(-1) * X).sum(dim=1)                    # (B, d)
@@ -153,7 +178,12 @@ def _mask_answer_only(mask):
 
 def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_position=False,
                answer_only=False, weight_decay=WEIGHT_DECAY, wd_query=0.0, freeze_query=False,
-               epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0):
+               epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
+               prior_list=None, frozen_prior=False, beta=1.0):
+    """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
+    frozen_prior=True the attention IS the renormalised prior and only the head trains (arm C); with
+    frozen_prior=False it is an annealed additive log-prior tilt on the learned query (arm D). prior_list=None
+    keeps the plain learned/frozen-query pooler (arms A/B) unchanged."""
     """`shrink_lambda` > 0 = H5 (shrink-the-pooler): add a shrink-to-uniform penalty on the attention weights
     to the BCE loss, pulling the learned attention toward mean-pool (its unsupervised prior). Tests whether
     moderation-toward-the-unsupervised-prior — the mechanism that helps weighted-MSP — makes the ATTENTION
@@ -162,13 +192,14 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     torch.manual_seed(seed)
     d = states[0].shape[1]
     model = AttnPool(d, temperature=temperature, use_position=use_position,
-                     freeze_query=freeze_query).to(device)
+                     freeze_query=freeze_query or frozen_prior,
+                     frozen_prior=frozen_prior, beta=beta).to(device)
     # Separate param groups: the head (and positional bias) get weight decay against p >> n, but the
     # query is left UN-decayed (wd_query=0) so it can actually move off zero -- with decay on it, the
     # query collapsed to 0 and the attention stayed uniform (the first run's diagnostic showed this).
     head_params = [p for n, p in model.named_parameters() if not n.startswith("q")]
     groups = [{"params": head_params, "weight_decay": weight_decay}]
-    if not freeze_query:
+    if not (freeze_query or frozen_prior):
         groups.append({"params": [model.q], "weight_decay": wd_query})
     opt = torch.optim.Adam(groups, lr=lr)
     lossf = nn.BCEWithLogitsLoss()
@@ -181,8 +212,10 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
             X, mask, pos = pad_batch([states[i] for i in idx], device)
             if answer_only:
                 mask = _mask_answer_only(mask)
+            prior_b = (pad_prior([prior_list[i] for i in idx], X.shape[1], device)
+                       if prior_list is not None else None)
             opt.zero_grad()
-            logit, a = model(X, mask, pos)
+            logit, a = model(X, mask, pos, prior=prior_b)
             loss = lossf(logit, yt[idx])
             if shrink_lambda > 0:                       # H5: shrink attention toward mean-pool (avg-1 MSE)
                 n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
