@@ -63,20 +63,41 @@ def classify(token_str: str, token_id: int, special_ids: set) -> str:
     return "subword"
 
 
-def analyse(dataset: str, model: str, tok, cache_dir: Path):
-    key = cache.run_key(model, dataset, "ID")
-    sidecar = cache_dir / "viz" / f"{key}__attn.npz"
-    if not sidecar.exists():
-        print(f"\n#### {dataset}: no sidecar ({sidecar.name}) -- run dump_viz_attention first. skipped.")
-        return None
-    records = cache.load_records(cache_dir, key)
-    z = np.load(sidecar, allow_pickle=True)
-    pool = dict(zip(z["record_pos_all"].tolist(), z["pool_w"]))
-    special_ids = set(getattr(tok, "all_special_ids", []))
+# --- 2026-07-28 (P2b) extension: OOD sidecars, all 9 datasets, MASS-weighted fractions, regime record dirs ---
+_CLS = {}
 
-    type_counts = Counter()
-    peak_ids = Counter()
+
+def classify_id(tid, tok, special_ids):
+    """Memoised token-id -> class (decode once; ~100k decodes -> a few thousand unique)."""
+    c = _CLS.get(tid)
+    if c is None:
+        c = classify(tok.decode([tid]), tid, special_ids); _CLS[tid] = c
+    return c
+
+
+REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
+
+
+def sidecars_for(dataset, model, cache_dir):
+    """{rung: path} for every viz sidecar of this eval (ID = no suffix; OOD suffix = the rung)."""
+    import glob
+    key = cache.run_key(model, dataset, "ID")
+    out = {}
+    for p in sorted(glob.glob(str(cache_dir / "viz" / f"{key}__attn*.npz"))):
+        stem = Path(p).name[len(f"{key}__attn"):-len(".npz")]
+        out["ID" if stem == "" else stem.lstrip("_")] = p
+    return out
+
+
+def analyse(dataset, rung, sidecar_path, records, tok, special_ids):
+    """Peak-token AND mass-weighted content/punct focus for one (dataset, rung) sidecar. LEAD with the
+    mass fractions -- a near-uniform OOD distribution has a noisy argmax, so peak stats are least meaningful
+    exactly where dissolution is strongest."""
+    z = np.load(sidecar_path, allow_pickle=True)
+    pool = dict(zip(z["record_pos_all"].tolist(), z["pool_w"]))
+    type_counts = Counter(); peak_ids = Counter()
     frac_pos, row0_w, ent_ratio = [], [], []
+    cmass, pmass, smass = [], [], []              # MASS-weighted over the WHOLE distribution (not just the peak)
     for i, w in pool.items():
         w = np.asarray(w, float)
         if w.sum() <= 0:
@@ -84,48 +105,76 @@ def analyse(dataset: str, model: str, tok, cache_dir: Path):
         w = w / w.sum()
         gids = records[i]["gen_token_ids"]
         G = len(gids)
-        if len(w) != G + 1:          # alignment guard: G+1 (row0 = last-prompt token)
+        if len(w) != G + 1:                       # alignment guard: G+1 (row0 = last-prompt token)
             continue
         row0_w.append(float(w[0]))
-        gw = w[1:]                    # weights over the G generated tokens
-        j = int(np.argmax(gw))        # the peak generated token
-        tid = int(gids[j])
-        type_counts[classify(tok.decode([tid]), tid, special_ids)] += 1
+        gw = w[1:]
+        j = int(np.argmax(gw)); tid = int(gids[j])
+        type_counts[classify_id(tid, tok, special_ids)] += 1
         peak_ids[tid] += 1
         frac_pos.append(j / max(G - 1, 1))
         ent_ratio.append(float(-(w * np.log(w + 1e-12)).sum() / np.log(len(w))))
+        cm = pm = sm = 0.0
+        for k, t in enumerate(gids):
+            cl = classify_id(int(t), tok, special_ids)
+            if cl == "content":
+                cm += gw[k]
+            elif cl == "punct_space":
+                pm += gw[k]
+            elif cl == "special":
+                sm += gw[k]
+        cmass.append(cm); pmass.append(pm); smass.append(sm)
 
-    n = sum(type_counts.values())
-    dist = {k: type_counts[k] / n for k in ("content", "subword", "punct_space", "special")}
+    n = len(ent_ratio)
+    if n == 0:
+        print(f"\n#### {dataset} / {rung}: 0 aligned examples -- skipped")
+        return None
+    dist = {k: type_counts[k] / max(sum(type_counts.values()), 1)
+            for k in ("content", "subword", "punct_space", "special")}
     top = [(tid, c, repr(tok.decode([tid]))) for tid, c in peak_ids.most_common(6)]
-    print(f"\n#### {dataset}  (n={n}) ####")
-    print("  peak token-type:  " + "  ".join(f"{k} {dist[k]:.2f}" for k in dist))
-    print(f"  peak position:    mean {np.mean(frac_pos):.2f}  (0=first gen tok, 1=last)")
-    print(f"  concentration:    entropy/uniform {np.mean(ent_ratio):.2f}  (1.0=flat mean-pool)")
-    print(f"  weight on row0:   mean {np.mean(row0_w):.3f}  (last-prompt token; ~0 => no boundary artifact)")
-    print(f"  top peak ids:     {top}")
-    return {"dataset": dataset, "n": n, **{f"peak_{k}": dist[k] for k in dist},
+    noisy = "   [argmax noisy under near-uniform]" if rung != "ID" else ""
+    print(f"\n#### {dataset} / {rung}  (n={n}) ####")
+    print(f"  MASS content/punct/special : {np.mean(cmass):.2f} / {np.mean(pmass):.2f} / {np.mean(smass):.2f}"
+          f"   (mass-weighted, whole distribution -- LEAD with this)")
+    print(f"  concentration entropy/unif : {np.mean(ent_ratio):.2f}  (1.0 = flat mean-pool)")
+    print(f"  peak token-type (argmax)   : " + "  ".join(f"{k} {dist[k]:.2f}" for k in dist) + noisy)
+    print(f"  peak position mean         : {np.mean(frac_pos):.2f}  (0=first gen, 1=last)")
+    print(f"  weight on row0             : {np.mean(row0_w):.3f}")
+    print(f"  top peak ids               : {top}")
+    return {"dataset": dataset, "rung": rung, "n": n,
+            "content_mass": float(np.mean(cmass)), "punct_mass": float(np.mean(pmass)),
+            "special_mass": float(np.mean(smass)), "entropy_ratio": float(np.mean(ent_ratio)),
             "peak_pos_mean": float(np.mean(frac_pos)), "row0_w_mean": float(np.mean(row0_w)),
-            "entropy_ratio": float(np.mean(ent_ratio))}
+            **{f"peak_{k}": dist[k] for k in dist}}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--datasets", default="sciq,trivia_qa,pubmed_qa,xsum")
+    ap.add_argument("--datasets",
+                    default="sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa")
     ap.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B")
     ap.add_argument("--cache-dir", default=str(ROOT / "cache"))
-    ap.add_argument("--csv", default="", help="optional path to also write the per-dataset table as CSV")
+    ap.add_argument("--csv", default="", help="optional path to also write the per-(dataset,rung) table as CSV")
     args = ap.parse_args()
 
     from transformers import AutoTokenizer  # heavy import; do it after arg parsing
     tok = AutoTokenizer.from_pretrained(args.model)
+    special_ids = set(getattr(tok, "all_special_ids", []))
 
     cache_dir = Path(args.cache_dir)
     rows = []
     for ds in [d.strip() for d in args.datasets.split(",") if d.strip()]:
-        r = analyse(ds, args.model, tok, cache_dir)
-        if r:
-            rows.append(r)
+        scs = sidecars_for(ds, args.model, cache_dir)
+        if not scs:
+            print(f"\n#### {ds}: no sidecar -- skipped")
+            continue
+        rec_dir = cache_dir / REGIME[ds] if ds in REGIME else cache_dir     # regime-namespaced records
+        records = cache.load_records(rec_dir, cache.run_key(args.model, ds, "ID"))
+        for rung in ("ID", "LOO", "DiffTask", "SameTask"):                  # ID first, then OOD rungs present
+            if rung in scs:
+                r = analyse(ds, rung, scs[rung], records, tok, special_ids)
+                if r:
+                    rows.append(r)
 
     if args.csv and rows:
         import csv

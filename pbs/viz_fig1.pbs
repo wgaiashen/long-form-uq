@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -l walltime=00:20:00
+#PBS -N luq_viz_fig1
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+# Figure 1: pubmed ID-trained vs OOD-trained pooler attention on the same generations (dissolution, one image)
+python -u scripts/tools/visualise_attention.py --dataset pubmed_qa --rungs ID,DiffTask \
+  --out results/viz/FIG1_pubmed_ID_vs_DiffTask__meta-llama_Meta-Llama-3.1-8B.html

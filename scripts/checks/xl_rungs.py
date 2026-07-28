@@ -25,9 +25,11 @@ import numpy as np
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrift's faithful rung spec)
 
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
-ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
+ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa",
+       "factscore"]   # factscore added 2026-07-27 (Round-3 Task A): eval-only, but a valid TRAINING SOURCE
 FINE = {"sciq": "short_qa", "trivia_qa": "short_qa", "pubmed_qa": "long_qa", "med_quad": "long_qa",
-        "expertqa": "long_qa", "asqa": "long_qa", "xsum": "summ", "samsum": "summ", "cnn_dailymail": "summ"}
+        "expertqa": "long_qa", "asqa": "long_qa", "xsum": "summ", "samsum": "summ", "cnn_dailymail": "summ",
+        "factscore": "long_qa"}
 BROAD = {"short_qa": "qa", "long_qa": "qa", "summ": "summ"}
 
 KEYSTONES = {"sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"}   # -> get_training_spec (faithful)
@@ -136,9 +138,16 @@ def build_rows(X, spec, PT, seed, sampled_fn):
     train_rows = []
     for d, cap in spec:
         if d == X:                                    # ID cell: train on the eval target's OWN train split
-            idx = X_tr if cap is None else np.asarray(X_tr)[:cap]
-        else:                                         # OOD source: sample from its train rows (core unchanged)
-            idx = sampled_fn(PT[d][1], seed, cap)
+            idx = list(X_tr if cap is None else np.asarray(X_tr)[:cap])
+        else:                                         # OOD source: sampler draws its source rows. Task A
+            idx = list(sampled_fn(PT[d][1], seed, cap))   # (2026-07-27): eval-only sets have no split=="train",
+        # BUILD-TIME GUARD (Round-3 Task A / V-A0): a NAMED source (d != X) contributing ZERO realised rows is
+        # the silent-admission bug -- a pool label that overstates its contents. Fail loud rather than train on
+        # a smaller-than-labelled pool. Post-fix every listed source draws its rows (eval-only sets from all
+        # rows, source != eval enforced by cells()), so a 0 here is a genuine bug worth crashing on.
+        if d != X and len(idx) == 0:
+            raise SystemExit(f"build_rows: source '{d}' for eval '{X}' contributed 0 rows (cap={cap}). "
+                             f"Eval-only sets must draw from ALL rows via the Task-A sampler fix; see V-A0.")
         train_rows += [(d, int(i)) for i in idx]
     return train_rows, test_rows
 

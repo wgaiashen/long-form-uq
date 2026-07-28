@@ -62,26 +62,32 @@ from viz_common import (  # noqa: E402
 # Per-token signal values (Increment 1: surprisal only)
 # --------------------------------------------------------------------------------------
 
-def load_viz_sidecar(cache_dir, key):
-    """Load the attention sidecar written by dump_viz_attention.py, if it exists. Returns
-    per-record-position lookups for each attention signal, or None if Increment 2 has not
-    been run yet (in which case the renderer just shows the surprisal signal)."""
-    path = Path(cache_dir) / "viz" / f"{key}__attn.npz"
+def load_viz_sidecar(cache_dir, key, rung=None):
+    """Load an attention sidecar. `rung=None`/'ID' -> the `<key>__attn.npz` sidecar; an OOD rung
+    ('LOO'/'DiffTask') -> `<key>__attn__<rung>.npz` (the OOD-trained pooler, from dump_ood_attention.py).
+    ADDITIVE (2026-07-28): OOD sidecars carry ONLY `pool_w`/`record_pos_all` (no self-attention arrays), so
+    every self-attn/`block` key is treated as OPTIONAL -- old sidecars keep their self-attn tracks, OOD
+    sidecars render pooler-only. Returns None if the file is absent."""
+    suffix = "" if (rung is None or rung == "ID") else f"__{rung}"
+    path = Path(cache_dir) / "viz" / f"{key}__attn{suffix}.npz"
     if not path.exists():
         return None
     z = np.load(path, allow_pickle=True)
-    pool = dict(zip(z["record_pos_all"].tolist(), z["pool_w"]))
-    self_pos = z["record_pos_self"].tolist()
-    return {
-        "pool_w": pool,  # pos -> (G+1,) weights (row 0 = last-prompt token)
-        "self_lastq": dict(zip(self_pos, z["self_lastq_block"])),
-        "self_meanq": dict(zip(self_pos, z["self_meanq_block"])),
-        "self_lastq_last": dict(zip(self_pos, z["self_lastq_last"])),
-        "block": int(z["block"]), "layer": int(z["layer"]),
-    }
+    files = set(z.files)
+    out = {"pool_w": dict(zip(z["record_pos_all"].tolist(), z["pool_w"])),  # pos -> (G+1,) row0=last-prompt
+           "layer": int(z["layer"]) if "layer" in files else 15,
+           "self_lastq": {}, "self_meanq": {}, "self_lastq_last": {}, "block": None}
+    if "record_pos_self" in files:               # only the old dump_viz_attention sidecars carry self-attention
+        sp = z["record_pos_self"].tolist()
+        out["self_lastq"] = dict(zip(sp, z["self_lastq_block"]))
+        out["self_meanq"] = dict(zip(sp, z["self_meanq_block"]))
+        if "self_lastq_last" in files:
+            out["self_lastq_last"] = dict(zip(sp, z["self_lastq_last"]))
+        out["block"] = int(z["block"])
+    return out
 
 
-def per_token_signals(record, record_pos, sidecar):
+def per_token_signals(record, record_pos, sidecars):
     """Return a dict {signal_name: (values, norm)} of the per-token signals AVAILABLE for
     this example. `values` is the raw per-token number (shown on hover); `norm` is that
     value scaled to [0, 1] *within this example* so the standout tokens show regardless of
@@ -98,23 +104,31 @@ def per_token_signals(record, record_pos, sidecar):
     g = len(record["gen_token_ids"])
     surprisal = [-lp for lp in record["token_logprobs"]]
     signals = {"surprisal": (surprisal, minmax(surprisal))}
-    if not sidecar:
+    if not sidecars:
         return signals
 
-    if record_pos in sidecar["pool_w"]:
-        w = list(sidecar["pool_w"][record_pos])
-        # pool weights span the SAPLMA window (G+1): drop row 0 (last-prompt token) to
-        # align with the G generated tokens. Guard the length so a mismatch is skipped,
-        # not silently mis-coloured.
+    # sidecars is a dict {rung_label: sidecar}. ID -> track 'attnpool'; OOD rung -> 'attnpool_<rung>' (so an
+    # ID-trained and an OOD-trained pooler render side by side on the same generation -- Figure 1).
+    for rung, sc in sidecars.items():
+        if not sc or record_pos not in sc["pool_w"]:
+            continue
+        w = list(sc["pool_w"][record_pos])
+        # pool weights span the SAPLMA window (G+1): drop row 0 (last-prompt token) to align with the G
+        # generated tokens; a length mismatch is skipped, never silently mis-coloured (the G+1/G de-alignment
+        # guard -- same family as the expertqa n=24 bug).
         if len(w) == g + 1:
             aligned = w[1:]
-            signals["attnpool"] = (aligned, minmax(aligned))
-    for name, store in (("selfattn_lastq", "self_lastq"),
-                        ("selfattn_meanq", "self_meanq")):
-        if record_pos in sidecar[store]:
-            v = list(sidecar[store][record_pos])
-            if len(v) == g:
-                signals[name] = (v, minmax(v))
+            name = "attnpool" if (rung is None or rung == "ID") else f"attnpool_{rung}"
+            signals[name] = (aligned, minmax(aligned))
+    # self-attention (only the old ID sidecars carry it): meanq is clean; lastq has the EOS-attention-sink.
+    for sc in sidecars.values():
+        if not sc:
+            continue
+        for name, store in (("selfattn_lastq", "self_lastq"), ("selfattn_meanq", "self_meanq")):
+            if name not in signals and record_pos in sc.get(store, {}):
+                v = list(sc[store][record_pos])
+                if len(v) == g:
+                    signals[name] = (v, minmax(v))
     return signals
 
 
@@ -146,6 +160,10 @@ def main():
                     help="'interesting' surfaces confident-wrong / uncertain-right first.")
     ap.add_argument("--out", default="",
                     help="output HTML path (default: results/viz/<key>.html).")
+    ap.add_argument("--rungs", default="ID",
+                    help="comma-sep pooler rungs to render as tracks (ID renders 'attnpool'; an OOD rung like "
+                         "'LOO'/'DiffTask' renders 'attnpool_<rung>') -- lets ID-trained and OOD-trained "
+                         "poolers show side by side on the same generation (Figure 1).")
     args = ap.parse_args()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
@@ -164,13 +182,16 @@ def main():
     methods = method_scores(cfg.cache_dir, key, test_positions)
     print(f"  methods with scores: {list(methods.keys()) or '(none)'}")
 
-    sidecar = load_viz_sidecar(cfg.cache_dir, key)
-    if sidecar:
-        print(f"  attention sidecar found: pool_w for {len(sidecar['pool_w'])} test, "
-              f"self-attn for {len(sidecar['self_lastq'])} (block {sidecar['block']})")
-    else:
-        print("  no attention sidecar (run dump_viz_attention.py for the attn signals); "
-              "showing surprisal only")
+    sidecars = {}
+    for rg in args.rungs.split(","):
+        sc = load_viz_sidecar(cfg.cache_dir, key, rg)
+        if sc:
+            sidecars[rg] = sc
+            print(f"  sidecar [{rg}]: pool_w for {len(sc['pool_w'])} test, "
+                  f"self-attn for {len(sc['self_lastq'])} (layer {sc['layer']})")
+    if not sidecars:
+        print("  no attention sidecar for the requested rungs; showing surprisal only")
+    viz_layer = next(iter(sidecars.values()))["layer"] if sidecars else 15
 
     # Decode tokens once (a local cache) so rendering is cheap.
     tok = load_tokenizer(cfg.model_name)
@@ -199,7 +220,7 @@ def main():
     # Compute each shown example's available signals, and the UNION of signal names across
     # them (the toggle buttons). Examples missing a signal simply keep their default colour
     # when that toggle is picked -- the JS treats an absent value as 0.
-    per_example = {i: per_token_signals(records[i], i, sidecar) for i in shown}
+    per_example = {i: per_token_signals(records[i], i, sidecars) for i in shown}
     signal_names = []
     for i in shown:
         for name in per_example[i]:
@@ -213,10 +234,13 @@ def main():
         ex_html.append(render_example(records[i], i, methods, per_example[i],
                                       args.label_field, pieces_by_pos[i]))
 
+    subtitle = (f"layer {viz_layer}. <b>attnpool*</b> = the PROBE's learned pooling query (what dissolves OOD; "
+                f"'attnpool' = ID-trained, 'attnpool_&lt;rung&gt;' = OOD-trained). <b>selfattn_*</b> = the MODEL's "
+                f"own self-attention (meanq clean; lastq dominated by the EOS attention-sink).")
     out = Path(args.out) if args.out else (cfg.results_dir / "viz" / f"{key}.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_html(key, records, methods, args.label_field,
-                               signal_names, "\n".join(ex_html)))
+                               signal_names, "\n".join(ex_html), subtitle=subtitle))
     print(f"wrote {out}  ({len(shown)} of {len(candidates)} {args.split} examples)")
 
 

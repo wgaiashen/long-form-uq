@@ -69,22 +69,28 @@ def check_leakage(fe):
             if E in pool_sources:
                 print(f"  FAIL [{E}/{setting}]: eval dataset {E} is in its own training pool {pool_sources}")
                 ok = False
-            # (b) every source's draw must be restricted to that source's 'train' split
+            # (b) Round-3 Task A (2026-07-27): the invariant is SOURCE != EVAL (a), NOT "train-split-only". A
+            # source is a DIFFERENT dataset from E, so it leaks nothing into E's eval regardless of split label.
+            # A source that HAS a train split still draws train-only (core sets unchanged); an eval-only source
+            # (no train rows) legitimately contributes its own rows -- mirrors the Task-A sampler fallback. So
+            # only flag a source that HAS train rows but drew a non-train row (a genuine regression).
             for d, n in kept:
                 f, r = fe[d]
                 train_idx = _rows(r, "train")
-                # draw exactly as _prr does, for a couple of seeds, and check membership
+                has_train = len(train_idx) > 0
+                pool_idx = train_idx if has_train else np.arange(len(r))   # Task-A sampler: all rows if no train
                 for sub_seed in (0, 3):
-                    pick = train_idx[np.random.RandomState(sub_seed).permutation(len(train_idx))[:min(n, len(train_idx))]]
+                    pick = pool_idx[np.random.RandomState(sub_seed).permutation(len(pool_idx))[:min(n, len(pool_idx))]]
                     picked_splits = {r[i]["split"] for i in pick}
-                    if picked_splits != {"train"}:
-                        print(f"  FAIL [{E}/{setting}] source {d}: picked non-train splits {picked_splits}")
+                    if has_train and picked_splits != {"train"}:
+                        print(f"  FAIL [{E}/{setting}] source {d} (has train split): picked non-train {picked_splits}")
                         ok = False
-                    # (c) if a pool source were somehow E, its picks must not hit E's eval-test rows
+                    # (c) no source's picks may hit E's eval-test rows (source != E already makes this moot)
                     if d == E and (set(pick.tolist()) & eval_test):
                         print(f"  FAIL [{E}/{setting}] source {d}: training picks overlap E's test rows")
                         ok = False
-    print(f"[1] LEAKAGE (train-split-only pool, eval dataset excluded): {'PASS' if ok else 'FAIL'}")
+    print(f"[1] LEAKAGE (source != eval; core sources train-only, eval-only sources draw own rows): "
+          f"{'PASS' if ok else 'FAIL'}")
     return ok
 
 

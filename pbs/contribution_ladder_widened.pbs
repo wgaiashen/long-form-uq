@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=90gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_cl_widened
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# WIDENED §C.2/§B.3: SAME evals/seeds/sources as the committed narrow control; ONLY the sampler fix differs.
+python -u scripts/checks/contribution_ladder.py \
+  --evals sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa --seeds 1,2,3 \
+  --out results/_widened/contribution_ladder_widened__meta-llama_Meta-Llama-3.1-8B.csv

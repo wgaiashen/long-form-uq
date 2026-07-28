@@ -30,6 +30,9 @@ from luq import msp, probe, results  # noqa: E402
 
 MODEL_SLUG = "meta-llama_Meta-Llama-3.1-8B"
 LAYER = 15
+N_BOOT = 5000        # A3 (2026-07-27): raised 500 -> 5000. At 500 each 95% tail was ~12 points; two
+                     # significant cells sat at CI-lo +0.070 / +0.011, so the 16/27 count was budget-unstable.
+FDR_ALPHA = 0.05     # A3: Benjamini-Hochberg FDR across the 27 cells (no per-cell correction otherwise).
 # Core-6 (real train/test) + the XL sets (eval-only / train-only -> carved train/test below). 2026-07-27:
 # extended per the V-round to cover the long/factuality sets (expertqa = longest-output, the best case).
 DATASETS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail",
@@ -106,17 +109,29 @@ def main():
             msp_bar = prr_a["min"]                          # the PRE-REGISTERED msp_min bar
             mspv = max(prr_a.values())                      # best-of-three = the baseline's BEST shot
             pu = unc[m]; prbv = results.prr(yy, pu)
-            # Bootstrap CI on (probe - best-of-three): best-of-three recomputed per resample (the winning
-            # aggregate may vary), 500 resamples, seed 1 -> the noise floor on the "probe beats MSP" gap.
-            rs = np.random.RandomState(1); diffs = np.empty(500)
-            for b in range(500):
+            # A1: the error set is PRR's real denominator, not n. Two measures:
+            #   n_err   = LITERAL hard-zero count (label==0) -- faithful for the BINARY string-match sets.
+            #   err_mass= n*(1-meanY) -- the effective error count. For binary Y this EQUALS n_err exactly
+            #             (n*(1-#ones/n) = #zeros); for the GRADED judge sets the judge rarely returns exactly
+            #             0.0, so n_err badly undercounts and err_mass is the honest denominator. Flag thinness
+            #             on err_mass (label-type-agnostic); cnn has n_err~4 but err_mass~300 = NOT thin.
+            n_err = int((yy == 0).sum())
+            err_mass = float(len(yy) * (1.0 - yy.mean()))
+            # Bootstrap CI + one-sided p on (probe - best-of-three): best-of-three recomputed per resample
+            # (the winning aggregate may vary). N_BOOT resamples, seed 1 -> the noise floor on the gap.
+            rs = np.random.RandomState(1); diffs = np.empty(N_BOOT)
+            for b in range(N_BOOT):
                 ix = rs.randint(0, len(yy), len(yy)); yb = yy[ix]
                 diffs[b] = results.prr(yb, pu[ix]) - max(results.prr(yb, v[ix]) for v in msp_vecs.values())
             ci_lo, ci_hi = float(np.percentile(diffs, 2.5)), float(np.percentile(diffs, 97.5))
+            p_boot = float((diffs <= 0).mean())     # one-sided bootstrap p (H1: probe > best-of-3)
             medlen = float(np.median(length[te][m]))
-            print(f"{d:14s} {'Q'+str(qi+1):>8s} {int(m.sum()):5d} {medlen:7.0f} {yy.mean():6.2f} "
-                  f"{mspv:+7.3f} {prbv:+7.3f} {prbv-mspv:+7.3f} [{ci_lo:+.3f},{ci_hi:+.3f}]", flush=True)
-            out_rows.append({"dataset": d, "quartile": qi + 1, "n": int(m.sum()),
+            flag = "  <THIN err_mass<30" if err_mass < 30 else ""
+            print(f"{d:14s} {'Q'+str(qi+1):>8s} {int(m.sum()):5d} z={n_err:4d} m={err_mass:6.0f} {medlen:7.0f} "
+                  f"{yy.mean():6.2f} {mspv:+7.3f} {prbv:+7.3f} {prbv-mspv:+7.3f} [{ci_lo:+.3f},{ci_hi:+.3f}] "
+                  f"p={p_boot:.4f}{flag}", flush=True)
+            out_rows.append({"dataset": d, "quartile": qi + 1, "n": int(m.sum()), "n_err": n_err,
+                             "err_mass": round(err_mass, 1),
                              "median_len": round(medlen, 1), "mean_correctness": round(float(yy.mean()), 3),
                              "label_std": round(float(yy.std()), 3),
                              "msp_sum": round(prr_a["sum"], 4), "msp_perplexity": round(prr_a["perplexity"], 4),
@@ -124,7 +139,8 @@ def main():
                              "probe_prr": round(prbv, 4),
                              "gap_probe_minus_best3": round(prbv - mspv, 4),
                              "gap_probe_minus_mspmin": round(prbv - msp_bar, 4),
-                             "gap_ci_lo": round(ci_lo, 4), "gap_ci_hi": round(ci_hi, 4)})
+                             "gap_ci_lo": round(ci_lo, 4), "gap_ci_hi": round(ci_hi, 4),
+                             "p_boot": round(p_boot, 4), "n_boot": N_BOOT})
 
     # INVARIANT (V5 guard, 2026-07-27): best-of-three is BY CONSTRUCTION >= each of {sum,perplexity,min}.
     # Assert it on the EMITTED rows so any future refactor of the emit/merge step fails loud — the same class
@@ -132,19 +148,37 @@ def main():
     for r in out_rows:
         assert r["msp_bestof3"] >= max(r["msp_sum"], r["msp_perplexity"], r["msp_min"]) - 1e-9, \
             f"INVARIANT VIOLATED {r['dataset']} Q{r['quartile']}: best3 {r['msp_bestof3']} < a variant"
+    # A3: Benjamini-Hochberg FDR across ALL cells on the one-sided bootstrap p-values. Reject H0 for the
+    # largest k with p_(k) <= (k/m)*alpha, then flag every cell with p <= that threshold.
+    if out_rows:
+        m_tests = len(out_rows)
+        ranked = sorted(range(m_tests), key=lambda i: out_rows[i]["p_boot"])
+        bh_thresh = -1.0
+        for rank, i in enumerate(ranked, start=1):
+            if out_rows[i]["p_boot"] <= (rank / m_tests) * FDR_ALPHA:
+                bh_thresh = max(bh_thresh, out_rows[i]["p_boot"])
+        for r in out_rows:
+            r["bh_significant"] = int(bh_thresh >= 0 and r["p_boot"] <= bh_thresh)
     out = ROOT / "results" / f"probe_vs_msp_length__{MODEL_SLUG}.csv"
     with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["dataset", "quartile", "n", "median_len", "mean_correctness",
-                                           "label_std", "msp_sum", "msp_perplexity", "msp_min", "msp_bestof3",
-                                           "probe_prr", "gap_probe_minus_best3", "gap_probe_minus_mspmin",
-                                           "gap_ci_lo", "gap_ci_hi"])
+        w = _csv.DictWriter(f, fieldnames=["dataset", "quartile", "n", "n_err", "err_mass", "median_len",
+                                           "mean_correctness", "label_std", "msp_sum", "msp_perplexity",
+                                           "msp_min", "msp_bestof3", "probe_prr", "gap_probe_minus_best3",
+                                           "gap_probe_minus_mspmin", "gap_ci_lo", "gap_ci_hi", "p_boot",
+                                           "n_boot", "bh_significant"])
         w.writeheader(); w.writerows(out_rows)
-    # summary: headline = probe vs best-of-three (the baseline's BEST shot), with the CI-based significant count.
+    # summary: headline = probe vs best-of-three (the baseline's BEST shot). Report the raw CI count, the
+    # BH-adjusted count, and how many cells are noise-dominated (n_err<30).
     if out_rows:
         g3 = [r["gap_probe_minus_best3"] for r in out_rows]
         sig = [r for r in out_rows if r["gap_ci_lo"] > 0]                 # CI excludes 0 -> significant win
+        bh = [r for r in out_rows if r["bh_significant"]]
+        thin = [r for r in out_rows if r["err_mass"] < 30]
         print(f"\nprobe beats best-of-three MSP: {sum(1 for g in g3 if g > 0)}/{len(g3)} cells (>0), "
-              f"{len(sig)}/{len(out_rows)} SIGNIFICANT (95% CI > 0); mean gap {np.mean(g3):+.3f}", flush=True)
+              f"{len(sig)}/{len(out_rows)} SIGNIFICANT (raw 95% CI > 0), {len(bh)}/{len(out_rows)} survive "
+              f"BH-FDR@{FDR_ALPHA}; mean gap {np.mean(g3):+.3f} ({N_BOOT} resamples)", flush=True)
+        print(f"  thin cells (err_mass<30, noise-dominated): {len(thin)} -> "
+              f"{', '.join(r['dataset']+' Q'+str(r['quartile']) for r in thin)}", flush=True)
         print(f"  (vs the msp_min bar: {sum(1 for r in out_rows if r['gap_probe_minus_mspmin']>0)}/{len(out_rows)}; "
               f"mean {np.mean([r['gap_probe_minus_mspmin'] for r in out_rows]):+.3f})", flush=True)
     print(f"wrote {out}", flush=True)

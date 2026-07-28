@@ -53,7 +53,7 @@ from attn_pool import train_attn, select_temperature  # noqa: E402
 # Shared ProbeDriftXL rung machinery: makes med_quad/samsum/ExpertQA organic eval targets. `cells` dispatches
 # keystone->get_training_spec (faithful), XL->family taxonomy; `eval_split` carves the XL eval test set;
 # `label_of` gives the per-target label (ExpertQA=faithfulness); `different_label_projection` flags the ExpertQA OOD case.
-from xl_rungs import cells as xl_cells, eval_split, label_of, different_label_projection  # noqa: E402
+from xl_rungs import cells as xl_cells, eval_split, label_of, different_label_projection, build_rows  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
@@ -93,7 +93,12 @@ COMPARISONS = [("wmsp_norm_vs_floor", "weighted_msp_norm", "fair_floor"),
 
 
 def sampled_train_idx(split, seed, cap):
+    # Round-3 Task A (2026-07-27): eval-only sources (all split=="test") returned EMPTY here and silently
+    # contributed 0 rows (V-A0). Source != eval is enforced by xl_cells, so draw from ALL rows when a source
+    # has no dedicated train split. Core sets (with a real train split) are UNCHANGED.
     tr = np.where(split == "train")[0]
+    if len(tr) == 0:
+        tr = np.arange(len(split))
     if cap is None or cap >= len(tr):
         return tr
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
@@ -159,13 +164,10 @@ def main():
         unc_acc = {m: [] for m in methods}   # per-seed per-example uncertainty vectors (for the bootstrap)
         yte_ref = None                        # test labels (identical across seeds; the bootstrap target)
         for sd in seeds:
-            train_rows = []
-            for d, cap in spec:
-                if d == X:                    # ID cell: train on the eval target's OWN train split
-                    idx = X_tr if cap is None else np.asarray(X_tr)[:cap]
-                else:                         # OOD source: sample from its train rows (unchanged for core)
-                    idx = sampled_train_idx(PT[d][1], sd, cap)
-                train_rows += [(d, int(i)) for i in idx]
+            # Round-3 Task A (2026-07-27): use the SHARED build_rows (was an inline duplicate). It enforces
+            # source != eval, lets eval-only sets draw all rows via the fixed sampler, and RAISES on a 0-row
+            # named source (the silent-admission guard). test_rows it returns == test_rows above.
+            train_rows, _ = build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows:
                 continue
             n_tr = len(train_rows)
@@ -208,7 +210,13 @@ def main():
                 unc_acc[m].append(u)
 
         stats = {m: (float(np.mean(v)), float(np.std(v))) for m, v in per_method.items() if v}
-        srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
+        # HONEST LABEL (Round-3 Task A): build `train` from the REALISED per-source counts (last seed; counts
+        # are seed-stable = min(cap, available)), NOT the requested caps -- so the label can never overstate
+        # the pool (the V-A0 defect: `expertqa:360` while 0 were used). realised==labelled by construction.
+        _real = {}
+        for _d, _i in train_rows:
+            _real[_d] = _real.get(_d, 0) + 1
+        srcs = "+".join(f"{d}:{_real.get(d, 0)}" for d in dict.fromkeys(d for d, _c in spec))
         xflag = "  [CROSS-LABEL: train correctness -> test faithfulness]" if (xlbl and rung != "ID") else ""
         print(f"\n[{rung:9s}] eval={X} ({label_of(X)})  train={srcs}{xflag}", flush=True)
         for m in methods:
@@ -220,12 +228,20 @@ def main():
                 d = abs(stats[m][0] - ID_ANCHOR[X][m])
                 assert d < GATE_TOL, f"ID-GATE FAIL {X}/{m}: {stats[m][0]:.3f} vs {ID_ANCHOR[X][m]} (|d|={d:.3f})"
             print(f"    [ID-GATE OK] poolers reproduce anchors within {GATE_TOL}", flush=True)
+        # LENGTH COLUMNS (Round-3 Task C): expose the two shifts "OOD" hides -- domain vs length. Computed over
+        # the REALISED pool (last-seed train_rows; the widened Task-A pool should visibly raise train_max_len on
+        # the long evals). Length = len(token_logprobs) (the canonical per-example gen length).
+        _tl = [len(PT[d][3][i]["token_logprobs"]) for d, i in train_rows]
+        _el = [len(PT[X][3][i]["token_logprobs"]) for _d, i in test_rows]
+        _lens = {"eval_med_len": round(float(np.median(_el)), 1) if _el else "",
+                 "train_med_len": round(float(np.median(_tl)), 1) if _tl else "",
+                 "train_max_len": int(max(_tl)) if _tl else ""}
         for m in methods:
             if m in stats:
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                                  "n_seeds": len(per_method[m]),
-                                 "different_label_projection": (xlbl and rung != "ID")})   # ExpertQA OOD = cross-label
+                                 "different_label_projection": (xlbl and rung != "ID"), **_lens})   # ExpertQA OOD = cross-label
         # Paired test-set bootstrap on the seed-averaged uncertainty vectors: turns the head-to-heads
         # (contribution vs floor, pooler vs floor, contribution vs pooler) into CI-backed verdicts.
         avg_unc = {m: np.mean(np.stack(unc_acc[m]), axis=0) for m in unc_acc if unc_acc[m]}
@@ -263,7 +279,9 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "different_label_projection", "ci_lo", "ci_hi", "boot_p", "significant"])
+                                           "n_seeds", "different_label_projection", "eval_med_len",
+                                           "train_med_len", "train_max_len", "ci_lo", "ci_hi", "boot_p",
+                                           "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

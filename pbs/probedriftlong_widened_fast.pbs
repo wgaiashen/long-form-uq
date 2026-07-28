@@ -1,0 +1,9 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=13:00:00
+#PBS -N luq_pdlw_fast
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/probedriftlong.py --evals "$EVAL" --seeds 1,2,3 --skip-wmsp \
+  --out "/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/probedriftlong_${EVAL}_widened__meta-llama_Meta-Llama-3.1-8B.csv"

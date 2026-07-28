@@ -110,7 +110,14 @@ def cells_long(sources, evals):
 
 
 def sampled_train_idx(split, seed, cap):
+    # Round-3 Task A (2026-07-27): the defect was this filter returning EMPTY for eval-only sources (all
+    # split=="test"), so a listed source like `expertqa:360` silently contributed 0 rows (V-A0). A dataset used
+    # as a SOURCE for ANOTHER eval leaks nothing regardless of split label (source != eval is enforced by
+    # cells_long), so draw from ALL its rows when it has no dedicated train split. Core sets (with a train
+    # split) are UNCHANGED -- they still draw train-only.
     tr = np.where(split == "train")[0]
+    if len(tr) == 0:                                  # eval-only source: use its full row set as source rows
+        tr = np.arange(len(split))
     if cap is None or cap >= len(tr):
         return tr
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
@@ -130,7 +137,17 @@ def main():
                          "correctness. This reproduces the pre-2026-07-22 committed PART VII baseline and is "
                          "the control for 'does mixing label semantics help or hurt?'. ExpertQA remains an EVAL.")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--skip-wmsp", action="store_true",
+                    help="skip the 10 wMSP KEEP variants (the training bottleneck). Poolers + floors + saplma "
+                         "still run -- enough for §B.3 / P2a / Task D. Use when only the pooler numbers are "
+                         "needed; wMSP (§C.4) is re-run separately.")
     args = ap.parse_args()
+    # active method set: wMSP is the per-cell training bottleneck (10 variants); drop it when only the poolers
+    # and floors are needed. best_w / the wmsp verdicts are guarded below when wMSP is off.
+    active_wmsp = [] if args.skip_wmsp else WMSP
+    active_methods = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in active_wmsp]
+    if args.skip_wmsp:
+        print("SKIP-WMSP: running poolers + floors + saplma only (wMSP variants skipped)", flush=True)
     global LONG_SRC
     if args.label_homogeneous:
         LONG_SRC = [d for d in LONG_SRC if d != "expertqa"]
@@ -177,7 +194,7 @@ def main():
         if len(X_te) == 0:
             continue
         xlbl = different_label_projection(X)
-        per = {m: [] for m in METHODS}; unc_acc = {m: [] for m in METHODS}; yte_ref = None
+        per = {m: [] for m in active_methods}; unc_acc = {m: [] for m in active_methods}; yte_ref = None
         for sd in seeds:
             train_rows, test_rows = build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows or not test_rows:
@@ -201,9 +218,9 @@ def main():
                                                states, te_idx, device), float)
             v["attention"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T),
                                                  states, te_idx, device), float)
-            # wMSP KEEP variants
+            # wMSP KEEP variants (skipped under --skip-wmsp -- the training bottleneck)
             seg_cell = [SEG[d][i] for d, i in allrows]
-            for name, kw in WMSP:
+            for name, kw in active_wmsp:
                 kw2 = dict(kw)
                 if kw2.get('segment_ids') == '_seg_ids':
                     kw2['segment_ids'] = seg_cell
@@ -225,18 +242,30 @@ def main():
         stats["fair_floor"] = stats[fair_name]
         avg = {m: np.mean(np.stack(unc_acc[m]), 0) for m in unc_acc if unc_acc[m]}
         avg["fair_floor"] = avg[fair_name]
-        best_w = max((w[0] for w in WMSP), key=lambda m: stats[m][0])
+        best_w = max((w[0] for w in active_wmsp), key=lambda m: stats[m][0]) if active_wmsp else None
         best_p = max(POOLERS, key=lambda m: stats[m][0])
-        srcs = "+".join(f"{d}:{c}" if c else d for d, c in spec)
+        # HONEST LABEL (Round-3 Task A): `train` from REALISED per-source counts (last seed; seed-stable), not
+        # requested caps -- so the label can never overstate the pool (the V-A0 defect). realised==labelled.
+        _real = {}
+        for _d, _i in train_rows:
+            _real[_d] = _real.get(_d, 0) + 1
+        srcs = "+".join(f"{d}:{_real.get(d, 0)}" for d in dict.fromkeys(d for d, _c in spec))
         xf = "  [CROSS-LABEL]" if (xlbl and rung != "ID") else ""
         dual = "" if strongest == fair_name else f"  (strongest free = {strongest} {stats[strongest][0]:+.3f}; DUAL-REPORT)"
+        # LENGTH COLUMNS (Round-3 Task C): domain-shift vs length-shift made visible, over the REALISED pool.
+        _tl = [len(PT[d][3][i]["token_logprobs"]) for d, i in train_rows]
+        _el = [len(PT[X][3][i]["token_logprobs"]) for _d, i in test_rows]
+        _lens = {"eval_med_len": round(float(np.median(_el)), 1) if _el else "",
+                 "train_med_len": round(float(np.median(_tl)), 1) if _tl else "",
+                 "train_max_len": int(max(_tl)) if _tl else ""}
         print(f"\n[{rung:14s}] eval={X} ({label_of(X)}) train={srcs}{xf}  primary_floor={fair_name} {stats['fair_floor'][0]:+.3f}{dual}", flush=True)
-        for m in METHODS:
+        for m in active_methods:
             if m in stats:
                 print(f"    {m:14s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
-                                 "n_seeds": len(per[m]), "different_label_projection": bool(xlbl and rung != "ID")})
+                                 "n_seeds": len(per[m]), "different_label_projection": bool(xlbl and rung != "ID"),
+                                 **_lens})
         for vk, a, b in [("bestw_vs_fairfloor", best_w, "fair_floor"),
                          ("bestw_vs_bestpooler", best_w, best_p),
                          ("attention_vs_fairfloor", "attention", "fair_floor")]:
@@ -250,7 +279,9 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"probedriftlong__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "different_label_projection", "ci_lo", "ci_hi", "boot_p", "significant"])
+                                           "n_seeds", "different_label_projection", "eval_med_len",
+                                           "train_med_len", "train_max_len", "ci_lo", "ci_hi", "boot_p",
+                                           "significant"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 

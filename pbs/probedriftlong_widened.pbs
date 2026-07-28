@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_pdl_widened
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# WIDENED §C.3 (Task-A pool). Distinct --out; one eval per job via -v EVAL to fit walltime (like Section-2).
+python -u scripts/checks/probedriftlong.py --evals "$EVAL" --seeds 1,2,3 \
+  --out "/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/probedriftlong_${EVAL}_widened__meta-llama_Meta-Llama-3.1-8B.csv"
