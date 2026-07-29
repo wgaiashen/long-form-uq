@@ -141,10 +141,36 @@ def main():
                     help="skip the 10 wMSP KEEP variants (the training bottleneck). Poolers + floors + saplma "
                          "still run -- enough for §B.3 / P2a / Task D. Use when only the pooler numbers are "
                          "needed; wMSP (§C.4) is re-run separately.")
+    ap.add_argument("--wmsp-only", default=None,
+                    help="comma-separated wMSP variant names to KEEP (e.g. wmsp_norm,wmsp_shrink2,wmsp_shrink10). "
+                         "Any WMSP variant not listed is EXCLUDED and its column is left ABSENT (never zero). "
+                         "Each variant is a SEPARATE MLP fit, so this genuinely saves compute. Default None = all "
+                         "committed variants (RCS default behaviour unchanged). Fails loud on an unknown name.")
+    ap.add_argument("--rungs", default=None,
+                    help="comma-separated BASE rung names to KEEP: ID,SameTask,DiffTask,LOO,1ds-Diff (they map "
+                         "to the -long ladder names). Default None = every rung cells_long emits (RCS default "
+                         "unchanged). Pass 'ID,LOO,DiffTask' for the 3 MASTER-GRID rungs only.")
     args = ap.parse_args()
+    want_rungs = set(s.strip() for s in args.rungs.split(",") if s.strip()) if args.rungs else None
+    if want_rungs is not None:
+        _valid = {"ID", "SameTask", "DiffTask", "LOO", "1ds-Diff", "Long->Short"}
+        _bad = want_rungs - _valid
+        if _bad:
+            raise SystemExit(f"--rungs: unknown rung(s) {sorted(_bad)}; valid = {sorted(_valid)}")
+        print(f"RUNGS filter: keeping base rungs {sorted(want_rungs)} (others skipped)", flush=True)
     # active method set: wMSP is the per-cell training bottleneck (10 variants); drop it when only the poolers
     # and floors are needed. best_w / the wmsp verdicts are guarded below when wMSP is off.
     active_wmsp = [] if args.skip_wmsp else WMSP
+    if args.wmsp_only and not args.skip_wmsp:
+        keep_names = [s.strip() for s in args.wmsp_only.split(",") if s.strip()]
+        known = {w[0] for w in WMSP}
+        unknown = [n for n in keep_names if n not in known]
+        if unknown:
+            raise SystemExit(f"--wmsp-only: unknown variant(s) {unknown}; valid = {sorted(known)}")
+        excluded = [w[0] for w in WMSP if w[0] not in keep_names]
+        active_wmsp = [w for w in WMSP if w[0] in keep_names]
+        print(f"WMSP-ONLY: keeping {[w[0] for w in active_wmsp]} ; EXCLUDED {excluded} "
+              "(their columns are left ABSENT, not zero)", flush=True)
     active_methods = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in active_wmsp]
     if args.skip_wmsp:
         print("SKIP-WMSP: running poolers + floors + saplma only (wMSP variants skipped)", flush=True)
@@ -188,6 +214,8 @@ def main():
 
     out_rows = []
     for rung, X, spec in cells_long(sources, evals):
+        if want_rungs is not None and rung.replace("-long", "") not in want_rungs:
+            continue
         if X not in PT:
             continue
         _, X_te = eval_split(PT[X][1])
