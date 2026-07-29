@@ -24,7 +24,7 @@ METHODS (the KEEP set): fair floor (msp_sum/perplexity/msp_min -> max), uniform 
     python scripts/checks/probedriftlong.py --seeds 1,2,3
     python scripts/checks/probedriftlong.py --evals pubmed_qa,xsum --seeds 1   # smoke
 """
-import argparse, csv as _csv, sys
+import argparse, csv as _csv, sys, pickle
 from pathlib import Path
 import numpy as np
 
@@ -36,7 +36,7 @@ from luq.features import sar  # noqa: E402  (shared sentence splitter)
 from transformers import AutoTokenizer  # noqa: E402
 from luq.weighting import shrink_to_uniform  # noqa: E402
 from aggregation_table import load_per_token, attn_unc, paired_bootstrap, conf_meanpool, prr_from_conf  # noqa: E402
-from attn_pool import train_attn, select_temperature  # noqa: E402
+from attn_pool import train_attn, select_temperature, pad_batch  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -123,6 +123,69 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
+def _provenance():
+    """Per-row provenance: git_sha + cluster + env_hash. FAILS LOUD if the TRACKED working tree is dirty --
+    a SHA stamped from a modified tree asserts a reproducibility that does not hold, so refuse to run rather
+    than stamp a lie. Untracked scratch files are ignored (they do not change the committed code the SHA
+    points at). Called at the top of main() so it aborts before the ~20-min pool load."""
+    import subprocess, socket, hashlib
+
+    def _git(*a):
+        return subprocess.run(["git", *a], cwd=str(ROOT), capture_output=True, text=True).stdout.strip()
+    sha = _git("rev-parse", "HEAD")
+    if not sha:
+        raise SystemExit("provenance: could not read git HEAD (not a repo?) -- refusing to run unversioned")
+    dirty = _git("status", "--porcelain", "--untracked-files=no")
+    if dirty:
+        raise SystemExit("provenance: TRACKED working tree is DIRTY -- refusing to stamp a git_sha that does "
+                         f"not reproduce. Commit or stash first, then resubmit.\n{dirty}")
+    root = str(ROOT)
+    cluster = "DoC" if root.startswith("/vol/gpudata") else ("RCS" if "/rds/" in root else socket.gethostname())
+    try:
+        from importlib.metadata import distributions
+        pkgs = sorted(f"{dist.metadata['Name']}=={dist.version}" for dist in distributions()
+                      if dist.metadata.get('Name'))
+        env_hash = hashlib.sha256("\n".join(pkgs).encode()).hexdigest()[:12]
+    except Exception as e:                              # never let env-hashing crash the run
+        env_hash = f"unknown:{type(e).__name__}"
+    return {"git_sha": sha, "cluster": cluster, "env_hash": env_hash}
+
+
+def _save_pooler(pooler, best_T, rung, X, sd, layer, states, te_idx, test_rows, PT, device):
+    """Persist the trained attention pooler (armA) + its test-set sidecar, byte-format-identical to
+    scripts/tools/dump_ood_attention.py so RCS's post-hoc pass + G1 cross-check consume them unchanged.
+    The pooler is trained identically here (same states/tr_idx/seed/best_T), so this adds only the cheap
+    forward pass for pool_w -- no retrain. Sidecar filename carries NO seed (seed-1 convention); pkl carries
+    s<seed>."""
+    base_rung = rung.replace("-long", "")
+    if any(c in rung for c in ">/\\"):                  # e.g. "Long->Short" -> unsafe filename; skip loudly
+        print(f"  [save-pooler] skip {X} {rung!r}: unsafe rung name for a filename", flush=True)
+        return
+    ladder_family = "ID" if base_rung == "ID" else ("LONG" if rung.endswith("-long") else "STANDARD")
+    probes = ROOT / "cache" / "probes"; probes.mkdir(parents=True, exist_ok=True)
+    viz = ROOT / "cache" / "viz"; viz.mkdir(parents=True, exist_ok=True)
+    pooler.eval()
+    pool_w = []
+    with torch.no_grad():
+        for k in te_idx:
+            Xk, mask, pos = pad_batch([states[k]], device)
+            _, a = pooler(Xk, mask, pos)
+            pool_w.append(a[0, : states[k].shape[0]].float().cpu().numpy())
+    record_pos_all = np.array([int(PT[X][4][i]) for _d, i in test_rows])   # PT[.][4] = orig record positions
+    key = cache.run_key(MODEL, X, "ID")
+    suffix = "" if base_rung == "ID" else f"__{rung}"
+    np.savez_compressed(viz / f"{key}__attn{suffix}.npz", record_pos_all=record_pos_all,
+                        pool_w=np.array(pool_w, dtype=object), rung=rung, base_rung=base_rung,
+                        ladder_family=ladder_family, seed=sd, layer=layer, best_T=float(best_T),
+                        pool_config="post-TaskA-widened", n_train=len(states) - len(te_idx))
+    pk = probes / f"{cache._slug(MODEL)}__{X}__ID__attnpool_{rung}_s{sd}__L{layer}.pkl"
+    with open(pk, "wb") as f:
+        pickle.dump({"model": pooler, "best_T": float(best_T), "rung": rung, "base_rung": base_rung,
+                     "ladder_family": ladder_family, "seed": sd, "eval": X, "layer": layer,
+                     "pool_config": "post-TaskA-widened"}, f)
+    print(f"  [save-pooler] {X} {rung} s{sd} -> {pk.name}  (+sidecar {key}__attn{suffix}.npz)", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
@@ -150,7 +213,16 @@ def main():
                     help="comma-separated BASE rung names to KEEP: ID,SameTask,DiffTask,LOO,1ds-Diff (they map "
                          "to the -long ladder names). Default None = every rung cells_long emits (RCS default "
                          "unchanged). Pass 'ID,LOO,DiffTask' for the 3 MASTER-GRID rungs only.")
+    ap.add_argument("--save-pooler", action="store_true",
+                    help="persist the seed-1 attention pooler (armA) trained in every cell: pkl "
+                         "(cache/probes/...attnpool_<rung>_s1__L15.pkl) + sidecar (cache/viz/...__attn[__<rung>].npz "
+                         "with pool_w + record_pos_all), byte-format-identical to dump_ood_attention so RCS's "
+                         "post-hoc pass + G1 cross-check read them directly. The pooler is already trained, so "
+                         "this is ~zero extra compute. Default off.")
     args = ap.parse_args()
+    prov = _provenance()   # aborts here (before the pool load) if the tracked tree is dirty
+    print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} env_hash={prov['env_hash']}"
+          + ("  [+save-pooler seed-1]" if args.save_pooler else ""), flush=True)
     want_rungs = set(s.strip() for s in args.rungs.split(",") if s.strip()) if args.rungs else None
     if want_rungs is not None:
         _valid = {"ID", "SameTask", "DiffTask", "LOO", "1ds-Diff", "Long->Short"}
@@ -192,13 +264,14 @@ def main():
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True); continue
         states, split, y, _, records = loaded
+        orig = np.arange(len(records))                 # filtered-row -> ORIGINAL record position (for sidecars)
         finite = np.isfinite(y)
         if not finite.any():
             print(f"  {d}: fully unlabelled ({label_of(d)}) -> skip", flush=True); continue
         if not finite.all():
             keep = np.where(finite)[0]
             states = [states[k] for k in keep]; records = [records[k] for k in keep]
-            split = split[keep]; y = y[keep]
+            split = split[keep]; y = y[keep]; orig = keep
         segs = []
         for r, st in zip(records, states):
             sid, _ = sar._token_sentence_ids(tok, list(r['gen_token_ids']),
@@ -208,7 +281,7 @@ def main():
             if len(sid) == g:                  # already G (state has the +1 anchor); trim to answer tokens
                 sid = sid
             segs.append(sid)
-        PT[d] = (states, split, y, records); SEG[d] = segs
+        PT[d] = (states, split, y, records, orig); SEG[d] = segs
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
@@ -244,8 +317,10 @@ def main():
             best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
             v["uniform"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True),
                                                states, te_idx, device), float)
-            v["attention"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T),
-                                                 states, te_idx, device), float)
+            attn_pooler = train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T)
+            v["attention"] = np.asarray(attn_unc(attn_pooler, states, te_idx, device), float)
+            if args.save_pooler and sd == seeds[0]:    # seed-1 pooler = the RCS post-hoc convention
+                _save_pooler(attn_pooler, best_T, rung, X, sd, args.layer, states, te_idx, test_rows, PT, device)
             # wMSP KEEP variants (skipped under --skip-wmsp -- the training bottleneck)
             seg_cell = [SEG[d][i] for d, i in allrows]
             for name, kw in active_wmsp:
@@ -305,11 +380,13 @@ def main():
                                  "boot_p": round(p, 4), "significant": bool(sig), "n_seeds": len(seeds)})
 
     out = Path(args.out) if args.out else (ROOT / "results" / f"probedriftlong__{cache._slug(MODEL)}.csv")
+    for _r in out_rows:                                # stamp provenance on EVERY row (method + VERDICT rows)
+        _r.update(prov)
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
                                            "n_seeds", "different_label_projection", "eval_med_len",
                                            "train_med_len", "train_max_len", "ci_lo", "ci_hi", "boot_p",
-                                           "significant"])
+                                           "significant", "git_sha", "cluster", "env_hash"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}", flush=True)
 
