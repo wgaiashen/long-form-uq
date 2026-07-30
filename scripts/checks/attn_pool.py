@@ -201,6 +201,28 @@ def pad_batch(states_list, device):
     return X.to(device), mask.to(device), pos.to(device)
 
 
+def _make_head(d, head_hidden):
+    """Classifier head on the pooled vector.
+
+    head_hidden=None -> a single nn.Linear(d, 1), BYTE-IDENTICAL to the original pooler head (same
+      module, same RNG draw), so every existing caller (arms A/B/D, multi-head) is unchanged.
+    head_hidden=(256,128,64) -> the SAPLMA MLP stack Linear->ReLU->...->Linear(.,1), mirroring
+      luq.probe.train_probe_mlp's build (probe.py). This lets the head axis of the 2x2 be a pure head
+      swap trained by the SAME train_attn recipe as the linear-head cells (head_aggregation_2x2.py).
+    All params are UN-prefixed by 'q', so train_attn's param-group split routes them to the decayed
+      (wd) group exactly like the linear head -- the query stays the only un-decayed param.
+    """
+    if head_hidden is None:
+        return nn.Linear(d, 1)
+    layers = []
+    prev = d
+    for h in head_hidden:
+        layers += [nn.Linear(prev, h), nn.ReLU()]
+        prev = h
+    layers += [nn.Linear(prev, 1)]     # final bare logit (sigmoid applied at scoring time)
+    return nn.Sequential(*layers)
+
+
 class AttnPool(nn.Module):
     """One learned-query softmax-attention step over token states, then a linear head.
 
@@ -212,12 +234,12 @@ class AttnPool(nn.Module):
     """
 
     def __init__(self, d, temperature=1.0, use_position=False, freeze_query=False,
-                 frozen_prior=False, beta=1.0, n_query=1, n_head=1):
+                 frozen_prior=False, beta=1.0, n_query=1, n_head=1, head_hidden=None):
         super().__init__()
         self.q = nn.Parameter(torch.zeros(d))       # primary learned query (init 0 => starts at mean-pool)
         if freeze_query or frozen_prior:
             self.q.requires_grad_(False)            # q stays 0 (uniform), or is unused (frozen prior)
-        self.head = nn.Linear(d, 1)                 # primary head
+        self.head = _make_head(d, head_hidden)      # primary head (None -> Linear(d,1); tuple -> SAPLMA MLP)
         self.scale = d ** 0.5
         self.temperature = temperature
         self.use_position = use_position
@@ -236,7 +258,7 @@ class AttnPool(nn.Module):
         self.n_query = n_query
         self.n_head = n_head
         self.q_rest = nn.Parameter(torch.randn(n_query - 1, d) * 0.02) if n_query > 1 else None
-        self.heads_rest = nn.ModuleList([nn.Linear(d, 1) for _ in range(n_head - 1)]) if n_head > 1 else None
+        self.heads_rest = nn.ModuleList([_make_head(d, head_hidden) for _ in range(n_head - 1)]) if n_head > 1 else None
 
     def forward(self, X, mask, posfeat, prior=None):
         # arm C (frozen prior): attention IS the renormalised prior over real tokens; the query is unused.
@@ -285,7 +307,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                answer_only=False, weight_decay=WEIGHT_DECAY, wd_query=0.0, freeze_query=False,
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
                prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
-               aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False):
+               aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False,
+               head_hidden=None):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -319,7 +342,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     d = states[0].shape[1]
     model = AttnPool(d, temperature=temperature, use_position=use_position,
                      freeze_query=freeze_query or frozen_prior,
-                     frozen_prior=frozen_prior, beta=beta, n_query=n_query, n_head=n_head).to(device)
+                     frozen_prior=frozen_prior, beta=beta, n_query=n_query, n_head=n_head,
+                     head_hidden=head_hidden).to(device)
     # Separate param groups: the heads (and positional bias) get weight decay against p >> n, but the
     # queries are left UN-decayed (wd_query=0) so they can actually move off zero -- with decay on them, the
     # query collapsed to 0 and the attention stayed uniform (the first run's diagnostic showed this).
@@ -392,9 +416,13 @@ def attn_prr(model, states, y, te_idx, device, answer_only=False, bs=64):
     return results.prr([y[i] for i in te_idx], unc)
 
 
-def select_temperature(states, y, tr_idx, device, seed, use_position, answer_only):
+def select_temperature(states, y, tr_idx, device, seed, use_position, answer_only, head_hidden=None):
     """Carve a validation split from train (never test), train at each temperature, pick the one with
-    the best validation PRR. Returns (best_T, [(T, val_prr), ...])."""
+    the best validation PRR. Returns (best_T, [(T, val_prr), ...]).
+
+    head_hidden is passed straight to train_attn so T is selected FOR THE HEAD ARCHITECTURE IN USE
+    (armA's protocol is "select T for this architecture", not "reuse the linear-head T"). Default None
+    keeps the existing linear-head callers byte-identical."""
     g = np.random.RandomState(seed)
     order = list(tr_idx)
     g.shuffle(order)
@@ -403,7 +431,8 @@ def select_temperature(states, y, tr_idx, device, seed, use_position, answer_onl
     curve = []
     for T in TEMP_GRID:
         m = train_attn(states, y, sub_tr, device, seed=seed, temperature=T,
-                       use_position=use_position, answer_only=answer_only, epochs=40)
+                       use_position=use_position, answer_only=answer_only, epochs=40,
+                       head_hidden=head_hidden)
         curve.append((T, attn_prr(m, states, y, val_idx, device, answer_only=answer_only)))
     best_T = max(curve, key=lambda c: c[1])[0]
     return best_T, curve
