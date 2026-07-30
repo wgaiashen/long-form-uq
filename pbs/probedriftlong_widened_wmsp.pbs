@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_pdl_wid_wmsp
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# WIDENED §C.3 *WITH* wMSP (dissertation background). Distinct --out so it CANNOT clobber the
+# existing --skip-wmsp widened CSVs that §D.0 / §B.3-WIDENED were computed from. One eval per job (-v EVAL).
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+DIR="/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results"
+OUT="${DIR}/probedriftlong_${EVAL}_widened_wmsp__${SLUG}.csv"
+NARROW="${DIR}/probedriftlong_${EVAL}_widened__${SLUG}.csv"   # the skip-wmsp CSV — MUST NOT be touched
+echo "[widened+wMSP] EVAL=${EVAL}"
+echo "[widened+wMSP] resolved OUT   = ${OUT}"
+echo "[widened+wMSP] protected skip-wmsp CSV = ${NARROW}"
+# Guard 1: the new path must differ from the existing skip-wmsp CSV.
+if [ "${OUT}" = "${NARROW}" ]; then echo "FATAL: OUT collides with the skip-wmsp CSV — refusing"; exit 2; fi
+# Guard 2: abort rather than clobber if the target already exists.
+if [ -e "${OUT}" ]; then echo "FATAL: target already exists, refusing to clobber: ${OUT}"; exit 3; fi
+# Guard 3 (belt-and-braces): confirm the protected CSV is present and record its size, so a later
+# diff can prove it was untouched.
+if [ -e "${NARROW}" ]; then echo "[widened+wMSP] protected CSV size BEFORE = $(stat -c%s "${NARROW}") bytes"; fi
+# NOTE: no --skip-wmsp -> wMSP variants included. Same evals/seeds/rungs as the skip-wmsp run.
+python -u scripts/checks/probedriftlong.py --evals "$EVAL" --seeds 1,2,3 --out "${OUT}"
+echo "[widened+wMSP] DONE eval=${EVAL} -> ${OUT}"
+if [ -e "${NARROW}" ]; then echo "[widened+wMSP] protected CSV size AFTER  = $(stat -c%s "${NARROW}") bytes (must equal BEFORE)"; fi

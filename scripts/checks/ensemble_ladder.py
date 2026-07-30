@@ -106,6 +106,12 @@ def main():
         for ps in PROBE_SIDE:
             ENS.append((f"rankavg_{ms}+{ps}", ms, ps, "rank"))
             ENS.append((f"zavg_{ms}+{ps}", ms, ps, "z"))
+    # {wMSP, MSP} -- model-side x model-side (Lihu's actual suggestion; the MODEL_SIDE x PROBE_SIDE loop above
+    # never pairs two model-side scores, so this ensemble had never been formed). Both components are computed
+    # below (v["wmsp"], v["floor_min"]).
+    if not args.skip_wmsp:
+        ENS.append(("rankavg_wmsp+floor_min", "wmsp", "floor_min", "rank"))
+        ENS.append(("zavg_wmsp+floor_min", "wmsp", "floor_min", "z"))
     base_methods = ["floor_sum", "floor_ppl", "floor_min"] + PROBE_SIDE + ([] if args.skip_wmsp else ["wmsp"])
     all_methods = base_methods + [e[0] for e in ENS]
 
@@ -163,6 +169,8 @@ def main():
         for ms in MODEL_SIDE:
             for ps in PROBE_SIDE:
                 corr[f"{ms}~{ps}"] = spearman(avg[ms], avg[ps])
+        if not args.skip_wmsp and "wmsp" in avg and "floor_min" in avg:
+            corr["wmsp~floor_min"] = spearman(avg["wmsp"], avg["floor_min"])
         _real = {}
         for _d, _i in train_rows:
             _real[_d] = _real.get(_d, 0) + 1

@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_fill
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# Parameterised arm/MH fill for the missing rungs. Pass with -v:
+#   DRIVER=fixed_prior_ladder|multihead_ladder  EVAL=<eval>  RUNGS=<base names joined by '+', or _ALL_>  OUT=<path>
+# '+' is used (not ',') because PBS -v splits variables on commas; converted to ',' below.
+echo "[fill] host $(hostname) DRIVER=$DRIVER EVAL=$EVAL RUNGS=$RUNGS OUT=$OUT commit=$(git rev-parse --short HEAD 2>/dev/null)"
+PROT1="results/fixed_prior_ladder__meta-llama_Meta-Llama-3.1-8B.csv"
+PROT2="results/multihead_ladder__meta-llama_Meta-Llama-3.1-8B_joined.csv"
+# Guard 1: never write onto a protected canonical CSV.
+if [ "$OUT" = "$PROT1" ] || [ "$OUT" = "$PROT2" ]; then echo "FATAL: OUT is a protected canonical CSV"; exit 2; fi
+# Guard 2: abort rather than clobber.
+if [ -e "$OUT" ]; then echo "FATAL: target already exists, refusing to clobber: $OUT"; exit 3; fi
+# Guard 3: record protected sizes BEFORE (a later diff proves they were untouched).
+[ -e "$PROT1" ] && echo "[fill] PROT1 size BEFORE=$(stat -c%s "$PROT1")"
+[ -e "$PROT2" ] && echo "[fill] PROT2 size BEFORE=$(stat -c%s "$PROT2")"
+if [ "$RUNGS" = "_ALL_" ]; then RUNGARG=""; else RUNGARG="--rungs ${RUNGS//+/,}"; fi
+if [ "$DRIVER" = "fixed_prior_ladder" ]; then
+  python -u scripts/checks/fixed_prior_ladder.py --evals "$EVAL" --seeds 1,2,3 --priors content_mass,nll $RUNGARG --out "$OUT"
+elif [ "$DRIVER" = "multihead_ladder" ]; then
+  python -u scripts/checks/multihead_ladder.py --evals "$EVAL" --seeds 1,2,3 --defer-baseline $RUNGARG --out "$OUT"
+else echo "FATAL: unknown DRIVER $DRIVER"; exit 4; fi
+RC=$?
+echo "[fill] DONE rc=$RC -> $OUT ($(wc -l <"$OUT" 2>/dev/null) rows)"
+[ -e "$PROT1" ] && echo "[fill] PROT1 size AFTER=$(stat -c%s "$PROT1")  (must equal BEFORE)"
+[ -e "$PROT2" ] && echo "[fill] PROT2 size AFTER=$(stat -c%s "$PROT2")  (must equal BEFORE)"

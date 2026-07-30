@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=14:00:00
+#PBS -N luq_ens_full
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# 3E: ensemble grid on ALL 8 long evals (adds asqa + factscore) with the NEW {wMSP,MSP} model-side x model-side
+# pairing (Lihu's suggestion). --probes saplma -> {MSP,SAPLMA}, {wMSP,SAPLMA}, {wMSP,MSP}. wMSP trains per cell
+# (the bottleneck). Distinct --out so it does NOT clobber the 6-eval ensemble_wmsp_saplma CSV.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)"
+OUT=/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/ensemble_wmsp_saplma_full__meta-llama_Meta-Llama-3.1-8B.csv
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+python -u scripts/checks/ensemble_ladder.py --probes saplma --seeds 1,2,3 \
+  --evals pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa,factscore \
+  --out "$OUT"
+echo "[3E] DONE -> $OUT"

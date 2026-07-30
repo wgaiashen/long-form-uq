@@ -62,11 +62,55 @@ def build_nll(record, state):
     return w, fell_back
 
 
-BUILDERS = {"content_mass": "content", "nll": "nll"}   # names -> kind (for the driver's --priors)
+BUILDERS = {"content_mass": "content", "nll": "nll", "orgad": "orgad"}   # names -> kind (for --priors)
+_SLUG = "meta-llama_Meta-Llama-3.1-8B"
 
 
-def build_prior(name, records_list, states_list, tok=None, special_ids=None):
-    """Return (list of length-(G+1) priors aligned to states_list, n_fallback_rows)."""
+class OrgadCoverageError(Exception):
+    """A cell's sources are not all Orgad-covered -> the driver skips that cell LOUDLY (never silent-uniform)."""
+
+
+def build_soft_orgad(records_list, states_list, datasets, tok, variant="broad", floor=0.0):
+    """S3.6 — soft-Orgad prior (Joe's lead): reuse the τ soft-tier `build_masks` (RAISES on a missing cache),
+    NOT the hard build_answer_masks. EXAMPLE-LOCAL + per-dataset, so EVERY source dataset must be covered; if
+    any isn't, raise OrgadCoverageError (the driver skips the cell). floor=0 -> pool over located tokens."""
+    from weighted_msp_orgad_ladder import build_masks
+    uncovered = sorted({d for d in set(datasets)
+                        if not (ROOT / "cache" / "orgad_llm" / f"{_SLUG}__{d}__ID__broad.json").exists()})
+    if uncovered:
+        raise OrgadCoverageError(f"no broad Orgad cache for {uncovered}")
+    masks = [None] * len(records_list); loc = [False] * len(records_list)
+    by_ds = {}
+    for i, d in enumerate(datasets):
+        by_ds.setdefault(d, []).append(i)
+    for d, idxs in by_ds.items():
+        recs = [records_list[i] for i in idxs]
+        for r in recs:
+            r["_dataset"] = d
+        m_d, loc_d = build_masks(tok, recs, variant=variant, floor=floor)
+        for j, i in enumerate(idxs):
+            masks[i] = m_d[j]; loc[i] = bool(loc_d[j])
+    out, nfb = [], 0
+    for r, s, m, lc in zip(records_list, states_list, masks, loc):
+        G, T = _window(r, s)
+        gw = np.clip(np.asarray(m, float), 0.0, None)
+        if len(gw) != G:
+            raise SystemExit(f"orgad mask len {len(gw)} != G={G}")
+        fell_back = not lc
+        if gw.sum() <= 0:
+            gw = np.ones(G, dtype=np.float32); fell_back = True    # degenerate row -> LOUD uniform fallback
+        w = np.zeros(T, dtype=np.float32); w[1:] = gw
+        out.append(w); nfb += int(fell_back)
+    return out, nfb
+
+
+def build_prior(name, records_list, states_list, tok=None, special_ids=None, datasets=None):
+    """Return (list of length-(G+1) priors aligned to states_list, n_fallback_rows). `datasets` (per-record
+    dataset name) is required for the soft-Orgad prior."""
+    if name == "orgad":
+        if datasets is None:
+            raise SystemExit("orgad prior needs per-record `datasets`")
+        return build_soft_orgad(records_list, states_list, datasets, tok)
     out, nfb = [], 0
     for r, s in zip(records_list, states_list):
         if name == "content_mass":

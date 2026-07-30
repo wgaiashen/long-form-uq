@@ -37,7 +37,7 @@ from aggregation_table import attn_unc, paired_bootstrap, load_per_token     # n
 from attn_pool import train_attn, select_temperature                         # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of                        # noqa: E402
 import probedriftlong as pdl                                                 # noqa: E402
-from prior_builders import build_prior                                       # noqa: E402
+from prior_builders import build_prior, OrgadCoverageError                   # noqa: E402
 from transformers import AutoTokenizer                                       # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -65,6 +65,11 @@ def main():
     ap.add_argument("--beta", type=float, default=1.0, help="arm D annealed log-prior weight")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--rungs", default="", help="base-rung filter (e.g. DiffTask,LOO); '' = all long OOD + ID")
+    ap.add_argument("--restricted-ood", action="store_true",
+                    help="S3.6: instead of cells_long, build ID + a RESTRICTED-POOL OOD rung — train each eval on "
+                         "the OTHER --evals only (e.g. pubmed <- {med_quad,expertqa}). A genuine OOD cell with "
+                         "FULL Orgad coverage (the standard LOO/DiffTask pools pull in uncovered sources). Keeps "
+                         "the ID cells as the ID-vs-OOD control.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     evals = args.evals.split(","); seeds = [int(s) for s in args.seeds.split(",")]
@@ -87,7 +92,8 @@ def main():
     tok = AutoTokenizer.from_pretrained(MODEL)
     special_ids = set(getattr(tok, "all_special_ids", []))
     PT = {}
-    for d in sorted(set(pdl.LONG_SRC) | set(evals)):
+    to_load = set(evals) if args.restricted_ood else (set(pdl.LONG_SRC) | set(evals))   # restricted = evals only
+    for d in sorted(to_load):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok -> skip", flush=True); continue
@@ -106,9 +112,15 @@ def main():
     ARMS_PRIORLESS = ["floor_min", "armA", "armB"]
     ARMS_PRIOR = [f"{a}_{p}" for p in priors for a in ("armC", "armD")]
     all_methods = ARMS_PRIORLESS + ARMS_PRIOR
-    out_rows = []; gate_rows = []
+    out_rows = []; gate_rows = []; skipped = set()
 
-    for rung, X, spec in pdl.cells_long(sources, evals):
+    if args.restricted_ood:                          # S3.6: ID (control) + restricted-pool OOD (covered sets only)
+        cell_iter = ([("ID", X, [(X, None)]) for X in evals if X in sources]
+                     + [("RestrictedOOD-covered", X, [(o, 900) for o in evals if o != X and o in sources])
+                        for X in evals if X in sources])
+    else:
+        cell_iter = pdl.cells_long(sources, evals)
+    for rung, X, spec in cell_iter:
         base_rung = rung.replace("-long", "")
         if X not in PT or (want and base_rung not in want and rung != "ID"):
             continue
@@ -134,8 +146,15 @@ def main():
                                             states, te_idx, device), float)
             v["armB"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True),
                                             states, te_idx, device), float)
+            cell_datasets = [d for d, _i in allrows]
             for p in priors:
-                priors_cell, nfb = build_prior(p, records, states, tok, special_ids)
+                try:
+                    priors_cell, nfb = build_prior(p, records, states, tok, special_ids, datasets=cell_datasets)
+                except OrgadCoverageError as e:
+                    if (rung, X, p) not in skipped:
+                        print(f"    [{rung:14s} {X}] prior '{p}' SKIPPED — {e} (LOUD; never silent-uniform)", flush=True)
+                        skipped.add((rung, X, p))
+                    continue
                 fb_count[p] += nfb; fb_total[p] += len(priors_cell)
                 pc = train_attn(states, y, tr_idx, device, seed=sd, prior_list=priors_cell, frozen_prior=True)
                 assert int(torch.count_nonzero(pc.q)) == 0, "arm C query moved off init — freeze failed!"
@@ -143,7 +162,7 @@ def main():
                 pd_ = train_attn(states, y, tr_idx, device, seed=sd, prior_list=priors_cell,
                                  frozen_prior=False, beta=args.beta)
                 v[f"armD_{p}"] = np.asarray(attn_unc(pd_, states, te_idx, device, prior_list=priors_cell), float)
-            for m in all_methods:
+            for m in v:                      # only the methods actually computed (Orgad-skipped arms absent)
                 per[m].append(results.prr(yte, v[m])); acc[m].append(v[m])
         if yte_ref is None:
             continue
@@ -174,6 +193,8 @@ def main():
         # verdicts: each prior arm vs the floor bar, vs arm A, vs arm B
         for p in priors:
             for arm in (f"armC_{p}", f"armD_{p}"):
+                if arm not in avg:            # prior skipped for this cell (e.g. Orgad coverage) -> no verdict
+                    continue
                 for vk, other in [(f"{arm}_vs_floor", "floor_min"), (f"{arm}_vs_armA", "armA"),
                                   (f"{arm}_vs_armB", "armB")]:
                     mg, lo, hi, pv, sig = paired_bootstrap(yte_ref, avg[arm], avg[other])
@@ -188,6 +209,15 @@ def main():
         print(f"  {X:13s} {rung:14s} armA {got:+.3f} vs §C.3 {tgt:+.3f} |Δ|={d_:.3f} {'PASS' if ok else 'FAIL <== HALT'}", flush=True)
         allok = allok and ok
     print(f"GATE: {'ALL PASS' if allok else 'FAIL — do NOT trust C/D on failing cells'}", flush=True)
+
+    # COVERED-SET CAPTION (S3.6): report exactly which (rung,eval) cells each prior actually ran on, and which
+    # were skipped for coverage -- never a silent partial grid.
+    if skipped:
+        for p in sorted({s[2] for s in skipped}):
+            sk = sorted(f"{s[1]}/{s[0]}" for s in skipped if s[2] == p)
+            ran = sorted({(r["eval"], r["rung"]) for r in out_rows if r["method"] == f"armC_{p}"})
+            print(f"\nPRIOR '{p}' COVERAGE: ran on {len(ran)} cells {sorted(f'{e}/{rg}' for e, rg in ran)}; "
+                  f"SKIPPED {len(sk)} for coverage {sk}", flush=True)
 
     out = Path(args.out) if args.out else (ROOT / "results" / f"fixed_prior_ladder__{cache._slug(MODEL)}.csv")
     with open(out, "w", newline="") as f:

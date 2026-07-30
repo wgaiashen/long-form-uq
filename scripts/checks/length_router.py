@@ -45,6 +45,7 @@ LAYER = 15
 EVALS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa"]
 LABEL = {"expertqa": "factuality", "factscore": "factuality"}
 CACHE = ROOT / "cache" / "router"
+CACHE_OOD = ROOT / "cache" / "router_ood"     # S4.1-REDO: the OOD framing (probe trained on OTHER datasets)
 
 
 def floor_entropy(token_logprobs):
@@ -106,6 +107,71 @@ def extract():
               f"floor_min_PRR={results.prr(yte, floor_min):+.3f}  med_len={np.median(length):.0f}", flush=True)
 
 
+def extract_ood(cap=225):
+    """S4.1-REDO — the OOD framing (the setting where routing CAN help). Per dataset D: train the pooler on a
+    broad LEAVE-D-OUT pool (the OTHER datasets' train examples, `cap` each ≈1800 total), apply to D's test set.
+    So `pooler_unc` is an OUT-of-distribution probe (never trained on D), and the probe wins on some datasets
+    / loses on others (heterogeneity a gate can exploit) -- unlike the ID extract where the probe always wins."""
+    import torch
+    from attn_pool import load_per_token, train_attn, select_temperature, pad_batch
+    from aggregation_table import attn_unc
+    from xl_rungs import eval_split
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    @torch.no_grad()
+    def pool_attn_entropy(pooler, states, te_idx, bs=64):
+        pooler.eval(); out = np.zeros(len(te_idx))
+        for b in range(0, len(te_idx), bs):
+            idx = te_idx[b:b + bs]
+            X, mask, pos = pad_batch([states[i] for i in idx], device)
+            _, a = pooler(X, mask, pos)
+            a = a.cpu().numpy()
+            for r, i in enumerate(idx):
+                T = states[i].shape[0]; w = a[r, :T]; w = w / max(w.sum(), 1e-12)
+                out[b + r] = float(-(w * np.log(w + 1e-12)).sum() / np.log(max(T, 2)))
+        return out
+
+    CACHE_OOD.mkdir(parents=True, exist_ok=True)
+    DATA = {}
+    for d in EVALS:
+        loaded = load_per_token(MODEL, d, LAYER, LABEL.get(d, "correctness"))
+        if loaded is None:
+            print(f"  {d}: no pertok -> skip", flush=True); continue
+        states, split, y, _lyr, records = loaded
+        DATA[d] = (states, split, y, records)
+    for D in DATA:
+        s_D, sp_D, y_D, rec_D = DATA[D]
+        _, te = eval_split(sp_D); te = [i for i in te if np.isfinite(y_D[i])]
+        if len(te) < 30:
+            print(f"  {D}: too few test rows -> skip", flush=True); continue
+        rng = np.random.RandomState(1)                      # broad leave-D-out training pool
+        pool_states, pool_y = [], []
+        for o in DATA:
+            if o == D:
+                continue
+            s_o, sp_o, y_o, _ = DATA[o]
+            tr_o, _ = eval_split(sp_o); tr_o = [i for i in tr_o if np.isfinite(y_o[i])]
+            for i in rng.choice(tr_o, min(cap, len(tr_o)), replace=False):
+                pool_states.append(s_o[i]); pool_y.append(float(y_o[i]))
+        allstates = pool_states + [s_D[i] for i in te]
+        ally = np.array(pool_y + [float(y_D[i]) for i in te], float)
+        tr_idx = list(range(len(pool_states))); te_idx = list(range(len(pool_states), len(allstates)))
+        best_T, _ = select_temperature(allstates, ally, tr_idx, device, 1, False, False)
+        pooler = train_attn(allstates, ally, tr_idx, device, seed=1, temperature=best_T)
+        pooler_unc = np.asarray(attn_unc(pooler, allstates, te_idx, device), float)
+        pool_ent = pool_attn_entropy(pooler, allstates, te_idx)
+        floor_min = np.array([msp.msp_uncertainty(rec_D[i]["token_logprobs"], "min") for i in te])
+        floor_ppl = np.array([msp.msp_uncertainty(rec_D[i]["token_logprobs"], "perplexity") for i in te])
+        length = np.array([len(rec_D[i]["token_logprobs"]) for i in te], float)
+        f_ent = np.array([floor_entropy(rec_D[i]["token_logprobs"]) for i in te])
+        yte = np.array([float(y_D[i]) for i in te], float)
+        np.savez_compressed(CACHE_OOD / f"{MODEL_SLUG}__{D}.npz",
+                            pooler_unc=pooler_unc, floor_min=floor_min, floor_ppl=floor_ppl,
+                            length=length, floor_entropy=f_ent, pool_entropy=pool_ent, y=yte)
+        print(f"  {D}: n_pool={len(pool_states)} n_te={len(te)}  probe_OOD_PRR={results.prr(yte, pooler_unc):+.3f}  "
+              f"floor_PRR={results.prr(yte, floor_min):+.3f}  med_len={np.median(length):.0f}", flush=True)
+
+
 def zscore(v):
     s = v.std()
     return (v - v.mean()) / s if s > 1e-9 else v - v.mean()
@@ -117,10 +183,10 @@ def hybrid(feat, thr, pooler_unc, floor_unc):
     return np.where(use_pooler, zscore(pooler_unc), zscore(floor_unc))
 
 
-def load_cells():
+def load_cells(cache_dir):
     cells = {}
     for d in EVALS:
-        p = CACHE / f"{MODEL_SLUG}__{d}.npz"
+        p = cache_dir / f"{MODEL_SLUG}__{d}.npz"
         if p.exists():
             z = np.load(p)
             cells[d] = {k: z[k] for k in z.files}
@@ -142,15 +208,29 @@ def fit_threshold(train_cells, feat_key):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--extract", action="store_true", help="heavy step: build per-dataset vector caches")
+    ap.add_argument("--ood", action="store_true",
+                    help="S4.1-REDO: the OOD framing (probe trained on OTHER datasets). With --extract, builds "
+                         "the leave-D-out caches; without, runs the router on them. The ID framing is misspecified "
+                         "(probe wins 9/9 -> oracle == always-pooler -> no headroom); routing lives in the OOD table.")
     ap.add_argument("--feature", default="length", choices=["length", "floor_entropy", "pool_entropy"])
     args = ap.parse_args()
     if args.extract:
-        extract(); return
-    cells = load_cells()
+        (extract_ood() if args.ood else extract()); return
+    cache_dir = CACHE_OOD if args.ood else CACHE
+    cells = load_cells(cache_dir)
     if len(cells) < 3:
-        raise SystemExit(f"only {len(cells)} cached cells -- run --extract first (qsub pbs/length_router_extract.pbs)")
+        raise SystemExit(f"only {len(cells)} cached cells in {cache_dir} -- run --extract{' --ood' if args.ood else ''} first")
 
-    print(f"\nLENGTH-GATED ROUTER (LODO) — gate feature = {args.feature}; bar = msp_min (perplexity dual)\n")
+    # ORACLE FIRST (the decisive number): does routing headroom exist at all?
+    af0 = np.mean([results.prr(c["y"], c["floor_min"]) for c in cells.values()])
+    ap0 = np.mean([results.prr(c["y"], c["pooler_unc"]) for c in cells.values()])
+    orc0 = np.mean([max(results.prr(c["y"], c["floor_min"]), results.prr(c["y"], c["pooler_unc"])) for c in cells.values()])
+    print(f"\n=== ORACLE FIRST ({'OOD' if args.ood else 'ID'} framing, {len(cells)} datasets) ===")
+    print(f"  always-floor {af0:+.3f} | always-pooler {ap0:+.3f} | ORACLE {orc0:+.3f}  -> "
+          f"headroom over always-pooler = {orc0 - ap0:+.3f}")
+    print(f"  {'HEADROOM EXISTS -> fitting the gate is worthwhile.' if orc0 - ap0 > 0.005 else 'NO headroom -> the null is STRUCTURAL (settled).'}")
+
+    print(f"\nROUTER (LODO, {'OOD' if args.ood else 'ID'}) — gate feature = {args.feature}; bar = msp_min (perplexity dual)\n")
     print(f"{'held-out':14s}{'always-floor':>13s}{'always-pool':>12s}{'ROUTER':>9s}{'oracle':>8s}{'thr':>7s}")
     rows = []
     for held in cells:

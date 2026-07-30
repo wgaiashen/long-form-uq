@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -l walltime=00:30:00
+#PBS -N luq_topk_sweep
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# §D.6 top-k floor sweep -- no training, no GPU, records-only. Endpoint gate reproduces §B.2.
+python -u scripts/checks/topk_floor_sweep.py
+echo "[topk-sweep] DONE"

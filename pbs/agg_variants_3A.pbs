@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_agg3A
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# 3A: POST-HOC aggregation variants (MultiMax, Rolling-Means, score-std V1/V2, LayerNorm control) read off the
+# saved seed-1 attention poolers. NO training. CPU-only, one eval's pertok loaded at a time.
+echo "[3A] host $(hostname)"
+python -u scripts/checks/aggregation_variants_ladder.py \
+    --out /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/aggregation_variants_3A__meta-llama_Meta-Llama-3.1-8B.csv
+echo "[3A] DONE"

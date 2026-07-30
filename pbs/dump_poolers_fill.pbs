@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_dumppool
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# Phase B: dump the 8 seed-1 poolers I own locally (DoC JOB2 covers its own 4 evals). Writes PER CELL
+# (savez + pickle inside the cell loop) so a walltime kill loses only the in-progress cell, not all 8.
+# Base rung names: SameTask -> SameTask-long, 1ds-Diff -> 1ds-Diff-long.
+echo "[dumppool] host $(hostname) commit=$(git rev-parse --short HEAD 2>/dev/null)"
+python -u scripts/tools/dump_ood_attention.py \
+  --evals pubmed_qa,cnn_dailymail,xsum,expertqa --rungs SameTask,1ds-Diff --seed 1 --save-pooler
+echo "[dumppool] DONE; poolers now present:"
+ls cache/probes/*attnpool_{SameTask-long,1ds-Diff-long}_s1__L15.pkl 2>/dev/null | wc -l

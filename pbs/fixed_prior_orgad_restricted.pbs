@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=48gb
+#PBS -l walltime=10:00:00
+#PBS -N luq_fp_orgad_r
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "HOST $(hostname)"
+python -u scripts/checks/fixed_prior_ladder.py --priors orgad --evals pubmed_qa,med_quad,expertqa \
+  --restricted-ood --seeds 1,2,3 \
+  --out /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/fixed_prior_orgad_restricted__meta-llama_Meta-Llama-3.1-8B.csv
