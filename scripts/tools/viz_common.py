@@ -131,10 +131,12 @@ def tail_prompt(prompt, n=400):
     return ("..." + p[-n:]) if len(p) > n else p
 
 
-def render_token_spans(pieces, signals):
+def render_token_spans(pieces, signals, token_meta=None):
     """One <span> per generated token, carrying the normalised value of every available
     signal as a data-attribute. JS recolours on toggle; here we just set the default
-    (the first signal) inline so the file looks right even with JS disabled."""
+    (the first signal) inline so the file looks right even with JS disabled.
+    `token_meta` (optional, additive): list length == pieces of extra hover strings per token
+    (e.g. 'logprob -2.3 | punct') appended to the title. None = unchanged behaviour."""
     names = list(signals.keys())
     default = names[0]
     spans = []
@@ -145,6 +147,8 @@ def render_token_spans(pieces, signals):
         title_bits = "; ".join(
             f"{name} {signals[name][0][i]:.3f}" for name in names
         )
+        if token_meta is not None and i < len(token_meta):
+            title_bits += "  ||  " + token_meta[i]
         v = signals[default][1][i]
         style = f"background: rgba(220,38,38,{v:.3f});"  # red, alpha = normalised value
         spans.append(
@@ -154,7 +158,7 @@ def render_token_spans(pieces, signals):
     return "".join(spans)
 
 
-def render_example(record, record_pos, methods, signals, label_field, pieces):
+def render_example(record, record_pos, methods, signals, label_field, pieces, token_meta=None):
     # label may be explicitly None (e.g. ExpertQA's faithfulness on an unlabelled row), not just missing --
     # coerce both to NaN so the render doesn't crash (the row shows a blank/NaN correctness, which is honest).
     _lab = record.get(label_field, float("nan"))
@@ -191,17 +195,25 @@ def render_example(record, record_pos, methods, signals, label_field, pieces):
       <div class="q"><b>Q (prompt tail):</b> {html.escape(tail_prompt(record['prompt']))}</div>
       <div class="gold"><b>gold:</b> {html.escape(str(target))}</div>
       <div class="gen"><b>generation (coloured by <span class="sig-name">{list(signals.keys())[0]}</span>):</b><br>
-        <div class="toks">{render_token_spans(pieces, signals)}</div>
+        <div class="toks">{render_token_spans(pieces, signals, token_meta)}</div>
       </div>
       <details><summary>full prompt</summary><pre>{html.escape(record['prompt'])}</pre></details>
     </div>"""
 
 
 def render_html(key, records, methods, label_field, signal_names, examples_html, subtitle="",
-                method_docs=None):
+                method_docs=None, absent=None):
     toggle_buttons = "".join(
         f'<button onclick="recolour(\'{n}\')">{n}</button>' for n in signal_names
     )
+    # `absent` (optional, additive): {track_name: reason} for methods with NO data on this dataset -- rendered as
+    # disabled greyed buttons carrying the reason, so a missing track is EXPLICIT (never silently omitted, never
+    # a uniform fallback). None = unchanged behaviour.
+    if absent:
+        toggle_buttons += "".join(
+            f'<button disabled class="absent" title="{html.escape(reason)}">{html.escape(n)} — absent</button>'
+            for n, reason in absent.items()
+        )
     # Optional "Method reference" panel: one short technical blurb per toggle actually shown.
     # method_docs maps signal_name -> a short HTML string (kept trusted; we author it, no user input).
     # We only list signals present in signal_names, in that order, so a dataset missing orgad/SAR does
@@ -239,6 +251,7 @@ def render_html(key, records, methods, label_field, signal_names, examples_html,
   h1 {{ font-size: 18px; }}
   .controls {{ position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 1px solid #ddd; }}
   .controls button {{ margin-right: 6px; padding: 4px 10px; cursor: pointer; }}
+  .controls button.absent {{ color: #999; background: #f3f3f3; border-style: dashed; cursor: not-allowed; font-style: italic; }}
   .ex {{ border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; margin: 14px 0; }}
   .ex.wrong {{ border-left: 4px solid #dc2626; }}
   .ex.correct {{ border-left: 4px solid #16a34a; }}

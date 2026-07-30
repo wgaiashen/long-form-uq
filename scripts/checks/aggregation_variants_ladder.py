@@ -50,7 +50,7 @@ VIZ = ROOT / "cache" / "viz"
 OUT_DEFAULT = ROOT / "results" / f"aggregation_variants_3A__{cache._slug(MODEL)}.csv"
 
 EVALS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "expertqa", "samsum", "factscore"]
-RUNGS = ["ID", "LOO-long", "DiffTask-long"]     # cells without a saved pooler are skipped by the presence check
+RUNGS = ["ID", "SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]  # all 5 (poolers now exist at all rungs);
 #                                                 (samsum OOD + factscore arrive from DoC JOB 2 -> re-run then)
 SEED = 1
 

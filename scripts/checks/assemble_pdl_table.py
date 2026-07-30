@@ -78,11 +78,15 @@ ROUTER_GLOB = "router_pdl__" + SLUG + ".csv"
 
 
 def find(glob_pat):
+    # UNION both dirs (was: first-dir-wins, which shadowed the 4-core widened+wMSP CSVs living in EPHEM behind
+    # the 4 DoC base CSVs in RESULTS -> wMSP-shrink was 4/8). Dedupe by basename; RESULTS wins a name conflict.
+    seen = {}
     for d in (RESULTS, EPHEM):
-        hits = sorted(glob.glob(str(d / glob_pat)))
-        if hits:
-            return hits
-    return []
+        for p in sorted(glob.glob(str(d / glob_pat))):
+            b = Path(p).name
+            if b not in seen:
+                seen[b] = p
+    return list(seen.values())
 
 
 def read_long(path, valcol):
