@@ -25,8 +25,13 @@ from luq import cache  # noqa: E402
 from luq.config import Config  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
-# known regime-namespaced sets (so --datasets can list them without a per-dataset --prompt-regime)
-REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
+# Known regime-namespaced sets (so --datasets can list them without a per-dataset --prompt-regime).
+# Imported from attn_pool rather than re-declared: this map was duplicated here, and a duplicated
+# cache-root map is how one reader silently ends up on a different cache from every other. Importing it
+# also means `LUQ_REGIME=...` redirects this guard to the v2 caches along with the ladders, so the guard
+# checks the data that is actually being used.
+sys.path.insert(0, str(ROOT / "scripts" / "checks"))
+from attn_pool import PROMPT_REGIME as REGIME  # noqa: E402
 TOL = 1e-4          # max abs Δ that still counts as "teacher-forced consistent" (fp32 match is ~1e-6)
 
 

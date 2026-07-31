@@ -57,7 +57,46 @@ VAL_FRAC = 0.2              # validation carved from train for temperature selec
 
 # XL datasets whose per-token cache + records live in a prompt-regime namespace (not the default cache/).
 # This is what lets ExpertQA load through the SAME interface as the core datasets (organic ProbeDriftXL).
-PROMPT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
+_BASE_PROMPT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
+
+# v2 INDIRECTION (2026-07-31). Every ladder driver resolves its cache root through this dict, so with the
+# mapping hardcoded there was no way to point the ladder at a regenerated (v2) cache -- and editing the
+# dict in place would silently redirect the v1 reads too, which is exactly the "never mix v1 and v2" rule
+# it would be breaking. Overrides are supplied per dataset through the environment instead:
+#
+#     LUQ_REGIME="samsum=v2pilot_samsum_plain,xsum=v2_xsum" python scripts/checks/<driver>.py ...
+#
+# Follows the LUQ_EXPERTQA_LABEL pattern in xl_rungs.py. Unset = the v1 mapping, byte-identical to before.
+# An empty value ("samsum=") pins a dataset to the DEFAULT cache root explicitly, which is not the same as
+# omitting it -- omitting means "whatever the base map says", pinning means "the v1 root, on purpose".
+def _parse_regime_override(raw):
+    out = {}
+    for item in (s.strip() for s in raw.split(",")):
+        if not item:
+            continue
+        if "=" not in item:
+            raise SystemExit(f"LUQ_REGIME entry {item!r} is not dataset=regime; refusing to guess which "
+                             "cache root was meant.")
+        ds, rg = item.split("=", 1)
+        out[ds.strip()] = rg.strip()
+    return out
+
+
+PROMPT_REGIME = dict(_BASE_PROMPT_REGIME)
+_REGIME_OVERRIDE = _parse_regime_override(os.environ.get("LUQ_REGIME", ""))
+if _REGIME_OVERRIDE:
+    PROMPT_REGIME.update(_REGIME_OVERRIDE)
+    # LOUD: a run reading regenerated caches must say so in its own log, or a v2 number could later be
+    # mistaken for a v1 one purely because nothing recorded which cache it came from.
+    print(f"[LUQ_REGIME] cache-root overrides active: {_REGIME_OVERRIDE}", flush=True)
+
+
+def regime_tag():
+    """Short, filename-safe tag naming the active regime override ('' when none). Used by the ladder
+    drivers to keep v1 and v2 result CSVs on separate paths -- see the note on --out in probedriftlong."""
+    if not _REGIME_OVERRIDE:
+        return ""
+    return "__" + "_".join(f"{k}-{v}" for k, v in sorted(_REGIME_OVERRIDE.items()))
 
 
 def load_per_token(model, dataset, layer, label_field="correctness"):

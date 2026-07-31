@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 from luq import cache, msp, probe, results                                   # noqa: E402
 from aggregation_table import attn_unc, load_per_token                       # noqa: E402
-from attn_pool import train_attn, select_temperature                         # noqa: E402
+from attn_pool import train_attn, select_temperature, regime_tag             # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of                        # noqa: E402
 from luq.data import MAX_NEW_TOKENS                                          # noqa: E402
 import probedriftlong as pdl                                                 # noqa: E402
@@ -66,7 +66,8 @@ def boot_prr_diff(y, ua, ub, n=2000, seed=1):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=str(ROOT / "results" / f"truncation_confound__{SLUG}.csv"))
+    # regime tag in the default name so a v2 re-run cannot overwrite the v1 capping analysis in place
+    ap.add_argument("--out", default=str(ROOT / "results" / f"truncation_confound{regime_tag()}__{SLUG}.csv"))
     ap.add_argument("--layer", type=int, default=15)
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"

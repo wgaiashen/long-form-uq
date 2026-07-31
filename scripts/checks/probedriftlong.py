@@ -36,7 +36,7 @@ from luq.features import sar  # noqa: E402  (shared sentence splitter)
 from transformers import AutoTokenizer  # noqa: E402
 from luq.weighting import shrink_to_uniform  # noqa: E402
 from aggregation_table import load_per_token, attn_unc, paired_bootstrap, conf_meanpool, prr_from_conf  # noqa: E402
-from attn_pool import train_attn, select_temperature, pad_batch  # noqa: E402
+from attn_pool import train_attn, select_temperature, pad_batch, regime_tag  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -475,7 +475,13 @@ def main():
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": bool(sig), "n_seeds": len(seeds)})
 
-    out = Path(args.out) if args.out else (ROOT / "results" / f"probedriftlong__{cache._slug(MODEL)}.csv")
+    # The regime tag goes in the DEFAULT filename so a v2 run cannot silently overwrite the v1 CSV in
+    # place. The drivers write to a fixed path, so without this a single `LUQ_REGIME=...` run would land
+    # on top of the v1 results and the only clue would be an mtime. v1_frozen/ makes that recoverable
+    # rather than fatal, but recoverable is not a reason to allow it. Tag is '' when no override is set,
+    # so the v1 default filename is unchanged.
+    out = Path(args.out) if args.out else (
+        ROOT / "results" / f"probedriftlong{regime_tag()}__{cache._slug(MODEL)}.csv")
     for _r in out_rows:                                # stamp provenance on EVERY row (method + VERDICT rows)
         _r.update(prov)
     with open(out, "w", newline="") as f:
