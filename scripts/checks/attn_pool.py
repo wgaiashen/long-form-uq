@@ -144,6 +144,45 @@ def pad_prior(priors_list, tmax, device):
     return P.to(device)
 
 
+def normalise_target(D, mask):
+    """Row-normalise a padded target to a DISTRIBUTION over real tokens, so it is on the same footing as
+    the attention `a` (a softmax, which already sums to 1 over real tokens).
+
+    Convention note: `prior_builders` returns UNNORMALISED weights (content-mass is 0/1, NLL is clipped
+    surprisal). Supervising `a` toward an unnormalised target would penalise the total mass rather than
+    the shape, which is not what the paper's loss means.
+
+    A row that sums to zero RAISES rather than falling back to uniform. The builders already guarantee a
+    non-zero row and count their own fallbacks, so a zero here is a genuine bug -- and silently swapping
+    in uniform would turn the supervised arm into its own control, which is exactly the failure mode that
+    manufactures a null."""
+    D = D * mask
+    s = D.sum(1, keepdim=True)
+    if bool((s <= 0).any()):
+        bad = int((s <= 0).sum())
+        raise SystemExit(f"aux target: {bad} example(s) have zero mass over their real tokens. The prior "
+                         "builders guarantee a non-zero row, so this is a bug -- refusing to substitute "
+                         "uniform, which would silently make the supervised arm identical to its control.")
+    return D / s
+
+
+def shuffle_target(D, mask, generator):
+    """Permute each row's target WITHIN its real tokens -- the paper's randomised control.
+
+    In the paper this shuffled version performed WORSE than no supervision at all, which is what makes it
+    the right control: it holds the target's marginal distribution fixed and destroys only its ALIGNMENT
+    to the tokens, so any gain that survives cannot be explained as generic regularisation from
+    constraining the attention."""
+    out = torch.zeros_like(D)
+    n = mask.sum(1).long()
+    for i in range(D.shape[0]):
+        t = int(n[i])
+        if t > 0:
+            perm = torch.randperm(t, generator=generator).to(D.device)
+            out[i, :t] = D[i, :t][perm]
+    return out
+
+
 def pad_batch(states_list, device):
     """Pad to (B, Tmax, d); return X, mask (1=real token), and positional features (B, Tmax, 2):
     [relative position in the response, inverse response length]."""
@@ -245,7 +284,8 @@ def _mask_answer_only(mask):
 def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_position=False,
                answer_only=False, weight_decay=WEIGHT_DECAY, wd_query=0.0, freeze_query=False,
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
-               prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1):
+               prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
+               aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -257,6 +297,24 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     moderation-toward-the-unsupervised-prior — the mechanism that helps weighted-MSP — makes the ATTENTION
     POOLER OOD-robust too. Penalty = mean over real tokens of (a_i·n − 1)² (the same avg-1 shrink as wMSP).
     Default 0.0 = the plain pooler (unchanged), so existing callers are untouched."""
+    """`aux_target` / `aux_lambda` / `aux_drop_epoch` / `aux_shuffle` (B.1 — auxiliary-loss attention
+    supervision, Stacey/Belinkov/Rei AAAI-22, adapted). Adds the paper's term to the LOSS:
+
+        L_total = L_task + (λ/H) · Σ_h Σ_i (a_hi − d_i)²
+
+    ⚠️ This is a different mechanism from anything already here. `prior_list` (S3) modifies the attention
+    SCORE — the attention is pushed, and when the push is removed it jumps back. This trains the attention
+    to MATCH the target, so it moves away smoothly when the constraint lifts.
+
+    MSE, not KL: the paper tested both and found MSE better for supervising attention (their §related
+    work, vs Pruthi et al. 2020).
+
+    `aux_target` = per-example target vectors aligned to `states` (length G+1 each, same convention as
+    `prior_list`), normalised here to a distribution over real tokens. `aux_lambda` is the paper's λ (they
+    swept [0.2, 1.8] step 0.2 and found 1.0 best for BERT, 0.8 for DeBERTa). `aux_drop_epoch=N` runs the
+    'strong at the start, removed after N epochs' schedule; None keeps λ on throughout (the 'low weight
+    ~0.1 all the way' variant). `aux_shuffle=True` is the MANDATORY control — the same target permuted
+    within each example. Default aux_lambda=0.0 leaves every existing caller byte-identical."""
     torch.manual_seed(seed)
     d = states[0].shape[1]
     model = AttnPool(d, temperature=temperature, use_position=use_position,
@@ -275,7 +333,13 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     lossf = nn.BCEWithLogitsLoss()
     yt = torch.tensor(y, dtype=torch.float32, device=device)
     g = torch.Generator().manual_seed(seed)
-    for _ in range(epochs):
+    # separate generator for the shuffled-target control, so turning the control on cannot perturb the
+    # batch order and thereby change the run for a reason unrelated to the shuffling
+    g_shuf = torch.Generator().manual_seed(seed + 10_000)
+    if aux_lambda > 0 and aux_target is None:
+        raise SystemExit("aux_lambda > 0 with aux_target=None: refusing to run a 'supervised' arm with no "
+                         "target, which would silently be the unsupervised baseline under another name.")
+    for ep in range(epochs):
         perm = torch.randperm(len(tr_idx), generator=g).tolist()
         for b in range(0, len(perm), bs):
             idx = [tr_idx[perm[j]] for j in range(b, min(b + bs, len(perm)))]
@@ -294,6 +358,17 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                     n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
                     dev = ((a * n_real - 1.0) ** 2) * mask                 # only real tokens contribute
                     loss = loss + shrink_lambda * (dev.sum(1) / n_real.squeeze(1)).mean()
+                # B.1: auxiliary supervision toward a target attention distribution. Active only while the
+                # schedule says so -- aux_drop_epoch=N is the paper-adjacent "strong then removed" variant
+                # (Joe's suggestion at the 31 July meeting; the paper itself has no annealing schedule).
+                if aux_lambda > 0 and (aux_drop_epoch is None or ep < aux_drop_epoch):
+                    D = pad_prior([aux_target[i] for i in idx], X.shape[1], device)
+                    D = normalise_target(D, mask)
+                    if aux_shuffle:
+                        D = shuffle_target(D, mask, g_shuf)
+                    # (λ/H)·Σ_i (a_i − d_i)², H=1 on this single-head path; summed over tokens, mean over
+                    # the batch. Masked so padding contributes nothing.
+                    loss = loss + aux_lambda * (((a - D) ** 2) * mask).sum(1).mean()
             loss.backward()
             opt.step()
     return model
