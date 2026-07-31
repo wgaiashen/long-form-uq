@@ -186,6 +186,69 @@ def _save_pooler(pooler, best_T, rung, X, sd, layer, states, te_idx, test_rows, 
     print(f"  [save-pooler] {X} {rung} s{sd} -> {pk.name}  (+sidecar {key}__attn{suffix}.npz)", flush=True)
 
 
+PEREX_TOL = 1e-6
+
+
+def _save_perex(perex_dir, X, rung, srcs, seeds_done, yte, unc_acc, stats, fair_name, layer, prov):
+    """Dump this cell's PER-EXAMPLE uncertainty vectors so significance for ANY method pair becomes a
+    post-hoc read instead of a re-run.
+
+    Why this exists: `pdl_master` carries only a per-cell PRR, so every "is this difference significant?"
+    question needed the whole ladder re-run. The vectors were always in memory here -- they were simply
+    never written down.
+
+    Layout, one .npz per cell:
+      y            (n_te,)            test labels (asserted seed-invariant by the caller)
+      seeds        (n_seeds,)         the seeds actually completed, in order
+      unc__<m>     (n_seeds, n_te)    per-seed per-example uncertainty for method <m>
+      prr__<m>     (n_seeds,)         per-seed PRR, recomputed here from the stored vectors
+      prr_mean__<m> scalar            UNROUNDED mean over seeds (the CSV rounds to 4dp)
+      + eval / rung / train / fair_floor_alias / layer / git_sha as metadata
+
+    float64 throughout: the gate is 1e-6 and float32 storage would round the vectors enough to break it.
+
+    SELF-GATE: PRR recomputed from the persisted vectors must reproduce the in-memory per-seed PRR to
+    <1e-6, or this raises. A sidecar that silently disagrees with its own CSV is worse than no sidecar --
+    it would look authoritative while quietly answering a different question.
+    """
+    methods = [m for m in unc_acc if unc_acc[m]]
+    out = {"y": np.asarray(yte, np.float64), "seeds": np.asarray(seeds_done, np.int64)}
+    meta = {"eval": X, "rung": rung, "train": srcs, "fair_floor_alias": fair_name,
+            "layer": str(layer), "git_sha": prov.get("git_sha", "")}
+    for m in methods:
+        V = np.stack([np.asarray(v, np.float64) for v in unc_acc[m]])      # (n_seeds, n_te)
+        if V.shape[1] != len(yte):
+            raise SystemExit(f"FATAL [{rung}/{X}] sidecar: method {m} has {V.shape[1]} values for "
+                             f"{len(yte)} test labels -- refusing to write a misaligned sidecar.")
+        out[f"unc__{m}"] = V
+        out[f"prr__{m}"] = np.array([results.prr(yte, V[i]) for i in range(V.shape[0])], np.float64)
+        out[f"prr_mean__{m}"] = np.float64(np.mean(out[f"prr__{m}"]))
+    # fair_floor is an ALIAS of whichever floor won; store it explicitly so a reader never has to re-derive
+    # which floor was primary (re-deriving it is exactly how a floor mix-up would creep back in).
+    if fair_name in methods:
+        out["unc__fair_floor"] = out[f"unc__{fair_name}"]
+        out["prr__fair_floor"] = out[f"prr__{fair_name}"]
+        out["prr_mean__fair_floor"] = out[f"prr_mean__{fair_name}"]
+    # THE GATE -- recomputed vs the in-memory stats that produced the CSV row
+    worst, worst_m = 0.0, None
+    for m in methods:
+        d = abs(float(out[f"prr_mean__{m}"]) - float(stats[m][0]))
+        if d > worst:
+            worst, worst_m = d, m
+    if worst >= PEREX_TOL:
+        raise SystemExit(f"FATAL [{rung}/{X}] sidecar GATE FAILED: method {worst_m} PRR recomputed from the "
+                         f"stored vectors differs from the in-memory mean by {worst:.3g} (tol {PEREX_TOL:g}). "
+                         "The sidecar does not reproduce its own CSV row -- aborting rather than persisting it.")
+    p = Path(perex_dir) / f"{X}__{rung}__{cache._slug(MODEL)}.npz"
+    # NB the temp name must itself end in .npz -- np.savez_compressed APPENDS ".npz" to any path that does
+    # not, which would write "<name>.npz.tmp.npz" and leave the rename below pointing at nothing.
+    tmp = p.with_suffix(".tmp.npz")
+    np.savez_compressed(tmp, **out, **{f"meta__{k}": np.array(v) for k, v in meta.items()})
+    tmp.replace(p)                                     # atomic: never leave a half-written sidecar behind
+    print(f"  [perex] {p.name}  {len(methods)} methods x {len(seeds_done)} seeds x {len(yte)} rows  "
+          f"(gate max|Δ|={worst:.2g})", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3")
@@ -219,6 +282,18 @@ def main():
                          "with pool_w + record_pos_all), byte-format-identical to dump_ood_attention so RCS's "
                          "post-hoc pass + G1 cross-check read them directly. The pooler is already trained, so "
                          "this is ~zero extra compute. Default off.")
+    ap.add_argument("--skip-poolers", action="store_true",
+                    help="skip the uniform + attention poolers (select_temperature is 5 temperatures x 40 "
+                         "epochs, then 2 more fits -- the second bottleneck after wMSP). Floors + saplma still "
+                         "run. Use with --skip-wmsp for the cheap floors-and-SAPLMA pass that the significance "
+                         "re-score needs. Skipped methods are left ABSENT from the CSV, never zero.")
+    ap.add_argument("--perex-dir", default=None,
+                    help="ALSO dump a per-example sidecar per cell to <dir>/{eval}__{rung}__{slug}.npz: every "
+                         "method's per-seed per-example uncertainty vector + the labels + the unrounded "
+                         "prr_mean. Additive -- the CSV schema is untouched. This is what makes significance "
+                         "for ANY method pair a post-hoc read instead of a re-run. Self-gated: PRR recomputed "
+                         "from the stored vectors must reproduce the in-memory prr_mean to <1e-6 or the run "
+                         "ABORTS (a sidecar that disagrees with its own CSV is worse than no sidecar).")
     args = ap.parse_args()
     prov = _provenance()   # aborts here (before the pool load) if the tracked tree is dirty
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} env_hash={prov['env_hash']}"
@@ -243,9 +318,15 @@ def main():
         active_wmsp = [w for w in WMSP if w[0] in keep_names]
         print(f"WMSP-ONLY: keeping {[w[0] for w in active_wmsp]} ; EXCLUDED {excluded} "
               "(their columns are left ABSENT, not zero)", flush=True)
-    active_methods = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in active_wmsp]
+    active_poolers = [] if args.skip_poolers else POOLERS
+    active_methods = FLOORS + ["fair_floor", "saplma"] + active_poolers + [w[0] for w in active_wmsp]
     if args.skip_wmsp:
-        print("SKIP-WMSP: running poolers + floors + saplma only (wMSP variants skipped)", flush=True)
+        print("SKIP-WMSP: wMSP variants skipped (their columns are ABSENT, not zero)", flush=True)
+    if args.skip_poolers:
+        print("SKIP-POOLERS: uniform + attention skipped (their columns are ABSENT, not zero)", flush=True)
+    if args.perex_dir:
+        Path(args.perex_dir).mkdir(parents=True, exist_ok=True)
+        print(f"PER-EXAMPLE SIDECARS -> {args.perex_dir} (gated: recomputed PRR must match to <1e-6)", flush=True)
     global LONG_SRC
     if args.label_homogeneous:
         LONG_SRC = [d for d in LONG_SRC if d != "expertqa"]
@@ -296,6 +377,7 @@ def main():
             continue
         xlbl = different_label_projection(X)
         per = {m: [] for m in active_methods}; unc_acc = {m: [] for m in active_methods}; yte_ref = None
+        yte_per_seed = []; seeds_done = []
         for sd in seeds:
             train_rows, test_rows = build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows or not test_rows:
@@ -313,14 +395,15 @@ def main():
             # SAPLMA mean-pool + MLP
             Xmean = np.stack([s.mean(axis=0) for s in states])
             v["saplma"] = 1.0 - conf_meanpool(Xmean, tr_idx, te_idx, y, sd)
-            # poolers
-            best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
-            v["uniform"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True),
-                                               states, te_idx, device), float)
-            attn_pooler = train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T)
-            v["attention"] = np.asarray(attn_unc(attn_pooler, states, te_idx, device), float)
-            if args.save_pooler and sd == seeds[0]:    # seed-1 pooler = the RCS post-hoc convention
-                _save_pooler(attn_pooler, best_T, rung, X, sd, args.layer, states, te_idx, test_rows, PT, device)
+            # poolers (skipped under --skip-poolers -- select_temperature is the second bottleneck)
+            if active_poolers:
+                best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
+                v["uniform"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, freeze_query=True),
+                                                   states, te_idx, device), float)
+                attn_pooler = train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T)
+                v["attention"] = np.asarray(attn_unc(attn_pooler, states, te_idx, device), float)
+                if args.save_pooler and sd == seeds[0]:    # seed-1 pooler = the RCS post-hoc convention
+                    _save_pooler(attn_pooler, best_T, rung, X, sd, args.layer, states, te_idx, test_rows, PT, device)
             # wMSP KEEP variants (skipped under --skip-wmsp -- the training bottleneck)
             seg_cell = [SEG[d][i] for d, i in allrows]
             for name, kw in active_wmsp:
@@ -331,8 +414,18 @@ def main():
                                      length_normalise=True, seed=sd, **kw2), float)
             for m in v:
                 per[m].append(results.prr(yte, v[m])); unc_acc[m].append(v[m])
+            yte_per_seed.append(yte); seeds_done.append(sd)
         if yte_ref is None:
             continue
+        # The existing `avg`/paired_bootstrap path averages uncertainty vectors ACROSS seeds and scores them
+        # against a single yte_ref -- which is only valid if the test labels are seed-invariant. That has always
+        # been assumed (eval_split is fixed-seed); assert it rather than trusting it, because a silent per-seed
+        # test-set change would misalign every vector without changing any shape.
+        for _s, _yt in zip(seeds_done, yte_per_seed):
+            if _yt.shape != yte_ref.shape or not np.array_equal(_yt, yte_ref):
+                raise SystemExit(f"FATAL [{rung}/{X}]: test labels differ across seeds (seed {_s} vs "
+                                 f"{seeds_done[-1]}). Cross-seed vector averaging and the per-example sidecar "
+                                 "both assume a fixed test set -- refusing to emit numbers built on that.")
         stats = {m: (float(np.mean(per[m])), float(np.std(per[m]))) for m in per if per[m]}
         # PRE-REGISTERED primary bar = floor_min (msp_min), FIXED across datasets (2026-07-24 meeting);
         # replaces the rejected max-of-three ("three shots for the baseline"). All three floors are still
@@ -346,7 +439,7 @@ def main():
         avg = {m: np.mean(np.stack(unc_acc[m]), 0) for m in unc_acc if unc_acc[m]}
         avg["fair_floor"] = avg[fair_name]
         best_w = max((w[0] for w in active_wmsp), key=lambda m: stats[m][0]) if active_wmsp else None
-        best_p = max(POOLERS, key=lambda m: stats[m][0])
+        best_p = max(active_poolers, key=lambda m: stats[m][0]) if active_poolers else None
         # HONEST LABEL (Round-3 Task A): `train` from REALISED per-source counts (last seed; seed-stable), not
         # requested caps -- so the label can never overstate the pool (the V-A0 defect). realised==labelled.
         _real = {}
@@ -361,6 +454,9 @@ def main():
         _lens = {"eval_med_len": round(float(np.median(_el)), 1) if _el else "",
                  "train_med_len": round(float(np.median(_tl)), 1) if _tl else "",
                  "train_max_len": int(max(_tl)) if _tl else ""}
+        if args.perex_dir:
+            _save_perex(args.perex_dir, X, rung, srcs, seeds_done, yte_ref, unc_acc, stats, fair_name,
+                        args.layer, prov)
         print(f"\n[{rung:14s}] eval={X} ({label_of(X)}) train={srcs}{xf}  primary_floor={fair_name} {stats['fair_floor'][0]:+.3f}{dual}", flush=True)
         for m in active_methods:
             if m in stats:
