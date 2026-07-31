@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_rerender
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "[rerender] host $(hostname) commit=$(git rev-parse --short HEAD 2>/dev/null)"
+echo "[rerender] wMSP dumps present:"; ls cache/viz/*wmsp_weights.npz 2>/dev/null | wc -l
+echo "[rerender] mh4 poolers present:"; ls cache/probes/*mh4_s1* 2>/dev/null | wc -l
+for D in pubmed_qa med_quad asqa expertqa factscore xsum cnn_dailymail samsum; do
+  echo "[rerender] === $D ==="
+  python -u scripts/tools/visualise_allmethods.py --dataset "$D" || echo "[rerender] $D FAILED (continuing)"
+done
+python -u scripts/tools/allmethods_index.py
+echo "[rerender] DONE"; ls -la results/viz/ALLMETHODS_*.html 2>/dev/null | wc -l

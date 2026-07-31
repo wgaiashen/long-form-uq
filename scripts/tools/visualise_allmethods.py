@@ -92,6 +92,46 @@ def sidecar_poolw(dataset, rung):
     return dict(zip(z["record_pos_all"].tolist(), z["pool_w"]))
 
 
+# CONSOLIDATION: display names for the curated wMSP/orgad/sar tracks dumped by
+# visualise_token_weights.py --dump-weights (npz key -> toggle label).
+WMSP_DISPLAY = {"wMSP_pairwise": "wMSP-pairwise", "wMSP_shrink10": "wMSP-shrink10",
+                "wMSP_content": "wMSP-content", "wMSP_segment": "wMSP-segment",
+                "wMSP_smooth3": "wMSP-smooth3", "orgad": "orgad-hard",
+                "orgad_broad": "orgad-broad", "sar": "SAR"}
+
+
+def load_wmsp_weights(dataset):
+    """Curated per-token wMSP/orgad/SAR weight tracks, keyed by record position. Same vectors this dataset's
+    token_weights view renders (dumped from the SAME ctx). Returns {display_name: {record_pos: length-G vec}}
+    or None if the dump has not been produced yet."""
+    p = VIZ / f"{cache._slug(MODEL)}__{dataset}__ID__wmsp_weights.npz"
+    if not p.exists():
+        return None
+    z = np.load(p, allow_pickle=True)
+    pos = z["record_pos"].tolist()
+    return {WMSP_DISPLAY.get(k, k): dict(zip(pos, z[k])) for k in z.files if k != "record_pos"}
+
+
+def load_mh_pooler(dataset, rung):
+    """The persisted 4-head MultiMax-diagnostic pooler (mh_multimax_diag.py), or None. Only pubmed_qa/
+    cnn_dailymail/xsum x {ID, DiffTask-long} exist (the diagnostic's scope)."""
+    pk = PROBES / f"{cache._slug(MODEL)}__{dataset}__{rung}_mh4_s1__L15.pkl"
+    if not pk.exists():
+        return None
+    m, _ = load_pooler(pk)
+    return m
+
+
+def mh_head_attention(model, x):
+    """The K per-head attention vectors for one example, anchor row 0 dropped -> length G each."""
+    X, mask, pos = ap.pad_batch([x], "cpu")
+    model.eval()
+    with torch.no_grad():
+        _, a = model(X, mask, pos)              # (1, T, K)
+    A = a[0].cpu().numpy()                       # (T, K)
+    return [A[1:, h] for h in range(A.shape[1])]
+
+
 def main():
     ap_ = argparse.ArgumentParser()
     ap_.add_argument("--dataset", required=True)
@@ -115,6 +155,9 @@ def main():
     # cached per-token weight sources
     pw_id = sidecar_poolw(D, "ID")
     pw_ood = sidecar_poolw(D, args.ood_rung)
+    # CONSOLIDATED: curated wMSP/orgad/SAR tracks (from token_weights --dump-weights) + the 4-head diagnostic pooler
+    wmsp = load_wmsp_weights(D)                       # {display: {pos: vec_G}} or None
+    mh_id = load_mh_pooler(D, "ID")                   # 4-head pooler (pubmed/cnn/xsum only) or None
     # armA pooler for MultiMax (ID rung)
     armA_pk = PROBES / f"{cache._slug(MODEL)}__{D}__ID__attnpool_ID_s1__L15.pkl"
     W_armA = None
@@ -216,6 +259,18 @@ def main():
                     add("soft_orgad", w[1:])
             except (OrgadCoverageError, Exception):
                 pass
+        # CONSOLIDATED wMSP family + orgad-hard + SAR (curated, already length-G, dumped from token_weights)
+        if wmsp is not None:
+            for name, byid in wmsp.items():
+                if i in byid and byid[i] is not None:
+                    add(name, list(byid[i]))
+        # 4-head diagnostic pooler: the per-head attention (does each head attend to a different token?)
+        if mh_id is not None:
+            try:
+                for h, vec in enumerate(mh_head_attention(mh_id, x)):
+                    add(f"mh_head{h + 1}", vec)
+            except Exception as e:
+                align_skips.append(f"ex{i}/mh_head: {type(e).__name__}")
 
         # per-token hover metadata: logprob + token class
         for j in range(g):
@@ -228,12 +283,16 @@ def main():
         examples_html.append(vc.render_example(r, i, methods, sig, lf, pieces, token_meta=meta))
 
     # ---- absent tracks (explicit, with reason) ----
-    absent = {
-        "wMSP-norm/shrink@2/@10": "needs a per-dataset MLP retrain (weighted_msp) — see visualise_token_weights.py for the single-method wMSP view",
-        "selfattn_meanq": "needs a GPU eager-attention pass; only cached for sciq/trivia (old dumps)",
-        "multi-head heads 1-4": "the multi-head pooler was not persisted (--save-pooler saves the single-head query only)",
-        "armD (annealed prior)": "the armD pooler was not persisted; would require a retrain",
-    }
+    absent = {"armD (annealed prior)": "the armD pooler was not persisted; would require a retrain"}
+    if wmsp is None:
+        absent["wMSP family / orgad-hard / SAR"] = ("weight dump not yet produced for this dataset — run "
+                                                    "visualise_token_weights.py --dump-weights")
+    else:
+        absent["wMSP full 9-variant set (Blondel/shrink2/special_punct/entropy_hinge)"] = (
+            "the curated 5 are shown here; the full nine live in the standalone visualise_token_weights.py view")
+    if mh_id is None:
+        absent["multi-head heads 1-4"] = ("the 4-head diagnostic pooler is only trained for "
+                                          "pubmed_qa/cnn_dailymail/xsum (mh_multimax_diag.py scope)")
     if D not in ORGAD_DATASETS:
         absent["soft_orgad"] = f"no cache/orgad_llm broad cache for {D} (only pubmed_qa/med_quad/expertqa)"
 

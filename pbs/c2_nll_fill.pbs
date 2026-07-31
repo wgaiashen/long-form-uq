@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_c2
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# C2 (token-logprob as pooler input) fill, ONE eval per job for walltime safety. Pass with -v:
+#   EVAL=<eval>  OUT=<path>
+echo "[c2] host $(hostname) EVAL=$EVAL OUT=$OUT commit=$(git rev-parse --short HEAD 2>/dev/null)"
+# Guard: abort rather than clobber an existing target.
+if [ -e "$OUT" ]; then echo "FATAL: target already exists, refusing to clobber: $OUT"; exit 3; fi
+python -u scripts/checks/c2_nll_pooler_ladder.py --evals "$EVAL" --seeds 1,2,3 --out "$OUT"
+RC=$?
+echo "[c2] DONE rc=$RC -> $OUT ($(wc -l <"$OUT" 2>/dev/null) rows)"

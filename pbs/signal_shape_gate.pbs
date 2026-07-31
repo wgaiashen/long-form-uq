@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_gate
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "[gate] host $(hostname)"
+python -u scripts/checks/signal_shape_gate.py
+echo "[gate] DONE"

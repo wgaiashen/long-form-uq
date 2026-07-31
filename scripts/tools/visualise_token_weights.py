@@ -335,6 +335,10 @@ def main():
     ap.add_argument("--no-ablations", dest="show_ablations", action="store_false",
                     help="hide the P1.2 MSP-ablation keep-masks (shown by default).")
     ap.set_defaults(show_ablations=True)
+    ap.add_argument("--dump-weights", default="",
+                    help="CONSOLIDATION MODE: instead of rendering, compute the per-token weights for the WHOLE "
+                         "test set and save a curated subset (+orgad/sar) to this npz, keyed by record position, "
+                         "so visualise_allmethods.py can read them as tracks (no retrain). Skips the HTML.")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -462,6 +466,34 @@ def main():
            "wm_segment": wm_segment, "show_ablations": args.show_ablations,
            "device": device, "orgad_json": orgad_json, "orgad_broad_json": orgad_broad_json,
            "sar_rel": sar_rel, "gran": gran, "tok": tok}
+
+    # CONSOLIDATION dump: compute per-token weights for the WHOLE test set and persist a curated subset so
+    # visualise_allmethods.py reads them as tracks (no per-dataset retrain there). Reuses the SAME ctx +
+    # per_token_signals as the render path, so the dumped vectors are byte-identical to what this tool shows.
+    if args.dump_weights:
+        CURATED = ["wMSP-pairwise", "wMSP-shrink10", "wMSP-content", "wMSP-segment", "wMSP-smooth3",
+                   "orgad", "orgad-broad", "sar"]
+        # key on the SAME test set the ladders/sidecars/all-methods use (xl_rungs.eval_split), NOT split=="test"
+        # (which is empty for the all-'train' XL sets med_quad/samsum) -> guarantees overlap with all-methods.
+        _, te_es = xl_rungs.eval_split(np.asarray(split_pt))
+        dump_positions = [int(i) for i in te_es]
+        cols = {k: [] for k in CURATED}
+        rec_pos = []
+        for i in dump_positions:
+            sigs = per_token_signals(records[i], i, ctx)
+            rec_pos.append(i)
+            for k in CURATED:
+                cols[k].append(np.asarray(sigs[k][0], dtype=np.float32) if k in sigs else None)
+        save = {"record_pos": np.asarray(rec_pos, dtype=np.int64)}
+        present = []
+        for k in CURATED:                              # drop tracks absent for EVERY example (no cache for this set)
+            if any(v is not None for v in cols[k]):
+                save[k.replace("-", "_")] = np.array(cols[k], dtype=object)
+                present.append(k)
+        dp = Path(args.dump_weights); dp.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(dp, **save)
+        print(f"[dump-weights] wrote {dp}  ({len(rec_pos)} test examples; tracks: {present})")
+        return
 
     per_example = {i: per_token_signals(records[i], i, ctx) for i in shown}
     signal_names = []

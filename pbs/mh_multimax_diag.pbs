@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_mhmm
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "[mhmm] host $(hostname) commit=$(git rev-parse --short HEAD 2>/dev/null)"
+OUT="results/mh_multimax_diag__meta-llama_Meta-Llama-3.1-8B.csv"
+if [ -e "$OUT" ]; then echo "target exists, refusing to clobber: $OUT"; exit 3; fi
+python -u scripts/checks/mh_multimax_diag.py --out "$OUT"
+echo "[mhmm] DONE rc=$? -> $OUT"
