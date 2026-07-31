@@ -1,0 +1,46 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_perex
+#PBS -j oe
+
+# 0.3 significance re-score + the per-example sidecar build.
+#
+# Runs ProbeDriftLong with ONLY the floors + SAPLMA (--skip-wmsp --skip-poolers), which is the cheap
+# subset: the floors are unsupervised (no training at all) and SAPLMA is mean-pool -> MLP, 5 epochs,
+# no temperature sweep. That is what makes 3 seeds over all 40 cells affordable. wMSP and the poolers
+# are the two bottlenecks and are deliberately excluded -- their columns are left ABSENT, never zero.
+#
+# 3 seeds, matching pdl_master's regime, so the resulting numbers sit beside the master rather than
+# beside it as a second, differently-seeded set.
+#
+# CPU only: no GPU is requested. The ladder falls back to device=cpu and this workload is CPU-bound.
+#
+# Writes:
+#   results/pdl_perex/{eval}__{rung}__<slug>.npz   -- per-example vectors, self-gated at 1e-6
+#   results/probedriftlong_floors_saplma__<slug>.csv -- a SEPARATE csv; does NOT touch the v1 files
+#
+#   qsub pbs/pdl_perex_significance.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+echo "pdl_perex: floors+SAPLMA, 3 seeds, per-example sidecars on $(hostname) at $(date)" >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --seeds 1,2,3 \
+    --skip-wmsp --skip-poolers \
+    --perex-dir results/pdl_perex \
+    --out results/probedriftlong_floors_saplma__meta-llama_Meta-Llama-3.1-8B.csv
+
+echo "=== ladder done at $(date); running the post-hoc significance read ===" >&2
+
+python -u scripts/checks/pdl_significance.py \
+    --pairs saplma:floor_min,saplma:fair_floor,saplma:floor_ppl,saplma:floor_sum
+
+echo "pdl_perex: finished at $(date)" >&2
