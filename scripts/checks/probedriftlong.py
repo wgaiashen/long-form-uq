@@ -32,11 +32,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src")); sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 import torch  # noqa: E402
 from luq import cache, msp, results, weighted_msp, probe  # noqa: E402
+from luq.config import Config  # noqa: E402  (B.5: resolving a dataset's pooled-feature cache root)
 from luq.features import sar  # noqa: E402  (shared sentence splitter)
 from transformers import AutoTokenizer  # noqa: E402
 from luq.weighting import shrink_to_uniform  # noqa: E402
 from aggregation_table import load_per_token, attn_unc, paired_bootstrap, conf_meanpool, prr_from_conf  # noqa: E402
-from attn_pool import train_attn, select_temperature, pad_batch, regime_tag  # noqa: E402
+from attn_pool import train_attn, select_temperature, pad_batch, regime_tag, PROMPT_REGIME  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
@@ -75,6 +76,12 @@ WMSP = [("wmsp_norm", {"weight_mode": "normalised"}),
                                    "reg_lambda": 10.0, "loss": "blondel"})]
 POOLERS = ["uniform", "attention"]
 FLOORS = ["floor_sum", "floor_ppl", "floor_min"]
+# B.5 — the baselines dropped for time and asked for again at the 31 July meeting. Recipe copied verbatim
+# from ood_onegrid.py:48 (the only driver that ever ran them), so these stay faithful reproductions rather
+# than re-derivations:  name -> (cached pooled feature, layer, standardize)
+# uhead is deliberately ABSENT: implemented and verified against the authors, but never carried to the
+# long-form grid, and dropped by decision on 2026-07-31 for time. Say so in the write-up.
+BASE_FEATS = {"ptrue": ("ptrue_accurate", 15, True), "lookback": ("lookback", 0, False)}
 METHODS = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in WMSP]
 
 
@@ -282,6 +289,14 @@ def main():
                          "with pool_w + record_pos_all), byte-format-identical to dump_ood_attention so RCS's "
                          "post-hoc pass + G1 cross-check read them directly. The pooler is already trained, so "
                          "this is ~zero extra compute. Default off.")
+    ap.add_argument("--baselines", default=None,
+                    help="comma-separated supervised baselines to ADD as extra rows: ptrue,lookback (B.5). "
+                         "Off by default so existing runs stay byte-identical and do not pay to read the "
+                         "pooled feature caches. A dataset without the cached feature makes its cells "
+                         "UNCOMPUTABLE, and those cells are skipped LOUDLY and left BLANK -- never zero. "
+                         "As of 2026-08-01 the features exist for sciq/trivia/pubmed/xsum (v1) and "
+                         "asqa/expertqa/factscore (DoC); med_quad, samsum and cnn_dailymail are pending "
+                         "their regeneration, so most OOD cells stay blank until then.")
     ap.add_argument("--skip-poolers", action="store_true",
                     help="skip the uniform + attention poolers (select_temperature is 5 temperatures x 40 "
                          "epochs, then 2 more fits -- the second bottleneck after wMSP). Floors + saplma still "
@@ -319,7 +334,15 @@ def main():
         print(f"WMSP-ONLY: keeping {[w[0] for w in active_wmsp]} ; EXCLUDED {excluded} "
               "(their columns are left ABSENT, not zero)", flush=True)
     active_poolers = [] if args.skip_poolers else POOLERS
-    active_methods = FLOORS + ["fair_floor", "saplma"] + active_poolers + [w[0] for w in active_wmsp]
+    active_base = []
+    if args.baselines:
+        active_base = [b.strip() for b in args.baselines.split(",") if b.strip()]
+        unknown = [b for b in active_base if b not in BASE_FEATS]
+        if unknown:
+            raise SystemExit(f"--baselines: unknown {unknown}; valid = {sorted(BASE_FEATS)}")
+        print(f"BASELINES: adding {active_base} (uncomputable cells are skipped LOUDLY, left blank)", flush=True)
+    active_methods = (FLOORS + ["fair_floor", "saplma"] + active_poolers
+                      + [w[0] for w in active_wmsp] + active_base)
     if args.skip_wmsp:
         print("SKIP-WMSP: wMSP variants skipped (their columns are ABSENT, not zero)", flush=True)
     if args.skip_poolers:
@@ -339,7 +362,7 @@ def main():
     print(f"device {device} | seeds {seeds} | evals {evals}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)
-    PT, SEG = {}, {}
+    PT, SEG, POOLED = {}, {}, {}
     for d in sorted(set(LONG_SRC) | set(evals)):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
@@ -363,6 +386,28 @@ def main():
                 sid = sid
             segs.append(sid)
         PT[d] = (states, split, y, records, orig); SEG[d] = segs
+        # B.5: pooled baseline features, one vector per example. Loaded per dataset and immediately sliced
+        # to the method's layer -- the full array is (n, 33, 4096) and only one layer is ever used, so
+        # holding all of them would cost gigabytes for nothing. A dataset missing the cache is recorded as
+        # absent so its cells can be skipped loudly rather than silently imputed.
+        if active_base:
+            cfg_d = Config(model_name=MODEL, dataset=d, ood_setting="ID",
+                           prompt_regime=PROMPT_REGIME.get(d, ""))
+            key_d = cache.run_key(MODEL, d, "ID")
+            POOLED[d] = {}
+            for bm in active_base:
+                fm, layer_b, _std = BASE_FEATS[bm]
+                try:
+                    arr = cache.load_features(cfg_d.cache_dir, key_d, fm)
+                    v_b = np.ascontiguousarray(arr[:, layer_b, :]); del arr
+                    if len(v_b) != len(orig):      # feature rows must match the pre-filter record count
+                        raise ValueError(f"{len(v_b)} feature rows vs {len(orig)} records")
+                    POOLED[d][bm] = v_b[orig] if len(orig) != len(v_b) or not np.array_equal(
+                        orig, np.arange(len(v_b))) else v_b
+                except Exception as e:
+                    POOLED[d][bm] = None
+                    print(f"    {d}: baseline '{bm}' UNAVAILABLE ({type(e).__name__}: {e}) -> cells using "
+                          f"{d} will be left BLANK for this method", flush=True)
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
@@ -404,6 +449,22 @@ def main():
                 v["attention"] = np.asarray(attn_unc(attn_pooler, states, te_idx, device), float)
                 if args.save_pooler and sd == seeds[0]:    # seed-1 pooler = the RCS post-hoc convention
                     _save_pooler(attn_pooler, best_T, rung, X, sd, args.layer, states, te_idx, test_rows, PT, device)
+            # B.5 supervised baselines on the SAME sampled rows, so they are paired with everything else.
+            # A cell is computable only if EVERY dataset it touches has the feature; otherwise it is skipped
+            # loudly and left absent. Imputing here would be the banned no-op default -- a zero or a mean
+            # would read as "measured and bad" rather than "not measured".
+            for bm in active_base:
+                fm, layer_b, std_b = BASE_FEATS[bm]
+                missing = sorted({d for d, _ in allrows if POOLED.get(d, {}).get(bm) is None})
+                if missing:
+                    if sd == seeds[0]:
+                        print(f"    [{rung}/{X}] baseline '{bm}' SKIPPED -- no cached feature for "
+                              f"{missing}; cell left BLANK", flush=True)
+                    continue
+                Xtr_b = np.vstack([POOLED[d][bm][i] for d, i in train_rows])
+                Xte_b = np.vstack([POOLED[d][bm][i] for d, i in test_rows])
+                clf_b = probe.train_probe(Xtr_b, y[tr_idx], standardize=std_b, seed=sd)
+                v[bm] = np.asarray(list(probe.uncertainty(clf_b, Xte_b)), float)
             # wMSP KEEP variants (skipped under --skip-wmsp -- the training bottleneck)
             seg_cell = [SEG[d][i] for d, i in allrows]
             for name, kw in active_wmsp:
