@@ -49,12 +49,30 @@ def load_cells(perex_dir):
     return cells
 
 
+FLOORS3 = ["floor_sum", "floor_ppl", "floor_min"]
+
+
+def _prr_vec(z, m):
+    """Per-seed PRR vector for method `m`, or None if absent.
+
+    `maxof3` is DERIVED here rather than stored: the per-seed max over the three MSP floors, i.e. the
+    best-of-three bar. Joe REJECTED that bar on 2026-07-24 ("gives the baseline three shots at being
+    good"), so it is a ROBUSTNESS check and never the primary comparison -- but it has to be testable,
+    and it cannot be read off the CSV because `fair_floor` in probedriftlong is hard-wired to the
+    pre-registered `msp_min`, not to a max. Computing it from the stored vectors is exactly the kind of
+    after-the-fact question the sidecars exist to answer.
+    """
+    if m == "maxof3":
+        vs = [z[f"prr__{f}"] for f in FLOORS3 if f"prr__{f}" in z]
+        return np.max(np.stack(vs), axis=0) if len(vs) == len(FLOORS3) else None
+    return z[f"prr__{m}"] if f"prr__{m}" in z else None
+
+
 def per_cell_margin(z, a, b):
     """3-seed mean of (PRR_a - PRR_b) for one cell, or None if either method is absent / regimes differ."""
-    ka, kb = f"prr__{a}", f"prr__{b}"
-    if ka not in z or kb not in z:
+    pa, pb = _prr_vec(z, a), _prr_vec(z, b)
+    if pa is None or pb is None:
         return None, "absent"
-    pa, pb = z[ka], z[kb]
     if pa.shape != pb.shape:
         return None, f"seed-regime mismatch ({pa.shape[0]} vs {pb.shape[0]} seeds)"
     return float(np.mean(pa - pb)), None
