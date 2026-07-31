@@ -1,0 +1,180 @@
+"""B.1 — screen auxiliary-loss attention supervision on the ProbeDriftLong population.
+
+The method: add the AAAI-22 term to the LOSS, L = L_task + (λ/H)·Σ_i (a_i − d_i)², so the attention is
+TRAINED to match a target distribution and moves away smoothly when the constraint lifts. This is a
+different mechanism from the S3 prior arms, which modify the attention SCORE.
+
+⚠️ THE REPORTED QUANTITY IS (real target − SHUFFLED target), NOT (real − baseline). In the paper the
+shuffled version performed worse than no supervision at all, so the shuffled arm is what separates "the
+target carries useful information" from "constraining the attention regularises it". Reporting the raw
+improvement would confuse the two.
+
+⚠️ HOW TO JUDGE THIS (decided in advance): on CONSISTENCY ACROSS CELLS, not on the size of the mean
+improvement. Only the ID cells of the non-regenerating datasets are permanent — pubmed/asqa/expertqa/
+factscore keep their generations, but their SameTask/LOO/DiffTask cells all train on pools containing
+med_quad, samsum or cnn, so those move when v2 lands. "Helps on k of N cells, including the ID cells"
+survives regeneration; "improves the mean by X" does not. Both are reported; the carry-forward decision
+is on the count.
+
+Pre-registered prediction: helps most on pubmed and med_quad (concentrated error signal, high
+punctuation mass in the attention) and does little on xsum and cnn (already content-dominated).
+UNIFORM IMPROVEMENT EVERYWHERE IS SUSPICIOUS and should be treated as a bug until checked.
+
+    python scripts/checks/aux_attention_ladder.py --evals pubmed_qa,xsum --rungs ID --lambdas 0.2,1.0,1.8
+    python scripts/checks/aux_attention_ladder.py --targets nll,content_mass --seeds 1,2,3
+"""
+import argparse
+import csv as _csv
+import sys
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts" / "checks"))
+
+import torch  # noqa: E402
+from transformers import AutoTokenizer  # noqa: E402
+
+from luq import results  # noqa: E402
+from aggregation_table import attn_unc, prr_from_conf  # noqa: E402
+from attn_pool import load_per_token, train_attn, select_temperature, regime_tag  # noqa: E402
+from xl_rungs import build_rows, eval_split, label_of  # noqa: E402
+import prior_builders as PB  # noqa: E402
+import probedriftlong as PDL  # noqa: E402
+
+MODEL = "meta-llama/Meta-Llama-3.1-8B"
+SLUG = "meta-llama_Meta-Llama-3.1-8B"
+# the paper swept [0.2, 1.8] in steps of 0.2 and found 1.0 best for BERT, 0.8 for DeBERTa
+LAMBDAS = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
+VAL_FRAC = 0.2
+
+
+def val_split(tr_idx, seed):
+    """Carve a validation slice from TRAIN for λ selection. Never touches test."""
+    perm = np.random.RandomState(seed).permutation(len(tr_idx))
+    n_val = max(1, int(round(len(tr_idx) * VAL_FRAC)))
+    return [tr_idx[i] for i in perm[n_val:]], [tr_idx[i] for i in perm[:n_val]]
+
+
+def fit_and_score(states, y, tr, te, device, seed, best_T, **kw):
+    m = train_attn(states, y, tr, device, seed=seed, temperature=best_T, **kw)
+    return float(prr_from_conf(np.array([y[i] for i in te], float),
+                               -np.asarray(attn_unc(m, states, te, device), float)))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--evals", default=",".join(PDL.LONG))
+    ap.add_argument("--rungs", default=None, help="base rung names, e.g. ID,LOO. Default = all")
+    ap.add_argument("--targets", default="nll,content_mass", help="nll|content_mass|orgad")
+    ap.add_argument("--lambdas", default=",".join(str(x) for x in LAMBDAS))
+    ap.add_argument("--drop-epoch", type=int, default=None,
+                    help="strong-then-removed schedule: drop the aux term after N epochs (default: keep)")
+    ap.add_argument("--seeds", default="1")
+    ap.add_argument("--layer", type=int, default=15)
+    ap.add_argument("--out", default=None)
+    args = ap.parse_args()
+
+    evals = [e.strip() for e in args.evals.split(",")]
+    lambdas = [float(x) for x in args.lambdas.split(",")]
+    seeds = [int(s) for s in args.seeds.split(",")]
+    targets = [t.strip() for t in args.targets.split(",")]
+    want_rungs = set(s.strip() for s in args.rungs.split(",")) if args.rungs else None
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"device={device} evals={evals} targets={targets} lambdas={lambdas} seeds={seeds}", flush=True)
+
+    tok = AutoTokenizer.from_pretrained(MODEL)
+    special_ids = set(getattr(tok, "all_special_ids", []) or [])
+
+    PT = {}
+    for d in sorted(set(PDL.LONG_SRC) | set(evals)):
+        loaded = load_per_token(MODEL, d, args.layer, label_of(d))
+        if loaded is None:
+            print(f"  {d}: no pertok cache -> skip", flush=True); continue
+        states, split, y, _, records = loaded
+        finite = np.isfinite(y)
+        if not finite.any():
+            continue
+        if not finite.all():
+            keep = np.where(finite)[0]
+            states = [states[k] for k in keep]; records = [records[k] for k in keep]
+            split = split[keep]; y = y[keep]
+        PT[d] = (states, split, y, records)
+        print(f"  {d}: {len(states)} rows", flush=True)
+
+    rows = []
+    for rung, X, spec in PDL.cells_long(set(PT), evals):
+        if want_rungs is not None and rung.replace("-long", "") not in want_rungs:
+            continue
+        for sd in seeds:
+            train_rows, test_rows = build_rows(X, spec, PT, sd, PDL.sampled_train_idx)
+            if not train_rows or not test_rows:
+                continue
+            n_tr = len(train_rows)
+            tr_idx = list(range(n_tr)); te_idx = list(range(n_tr, n_tr + len(test_rows)))
+            allrows = train_rows + test_rows
+            y = np.array([PT[d][2][i] for d, i in allrows], float)
+            states = [PT[d][0][i] for d, i in allrows]
+            recs = [PT[d][3][i] for d, i in allrows]
+            dsets = [d for d, _ in allrows]
+            best_T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
+            base = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T)
+
+            for tname in targets:
+                try:
+                    tgt, n_fb = PB.build_prior(tname, recs, states, tok=tok,
+                                               special_ids=special_ids, datasets=dsets)
+                except Exception as e:            # a missing prior is reported, never silently uniform
+                    print(f"  [{rung}/{X}] target {tname}: UNAVAILABLE ({type(e).__name__}: {e}) -> cell "
+                          "left BLANK", flush=True)
+                    continue
+                # λ selected on a validation slice carved from TRAIN
+                sub_tr, sub_val = val_split(tr_idx, sd)
+                curve = {lam: fit_and_score(states, y, sub_tr, sub_val, device, sd, best_T,
+                                            aux_target=tgt, aux_lambda=lam,
+                                            aux_drop_epoch=args.drop_epoch)
+                         for lam in lambdas}
+                best_lam = max(curve, key=curve.get)
+                real = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T, aux_target=tgt,
+                                     aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch)
+                shuf = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T, aux_target=tgt,
+                                     aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch, aux_shuffle=True)
+                rows.append({"rung": rung, "eval": X, "seed": sd, "target": tname,
+                             "best_lambda": best_lam, "drop_epoch": args.drop_epoch,
+                             "prr_baseline": round(base, 4), "prr_real": round(real, 4),
+                             "prr_shuffled": round(shuf, 4),
+                             "real_minus_shuffled": round(real - shuf, 4),
+                             "real_minus_baseline": round(real - base, 4),
+                             "n_target_fallback": int(n_fb), "n_test": len(te_idx)})
+                print(f"  [{rung:14s}] {X:<13} {tname:<12} s{sd} λ={best_lam:.1f}  base {base:+.3f}  "
+                      f"real {real:+.3f}  shuf {shuf:+.3f}  |  real-shuf {real-shuf:+.3f}  "
+                      f"real-base {real-base:+.3f}", flush=True)
+
+    if not rows:
+        raise SystemExit("no cells produced -- nothing to report")
+    out = Path(args.out) if args.out else ROOT / "results" / f"aux_attention{regime_tag()}__{SLUG}.csv"
+    with open(out, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+
+    print("\n=== SUMMARY (the decisive column is real_minus_shuffled) ===")
+    for tname in targets:
+        sub = [r for r in rows if r["target"] == tname]
+        if not sub:
+            continue
+        rs_ = np.array([r["real_minus_shuffled"] for r in sub])
+        rb = np.array([r["real_minus_baseline"] for r in sub])
+        idc = [r for r in sub if r["rung"] == "ID"]
+        print(f"{tname:<12} n={len(sub):>3}  real-shuf mean {rs_.mean():+.4f}, POSITIVE on "
+              f"{int((rs_ > 0).sum())}/{len(rs_)}  |  real-base mean {rb.mean():+.4f}, "
+              f"positive on {int((rb > 0).sum())}/{len(rb)}"
+              + (f"  |  ID cells: {sum(1 for r in idc if r['real_minus_shuffled'] > 0)}/{len(idc)}"
+                 if idc else ""))
+    print("\nCarry-forward decision is on the COUNT (and the ID cells), not the mean -- only ID cells of "
+          "the non-regenerating datasets are permanent.")
+    print(f"wrote {out}")
+
+
+if __name__ == "__main__":
+    main()

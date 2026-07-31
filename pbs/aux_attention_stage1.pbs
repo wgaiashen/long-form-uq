@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_aux1
+#PBS -j oe
+
+# B.1 STAGE 1 -- the cheap λ sweep, on the two datasets the pre-registration disagrees about.
+#
+# WHY THESE TWO. The registered prediction is that auxiliary supervision helps most on pubmed (a
+# concentrated error signal and 51% of the attention mass sitting on punctuation) and does little on
+# xsum (already content-dominated). So pubmed is the predicted-help case and xsum the predicted-null
+# case, and running exactly those two first is the sharpest cheap test of the prediction. If BOTH
+# improve by a similar amount that is a warning sign, not a success.
+#
+# COST. A full pass is roughly 12 pooler fits per (cell, target) across 40 cells -- far too much for a
+# screen. Stage 1 is 2 cells x 2 targets x (5 lambdas + base + real + shuffled) ~= 32 fits, which fixes
+# lambda before any expensive run. Stage 2 then carries the chosen lambda across all cells.
+#
+# CPU, not GPU: the GPU queue is currently occupied by the samsum pilot, and the ladder work is
+# CPU-bound anyway (measured ~260% CPU, ~11% GPU). The drivers fall back to device=cpu automatically.
+#
+#   qsub pbs/aux_attention_stage1.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+echo "=== B.1 stage 1: lambda sweep, ID cells, pubmed vs xsum on $(hostname) $(date) ===" >&2
+
+python -u scripts/checks/aux_attention_ladder.py \
+    --evals pubmed_qa,xsum \
+    --rungs ID \
+    --targets nll,content_mass \
+    --lambdas 0.2,0.6,1.0,1.4,1.8 \
+    --seeds 1 \
+    --out results/aux_attention_stage1__meta-llama_Meta-Llama-3.1-8B.csv
+
+echo "=== stage 1 done $(date). Read real_minus_shuffled, NOT real_minus_baseline. ===" >&2
