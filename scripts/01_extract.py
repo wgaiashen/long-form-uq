@@ -45,6 +45,14 @@ def main():
                     help="override the safety ceiling on generation length (default 128 from "
                          "Config). REQUIRED for datasets whose MAX_NEW_TOKENS exceeds 128, e.g. "
                          "expertqa (384) — else the budget is silently clipped to 128.")
+    ap.add_argument("--max-new-tokens", type=int, default=None,
+                    help="REPLACE this dataset's data.MAX_NEW_TOKENS budget for this run. Distinct from "
+                         "--max-new-tokens-cap, which is a safety CEILING and can therefore only ever "
+                         "LOWER the budget (the effective value is min(table, cap)) -- so the cap alone "
+                         "cannot raise samsum 56 -> 96 for the v2 pilot. Use this instead of editing the "
+                         "table: data.MAX_NEW_TOKENS is also what truncation_confound.py uses to decide "
+                         "which v1 rows were capped, so mutating it would silently rewrite the v1 "
+                         "truncation analysis. ALWAYS pair with a fresh --prompt-regime.")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag for one ProbeDrift prompt set. Empty = the "
                          "frozen original cache; use e.g. 'pdnew' for the updated ProbeDrift "
@@ -62,6 +70,18 @@ def main():
                  prompt_regime=args.prompt_regime)
     if args.max_new_tokens_cap is not None:
         cfg.max_new_tokens_cap = args.max_new_tokens_cap
+    # Validate the budget override BEFORE loading an 8B model -- a config error should cost a second,
+    # not a GPU allocation and several minutes of weight loading.
+    if args.max_new_tokens is not None:
+        if not args.prompt_regime:
+            raise SystemExit("--max-new-tokens changes the generations, so it MUST be paired with a fresh "
+                             "--prompt-regime; refusing to write non-default-budget records into the "
+                             "default cache namespace alongside the frozen v1 records.")
+        if args.max_new_tokens > cfg.max_new_tokens_cap:
+            raise SystemExit(f"--max-new-tokens {args.max_new_tokens} exceeds the safety ceiling "
+                             f"--max-new-tokens-cap {cfg.max_new_tokens_cap} and would be silently "
+                             "clipped. Raise the ceiling explicitly rather than generating at a budget "
+                             "you did not ask for.")
     train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting)
     # auto -> None so load_model keeps its per-model defaults; otherwise override.
     dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]
@@ -101,7 +121,15 @@ def main():
     # Checkpoint every CKPT_EVERY new examples. A kill loses at most this many.
     CKPT_EVERY = 200
     n_new = 0
-    budget = min(data.MAX_NEW_TOKENS[cfg.dataset], cfg.max_new_tokens_cap)
+    # --max-new-tokens REPLACES the table value (it may raise it); --max-new-tokens-cap remains a pure
+    # ceiling applied afterwards. Print the resolved budget so the log records what was actually used --
+    # a silently-clipped budget is the exact failure this pair of flags exists to make visible.
+    _table = data.MAX_NEW_TOKENS[cfg.dataset]
+    _want = args.max_new_tokens if args.max_new_tokens is not None else _table
+    budget = min(_want, cfg.max_new_tokens_cap)
+    if args.max_new_tokens is not None:
+        print(f"BUDGET OVERRIDE: {cfg.dataset} table={_table} -> effective={budget} "
+              f"(ceiling={cfg.max_new_tokens_cap}, regime={cfg.prompt_regime!r})", flush=True)
     for split, ds in [("train", train_ds), ("test", eval_ds)]:
         for idx, batch in enumerate(ds):
             # The updated ProbeDrift yields (x, y); the old one yielded (x, y, mnt). Take
