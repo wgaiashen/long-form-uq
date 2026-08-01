@@ -368,6 +368,7 @@ def main():
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True); continue
         states, split, y, _, records = loaded
+        n_orig = len(records)                          # ORIGINAL record count, BEFORE the unlabelled filter
         orig = np.arange(len(records))                 # filtered-row -> ORIGINAL record position (for sidecars)
         finite = np.isfinite(y)
         if not finite.any():
@@ -399,15 +400,34 @@ def main():
                 fm, layer_b, _std = BASE_FEATS[bm]
                 try:
                     arr = cache.load_features(cfg_d.cache_dir, key_d, fm)
-                    v_b = np.ascontiguousarray(arr[:, layer_b, :]); del arr
-                    if len(v_b) != len(orig):      # feature rows must match the pre-filter record count
-                        raise ValueError(f"{len(v_b)} feature rows vs {len(orig)} records")
-                    POOLED[d][bm] = v_b[orig] if len(orig) != len(v_b) or not np.array_equal(
-                        orig, np.arange(len(v_b))) else v_b
-                except Exception as e:
+                except Exception as e:                 # genuinely absent cache -> blank cells, loudly
                     POOLED[d][bm] = None
                     print(f"    {d}: baseline '{bm}' UNAVAILABLE ({type(e).__name__}: {e}) -> cells using "
                           f"{d} will be left BLANK for this method", flush=True)
+                    continue
+                v_b = np.ascontiguousarray(arr[:, layer_b, :]); del arr
+                # ⚠️ THE INDEX BASE IS THE TRAP. The feature cache is indexed by ORIGINAL record position,
+                # but this loop has already DROPPED unlabelled rows, so every downstream index is a
+                # FILTERED position. expertqa drops 292 of 2016 rows and factscore 45 of 500, so indexing
+                # the features with a filtered index shifts those datasets by up to 292 places -- and still
+                # returns a perfectly plausible PRR, which is the worst possible failure mode. Reindex ONCE
+                # here, so every later `POOLED[d][bm][i]` uses the same filtered basis as states/records/y.
+                # These are hard assertions, not comments: a mismatch here is a bug, not a missing input,
+                # and must NOT be swallowed into the "unavailable" path that legitimately skips a cell.
+                if len(v_b) != n_orig:
+                    raise SystemExit(
+                        f"FATAL {d}/{bm}: feature cache has {len(v_b)} rows but the record file has "
+                        f"{n_orig}. These must be the same array length -- refusing to guess an alignment.")
+                v_b = v_b[orig]                        # ORIGINAL basis -> FILTERED basis
+                if len(v_b) != len(states):
+                    raise SystemExit(
+                        f"FATAL {d}/{bm}: after reindexing, {len(v_b)} feature rows vs {len(states)} "
+                        f"states. The filtered bases disagree -- refusing to emit numbers built on that.")
+                POOLED[d][bm] = v_b
+                if n_orig != len(states):
+                    print(f"    {d}: baseline '{bm}' reindexed ORIGINAL->FILTERED "
+                          f"({n_orig} -> {len(states)} rows, {n_orig - len(states)} unlabelled dropped)",
+                          flush=True)
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
@@ -461,6 +481,13 @@ def main():
                         print(f"    [{rung}/{X}] baseline '{bm}' SKIPPED -- no cached feature for "
                               f"{missing}; cell left BLANK", flush=True)
                     continue
+                # Join-site guard: `i` here is a FILTERED index into PT[d], and POOLED was reindexed to the
+                # same basis at load. Assert the two agree per dataset rather than trusting it -- an
+                # off-by-292 join would return a plausible number rather than an error.
+                for _d in {d for d, _ in allrows}:
+                    if len(POOLED[_d][bm]) != len(PT[_d][0]):
+                        raise SystemExit(f"FATAL {_d}/{bm}: {len(POOLED[_d][bm])} feature rows vs "
+                                         f"{len(PT[_d][0])} states -- index bases disagree at the join.")
                 Xtr_b = np.vstack([POOLED[d][bm][i] for d, i in train_rows])
                 Xte_b = np.vstack([POOLED[d][bm][i] for d, i in test_rows])
                 clf_b = probe.train_probe(Xtr_b, y[tr_idx], standardize=std_b, seed=sd)
