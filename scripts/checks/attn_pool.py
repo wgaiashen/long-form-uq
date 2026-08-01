@@ -197,11 +197,14 @@ def normalised_entropy(a, mask, eps=1e-9):
     return H / torch.log(T)
 
 
-def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False):
-    """Mean normalised attention entropy over `idx`. B.3 reports this PER ARM, so we can tell whether
-    the penalty actually did what it claims INDEPENDENTLY of whether PRR moved -- a null is only
-    interpretable if we know the constraint bound."""
-    model.eval(); tot, n = 0.0, 0
+def attention_entropies(model, states, idx, device, bs=64, answer_only=False):
+    """PER-EXAMPLE normalised attention entropy over `idx`, as an array.
+
+    B.3 needs the DISTRIBUTION, not just the mean. A one-sided sharpness penalty can only act on the
+    LEFT TAIL, so if a dataset has no meaningful mass below the threshold the penalty has nothing to
+    act on -- and "there is no over-sharp subpopulation to fix" is a cleaner and more informative
+    answer than "the penalty acted and did not help"."""
+    model.eval(); out = []
     with torch.no_grad():
         for b in range(0, len(idx), bs):
             X, mask, pos = pad_batch([states[i] for i in idx[b:b + bs]], device)
@@ -210,9 +213,16 @@ def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False)
             _l, a = model(X, mask, pos)
             if a.dim() == 3:                            # multi-head: average over heads
                 a = a.mean(dim=2)
-            e = normalised_entropy(a, mask)
-            tot += float(e.sum()); n += e.shape[0]
-    return tot / max(n, 1)
+            out.append(normalised_entropy(a, mask).cpu().numpy())
+    return np.concatenate(out) if out else np.array([])
+
+
+def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False):
+    """Mean normalised attention entropy over `idx`. B.3 reports this PER ARM, so we can tell whether
+    the penalty actually did what it claims INDEPENDENTLY of whether PRR moved -- a null is only
+    interpretable if we know the constraint bound."""
+    e = attention_entropies(model, states, idx, device, bs=bs, answer_only=answer_only)
+    return float(e.mean()) if len(e) else 0.0
 
 
 def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False):

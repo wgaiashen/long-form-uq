@@ -1,0 +1,45 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_b3lt
+#PBS -j oe
+# B.3 RE-RUN AT LOW TAU -- because the first run did not test one-sidedness.
+#
+# WHAT WENT WRONG. The first run (3526631) swept tau over [0.5, 0.9] and validation selected 0.9, the
+# top of the range. At tau=0.9 the hinge bound on 97% of pubmed examples and 83% of xsum's, so by the
+# criterion written into the pre-registration -- "a penalty that binds everywhere is just the two-sided
+# entropy control we already ran and found PRR-neutral" -- that arm has to be READ AS the two-sided
+# control. The surgical version of the hypothesis was never tested. The sweep floor was the error:
+# pubmed's mean entropy is 0.606, so a genuinely one-sided tau had to sit near 0.3-0.4, below anything
+# offered. Same shape of mistake as B.1's lambda floor.
+#
+# THIS RUN offers only genuinely one-sided thresholds, tau in {0.2, 0.3, 0.4, 0.5}, with larger lambdas
+# since far fewer examples contribute to the penalty. It also now prints the BASELINE ENTROPY
+# DISTRIBUTION (p05/p10/p25/p50), which may settle it directly: a one-sided penalty can only act on the
+# left tail, so if pubmed has little mass below 0.4 there is no over-sharp subpopulation to fix, and
+# that is a cleaner answer than "the penalty acted and did not help".
+#
+# WHAT THE FIRST RUN DID ESTABLISH, and this run does not revisit: flattening pubmed's attention a long
+# way (entropy 0.606 -> 0.874) did NOT improve PRR (-0.018). So the motivating over-sharpness story is
+# already disconfirmed in its broad form.
+#
+# PRIMARY SCREEN IS pubmed ID, and that is deliberate. pubmed is the only dataset with genuinely
+# concentrated ID attention (normalised entropy 0.61, ~half its mass on punctuation), so if a sharpness
+# penalty does anything anywhere it does it there. pubmed's OOD rungs are NOT stable (their pools contain
+# med_quad, regenerating now) and xsum is undecided pending DoC's probe -- both are labelled provisional
+# in the output. pubmed ID is permanent and sufficient: if it does not help there it will not help
+# anywhere, and no amount of regeneration changes that.
+#
+# READ THE OUTPUT IN THIS ORDER: frac_bound first (a penalty binding everywhere is just the two-sided
+# entropy control we already ran and found PRR-neutral), then ent_before->ent_after (did the constraint
+# move the attention at all), then delta on pubmed ID only.
+#
+# Pre-registered: helps pubmed, no-op on xsum; a uniform effect is SUSPICIOUS.
+# prereg/B3_one_sided_entropy_penalty.md
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/entropy_penalty_ladder.py \
+    --evals pubmed_qa,xsum --rungs ID \
+    --taus 0.2,0.3,0.4,0.5 --lambdas 1.0,2.0,5.0 --seeds 1 \
+    --out results/b3_entropy_penalty_lowtau__meta-llama_Meta-Llama-3.1-8B.csv

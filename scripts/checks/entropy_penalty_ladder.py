@@ -30,7 +30,8 @@ sys.path.insert(0, str(ROOT / "src")); sys.path.insert(0, str(ROOT / "scripts" /
 import torch  # noqa: E402
 from aggregation_table import attn_unc, prr_from_conf  # noqa: E402
 from attn_pool import (load_per_token, train_attn, select_temperature, regime_tag,  # noqa: E402
-                       mean_attention_entropy, normalised_entropy, pad_batch)  # noqa: E402
+                       mean_attention_entropy, attention_entropies,  # noqa: E402
+                       normalised_entropy, pad_batch)  # noqa: E402
 from xl_rungs import build_rows, label_of  # noqa: E402
 import probedriftlong as PDL  # noqa: E402
 
@@ -116,7 +117,14 @@ def main():
             states = [PT[d][0][i] for d, i in allr]
             T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
             base, m0 = fit(states, y, tr_idx, te_idx, device, sd, T)
-            ent0 = mean_attention_entropy(m0, states, te_idx, device)
+            # ⭐ THE LEFT TAIL. A one-sided penalty can only act on examples BELOW tau, so if there is no
+            # mass down there it has nothing to act on -- and "no over-sharp subpopulation exists" is a
+            # cleaner answer than "it acted and did not help". Reported before any penalty is applied.
+            e0 = attention_entropies(m0, states, te_idx, device)
+            q = {f"ent_p{p_}": round(float(np.percentile(e0, p_)), 4) for p_ in (5, 10, 25, 50)}
+            ent0 = float(e0.mean())
+            print(f"    baseline entropy distribution {X}: p05={q['ent_p5']:.3f} p10={q['ent_p10']:.3f} "
+                  f"p25={q['ent_p25']:.3f} p50={q['ent_p50']:.3f} mean={ent0:.3f}", flush=True)
             # tau/lambda chosen on a validation slice carved from TRAIN, never on test
             sub_tr, sub_val = val_split(tr_idx, sd)
             grid = {(t, l): fit(states, y, sub_tr, sub_val, device, sd, T,
@@ -130,7 +138,7 @@ def main():
             rows.append({"rung": rung, "eval": X, "seed": sd, "tau": bt, "lambda": bl,
                          "prr_baseline": round(base, 4), "prr_penalty": round(pen, 4),
                          "delta": round(pen - base, 4),
-                         "ent_before": round(ent0, 4), "ent_after": round(ent1, 4),
+                         "ent_before": round(ent0, 4), "ent_after": round(ent1, 4), **q,
                          "frac_bound_before": round(fb0, 3), "frac_bound_after": round(fb1, 3),
                          "stability": prov or "PERMANENT", "n_test": len(te_idx)})
             print(f"  [{rung:14s}] {X:<12} s{sd} tau={bt} lam={bl}  base {base:+.4f} pen {pen:+.4f} "
