@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=02:00:00
+#PBS -N luq_sams_p
+#PBS -j oe
+
+# A.1 -- the samsum regeneration pilot. GENERATION ONLY: no judge call is made here, because the
+# generation-side gates must be seen and approved before any £ is spent.
+#
+# THE QUESTION. samsum's budget (56) is ALREADY 1.25x its gold reference p90 (45 tokens), yet 65.9% of
+# generations still hit the cap. So the capping is the model OVER-GENERATING relative to the reference,
+# not the task needing more room. Two hypotheses with opposite predictions:
+#   H-trunc  truncation is hurting     -> more room lets sentences finish  -> judge scores IMPROVE
+#   H-over   over-generation is hurting -> more room means more drift      -> scores FALL or hold FLAT
+# Pre-registered prediction: FLAT or SLIGHTLY WORSE (H-over). See prereg/A1_samsum_regeneration_pilot.md
+#
+# ⚠️ WHY TWO ARMS. The v2 recipe changes the budget AND applies repetition-penalty 1.2. Changing both at
+# once confounds the hypothesis: if scores fall, the extra room and the penalty are indistinguishable as
+# causes. samsum is the cheapest of the four datasets, so this is the right place to pay for the clean
+# decomposition:
+#   arm A  budget 96, PLAIN decoding   -> matches v1 EXACTLY except the budget. Isolates the budget effect.
+#   arm B  budget 96, rep-penalty 1.2  -> the proposed v2 regime. Isolates the penalty effect ON TOP of A.
+# v1 samsum was verified to be plain greedy (pbs/extract_neighbour.pbs: samsum ran with the anti-loop
+# opt-OUT), so arm A really is a one-variable change.
+#
+# fp32 + eager throughout, matching v1, so the pooling-consistency guard can pass at TOL=1e-4 later.
+# Both arms are namespaced by --prompt-regime, so no v1 path can be touched.
+#
+# ⚠️ SMALLER n, AND WHY. The full pilot sat 8h in the RCS GPU queue without starting. Rerouting to DoC
+# was rejected because v1 samsum was RCS-generated, so a DoC-generated v2 would confound the decoding
+# change with a hardware change inside the exact comparison this pilot exists to make. So: same cluster,
+# smaller job. --limit applies PER SPLIT, so 400 gives 400 train + 400 test = 800 rows per arm.
+# Sizing: at 800 rows, a judge re-scoring sd of ~0.15 gives a 95%-resolvable mean shift of 0.010, well
+# below the 0.02-0.05 this pilot is looking for. The generation-side gates (truncation, empty, degeneracy,
+# and the LENGTH DISTRIBUTION, which is the cleanest evidence either way) need far less than that.
+# A noisier answer today beats a clean one next week.
+#
+#   qsub pbs/samsum_pilot_v2_small.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+BUDGET=96          # ~2x gold p90 (45), deliberately generous: if the model runs to 96, over-generation
+                   # is unambiguous rather than a matter of interpretation
+
+echo "=== samsum pilot: budget $BUDGET, two arms, generation only (no judge) on $(hostname) $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+echo "--- ARM A: budget $BUDGET, PLAIN decoding (v1 decoding, budget changed) ---" >&2
+python -u scripts/01_extract.py --dataset samsum --ood ID \
+    --max-new-tokens "$BUDGET" --max-new-tokens-cap "$BUDGET" \
+    --prompt-regime v2pilot_samsum_plain \
+    --limit 400 --dtype fp32 --attn eager
+
+echo "--- ARM B: budget $BUDGET, repetition-penalty 1.2 (the proposed v2 regime) ---" >&2
+python -u scripts/01_extract.py --dataset samsum --ood ID \
+    --max-new-tokens "$BUDGET" --max-new-tokens-cap "$BUDGET" \
+    --repetition-penalty 1.2 \
+    --prompt-regime v2pilot_samsum_rp12 \
+    --limit 400 --dtype fp32 --attn eager
+
+echo "=== generation-side gates: v1 vs both arms ===" >&2
+python -u scripts/checks/generation_quality.py --datasets samsum \
+    --out results/genqual_samsum_v1.csv
+python -u scripts/checks/generation_quality.py --datasets samsum --regime v2pilot_samsum_plain \
+    --budget "$BUDGET" --out results/genqual_samsum_v2plain.csv
+python -u scripts/checks/generation_quality.py --datasets samsum --regime v2pilot_samsum_rp12 \
+    --budget "$BUDGET" --out results/genqual_samsum_v2rp12.csv
+
+echo "=== samsum pilot finished $(date). NO judge spend yet -- gates await approval. ===" >&2
