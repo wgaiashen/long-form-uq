@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_b2j4
+#PBS -j oe
+# B.2 CONTROL -- J=4 (ALL heads supervised), the arm the first run omitted.
+#
+# WHY IT MATTERS. B.2 showed selective supervision breaking the head collapse: pairwise attention
+# correlation fell from 0.977/0.997 at J=0 to ~0.51 at J=2. But J<K creates TWO GROUPS -- supervised
+# heads pulled toward the target, free heads not -- so the measured "diversity" could be nothing more
+# than the split between those groups, rather than heads learning different roles.
+#
+# J=4 separates the two. If ALL heads are supervised toward the SAME target and the correlation goes
+# back to ~0.98, the diversity was purely the group split. If it stays low, the heads genuinely diverge.
+# The paper's claim is about ROLES, so this is the arm that decides which of the two we have.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/aux_attention_ladder.py \
+    --evals pubmed_qa,xsum --rungs ID --targets nll,content_mass \
+    --n-query 4 --aux-heads 4 \
+    --lambdas 0.2,0.6,1.0,1.4,1.8 --seeds 1 \
+    --out results/b2_j4_control__meta-llama_Meta-Llama-3.1-8B.csv
