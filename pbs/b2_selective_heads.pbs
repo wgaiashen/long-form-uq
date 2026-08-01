@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_b2
+#PBS -j oe
+
+# B.2 -- selective head supervision. K=4 heads, supervise only J of them, leave the rest free.
+#
+# ⚠️ THE PRIMARY DIAGNOSTIC IS head_attn_corr, NOT PRR. We already measured the 4 heads collapsing to
+# pairwise attention correlation 0.996-1.000, which made multi-head indistinguishable from K classifiers
+# on ONE attention pattern. The paper's fix is STRUCTURAL: supervise a MINORITY (they used 3 of 12) and
+# leave the rest free, because "supervising all of them in the same direction can potentially have
+# adverse effects". So the question this run answers is: does J<K prevent the collapse?
+#
+# IF THE HEADS STILL COLLAPSE, THE PRR IS UNINFORMATIVE and the whole multi-head line closes with it --
+# a PRR difference between arms whose attention is identical is a difference in the classifier, not in
+# the aggregation. Read the corr column first and the PRR only if corr moves.
+#
+# J=0 is the unsupervised multi-head baseline, i.e. the collapse condition we are trying to break.
+# B.1 (single head) is closer to the paper's losing "supervise everything" condition than its winning
+# one, which is why this run exists despite B.1 being a clean negative.
+#
+#   qsub pbs/b2_selective_heads.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+echo "=== B.2 selective head supervision, K=4, J in {0,1,2,3} on $(hostname) $(date) ===" >&2
+
+python -u scripts/checks/aux_attention_ladder.py \
+    --evals pubmed_qa,xsum --rungs ID \
+    --targets nll,content_mass \
+    --n-query 4 --aux-heads 0,1,2,3 \
+    --lambdas 0.2,0.6,1.0,1.4,1.8 --seeds 1 \
+    --out results/b2_selective_heads__meta-llama_Meta-Llama-3.1-8B.csv
+
+echo "=== B.2 done $(date). READ head_attn_corr FIRST. ===" >&2

@@ -183,6 +183,47 @@ def shuffle_target(D, mask, generator):
     return out
 
 
+def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False):
+    """B.2's PRIMARY diagnostic: do the K attention heads actually differ after training?
+
+    ⚠️ This, not PRR, is the question. We already measured the heads collapsing to pairwise correlation
+    0.996–1.000, which made multi-head indistinguishable from a control using K classifiers on ONE
+    attention pattern. Selective supervision is supposed to prevent that collapse STRUCTURALLY. **If it
+    does not, the PRR is uninformative and the whole multi-head line closes with it** — a PRR difference
+    between arms that have identical attention is a difference in the classifier, not the aggregation.
+
+    Returns (mean_offdiag_corr, full KxK matrix). Correlation is computed per example over its REAL
+    tokens, then averaged over examples, so padding cannot inflate agreement and a long example does not
+    dominate a short one.
+    """
+    model.eval()
+    K = model.n_query
+    if K < 2:
+        return float("nan"), np.full((K, K), np.nan)
+    acc, n = np.zeros((K, K)), 0
+    with torch.no_grad():
+        for b in range(0, len(idx), bs):
+            sub = [states[i] for i in idx[b:b + bs]]
+            X, mask, pos = pad_batch(sub, device)
+            if answer_only:
+                mask = _mask_answer_only(mask)
+            _logit, a = model(X, mask, pos)                     # (B, T, K)
+            a = a.detach().cpu().numpy(); m = mask.detach().cpu().numpy().astype(bool)
+            for j in range(a.shape[0]):
+                real = m[j]
+                if real.sum() < 3:                              # too short for a meaningful correlation
+                    continue
+                W = a[j][real].T                                # (K, T_real)
+                if np.allclose(W.std(axis=1), 0):               # a degenerate (uniform) head
+                    continue
+                acc += np.corrcoef(W); n += 1
+    if n == 0:
+        return float("nan"), np.full((K, K), np.nan)
+    C = acc / n
+    off = C[~np.eye(K, dtype=bool)]
+    return float(off.mean()), C
+
+
 def pad_batch(states_list, device):
     """Pad to (B, Tmax, d); return X, mask (1=real token), and positional features (B, Tmax, 2):
     [relative position in the response, inverse response length]."""
@@ -308,7 +349,7 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
                prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
                aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False,
-               head_hidden=None):
+               aux_heads=None, head_hidden=None):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -376,6 +417,24 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
             logit, a = model(X, mask, pos, prior=prior_b)
             if logit.dim() == 2:                        # S6 multi-head (B,H): mean of the per-head BCE losses
                 loss = sum(lossf(logit[:, k], yt[idx]) for k in range(logit.shape[1])) / logit.shape[1]
+                # B.2 — SELECTIVE head supervision. The paper supervised 3 of 12 heads and found that
+                # supervising ALL of them was WORSE than a subset: "supervising all of them in the same
+                # direction can potentially have adverse effects... allowing for diversity between the
+                # roles of the supervised and unsupervised heads." So the diversity is meant to be
+                # STRUCTURAL -- a supervised minority and a free majority -- rather than hoped for.
+                # a is (B, T, Q) here; supervise only the first J query heads and leave the rest free.
+                if aux_lambda > 0 and (aux_drop_epoch is None or ep < aux_drop_epoch):
+                    J = a.shape[2] if aux_heads is None else int(aux_heads)
+                    if not 0 <= J <= a.shape[2]:
+                        raise SystemExit(f"aux_heads={J} outside 0..{a.shape[2]} query heads")
+                    if J > 0:
+                        D = pad_prior([aux_target[i] for i in idx], X.shape[1], device)
+                        D = normalise_target(D, mask)
+                        if aux_shuffle:
+                            D = shuffle_target(D, mask, g_shuf)
+                        # (λ/J)·Σ_h Σ_i (a_hi − d_i)², i.e. the paper's form with H = heads SUPERVISED
+                        pen = sum((((a[:, :, h] - D) ** 2) * mask).sum(1).mean() for h in range(J)) / J
+                        loss = loss + aux_lambda * pen
             else:
                 loss = lossf(logit, yt[idx])
                 if shrink_lambda > 0:                   # H5: shrink attention toward mean-pool (avg-1 MSE; single-head)

@@ -39,7 +39,8 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from luq import results  # noqa: E402
 from aggregation_table import attn_unc, prr_from_conf  # noqa: E402
-from attn_pool import load_per_token, train_attn, select_temperature, regime_tag  # noqa: E402
+from attn_pool import (load_per_token, train_attn, select_temperature, regime_tag,  # noqa: E402
+                       head_attention_correlation)  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of  # noqa: E402
 import prior_builders as PB  # noqa: E402
 import probedriftlong as PDL  # noqa: E402
@@ -58,10 +59,11 @@ def val_split(tr_idx, seed):
     return [tr_idx[i] for i in perm[n_val:]], [tr_idx[i] for i in perm[:n_val]]
 
 
-def fit_and_score(states, y, tr, te, device, seed, best_T, **kw):
+def fit_and_score(states, y, tr, te, device, seed, best_T, return_model=False, **kw):
     m = train_attn(states, y, tr, device, seed=seed, temperature=best_T, **kw)
-    return float(prr_from_conf(np.array([y[i] for i in te], float),
-                               -np.asarray(attn_unc(m, states, te, device), float)))
+    prr = float(prr_from_conf(np.array([y[i] for i in te], float),
+                              -np.asarray(attn_unc(m, states, te, device), float)))
+    return (prr, m) if return_model else prr
 
 
 def main():
@@ -72,6 +74,12 @@ def main():
     ap.add_argument("--lambdas", default=",".join(str(x) for x in LAMBDAS))
     ap.add_argument("--drop-epoch", type=int, default=None,
                     help="strong-then-removed schedule: drop the aux term after N epochs (default: keep)")
+    ap.add_argument("--n-query", type=int, default=1,
+                    help="K attention heads (B.2). K=1 is the single-head pooler, unchanged.")
+    ap.add_argument("--aux-heads", default=None,
+                    help="B.2: comma-separated J values -- supervise only the first J of K heads, leaving "
+                         "the rest free. The paper supervised 3 of 12 and found supervising ALL was worse "
+                         "than a subset. J=0 is the unsupervised multi-head baseline. Requires --n-query>1.")
     ap.add_argument("--seeds", default="1")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--out", default=None)
@@ -82,6 +90,13 @@ def main():
     seeds = [int(s) for s in args.seeds.split(",")]
     targets = [t.strip() for t in args.targets.split(",")]
     want_rungs = set(s.strip() for s in args.rungs.split(",")) if args.rungs else None
+    # B.2: K heads with only J supervised. K=1 keeps the single-head path byte-identical (Js=[None],
+    # mh_kw={} -> train_attn never sees n_query/aux_heads), so B.1's numbers are reproducible from here.
+    if args.aux_heads is not None and args.n_query < 2:
+        raise SystemExit("--aux-heads needs --n-query > 1; supervising J of 1 head is just B.1.")
+    mh_kw = {"n_query": args.n_query, "n_head": args.n_query} if args.n_query > 1 else {}
+    Js = ([int(j) for j in args.aux_heads.split(",")] if args.aux_heads
+          else ([args.n_query] if args.n_query > 1 else [None]))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device} evals={evals} targets={targets} lambdas={lambdas} seeds={seeds}", flush=True)
 
@@ -132,25 +147,42 @@ def main():
                     continue
                 # λ selected on a validation slice carved from TRAIN
                 sub_tr, sub_val = val_split(tr_idx, sd)
+                # λ is selected on the SAME architecture it will be used with (mh_kw threaded through),
+                # otherwise K=4 runs would inherit a λ tuned on a 1-head model. Selection supervises all
+                # K heads; J is varied afterwards, so λ is not tuned per-J -- stated rather than hidden,
+                # and it is the conservative direction (J<K is not given its own tuned λ).
                 curve = {lam: fit_and_score(states, y, sub_tr, sub_val, device, sd, best_T,
                                             aux_target=tgt, aux_lambda=lam,
-                                            aux_drop_epoch=args.drop_epoch)
+                                            aux_drop_epoch=args.drop_epoch, **mh_kw)
                          for lam in lambdas}
                 best_lam = max(curve, key=curve.get)
-                real = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T, aux_target=tgt,
-                                     aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch)
-                shuf = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T, aux_target=tgt,
-                                     aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch, aux_shuffle=True)
-                rows.append({"rung": rung, "eval": X, "seed": sd, "target": tname,
-                             "best_lambda": best_lam, "drop_epoch": args.drop_epoch,
-                             "prr_baseline": round(base, 4), "prr_real": round(real, 4),
-                             "prr_shuffled": round(shuf, 4),
-                             "real_minus_shuffled": round(real - shuf, 4),
-                             "real_minus_baseline": round(real - base, 4),
-                             "n_target_fallback": int(n_fb), "n_test": len(te_idx)})
-                print(f"  [{rung:14s}] {X:<13} {tname:<12} s{sd} λ={best_lam:.1f}  base {base:+.3f}  "
-                      f"real {real:+.3f}  shuf {shuf:+.3f}  |  real-shuf {real-shuf:+.3f}  "
-                      f"real-base {real-base:+.3f}", flush=True)
+                for J in Js:
+                    kwJ = dict(aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch, **mh_kw)
+                    if mh_kw:
+                        kwJ["aux_heads"] = J
+                    real, m_real = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T,
+                                                 return_model=True, aux_target=tgt, **kwJ)
+                    shuf = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T,
+                                         aux_target=tgt, aux_shuffle=True, **kwJ)
+                    # ⭐ B.2 PRIMARY DIAGNOSTIC. Not PRR. The question is whether supervising a SUBSET of
+                    # heads prevents the collapse we already measured at 0.996-1.000. If the heads still
+                    # collapse, the PRR is uninformative -- a difference between arms with identical
+                    # attention is a difference in the classifier, not the aggregation.
+                    corr = (head_attention_correlation(m_real, states, te_idx, device)[0]
+                            if args.n_query > 1 else float("nan"))
+                    rows.append({"rung": rung, "eval": X, "seed": sd, "target": tname,
+                                 "K": args.n_query, "J_supervised": J,
+                                 "head_attn_corr": (round(corr, 4) if corr == corr else ""),
+                                 "best_lambda": best_lam, "drop_epoch": args.drop_epoch,
+                                 "prr_baseline": round(base, 4), "prr_real": round(real, 4),
+                                 "prr_shuffled": round(shuf, 4),
+                                 "real_minus_shuffled": round(real - shuf, 4),
+                                 "real_minus_baseline": round(real - base, 4),
+                                 "n_target_fallback": int(n_fb), "n_test": len(te_idx)})
+                    ctxt = f"corr {corr:+.4f}  " if corr == corr else ""
+                    print(f"  [{rung:14s}] {X:<13} {tname:<12} s{sd} K={args.n_query} J={J} "
+                          f"λ={best_lam:.2f}  {ctxt}base {base:+.3f} real {real:+.3f} shuf {shuf:+.3f}  |  "
+                          f"real-shuf {real-shuf:+.3f}", flush=True)
 
     if not rows:
         raise SystemExit("no cells produced -- nothing to report")
