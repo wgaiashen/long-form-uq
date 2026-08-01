@@ -1,0 +1,55 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_mq_rp
+#PBS -j oe
+
+# A.2b -- med_quad v2, SECOND ARM: budget 768 + repetition-penalty 1.2 (keeping no_repeat_ngram 3).
+#
+# ⚠️ STANDBY. Submit ONLY if the first arm (pbs/med_quad_v2.pbs, budget 768 + n-gram blocking, no
+# rep-pen) comes back with a MEDIAN AT OR NEAR 768. Read the LENGTH DISTRIBUTION, not the truncation
+# rate: the samsum pilot showed the model writes to whatever cap it is given (median went 56 -> 96 when
+# the cap moved 56 -> 96), so a median near the cap means the budget is still not the binding constraint
+# and drift, not room, is what is left to control.
+#
+# WHY THIS SUPERSEDES THE PRE-REGISTERED "NO REP-PEN" CHOICE. That choice rested on med_quad's ~35%
+# empty-generation history under a repetition penalty. The samsum pilot's arm B then showed rep-pen 1.2
+# doing exactly what is wanted: capping 65.9% -> 19.2%, severe degeneracy DOWN 0.72 -> 0.50, and 0.00%
+# empty. On that evidence the empty risk did not materialise, and med_quad plausibly needs BOTH the
+# larger budget AND general drift control rather than n-gram blocking alone.
+#
+# ⚠️ BUT THE samsum EVIDENCE DOES NOT FULLY TRANSFER, AND THIS IS THE REASON THE GATE STAYS HARD.
+# The empty-generation mechanism is a repetition penalty applied over a LONG FEW-SHOT CONTEXT, which
+# penalises context words a real answer legitimately repeats and forces immediate EOS. Measured prompt
+# lengths: samsum 147 tokens, med_quad 1184 -- EIGHT TIMES longer. So samsum is the WEAKEST available
+# test of precisely this failure mode, and its 0% empty is reassuring about rep-pen's effect on LENGTH
+# without being strong evidence about EMPTY on med_quad.
+#
+# Hence: SMOKE FIRST. LUQ_SMOKE=1 runs --limit 50 and stops, so the empty rate is measured for the cost
+# of a few minutes rather than a full run. The empty gate (<=2%) is the hard one here.
+#
+#   LUQ_SMOKE=1 qsub -v LUQ_SMOKE pbs/med_quad_v2_reppen.pbs   # check empty rate first
+#   qsub pbs/med_quad_v2_reppen.pbs                            # full run, only after the smoke passes
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+BUDGET=768
+SMOKE="${LUQ_SMOKE:-0}"
+LIMIT_ARG=""; REGIME="v2_med_quad_rp12"
+if [ "$SMOKE" = "1" ]; then LIMIT_ARG="--limit 50"; REGIME="v2_med_quad_rp12_smoke"; fi
+
+echo "=== med_quad v2 arm B: budget $BUDGET + rep-pen 1.2 + n-gram 3 (smoke=$SMOKE) $(date) ===" >&2
+
+python -u scripts/01_extract.py --dataset med_quad --ood ID \
+    --max-new-tokens "$BUDGET" --max-new-tokens-cap "$BUDGET" \
+    --no-repeat-ngram-size 3 --repetition-penalty 1.2 \
+    --prompt-regime "$REGIME" $LIMIT_ARG \
+    --dtype fp32 --attn eager
+
+python -u scripts/checks/generation_quality.py --datasets med_quad --regime "$REGIME" \
+    --budget "$BUDGET" --out "results/genqual_med_quad_${REGIME}.csv"
+
+echo "=== done $(date). GATE ORDER: %empty first (<=2%), then the LENGTH DISTRIBUTION. ===" >&2
