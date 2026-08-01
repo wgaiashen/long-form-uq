@@ -1,0 +1,28 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_b3
+#PBS -j oe
+# B.3 -- the one-sided entropy penalty. The LAST untested method item from the 31 July meeting, and the
+# last shot at Joe's condition that the attention probe must actually be improved.
+#
+# PRIMARY SCREEN IS pubmed ID, and that is deliberate. pubmed is the only dataset with genuinely
+# concentrated ID attention (normalised entropy 0.61, ~half its mass on punctuation), so if a sharpness
+# penalty does anything anywhere it does it there. pubmed's OOD rungs are NOT stable (their pools contain
+# med_quad, regenerating now) and xsum is undecided pending DoC's probe -- both are labelled provisional
+# in the output. pubmed ID is permanent and sufficient: if it does not help there it will not help
+# anywhere, and no amount of regeneration changes that.
+#
+# READ THE OUTPUT IN THIS ORDER: frac_bound first (a penalty binding everywhere is just the two-sided
+# entropy control we already ran and found PRR-neutral), then ent_before->ent_after (did the constraint
+# move the attention at all), then delta on pubmed ID only.
+#
+# Pre-registered: helps pubmed, no-op on xsum; a uniform effect is SUSPICIOUS.
+# prereg/B3_one_sided_entropy_penalty.md
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+python -u scripts/checks/entropy_penalty_ladder.py \
+    --evals pubmed_qa,xsum --rungs ID \
+    --taus 0.5,0.6,0.7,0.8,0.9 --lambdas 0.5,1.0,2.0 --seeds 1 \
+    --out results/b3_entropy_penalty__meta-llama_Meta-Llama-3.1-8B.csv

@@ -183,6 +183,38 @@ def shuffle_target(D, mask, generator):
     return out
 
 
+def normalised_entropy(a, mask, eps=1e-9):
+    """Per-example attention entropy, normalised to [0,1] by log(T_real).
+
+    Normalised because raw H scales with length, and these datasets span ~2 tokens (sciq) to ~384
+    (expertqa); an unnormalised threshold would bind on long examples and never on short ones purely
+    as a length artefact. 1.0 = uniform, 0 = all mass on one token. Same convention as
+    pool_attention_ood_diag, so the numbers here are comparable to the dissolution work.
+    """
+    a = a * mask
+    H = -(a * torch.log(a + eps)).sum(dim=1)
+    T = mask.sum(dim=1).clamp(min=2.0)                 # log(1)=0 would divide by zero
+    return H / torch.log(T)
+
+
+def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False):
+    """Mean normalised attention entropy over `idx`. B.3 reports this PER ARM, so we can tell whether
+    the penalty actually did what it claims INDEPENDENTLY of whether PRR moved -- a null is only
+    interpretable if we know the constraint bound."""
+    model.eval(); tot, n = 0.0, 0
+    with torch.no_grad():
+        for b in range(0, len(idx), bs):
+            X, mask, pos = pad_batch([states[i] for i in idx[b:b + bs]], device)
+            if answer_only:
+                mask = _mask_answer_only(mask)
+            _l, a = model(X, mask, pos)
+            if a.dim() == 3:                            # multi-head: average over heads
+                a = a.mean(dim=2)
+            e = normalised_entropy(a, mask)
+            tot += float(e.sum()); n += e.shape[0]
+    return tot / max(n, 1)
+
+
 def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False):
     """B.2's PRIMARY diagnostic: do the K attention heads actually differ after training?
 
@@ -349,7 +381,7 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
                prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
                aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False,
-               aux_heads=None, head_hidden=None):
+               aux_heads=None, ent_lambda=0.0, ent_threshold=0.7, head_hidden=None):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -441,6 +473,23 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                     n_real = mask.sum(1, keepdim=True).clamp(min=1.0)      # (B,1) real-token count
                     dev = ((a * n_real - 1.0) ** 2) * mask                 # only real tokens contribute
                     loss = loss + shrink_lambda * (dev.sum(1) / n_real.squeeze(1)).mean()
+                # B.3: ONE-SIDED entropy penalty. Penalise ONLY when the attention is too SHARP, and
+                # leave already-broad distributions completely untouched.
+                #
+                # ⚠️ WHY THIS IS A DIFFERENT TEST, NOT A THIRD VARIANT OF B.1/B.2. Those supervised the
+                # attention toward a TARGET, and both found the target carries no information (real ≈
+                # shuffled on every cell). This constrains a PROPERTY of the distribution and uses no
+                # target at all, so the "a shuffled target does just as well" failure mode structurally
+                # cannot arise here.
+                #
+                # The hinge is the whole point: penalty = relu(τ − H_norm)², which is EXACTLY ZERO for
+                # any example already at or above the threshold. A penalty that binds everywhere is just
+                # the two-sided entropy control we already ran and found PRR-neutral, so `ent_frac_bound`
+                # is reported to prove the one-sidedness is real rather than nominal.
+                if ent_lambda > 0:
+                    Hn = normalised_entropy(a, mask)
+                    viol = torch.relu(ent_threshold - Hn)      # 0 wherever the attention is broad enough
+                    loss = loss + ent_lambda * (viol ** 2).mean()
                 # B.1: auxiliary supervision toward a target attention distribution. Active only while the
                 # schedule says so -- aux_drop_epoch=N is the paper-adjacent "strong then removed" variant
                 # (Joe's suggestion at the 31 July meeting; the paper itself has no annealing schedule).
