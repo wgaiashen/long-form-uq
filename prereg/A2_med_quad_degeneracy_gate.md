@@ -59,3 +59,81 @@ So med_quad's regeneration must **not** simply inherit the samsum pilot's winnin
 gate (≤2%) is load-bearing here, and the expected configuration is **larger budget +
 `no_repeat_ngram_size=3`, without a repetition penalty** — to be confirmed by its own smoke run, not
 assumed.
+
+---
+
+# ⚠️ AMENDMENT — 2026-08-02
+
+**Logged as a deviation, not a clarification.** Everything below changes a registered comparison
+*after* seeing data. It is recorded so the choice is auditable rather than merely correct.
+
+## A1. The severe-degeneracy prediction was CONFIRMED IN NUMBER BUT NOT IN MECHANISM
+
+**Registered:** med_quad's 12.3% severe was a lower bound because the 128 cap truncated loops before
+the detector's run-length threshold could fire; a rise after uncapping would be the expected
+consequence of removing a loop-truncator.
+
+**Observed:** the rate did rise, 12.33% → 30.56%. **But the mechanism is wrong.** Breaking the flag
+down by which condition fired (`severe = run≥25 or code≥0.005 or ws≥8`):
+
+| | severe | fired by **whitespace** only | fired by **looping** (run≥25) |
+|---|---|---|---|
+| old (cap 128) | 222 (12.33%) | 218 — **98.2%** | **0** |
+| new (cap 768) | 550 (30.56%) | 527 — **95.8%** | **3** |
+
+**There is essentially no looping in either.** The flag is firing on the `max_whitespace_gap ≥ 8`
+rule, and **med_quad's own gold reference answers trip that same rule on 24.8% of rows** — it is
+detecting the indented-list formatting the references themselves use. The registered prediction was
+confirmed on the headline number by a mechanism it did not name.
+
+⚠️ **Do not quote med_quad's severe rate without this decomposition.** Report `run≥25` separately.
+
+## A2. The real failure is FEW-SHOT CONTINUATION, which the detector cannot see
+
+Base Llama is not instruction-tuned; under a few-shot prompt it answers and then writes the *next*
+`Question:/Answer:` pair itself, inventing both — often on an unrelated topic.
+
+| | contains a fabricated `Question:` | mean real-answer length | mean fraction that is the real answer |
+|---|---|---|---|
+| old (cap 128) | **47.8%** | 416 chars | 0.744 |
+| new (cap 768) | **92.6%** | **916 chars** | ~0.34 |
+
+**The budget fix genuinely worked** — the real answer more than doubled. But the invented part grew
+tenfold, so ~66% of the average new generation is text the model was never asked to produce, and the
+judge scores the whole saved output. This is now reported by
+`scripts/checks/generation_quality.py` as `%fabr` / `ansfrac`.
+
+## A3. DEVIATION: the v1 side of the comparison changes from `correctness` to `correctness_raw`
+
+**Originally registered:** "med_quad should improve" — comparing the regenerated dataset's judge
+labels against v1's.
+
+**The problem, found after the fact:** v1's live `correctness` is byte-identical to
+`correctness_clean`, the judge on **answer-span-CUT** text (mean 0.4180). `correctness_raw`, the judge
+on the **full** text, is 0.3935. They differ on 31.8% of rows (13.1% thresholded). If v2 is judged on
+full text, the registered comparison mixes the generation change with a change in *what the judge was
+shown*.
+
+**Amendment:** use **`correctness_raw` (0.3935) as the v1 side**. Same judge model, same full-text
+basis, already cached, zero cost. The clean/raw pair remains the archived v1 record; both stay
+labelled and are never merged.
+
+**Why this is a deviation and not a fix:** the substitution was chosen after observing the clean/raw
+gap. It is defensible on its own terms — you cannot compare two judgements of different strings and
+attribute the difference to the generations — but it was not the registered comparison.
+
+## A4. OPEN, decided by one number still to land
+
+med_quad's labels and features currently describe **different strings**: labels from the cut span,
+features (`saplma`, `pertok`, `token_logprobs`) from the full text. It is the only dataset like this.
+**The fabricated-`Question:` rate in the rep-pen arm selects the resolution**, and the choice must be
+recorded here when it lands:
+
+- **A** — rate falls sharply → judge the full text, no cut. Labels == features, consistent with the
+  other nine, no extra work.
+- **B** — rate low but nonzero → use `correctness_raw`. Labels == features, zero cost, label includes
+  some fabrication.
+- **C** — rate stays high → **cut the FEATURES too**, extracting hidden states over the span the judge
+  sees. ⚠️ **A and B are not escapes at a high rate**: both then produce a label computed over text
+  containing a fabricated follow-up question, and `correctness_raw` inherits that problem precisely
+  because raw *is* the full-text judge. Only C actually aligns the two.
