@@ -59,6 +59,78 @@ def save_prompt_hash(digest: str, cache_dir: Path, key: str) -> Path:
     return out
 
 
+# ---- source-library provenance: WHICH probe_drift produced these prompts -------------
+# The prompt_hash above catches a prompt change WITHIN one cache namespace. It cannot catch
+# the case that actually bit us on 2026-08-01: a fresh --prompt-regime starts with no stored
+# hash, so nothing compares it against the v1 cache it is destined to be read beside. The
+# xsum probe was generated under a DIFFERENT probe_drift from its own v1 cache, changing the
+# prompt and the drawn examples at the same time as the budget, and no guard could fire.
+#
+# The underlying reason is that `probe_drift` is an EDITABLE install: it resolves to whichever
+# checkout is registered, silently, for every process in the env. The v1 grid straddles a
+# migration between two checkouts -- sciq/trivia_qa/pubmed_qa/xsum came from one and
+# cnn_dailymail/med_quad/samsum from the other -- and nothing on disk recorded that.
+#
+# So: stamp WHICH library built each cache, the same way the prompt hash is stamped. That
+# makes the question answerable after the fact and across namespaces, which is exactly where
+# the prompt hash cannot help.
+
+def source_provenance() -> dict:
+    """Identify the probe_drift actually resolved by THIS process.
+
+    `version` is close to useless on its own (both checkouts report 0.1.0), so the identifying
+    fields are the resolved PATH and a content hash of `dataset_configs.py` -- the file whose
+    contents decide the prompts. The content hash matters because one of the two checkouts is
+    untracked, so its `git rev-parse` returns the enclosing repo's SHA and would be misleading;
+    hashing the file works whether or not anything is under version control.
+    """
+    import probe_drift
+    pkg = Path(probe_drift.__file__).resolve().parent
+    cfg = pkg / "dataset_configs.py"
+    prov = {"package": "probe_drift", "path": str(pkg),
+            "version": getattr(probe_drift, "__version__", None)}
+    prov["dataset_configs_sha256"] = (
+        hashlib.sha256(cfg.read_bytes()).hexdigest() if cfg.exists() else None)
+    return prov
+
+
+# The fields that must agree for two caches to be comparable. `version` is deliberately NOT
+# here: it is 0.1.0 in both checkouts and would make a real mismatch look like a match.
+PROVENANCE_KEYS = ("path", "dataset_configs_sha256")
+
+
+def source_provenance_path(cache_dir: Path, key: str) -> Path:
+    return Path(cache_dir) / "meta" / f"{key}.source.json"
+
+
+def load_source_provenance(cache_dir: Path, key: str) -> dict | None:
+    path = source_provenance_path(cache_dir, key)
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def save_source_provenance(prov: dict, cache_dir: Path, key: str) -> Path:
+    out = source_provenance_path(cache_dir, key)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(prov, indent=2, sort_keys=True) + "\n")
+    return out
+
+
+def provenance_mismatch(stored: dict | None, current: dict) -> str | None:
+    """Return a human-readable reason if the two disagree, else None.
+
+    A missing stamp returns None rather than a complaint: every cache written before this
+    existed has no stamp, and refusing to touch those would break the whole existing grid.
+    Absence is "unknown", which is not the same as "different" -- and only one of those is
+    an error.
+    """
+    if stored is None:
+        return None
+    diffs = [k for k in PROVENANCE_KEYS if stored.get(k) != current.get(k)]
+    if not diffs:
+        return None
+    return "; ".join(f"{k}: cached {stored.get(k)!r} != current {current.get(k)!r}" for k in diffs)
+
+
 def _atomic_replace(tmp: Path, out: Path) -> None:
     """Move a fully-written temp file onto the real path in one step.
 
