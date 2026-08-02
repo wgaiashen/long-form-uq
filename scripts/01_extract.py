@@ -102,6 +102,25 @@ def main():
                  f"or clear this namespace; do not mix prompt sets.")
     cache.save_prompt_hash(digest, cfg.cache_dir, key)
 
+    # Record WHICH probe_drift produced those prompts. The hash guard above is necessary but not
+    # sufficient: it only compares a cache against its OWN stored hash, so a fresh --prompt-regime
+    # starts empty and nothing compares it against the v1 cache it will be read beside. That is
+    # exactly how the xsum probe (2026-08-01) ended up varying prompt, examples and budget together
+    # while looking like a budget-only change -- 0 of 400 prompts shared with its own v1 cache.
+    # `probe_drift` is an editable install, so which checkout answers is invisible at the call site.
+    # Stamping it makes the question answerable later and ACROSS namespaces, where the hash cannot
+    # help. scripts/checks/source_provenance.py reads these, and reconstructs the answer for caches
+    # written before this existed.
+    prov = cache.source_provenance()
+    why = cache.provenance_mismatch(cache.load_source_provenance(cfg.cache_dir, key), prov)
+    if why:
+        sys.exit(f"SOURCE MISMATCH for {key} in {cfg.cache_dir}:\n  {why}\n"
+                 f"A different probe_drift built this cache. Use a fresh --prompt-regime or clear "
+                 f"this namespace; do not mix libraries in one cache.")
+    cache.save_source_provenance(prov, cfg.cache_dir, key)
+    print(f"probe_drift: {prov['path']} "
+          f"(dataset_configs sha256 {str(prov['dataset_configs_sha256'])[:16]})", flush=True)
+
     # Few-shot short-form QA: the answer ends at the first newline; after that the
     # model just imitates the prompt format. Long-form output keeps its newlines by
     # default, UNLESS --truncate-long is set (Joe's generate_until=['\n'] for the
