@@ -12,6 +12,8 @@ representation from cached token IDs; decomposition, Lookback Lens, and P(True)
 build on it.
 """
 import torch
+
+from . import answer_span
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -54,7 +56,8 @@ def load_model(name: str, attn_implementation: str | None = None,
 def generate(model, tok, prompt: str, max_new_tokens: int,
              truncate_at_newline: bool = False,
              repetition_penalty: float | None = None,
-             no_repeat_ngram_size: int | None = None):
+             no_repeat_ngram_size: int | None = None,
+             truncate_answer_span: str | None = None):
     """Generate one response; return (record, pooled_all_layers).
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
@@ -104,6 +107,32 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
             if "\n" in tok.decode([tid]):
                 gen_ids = gen_ids[: max(i, 1)]  # keep at least one token
                 break
+    if truncate_answer_span:
+        # Long-form sibling of truncate_at_newline. Base Llama is not instruction-tuned: under a
+        # few-shot prompt it finishes the answer and then CONTINUES THE FORMAT, writing a fresh
+        # "Question:/Answer:" pair and inventing both, often on an unrelated topic. On med_quad that
+        # affects 47.8% of generations at a 128-token budget and 92.6% at 768, where ~66% of the
+        # average generation is the invented part -- and the judge scores the whole saved output.
+        #
+        # ⚠️ THE POINT OF CUTTING HERE rather than at scoring time: gen_ids is truncated BEFORE the
+        # logprobs (out.scores[:n_gen]) and BEFORE the hidden-state pooling below, so the record, the
+        # MSP floors, the pooled features and the label all describe the SAME text. Cutting later
+        # would leave features computed over text the label never saw.
+        #
+        # `answer_span` owns the per-dataset rules and was already written for this exact failure; it
+        # returns a CHARACTER index, so map it back to a token boundary by binary search on the
+        # decoded prefix (monotone in k, ~10 decodes rather than one per token).
+        full = tok.decode(gen_ids, skip_special_tokens=True)
+        _clean, cut_char, _reason = answer_span.answer_span(full, truncate_answer_span)
+        if cut_char < len(full):
+            lo, hi = 1, len(gen_ids)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if len(tok.decode(gen_ids[:mid], skip_special_tokens=True)) >= cut_char:
+                    hi = mid
+                else:
+                    lo = mid + 1
+            gen_ids = gen_ids[: max(lo, 1)]         # keep at least one token, as above
     gen_text = tok.decode(gen_ids, skip_special_tokens=True)
     n_gen = len(gen_ids)
 

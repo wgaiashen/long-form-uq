@@ -53,6 +53,13 @@ def main():
                          "table: data.MAX_NEW_TOKENS is also what truncation_confound.py uses to decide "
                          "which v1 rows were capped, so mutating it would silently rewrite the v1 "
                          "truncation analysis. ALWAYS pair with a fresh --prompt-regime.")
+    ap.add_argument("--truncate-answer-span", action="store_true",
+                    help="LONG-FORM sibling of --truncate-long. Cut the generation at the point the "
+                         "model stops answering and starts inventing a fresh Question:/Answer: pair "
+                         "(luq.answer_span's per-dataset rules). Applied BEFORE the logprobs and the "
+                         "hidden-state pooling, so record, MSP floors, features and label all describe "
+                         "the same text. On med_quad's 768-token generations this takes the fabricated-"
+                         "continuation rate from 92.6%% to 2.3%% with ZERO rows emptied. Off by default.")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag for one ProbeDrift prompt set. Empty = the "
                          "frozen original cache; use e.g. 'pdnew' for the updated ProbeDrift "
@@ -162,6 +169,7 @@ def main():
 
             record, pooled = generate.generate(model, tok, prompt, budget,
                                                truncate_at_newline=truncate,
+                                               truncate_answer_span=(cfg.dataset if args.truncate_answer_span else None),
                                                repetition_penalty=args.repetition_penalty,
                                                no_repeat_ngram_size=args.no_repeat_ngram_size)
             record |= {"idx": idx, "split": split, "target": target}

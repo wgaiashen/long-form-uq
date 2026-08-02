@@ -137,3 +137,71 @@ recorded here when it lands:
   sees. ⚠️ **A and B are not escapes at a high rate**: both then produce a label computed over text
   containing a fabricated follow-up question, and `correctness_raw` inherits that problem precisely
   because raw *is* the full-text judge. Only C actually aligns the two.
+
+---
+
+# ⚠️ AMENDMENT 2 — 2026-08-02 (later the same day)
+
+## A5. The rep-pen arm FAILED its gate. It is not shipped.
+
+Smoke, n=50: **%empty 30.0%** against a ≤2% bar. Mechanism confirmed rather than inferred — all 15
+empty rows emitted exactly one token, `128001` = `<|end_of_text|>`. The historical ~35% failure
+reproduced almost exactly, and it is why samsum's 0.0% did not transfer: the mechanism scales with
+few-shot context length, and med_quad's prompt is 1184 tokens against samsum's 147.
+
+It also moved the wrong way on both other measures: **true looping (run≥25) 5 of 50**, versus 3 of 1800
+on the n-gram arm; **%fabr 56.0%** versus 47.8% at v1. The arm added to suppress repetition had the most
+of it.
+
+**Kept as evidence, not as data.** With the n-gram arm it forms the contrast that shows a 128-token cap
+concealed the repetition rather than preventing it.
+
+## A6. ⭐ THE DIAGNOSIS WAS WRONG, AND THAT IS WHY EVERY DECODING FIX FAILED
+
+Three arms, three failures: v1 truncates real answers; the n-gram arm sits exactly at the cap with 92.6%
+fabrication; rep-pen empties 30% of rows.
+
+**The problem was never repetition.** Base Llama is not instruction-tuned; under a few-shot prompt it
+finishes the answer and then **continues the format**, writing a fresh `Question:` and inventing both
+question and answer, often on an unrelated topic. **A repetition penalty cannot fix "invents a new
+question"** — which is exactly why it perturbed the decoding without touching the mechanism.
+
+**The fix is to stop at the boundary, which is this project's own documented convention** (short-form
+cuts at the first newline *at extraction time*, so record, logprobs, features and label describe the
+same text). Implemented as `--truncate-answer-span`, applied at the same site as `truncate_at_newline`,
+i.e. **before** `out.scores[:n_gen]` and **before** the hidden-state pooling.
+
+Simulated on the existing 768-token generations, then verified against the real tokenizer:
+
+| | v1 (128) | n-gram (768) | rep-pen (768) | **768 + cut** |
+|---|---|---|---|---|
+| median real answer | 498 ch | — | — | **591 ch** |
+| mean real answer | 415 ch | 948 of 2673 | — | **948 ch** |
+| % empty | 0 | 0 | **30.0** ✗ | **0** |
+| % fabricated | 47.8 | 92.6 | 56.0 | **2.0–2.3** |
+| median at the cap? | yes ✗ | yes ✗ | no | **no** |
+| true looping | 0 | 0.17% | 5/50 ✗ | **0.06%** |
+
+Char→token mapping verified on 300 real generations: **overshoot ≤1 char (one token boundary), zero
+undershoot**, so no real answer text is dropped.
+
+## A7. §A4 RESOLVES TO OPTION A — and A3's deviation is RETRACTED
+
+Cutting at generation time means labels, logprobs and features all describe the **same** text, so
+**option A applies** and med_quad's uniqueness disappears. **No feature re-extraction (option C) is
+needed.**
+
+⚠️ **The `correctness_raw` substitution registered in A3 is hereby RETRACTED.** It was needed only
+because v2 was going to be judged on *full* text while v1's live `correctness` is the *cut*-text judge
+label. With v2 generated-and-cut, **v1(cut) vs v2(cut) is like-for-like and the ORIGINALLY REGISTERED
+comparison stands.** Recording the retraction rather than deleting A3: the deviation was genuinely
+contemplated, and the reason it became unnecessary is itself part of the record.
+
+## A8. Residual risks, carried not hidden
+
+- **`answer_span` is now load-bearing at generation time**, having only ever been an analysis tool.
+  The stratified 20-row spot-check must now also judge **cut quality**, not just answer quality.
+- **~2% of cut generations still contain a fabricated `Question:`.** Report the data as
+  low-fabrication, never as fabrication-free.
+- 71 rows fall under 40 characters after cutting — **the same 71 as in v1**, so a pre-existing set of
+  genuinely short answers, not a new failure mode.
