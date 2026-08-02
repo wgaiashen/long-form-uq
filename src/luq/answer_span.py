@@ -36,6 +36,16 @@ from collections import defaultdict
 # starts a new 'Question:'), plus the universal soft-loop rule. Should barely move the score.
 SHORT_FORM = {"sciq", "trivia_qa"}
 
+# Datasets this module has an actual cut RULE for. Everything else falls through to the universal
+# soft-loop check only, and will usually return "no-cut".
+#
+# ⚠️ WHY THIS SET IS EXPORTED. As a post-hoc analysis tool, "no-cut" for an unknown dataset is a
+# perfectly good answer. As a GENERATION-TIME flag (01_extract --truncate-answer-span, added
+# 2026-08-02) it is a trap: you ask for the generation to be cut, silently get no cut, and the run
+# looks like it worked. That is the "a silent default is worse than a crash" failure. Callers that
+# depend on a cut actually existing must check membership here and fail loudly instead.
+DATASETS_WITH_RULES = {"med_quad", "xsum", "pubmed_qa"} | SHORT_FORM
+
 
 # ---- helpers ---------------------------------------------------------------------------
 

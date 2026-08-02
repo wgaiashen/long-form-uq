@@ -14,7 +14,7 @@ import torch
 # Make `src/` importable when running this file directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from luq import cache, data, generate  # noqa: E402
+from luq import answer_span, cache, data, generate  # noqa: E402
 from luq.config import Config  # noqa: E402
 
 # Map the --dtype flag to a torch dtype. "auto" -> None lets load_model pick its
@@ -79,6 +79,14 @@ def main():
         cfg.max_new_tokens_cap = args.max_new_tokens_cap
     # Validate the budget override BEFORE loading an 8B model -- a config error should cost a second,
     # not a GPU allocation and several minutes of weight loading.
+    # ⚠️ --truncate-answer-span only does anything for datasets answer_span has a RULE for. For any
+    # other name it returns "no-cut" silently, so the run would generate uncut while appearing to have
+    # been cut -- and the whole point of the flag is that the record, logprobs, features and label
+    # describe the same text. Fail here, before the model loads, rather than produce a plausible cache.
+    if args.truncate_answer_span and args.dataset not in answer_span.DATASETS_WITH_RULES:
+        raise SystemExit(f"--truncate-answer-span: no cut rule for {args.dataset!r}. answer_span has "
+                         f"rules for {sorted(answer_span.DATASETS_WITH_RULES)}; for anything else it "
+                         "returns 'no-cut' SILENTLY, which would look like a successful cut run.")
     if args.max_new_tokens is not None:
         if not args.prompt_regime:
             raise SystemExit("--max-new-tokens changes the generations, so it MUST be paired with a fresh "
