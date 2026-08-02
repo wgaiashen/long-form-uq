@@ -120,10 +120,21 @@ def main():
         _report(records, "correctness_strmatch", "string-match (kept for comparison)")
         return
 
+    # ⚠️ READ THIS BEFORE CONCLUDING WHICH LABEL A DATASET ACTUALLY USES (audit, 2026-08-02).
+    # This routing has now twice been read as "sciq/trivia are string-matched, so their labels are
+    # overlap labels". THAT IS NOT WHAT IS IN THE CACHE. On the shipped records, sciq's and trivia's
+    # `correctness` is BYTE-IDENTICAL to `correctness_judge` (max|diff| 0.0) and carries graded values
+    # (0.1, 0.2, 0.3 ...) that string-match, which only ever emits 0.0/1.0, cannot produce. The judge
+    # labels were promoted into `correctness` afterwards and the `correctness_model` stamp was not
+    # carried across -- so the ABSENT STAMP IS NOT EVIDENCE OF STRING MATCHING. Check the values.
+    # `correctness_strmatch` is the unused secondary field; nothing trains on it.
+    # ALL TEN datasets are judge-labelled: sciq/trivia by gpt-5, the rest by gpt-5-mini.
+    # For the record, on the two sets where overlap would have been most defensible it still disagreed
+    # with the judge on 9.5% (sciq) / 6.0% (trivia) of rows, always penalising correct paraphrase.
     if cfg.dataset in data.SHORT_FORM:
         # String match: does the gold answer (or any alias) appear in the output?
-        # This stays the canonical `correctness` for short-form: deterministic, free,
-        # no judge bias — the label stages 03/04 read.
+        # Written to `correctness` HERE, but see the note above: on the shipped caches it was later
+        # superseded by the judge. Deterministic, free, no judge bias.
         for r in records:
             r["correctness"] = string_match.match(r["gen_text"], r["target"])
         if args.judge_short_form:
