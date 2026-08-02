@@ -203,5 +203,28 @@ contemplated, and the reason it became unnecessary is itself part of the record.
   The stratified 20-row spot-check must now also judge **cut quality**, not just answer quality.
 - **~2% of cut generations still contain a fabricated `Question:`.** Report the data as
   low-fabrication, never as fabrication-free.
-- 71 rows fall under 40 characters after cutting — **the same 71 as in v1**, so a pre-existing set of
-  genuinely short answers, not a new failure mode.
+- 71 rows fall under 40 characters after cutting.
+  ⚠️ **CORRECTED 2026-08-02 (DoC).** An earlier draft said "the same 71 as in v1", which is wrong as
+  worded and would have overstated the case. Verified: **v1 RAW has ZERO rows under 40 characters**;
+  it is **v1 after the SAME cut** that has 71, and those are the identical 71 (overlap 71, neither-only
+  0). So the correct claim is that the short rows are a property of the *cut*, applied to either arm,
+  not of the new generations — a pre-existing set of genuinely short answers surfaced by cutting, not a
+  new failure mode. Say "v1 after the same cut", never "v1".
+
+## A9. Fabrication is med_quad-ONLY — cutting it is a fix, not a new uniformity break
+
+Measured across the grid (DoC, 2026-08-02), share of generations containing a fabricated `Question:`:
+
+| med_quad v1 | med_quad n-gram 768 | pubmed | sciq | trivia | xsum | cnn | samsum |
+|---|---|---|---|---|---|---|---|
+| **47.8%** | **92.6%** | 0.0 | 0.0 | 0.0 | 0.0 | 0.1 | 0.0 |
+
+This **reverses the concern raised in §A4**. The worry was that cutting med_quad would make it the odd
+one out — the only dataset whose labels and features came from a trimmed string. In fact **med_quad is
+already the odd one out**: it is the only dataset with this pathology at all, and every other set is at
+0.0–0.1% with nothing to cut. Applying the cut therefore **removes** a dataset-specific defect rather
+than introducing a study-wide inconsistency, and `--truncate-answer-span` is correctly scoped to the one
+dataset that needs it.
+
+State it this way in the write-up. "We cut med_quad and not the others" reads like an inconsistency
+until the 0.0–0.1% column is shown; with it, it reads as the only sensible choice.

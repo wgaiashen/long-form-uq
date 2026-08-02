@@ -10,6 +10,13 @@
 # MUST be judge-labelled first. med_quad fits the 48GB L40S in fp32 (moderate prompt/answer length,
 # unlike xsum's long articles which need DoC).
 #   qsub -v LUQ_DATASET=med_quad pbs/pertoken.pbs
+#
+# A NAMESPACED (prompt-regime) cache lives under cache/<regime>/{records,features,pertok} instead of
+# the default cache/{records,...}. Pass the regime through, or the job silently targets the DEFAULT
+# namespace and either re-extracts the old generations or fails on a missing record file:
+#   qsub -v LUQ_DATASET=med_quad,LUQ_REGIME=v2_med_quad_span pbs/pertoken.pbs
+# LUQ_LABEL_FIELD overrides the label the sanity gate trains on (default `correctness`); needed for
+# the factuality sets (expertqa/factscore) whose label field is `factuality`.
 
 set -uo pipefail
 cd "$PBS_O_WORKDIR"
@@ -21,7 +28,17 @@ export HF_HUB_OFFLINE=1
 
 DATASET="${LUQ_DATASET:-med_quad}"
 MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
-echo "01h_pertoken: dataset=$DATASET model=$MODEL (fp32+eager, L15) on $(hostname) at $(date)" >&2
+REGIME="${LUQ_REGIME:-}"
+LABEL_FIELD="${LUQ_LABEL_FIELD:-correctness}"
+
+# Build the optional flags as an array so an EMPTY regime passes nothing at all (passing
+# --prompt-regime "" is fine today but an array keeps the command line honest in the logs).
+EXTRA=()
+[ -n "$REGIME" ] && EXTRA+=(--prompt-regime "$REGIME")
+EXTRA+=(--label-field "$LABEL_FIELD")
+
+echo "01h_pertoken: dataset=$DATASET model=$MODEL regime='${REGIME:-<default>}' label=$LABEL_FIELD" \
+     "(fp32+eager, L15) on $(hostname) at $(date)" >&2
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DATASET" --ood ID \
-    --layer 15 --dtype fp32 --attn eager
+    --layer 15 --dtype fp32 --attn eager "${EXTRA[@]}"

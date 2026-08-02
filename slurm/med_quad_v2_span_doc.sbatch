@@ -37,8 +37,17 @@
 #   4. %severe WITH run>=25 SEPARATELY (most of med_quad's severe flags are the whitespace rule, which
 #      its own gold references trip on 24.8% of rows)
 #
-#   sbatch --export=ALL,LUQ_SMOKE=1 slurm/med_quad_v2_span_doc.sbatch   # 50-row smoke FIRST
-#   sbatch slurm/med_quad_v2_span_doc.sbatch                            # full, after the smoke passes
+#   LUQ_SMOKE=1 sbatch slurm/med_quad_v2_span_doc.sbatch   # 50-row smoke FIRST
+#   sbatch slurm/med_quad_v2_span_doc.sbatch               # full, after the smoke passes
+#
+# ⚠️ Use the ENV-VAR PREFIX form above, NOT `sbatch --export=ALL,LUQ_SMOKE=1 …`. On DoC the explicit
+# --export gets the job HELD with "user env retrieval failed" (reported from DoC, 2026-08-02). The
+# prefix form works because sbatch already exports the submitting environment by default.
+#
+# This job writes RECORDS + FEATURES ONLY. No labels and no per-token cache: 01h_pertoken's sanity
+# gate trains a probe on the label, so pertok cannot run until the judge has run, and the judge is an
+# RCS step. Doing pertok here would cost three password-prompted syncs instead of one (and its ~6.4 GB
+# exceeds DoC's free space anyway).
 
 set -uo pipefail
 export HF_HOME=/vol/gpudata/gs925-msc_project/hf_cache
