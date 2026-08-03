@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_pdlfull
+#PBS -j oe
+# STEP B — the LONG ladder, complete, WITH the supervised baselines.
+#
+# ⚠️ CPU BY DESIGN and NOT blocked on the GPU extraction. `--baselines` only ADDS rows; the headline
+# methods (floors, SAPLMA, poolers, wMSP) read only pertok + records, which are cached for all 8 long
+# evals. Gating this behind the stuck GPU job was a sequencing error that cost half a day.
+#
+# ptrue/lookback exist for 7 of 10 datasets. cnn_dailymail/med_quad/samsum are MISSING both, so those
+# cells are skipped LOUDLY and left BLANK (never zero) -- a top-up run adds them once Step A lands.
+#
+# ⚠️ FAMILY SPLIT (2026-08-03): expertqa+factscore are now their own `factuality` BROAD family and asqa
+# stays in long_qa. Every cell involving those three differs from earlier runs -- NEW output file.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== PDL FULL (+baselines, post family-split) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --baselines ptrue,lookback \
+    --out results/probedriftlong_FULL_famsplit__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

@@ -228,3 +228,76 @@ dataset that needs it.
 
 State it this way in the write-up. "We cut med_quad and not the others" reads like an inconsistency
 until the 0.0–0.1% column is shown; with it, it reads as the only sensible choice.
+
+---
+
+## AMENDMENT 3 (2026-08-03) — CLOSED. The gate PASSED and v2 is nonetheless ARCHIVED.
+
+A pre-registration abandoned without a recorded reason is worse than none, so this records both halves.
+
+### The generation-quality gate PASSED, emphatically
+
+| | v1 | v2 (n-gram) | **v2_span (adopted arm)** |
+|---|---|---|---|
+| % capped | **97.7** | 54.7 | **6.1** |
+| % fabricated `Question:` | 47.8 | 92.6 | **2.3** |
+| % severe degeneracy | — | 30.6 | **10.9** |
+| mean answer fraction | — | — | **0.987** |
+
+The span cut did what §A5–A7 predicted. As a piece of generation engineering it is a clear success.
+
+### And the correctness prediction is where it stops
+
+The §A2 prediction was *"med_quad should improve"* on the judge label. Paired over all 1800 examples,
+same judge (`gpt-5-mini`, verified identical on both sides — no judge mixing):
+
+**mean correctness 0.4180 → 0.4412, paired delta +0.0232 (sd 0.186, t +5.31).**
+**33.6% improved, 25.8% got WORSE, 40.6% unchanged.**
+
+Statistically clear, practically small, with substantial churn in both directions.
+
+### ⚠️ The apparent regime flip is a LENGTH ARTIFACT, not a result
+
+On the med_quad ID cell the raw floors appear to flip the taxonomy label CONCENTRATED → SPREAD:
+
+| floor | v1 | v2_span | delta |
+|---|---|---|---|
+| msp_min | +0.1492 | −0.0424 | **−0.1916** |
+| msp_sum | +0.0834 | −0.1910 | **−0.2744** |
+| perplexity | +0.0771 | +0.1105 | +0.0334 |
+| **msp_min, length-normalised** | +0.1448 | +0.1784 | **+0.0336** |
+
+The two floors that collapse are exactly the two that scale with sequence length (min-over-T, sum-over-T)
+while generations went from a hard 128-token cap to p90 = 560. Length-normalise `msp_min` and it *rises*
+by +0.034, matching perplexity. **There is no regime change — there is a longer sequence.**
+
+### DECISION: v1 remains canonical. v2 is archived and is not reported.
+
+Three reasons, in order of weight:
+
+1. **Sibling-budget consistency, which is a pre-existing documented design rule, not a post-hoc excuse.**
+   `src/luq/data.py:66` sets med_quad's 128 *"matching its pubmed sibling"*, and `samsum: 56` matches xsum
+   *"so the two are budget-consistent in the QA DiffTask pool"*. `_load_med_quad` states med_quad *"is a
+   training source for the pubmed SameTask rung, never an eval target"*. **v2's 768 budget is 6× pubmed's
+   128** and would put med_quad-as-training-source in a different length regime from the eval it feeds.
+2. **A partial adoption is a mixed population.** med_quad is a training source for other evals' OOD rungs,
+   so swapping only its ID cell would contaminate cells not even labelled med_quad. That is the P0 bug
+   class this project has a standing rule against.
+3. **The gain does not justify the cost.** +0.023 correctness, of which the striking floor movement is
+   artifact, against regenerating a 3.3GB pertok cache and re-running two full ladders.
+
+⚠️ **HOW TO STATE THE LIMITATION HONESTLY IN THE REPORT.** Say: token budgets are fixed per dataset and
+chosen for consistency with the sibling each set trains against; med_quad's is 128; the consequence is
+that med_quad generations are usually truncated (97.7% reach the cap). **Do NOT claim the budget was
+chosen to prevent degeneracy** — that would be a rationalisation invented after the fact, and v1's own
+47.8% fabricated-continuation rate contradicts it.
+
+**Archived to** `../ARCHIVED_v2_med_quad/` (mirroring the `../ARCHIVED_nonllama_caches/` precedent, which
+exists so a stray glob cannot reach a non-canonical cache): all four v2 cache dirs, the five v2 genqual
+CSVs, and `cache/_v3bak_med_quad/` — a 6-July pre-labelling backup (1800 rows, `correctness` all null, no
+judge stamp) found during the sweep and archived for the same reason.
+
+**Verified after archiving:** exactly ONE med_quad record file and ONE feature file remain under `cache/`,
+and the floors recompute to the v1 values **exactly** (msp_min +0.1492, perplexity +0.0771, msp_sum
++0.0834) — proving no driver silently reads v2. Canonical hashes now recorded in
+`prereg/CANONICAL_v1_MANIFEST.md`, closing the gap that made "v1 is unchanged" un-checkable tonight.

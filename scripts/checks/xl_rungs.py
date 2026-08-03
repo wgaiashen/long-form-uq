@@ -27,10 +27,23 @@ from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrif
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
 ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa",
        "factscore"]   # factscore added 2026-07-27 (Round-3 Task A): eval-only, but a valid TRAINING SOURCE
+# ⚠️ FACTUALITY IS ITS OWN FAMILY (author's decision 2026-08-03, resolving the "property tag deferred" /
+# "factuality-family split is a pending decision" placeholders left in data.py:32,43,47).
+# BEFORE: expertqa, factscore AND asqa were all "long_qa", i.e. one undifferentiated QA family.
+# NOW:
+#   * expertqa + factscore -> FINE "factuality", and BROAD "factuality" sits BESIDE "qa" and "summ".
+#     They are checked against WORLD KNOWLEDGE rather than answering a supplied question, which is the
+#     factuality-vs-faithfulness axis in framing.md §1.1 -- a genuinely different task, not a subtype.
+#   * asqa STAYS in "long_qa" (confirmed 2026-08-03). data.py:22 calls it "closed-book FACTUALITY QA",
+#     which invites the opposite grouping, so this is recorded explicitly: asqa is a QA-family eval.
+# CONSEQUENCES, so nobody has to rediscover them: expertqa's SameTask becomes {factscore} alone (was 4
+# datasets) and factscore's becomes {expertqa}; pubmed/med_quad/asqa lose both from their SameTask pools;
+# and because factuality is BROAD, it becomes a DiffTask source for the QA sets and vice versa.
+# ⚠️ Every cell involving these three moves. Results computed before this date are NOT comparable.
 FINE = {"sciq": "short_qa", "trivia_qa": "short_qa", "pubmed_qa": "long_qa", "med_quad": "long_qa",
-        "expertqa": "long_qa", "asqa": "long_qa", "xsum": "summ", "samsum": "summ", "cnn_dailymail": "summ",
-        "factscore": "long_qa"}
-BROAD = {"short_qa": "qa", "long_qa": "qa", "summ": "summ"}
+        "expertqa": "factuality", "asqa": "long_qa", "xsum": "summ", "samsum": "summ",
+        "cnn_dailymail": "summ", "factscore": "factuality"}
+BROAD = {"short_qa": "qa", "long_qa": "qa", "summ": "summ", "factuality": "factuality"}
 
 KEYSTONES = {"sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"}   # -> get_training_spec (faithful)
 XL_EVALS = {"med_quad", "samsum", "expertqa", "asqa"}                    # -> rung_sources (taxonomy)
@@ -112,7 +125,11 @@ def eval_split(split, seed=0, test_frac=XL_TEST_FRAC):
 # ---- rung generation -----------------------------------------------------------------------------
 # OneDatasetDiffTask preference: a SINGLE opposite-broad-family dataset, matching ProbeDrift's
 # OOD_ONE_DATASET_DIFF_TASK (a QA eval shifts to samsum; a summarisation eval shifts to med_quad).
-_ONE_DIFF_PREF = {"qa": "samsum", "summ": "med_quad"}
+# A third broad family needs its own preferred single-dataset shift, or `.get()` returns None for every
+# factuality eval and OneDatasetDiffTask silently falls back to "whatever is first in the pool" — a rung
+# whose composition would then depend on dict ordering rather than on a stated convention.
+# factuality -> samsum: the largest available shift (summarisation), matching the QA convention.
+_ONE_DIFF_PREF = {"qa": "samsum", "summ": "med_quad", "factuality": "samsum"}
 
 
 def rung_sources(X):

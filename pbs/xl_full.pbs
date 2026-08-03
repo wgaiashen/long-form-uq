@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_xlfull
+#PBS -j oe
+# STEP C — the XL ladder, complete. TWO drivers, deliberately kept separate (contribution_ladder.py:6):
+#   ood_onegrid.py       the VERIFIED baseline ladder (SAPLMA/linear/ptrue_accurate/lookback + poolers)
+#   contribution_ladder  the contribution methods (wMSP family + poolers + floors) + the SameTask rung
+# Keeping them apart means a bug in the new methods cannot break the baseline ladder.
+#
+# ⚠️ FAMILY SPLIT (2026-08-03): expertqa+factscore are their own `factuality` BROAD family; asqa stays
+# long_qa. This changes SameTask for 5 evals and DiffTask for all 10 -> NEW output files, and earlier
+# numbers for those three datasets are NOT comparable.
+# CPU by design: cache-bound, poolers fall back to device=cpu.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+echo "=== XL: contribution ladder on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 \
+    --out results/contribution_ladder_FULL_famsplit__meta-llama_Meta-Llama-3.1-8B.csv \
+    || echo "!!! contribution_ladder FAILED"
+echo "=== XL: baseline ladder (ood_onegrid) at $(date) ===" >&2
+python -u scripts/checks/ood_onegrid.py --seeds 1,2,3 \
+    --out results/ood_onegrid_FULL_famsplit__meta-llama_Meta-Llama-3.1-8B.csv \
+    || echo "!!! ood_onegrid FAILED"
+echo "=== done $(date) ===" >&2

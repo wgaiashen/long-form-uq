@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_basefeats
+#PBS -j oe
+
+# STEP A of the ladder-completion plan: extract the two SUPERVISED BASELINE feature sets that are
+# missing for three datasets, so P(True) and Lookback Lens can appear on the full grid.
+#
+# WHY THIS IS THE GATE. assemble_pdl_table.py's ALIAS defines a 24-method universe that contains NO
+# ptrue, NO lookback and NO uhead -- i.e. none of the supervised baselines the report's central claim
+# ("our method beats existing probes") is measured against. The features exist for 7 of 10 datasets;
+# cnn_dailymail, med_quad and samsum are missing both. Six extractions unlock the whole comparison.
+#
+# NAMING MATTERS: --name ptrue_accurate, matching slurm/ptrue_accurate_extract.sbatch and the wording
+# "Is the above response accurate?" already used on the other seven. A different name would silently
+# create a second, non-comparable feature set and the ladder would mix wordings across datasets.
+#
+# fp32 + L15. med_quad/cnn/samsum have short-to-medium sources and fit the L40S in fp32 (it is xsum's
+# ~5,600-token articles that OOM there, and xsum already HAS both features).
+#
+#   qsub -v LUQ_DATASETS=cnn_dailymail,med_quad,samsum pbs/baseline_feats_fill.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+MODEL="${LUQ_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
+DATASETS="${LUQ_DATASETS:-cnn_dailymail,med_quad,samsum}"
+echo "baseline feature fill on $(hostname) at $(date): datasets=$DATASETS model=$MODEL"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU -- will fall back to CPU)"
+
+IFS=',' read -ra DS_ARR <<< "$DATASETS"
+for DS in "${DS_ARR[@]}"; do
+  echo "======== $DS : 01b_ptrue --name ptrue_accurate ======== $(date)"
+  python -u scripts/01b_ptrue.py --dataset "$DS" --ood ID --model "$MODEL" \
+      --name ptrue_accurate || echo "!!! ptrue_accurate FAILED for $DS"
+
+  echo "======== $DS : 01c_lookback ======== $(date)"
+  python -u scripts/01c_lookback.py --dataset "$DS" --ood ID --model "$MODEL" \
+      || echo "!!! lookback FAILED for $DS"
+done
+
+echo "======== VERIFY (never trust presence alone) ======== $(date)"
+python -u scripts/checks/verify_baseline_features.py || echo "!!! verify_baseline_features reported a problem"
+echo "DONE $(date)"

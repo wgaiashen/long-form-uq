@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_R4b_hbo
+#PBS -j oe
+
+# R4b -- implement Joe's HBO from the paper and VALIDATE it before it is used as a baseline anywhere.
+# Pre-registered at prereg/R4b_hbo_reproduction.md with V1-V4 fixed BEFORE the numbers.
+#
+# Standalone by design (author's instruction): implementing HBO *as* our comparison's baseline creates a
+# pull toward specifying it in whatever form flatters us. If V1-V4 fail we report a FAILURE TO REPRODUCE
+# and do NOT re-tune it until it passes.
+#
+# READ THE OUTPUT IN THIS ORDER: the VACUITY CHECK first (if frac(R>0.5) at ID is near 1.0 then HBO is
+# pure MSP everywhere and the validation says nothing), then V1-V4.
+#
+# CPU by design -- SAPLMA is a small MLP over cached pooled features; no GPU-shaped work.
+
+cd "$PBS_O_WORKDIR" || exit 1
+source pbs/_env.sh && luq_activate
+echo "R4b HBO on $(hostname) at $(date)"
+python -u scripts/checks/hbo.py
+echo "DONE $(date)."
