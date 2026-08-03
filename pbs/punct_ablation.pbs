@@ -1,0 +1,40 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=16:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_R0_punct
+#PBS -j oe
+
+# R0 — the punctuation ablation (prereg/R0_punctuation_ablation.md).
+# Four arms (baseline / punct / posmatch / random) x 3 datasets x 3 seeds x 3 aggregators, all retrained,
+# all on the COMMON population. Tests whether pubmed's punctuation-heavy attention is carrying the signal
+# or wasting it -- the premise three Track B experiments were designed against and nobody measured.
+#
+#   qsub pbs/punct_ablation.pbs                          # the full run
+#   qsub -v LUQ_LIMIT=200 pbs/punct_ablation.pbs         # smoke (output is stamped SMOKE, never tabled)
+#
+# ⚠️ CPU BY DESIGN, not by fallback. This was first written asking for an L40S and TWO submissions died
+# in the queue on "Insufficient amount of resource: ngpus" without ever running, while the same work
+# started immediately on 16 CPU cores (job 3532455, 3 minutes). The pooler is a single attention head over
+# cached states -- there is no GPU-shaped work here, and requesting one only buys queue time. This is the
+# standing routing rule made permanent in the file rather than left to a command-line override: a stuck
+# RCS GPU job goes to RCS CPU before it goes to DoC.
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+LIMIT="${LUQ_LIMIT:-0}"
+DATASETS="${LUQ_DATASETS:-pubmed_qa,xsum,cnn_dailymail}"
+EXTRA=()
+[ "$LIMIT" != "0" ] && EXTRA+=(--limit "$LIMIT")
+
+echo "R0 punct ablation on $(hostname) at $(date): datasets=$DATASETS limit=$LIMIT" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU -- running on CPU)" >&2
+
+python -u scripts/checks/punct_ablation.py --datasets "$DATASETS" --seeds 1,2,3 --layer 15 "${EXTRA[@]}"
+
+echo "DONE $(date). Read the REGISTERED READING block at the end: punct vs posmatch vs random." >&2
