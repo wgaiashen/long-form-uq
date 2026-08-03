@@ -82,6 +82,11 @@ ALIAS = {
 # (glob, priority, seed_regime). Lower priority number wins on a shared cell. Base is authoritative for
 # floors/poolers/wMSP/SAPLMA; fixed_prior/mh add arm rows; ensemble adds ensemble rows; 3A/router add seed-1 rows.
 SOURCES = [
+    # The per-eval split runs (2026-08-03), post family-split: one job per eval, because the sequential
+    # run's cells ran >79min each and 42 cells could not fit a 24h walltime. Priority 0 and listed FIRST
+    # -- these supersede the pre-split numbers for every cell involving expertqa/factscore/asqa, whose
+    # rung composition changed when factuality became its own family.
+    ("pdl_fam_*__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
     ("probedriftlong_*_widened_wmsp__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
     ("fixed_prior_ladder__" + SLUG + ".csv", 1, "3seed", "prr_mean"),
     ("fixed_prior_ladder_factscore__" + SLUG + ".csv", 1, "3seed", "prr_mean"),

@@ -73,6 +73,10 @@ ALIAS = {
 # (glob, priority, seed_regime, value column). Lower priority wins a shared cell. The post-family-split
 # runs are priority 0 because they are the only ones whose rung composition matches the current code.
 SOURCES = [
+    # The per-eval split runs (2026-08-03): one job per eval, because the sequential run could not fit
+    # the walltime. These are the authoritative post-family-split numbers.
+    ("xlcontrib_fam_*__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
+    ("xlonegrid_fam_*__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
     ("contribution_ladder_FULL_famsplit__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
     ("ood_onegrid_FULL_famsplit__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
     ("contribution_ladder_xl__" + SLUG + ".csv", 5, "3seed", "prr_mean"),
@@ -100,7 +104,10 @@ def read_rows(path, valcol):
             if canon in (None, "__skip__"):
                 continue
             ev = (row.get("eval") or "").strip()
-            rg = (row.get("rung") or "").strip()
+            # ⚠️ ood_onegrid.py names this column `setting`, every other driver names it `rung`. Reading
+            # only `rung` would silently drop EVERY supervised-baseline row (linear/ptrue/lookback), which
+            # is exactly the comparison the XL table exists to show.
+            rg = (row.get("rung") or row.get("setting") or "").strip()
             v = row.get(valcol) or row.get("prr") or ""
             if ev not in XL_EVALS or rg not in RUNGS or v in ("", None):
                 continue
