@@ -207,6 +207,16 @@ def _weights_from_raw(raw, weight_mode: str, keep=None):
         if keep is None:
             return torch.softmax(raw, dim=0) * n
         n_kept = torch.clamp(keep.sum(), min=1.0)
+        # ⚠️ EVERY-TOKEN-EXCLUDED IS THE NaN CASE (found 2026-08-03 via the asqa wMSP outlier).
+        # If keep is all-zero, masked_fill sets EVERY position to -inf and softmax(all -inf) = NaN, so
+        # the whole example scores NaN. The clamp above protects the SCALE but not the softmax. Those
+        # NaNs then flowed into prr(), which used to rank them arbitrarily and return a plausible number
+        # -- asqa's wMSP read -0.0439 for all 8 variants and 3 seeds purely because of this.
+        # Falling back to UNIFORM weights over all tokens is the honest choice: with no token judged
+        # keepable there is no basis to prefer any, and uniform reduces wMSP to plain MSP for that
+        # example rather than inventing a ranking.
+        if float(keep.sum()) < 0.5:
+            return torch.ones_like(raw)
         masked = raw.masked_fill(keep < 0.5, float("-inf"))
         return torch.softmax(masked, dim=0) * n_kept            # special tokens -> 0; kept average 1
     if weight_mode == "unconstrained":

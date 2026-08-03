@@ -57,6 +57,22 @@ def prr(correctness, uncertainty) -> float:
     uncertainty = np.asarray(uncertainty, dtype=float)
     n = len(correctness)
 
+    # ⚠️ A NON-FINITE SCORE MUST NOT PRODUCE A NUMBER (added 2026-08-03).
+    # np.argsort puts NaN at the end and happily ranks the rest, so an ALL-NaN score vector used to
+    # return the PRR of an arbitrary permutation -- a different plausible-looking value for every label
+    # vector (-0.686, +0.013, -0.044 on three different inputs). That is exactly how asqa's wMSP cell
+    # came to read -0.0439 across all 8 variants and 3 seeds: the scores were entirely NaN and this
+    # function invented a ranking for them. Partial NaN is worse still, because it silently scores on a
+    # subset while reporting as the full test set.
+    # Returns NaN rather than raising so one bad method cannot kill a 40-cell ladder run: NaN lands in
+    # the CSV as an EMPTY cell, which reads as "not measured". The warning is what makes it loud.
+    n_bad = int((~np.isfinite(uncertainty)).sum())
+    if n_bad:
+        print(f"    ⚠️ prr(): {n_bad}/{n} uncertainty values are NaN/inf -> returning NaN, NOT a number. "
+              "The cell will be BLANK (not measured). Fix the score, do not read the blank as a result.",
+              flush=True)
+        return float("nan")
+
     def area(rank_by):
         # Keep the LEAST-uncertain prefix as we reject the most-uncertain end.
         order = np.argsort(rank_by)            # ascending: least "bad" first

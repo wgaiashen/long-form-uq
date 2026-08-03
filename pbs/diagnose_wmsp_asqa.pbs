@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=24gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_wmspdiag
+#PBS -j oe
+# Diagnose the asqa wMSP collapse. Submitted as a JOB because it loads a 1.3GB pertok cache and trains
+# a model -- that is compute, and compute never runs on a login node.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+python -u scripts/checks/diagnose_wmsp_asqa.py
