@@ -34,6 +34,7 @@ PAIRED seeds + ID-diagonal gate, same discipline as ood_onegrid.
     python scripts/checks/contribution_ladder.py --sources sciq,trivia_qa,pubmed_qa --seeds 1  # smoke
 """
 import argparse
+import os  # atomic replace in _flush_rows
 import csv as _csv
 import sys
 from pathlib import Path
@@ -104,6 +105,30 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
+CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
+              "different_label_projection", "eval_med_len", "train_med_len", "train_max_len",
+              "ci_lo", "ci_hi", "boot_p", "significant"]
+
+
+def _flush_rows(out, rows, fields):
+    """Write everything accumulated SO FAR, atomically (temp + os.replace).
+
+    CALLED PER CELL, NOT ONCE AT THE END (added 2026-08-03). This driver used to hold every row in
+    memory and write the CSV only after the last cell, so a run killed at hour 15 of 16 -- walltime,
+    OOM, or a node problem -- lost EVERYTHING and left nothing on disk saying which cells had already
+    succeeded. A job was SIGTERM'd on cx3-14-9 the same day, and these ladders run 8-16 hours.
+
+    temp-then-replace so a crash mid-write cannot leave a TRUNCATED csv, which would read as a
+    short-but-valid grid. A half-written table is worse than no table: it looks complete.
+    """
+    tmp = Path(str(out) + ".partial")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    with open(tmp, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader(); w.writerows(rows)
+    os.replace(tmp, out)
+
+
 def main():
     global EVALS
     ap = argparse.ArgumentParser()
@@ -117,6 +142,9 @@ def main():
     ap.add_argument("--length-normalise", default="yes", choices=["yes", "no"])
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    # Resolved BEFORE the cell loop so the per-cell crash-safety flush has somewhere to write.
+    out_path = Path(args.out) if args.out else (
+        ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     EVALS = args.evals.split(",")
     seeds = [int(s) for s in args.seeds.split(",")]
     ln = args.length_normalise == "yes"
@@ -275,14 +303,14 @@ def main():
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": sig, "n_seeds": len(seeds)})
+        # CRASH SAFETY: land this cell before starting the next. An interruption should cost the
+        # current cell, never the whole run.
+        _flush_rows(out_path, out_rows, CSV_FIELDS)
+        print(f"    [saved] {len(out_rows)} rows -> {out_path.name}", flush=True)
 
-    out = Path(args.out) if args.out else (ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "different_label_projection", "eval_med_len",
-                                           "train_med_len", "train_max_len", "ci_lo", "ci_hi", "boot_p",
-                                           "significant"])
-        w.writeheader(); w.writerows(out_rows)
+
+    out = out_path
+    _flush_rows(out, out_rows, CSV_FIELDS)
     print(f"\nwrote {out}", flush=True)
 
 

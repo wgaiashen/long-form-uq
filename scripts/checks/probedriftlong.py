@@ -24,7 +24,7 @@ METHODS (the KEEP set): fair floor (msp_sum/perplexity/msp_min -> max), uniform 
     python scripts/checks/probedriftlong.py --seeds 1,2,3
     python scripts/checks/probedriftlong.py --evals pubmed_qa,xsum --seeds 1   # smoke
 """
-import argparse, csv as _csv, sys, pickle
+import argparse, csv as _csv, os, sys, pickle   # os: atomic replace in _flush_rows
 from pathlib import Path
 import numpy as np
 
@@ -90,6 +90,35 @@ def rung_sources_long(X):
     diff = [d for d in LONG_SRC if d != X and FINE[d] != FINE[X]]
     loo = [d for d in LONG_SRC if d != X]
     return {"SameTask-long": same, "DiffTask-long": diff, "LOO-long": loo, "1ds-Diff-long": diff[:1]}
+
+
+CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
+              "different_label_projection", "eval_med_len", "train_med_len", "train_max_len",
+              "ci_lo", "ci_hi", "boot_p", "significant", "git_sha", "cluster", "env_hash"]
+
+
+def _flush_rows(out, rows, prov):
+    """Write every row accumulated SO FAR, atomically.
+
+    ⚠️ WHY THIS IS CALLED PER CELL, NOT ONCE AT THE END (added 2026-08-03).
+    This driver used to accumulate `out_rows` in memory for the whole run and write the CSV only after
+    the final cell. A 16-hour run killed at hour 15 -- by the walltime, an OOM, or a node problem --
+    lost EVERYTHING, with nothing on disk to show which cells had already succeeded. That is not
+    hypothetical: a job was SIGTERM'd on cx3-14-9 earlier the same day after 36 seconds, and the
+    ladders run for 8-16 hours.
+
+    Written to a temp file then os.replace()d, so a crash DURING the write cannot leave a truncated CSV
+    that later reads as a short-but-valid grid -- a half-written table is worse than none, because it
+    looks complete.
+    """
+    for r in rows:                                     # provenance on EVERY row (method + VERDICT rows)
+        r.update(prov)
+    tmp = Path(str(out) + ".partial")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    with open(tmp, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        w.writeheader(); w.writerows(rows)
+    os.replace(tmp, out)
 
 
 def cells_long(sources, evals):
@@ -563,6 +592,13 @@ def main():
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": bool(sig), "n_seeds": len(seeds)})
 
+        # ⭐ CRASH SAFETY: land this cell on disk before starting the next one. Each cell costs minutes
+        # to hours, so an interruption should cost the CURRENT cell, never the whole run.
+        _cell_out = Path(args.out) if args.out else (
+            ROOT / "results" / f"probedriftlong{regime_tag()}__{cache._slug(MODEL)}.csv")
+        _flush_rows(_cell_out, out_rows, prov)
+        print(f"    [saved] {len(out_rows)} rows -> {_cell_out.name}", flush=True)
+
     # The regime tag goes in the DEFAULT filename so a v2 run cannot silently overwrite the v1 CSV in
     # place. The drivers write to a fixed path, so without this a single `LUQ_REGIME=...` run would land
     # on top of the v1 results and the only clue would be an mtime. v1_frozen/ makes that recoverable
@@ -570,14 +606,7 @@ def main():
     # so the v1 default filename is unchanged.
     out = Path(args.out) if args.out else (
         ROOT / "results" / f"probedriftlong{regime_tag()}__{cache._slug(MODEL)}.csv")
-    for _r in out_rows:                                # stamp provenance on EVERY row (method + VERDICT rows)
-        _r.update(prov)
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std",
-                                           "n_seeds", "different_label_projection", "eval_med_len",
-                                           "train_med_len", "train_max_len", "ci_lo", "ci_hi", "boot_p",
-                                           "significant", "git_sha", "cluster", "env_hash"])
-        w.writeheader(); w.writerows(out_rows)
+    _flush_rows(out, out_rows, prov)
     print(f"\nwrote {out}", flush=True)
 
 

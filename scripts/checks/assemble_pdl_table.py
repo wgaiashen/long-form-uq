@@ -34,12 +34,16 @@ OOD_RUNGS = ["SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 # canonical row order (free floors first, then supervised)
 ORDER = ["msp_sum", "perplexity", "msp_min",
          "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",
-         "SAPLMA", "armB(mean-pool)", "armA(attention)",
+         # The supervised baselines. ⚠️ A method absent from ORDER is not rendered even when ALIAS knows
+         # it, so BOTH lists have to carry a new method -- adding it to only one is a silent half-fix.
+         "SAPLMA", "linear probe", "P(True)", "Lookback Lens",
+         "armB(mean-pool)", "armA(attention)",
          "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",
          "multi-head(MH)", "multi-head-ablation(ABL)",
          "MultiMax", "Max-of-Rolling-Means(w10)",
          "score-std:V2(entropy-solve)", "score-std:LayerNorm-ctrl",
          "ens{MSP,SAPLMA}", "ens{wMSP,SAPLMA}", "ens{wMSP,MSP}",
+         "ens-z{MSP,SAPLMA}", "ens-z{wMSP,SAPLMA}", "ens-z{wMSP,MSP}",
          "length-router", "length-blend"]
 FLOORS = {"msp_sum", "perplexity", "msp_min"}
 
@@ -49,6 +53,14 @@ ALIAS = {
     "wmsp_norm": "wMSP-norm", "wmsp_shrink2": "wMSP-shrink@2", "wmsp_shrink10": "wMSP-shrink@10",
     "wmsp_blondel": None, "wmsp_seg_flat": None, "wmsp_seg_softmax": None,
     "wmsp_shrink2_blondel": None, "wmsp_shrink10_blondel": None, "wmsp": "wMSP-norm",
+    # ⭐ THE SUPERVISED BASELINES. Added 2026-08-03: probedriftlong.py has supported `--baselines
+    # ptrue,lookback` for weeks (BASE_FEATS at probedriftlong.py:84) and writes the BARE KEY as the
+    # method string — but ALIAS did not carry them, and `ALIAS.get(m, "__skip__")` SILENTLY DROPS an
+    # unknown method. So the report's central claim ("our method beats existing probes") had no existing
+    # probes in its table, and nothing anywhere said so. `linear` was missing for the same reason.
+    "ptrue": "P(True)", "ptrue_accurate": "P(True)",
+    "lookback": "Lookback Lens",
+    "linear": "linear probe",
     "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",
     "attention": "armA(attention)", "armA": "armA(attention)",
     "armC_content_mass": "armC:content-mass", "armC_nll": "armC:NLL",
@@ -59,6 +71,12 @@ ALIAS = {
     "armA_s1": None, "rolling_wT": None, "zstd_V1": None,   # 3A internal reference / gate artifacts
     "rankavg_floor_min+saplma": "ens{MSP,SAPLMA}", "rankavg_wmsp+saplma": "ens{wMSP,SAPLMA}",
     "rankavg_wmsp+floor_min": "ens{wMSP,MSP}",
+    # The z-average ensemble flavour. Found 2026-08-03 by the new loud-drop report: these were COMPUTED
+    # in the same runs as the rank-average ones and silently discarded at assembly, so the ensemble
+    # comparison only ever showed one of the two combination rules. Rendered distinctly (z vs rank) --
+    # collapsing them onto one label would make two different methods look like one.
+    "zavg_floor_min+saplma": "ens-z{MSP,SAPLMA}", "zavg_wmsp+saplma": "ens-z{wMSP,SAPLMA}",
+    "zavg_wmsp+floor_min": "ens-z{wMSP,MSP}",
 }
 
 # (glob, priority, seed_regime). Lower priority number wins on a shared cell. Base is authoritative for
@@ -89,14 +107,25 @@ def find(glob_pat):
     return list(seen.values())
 
 
+# Methods deliberately not rendered (internal references / gate artifacts), vs methods we have simply
+# never heard of. The two must not be treated the same: the first is a decision, the second is a bug.
+DROPPED_UNKNOWN = {}
+
+
 def read_long(path, valcol):
     with open(path) as fh:
         for row in csv.DictReader(fh):
             m = (row.get("method") or "").strip()
             if not m or m.startswith("VERDICT:") or m == "method":
                 continue
-            canon = ALIAS.get(m, "__skip__")
-            if canon in (None, "__skip__"):
+            if m not in ALIAS:
+                # ⚠️ LOUD, not silent. A computed method that vanishes at assembly is invisible: the CSV
+                # says it ran, the table says nothing, and nobody can tell the difference between "not
+                # measured" and "measured then dropped". This is how ptrue/lookback/linear went missing.
+                DROPPED_UNKNOWN.setdefault(m, set()).add(Path(path).name)
+                continue
+            canon = ALIAS[m]
+            if canon is None:            # explicitly suppressed (see the ALIAS None entries)
                 continue
             ev = (row.get("eval") or "").strip(); rg = (row.get("rung") or "").strip()
             v = row.get(valcol, "")
@@ -161,6 +190,12 @@ def main():
     miss_ev = [e for e in LONG_EVALS if not any((rg, e, "msp_min") in present for rg in RUNGS)]
     if miss_ev:
         lines.append(f"⚠️ evals with NO base cells yet (DoC JOB 1 pending): {', '.join(miss_ev)}")
+    if DROPPED_UNKNOWN:
+        # Surfaced in the RENDERED table, not just on stdout: a run that computed a method the assembler
+        # does not know about has silently lost it, and the table must say so where it will be read.
+        lines.append("\n⚠️ **METHODS COMPUTED BUT NOT IN ALIAS — DROPPED FROM THIS TABLE.** They ran and "
+                     "are in the source CSVs; add them to ALIAS to render them:")
+        lines += [f"   `{m}`  (in {', '.join(sorted(srcs))})" for m, srcs in sorted(DROPPED_UNKNOWN.items())]
     if conflicts:
         lines.append("\n⚠️ CROSS-CHECK CONFLICTS (same-priority sources disagree >0.02 on a shared cell):")
         lines += [f"   {c}" for c in conflicts]

@@ -18,6 +18,7 @@ attention) + supervised baselines (linear, ptrue_accurate, lookback). Judge labe
     python scripts/checks/ood_onegrid.py --seeds 1,2,3,4,5     (GPU: per-token + attention training)
 """
 import argparse
+import os  # atomic replace in _flush_rows
 import sys
 import csv as _csv
 from pathlib import Path
@@ -76,12 +77,37 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
+CSV_FIELDS = ["setting", "eval", "method", "prr_mean", "prr_std", "n_seeds"]
+
+
+def _flush_rows(out, rows, fields):
+    """Write everything accumulated SO FAR, atomically (temp + os.replace).
+
+    CALLED PER CELL, NOT ONCE AT THE END (added 2026-08-03). This driver used to hold every row in
+    memory and write the CSV only after the last cell, so a run killed at hour 15 of 16 -- walltime,
+    OOM, or a node problem -- lost EVERYTHING and left nothing on disk saying which cells had already
+    succeeded. A job was SIGTERM'd on cx3-14-9 the same day, and these ladders run 8-16 hours.
+
+    temp-then-replace so a crash mid-write cannot leave a TRUNCATED csv, which would read as a
+    short-but-valid grid. A half-written table is worse than no table: it looks complete.
+    """
+    tmp = Path(str(out) + ".partial")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    with open(tmp, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader(); w.writerows(rows)
+    os.replace(tmp, out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="1,2,3,4,5")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    # Resolved BEFORE the loop so the crash-safety flush has a target.
+    out_path = Path(args.out) if args.out else (
+        ROOT / "results" / f"ood_onegrid__{cache._slug(MODEL)}.csv")
     seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(MODEL)
@@ -159,10 +185,12 @@ def main():
                              "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                              "n_seeds": len(seeds)})
 
-    out = Path(args.out) if args.out else (ROOT / "results" / f"ood_onegrid__{cache._slug(MODEL)}.csv")
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["setting", "eval", "method", "prr_mean", "prr_std", "n_seeds"])
-        w.writeheader(); w.writerows(out_rows)
+        # CRASH SAFETY: land this cell before the next one starts.
+        _flush_rows(out_path, out_rows, CSV_FIELDS)
+        print(f"    [saved] {len(out_rows)} rows -> {out_path.name}", flush=True)
+
+    out = out_path
+    _flush_rows(out, out_rows, CSV_FIELDS)
     print(f"\nwrote {out}", flush=True)
 
 
