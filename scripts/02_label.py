@@ -60,15 +60,117 @@ def _report(records, field, label):
     print(f"{label}: {len(scores)}/{len(records)} records, mean {mean:.3f}")
 
 
+def _stamped_judges(cache_dir, key, field):
+    """The set of judge models already stamped on these records for `field`.
+
+    Records carry `<field>_model` provenance (written by judge_into). Returns a set, because more than
+    one value means the file is ALREADY mixed and that is itself a finding.
+
+    ⚠️ An ABSENT stamp is not evidence that nothing was judged — sciq/trivia were judged and then had the
+    judge label promoted into `correctness` without carrying the stamp across (see the audit note further
+    down this file). So absence is reported as unknown, never as "safe to use any judge".
+    """
+    try:
+        recs = cache.load_records(cache_dir, key)
+    except Exception:
+        return set(), 0
+    stamps = {r.get(f"{field}_model") for r in recs if r.get(f"{field}_model")}
+    n_labelled = sum(1 for r in recs if r.get(field) is not None)
+    return stamps, n_labelled
+
+
+def _resolve_judge(args, cfg, key, field):
+    """Decide which judge model to use, and REFUSE rather than silently pick a different one.
+
+    The failure this prevents (caught on DoC, 2026-08-03, before any money was spent): `--judge` used to
+    default to the pinned GPT-5, while v1 med_quad is stamped `gpt-5-mini` on all 1800 rows. Labelling a
+    regenerated arm without remembering `--judge gpt-5-mini` would have produced a £-paid label set from a
+    DIFFERENT judge and confounded the pre-registered v1-vs-v2 comparison — with nothing in the output
+    saying so. "Never mix judges within one comparison" was a rule that lived only in a person's memory,
+    and a flag you have to remember is a defect, not a safeguard.
+
+    Resolution order:
+      1. The judge already used on THESE records (resuming a partial run).
+      2. When --prompt-regime is set, the judge used on the v1 CANONICAL records for the same dataset --
+         because a regenerated arm exists to be compared against v1, so it must share v1's yardstick.
+      3. Only if nothing has ever been judged: the pinned default.
+    An explicit --judge that contradicts 1 or 2 is refused unless --allow-judge-mismatch.
+    """
+    own, own_n = _stamped_judges(cfg.cache_dir, key, field)
+
+    # The v1 counterpart matters only for a namespaced regime; for v1 itself, `own` already IS it.
+    v1, v1_n = (set(), 0)
+    if cfg.prompt_regime:
+        v1_cfg = Config(model_name=cfg.model_name, dataset=cfg.dataset,
+                        ood_setting=cfg.ood_setting, prompt_regime="")
+        v1, v1_n = _stamped_judges(v1_cfg.cache_dir, key, field)
+
+    prior = own | v1
+    if len(prior) > 1:
+        sys.exit(f"REFUSING TO LABEL: the records for {cfg.dataset} already carry MORE THAN ONE judge "
+                 f"stamp on `{field}`: {sorted(prior)}. That comparison is already mixed and adding a "
+                 "third judge cannot fix it. Inspect the cache before labelling anything.")
+
+    if prior:
+        inherited = next(iter(prior))
+        src = "these records" if own else f"the v1 records for {cfg.dataset}"
+        if args.judge and args.judge != inherited:
+            if not args.allow_judge_mismatch:
+                sys.exit(
+                    f"REFUSING TO LABEL: you asked for judge `{args.judge}`, but {src} are labelled by "
+                    f"`{inherited}` ({own_n or v1_n} rows). Two £-paid label sets from different judges "
+                    "would confound the comparison, and a probe can learn a judge's biases. Either drop "
+                    f"--judge (it will inherit `{inherited}`), or pass --allow-judge-mismatch if you "
+                    "genuinely intend a judge-vs-judge study into a separate field.")
+            print(f"⚠️  JUDGE MISMATCH ACCEPTED: labelling with `{args.judge}` while {src} carry "
+                  f"`{inherited}`. You passed --allow-judge-mismatch.", flush=True)
+            return args.judge
+        print(f"judge = `{inherited}` (inherited from {src}; not the pinned default). "
+              f"{own_n or v1_n} rows already carry this stamp.", flush=True)
+        return inherited
+
+    # Nothing stamped anywhere. For a namespaced regime that is suspicious enough to stop on: the arm
+    # exists to be compared against a v1 set, so silently inventing a yardstick is the whole bug.
+    if cfg.prompt_regime and args.judge is None:
+        # Two different situations reach here and they deserve different explanations.
+        if v1_n:
+            # A v1 counterpart EXISTS and is labelled, but carries no stamp. This is the dangerous one:
+            # there IS a yardstick to match and we cannot read what it was.
+            sys.exit(
+                f"REFUSING TO LABEL: --prompt-regime {cfg.prompt_regime} was passed, and the v1 records "
+                f"for {cfg.dataset} have {v1_n} labelled rows on `{field}` but NO `{field}_model` stamp. "
+                "Absence of a stamp is NOT evidence of no judge (sciq/trivia were judged and promoted "
+                "without carrying the stamp across). A regenerated arm must share v1's judge or the "
+                "comparison is confounded, so check what actually labelled v1 and pass --judge explicitly.")
+        sys.exit(
+            f"REFUSING TO LABEL: --prompt-regime {cfg.prompt_regime} was passed and nothing has been "
+            f"judged on `{field}` here, nor is there a v1 counterpart for {cfg.dataset} to inherit from. "
+            "If this is a REGENERATED ARM, the missing v1 set is the real problem -- find it first. If it "
+            "is simply a namespaced primary dataset (asqa/expertqa/factscore), pass --judge explicitly; "
+            "naming the judge in the command is a one-word cost and it puts the yardstick on the record.")
+
+    chosen = args.judge or llm_judge.MODEL
+    print(f"judge = `{chosen}` ({'explicit' if args.judge else 'pinned default'}; nothing judged yet "
+          f"for `{field}`).", flush=True)
+    return chosen
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
-    ap.add_argument("--judge", default=llm_judge.MODEL,
-                    help="judge model (default: pinned GPT-5; pass e.g. gpt-5-mini "
-                         "for the cheaper judge). Used for long-form labels, and for "
-                         "short-form only with --judge-short-form.")
+    ap.add_argument("--judge", default=None,
+                    help="judge model. DEFAULT IS NOT A FIXED MODEL: it is whichever judge already "
+                         "labelled this dataset (read from the `<field>_model` stamps on the existing "
+                         "records), falling back to the pinned "
+                         f"{llm_judge.MODEL} only when nothing has been judged yet. Pass explicitly to "
+                         "override; a value that contradicts the existing stamps is refused unless "
+                         "--allow-judge-mismatch. See _resolve_judge().")
+    ap.add_argument("--allow-judge-mismatch", action="store_true",
+                    help="Deliberately label with a DIFFERENT judge from the one already on these "
+                         "records. Only legitimate when building a judge-vs-judge comparison into a "
+                         "separate field. Never use it to 'get the run going'.")
     ap.add_argument("--judge-short-form", action="store_true",
                     help="ALSO run the LLM judge on a short-form dataset, into a "
                          "SEPARATE `correctness_judge` field (string-match stays the "
@@ -140,11 +242,14 @@ def main():
         if args.judge_short_form:
             # Also score with the judge into a separate field so the two labels
             # coexist for the disagreement study. Does NOT touch `correctness`.
-            judge_into(records, "correctness_judge", cfg, args.judge,
+            judge = _resolve_judge(args, cfg, key, "correctness_judge")
+            judge_into(records, "correctness_judge", cfg, judge,
                        strip_newlines=args.strip_newlines)
     else:
-        # Long-form: Joe's LLM judge is the only label.
-        judge_into(records, "correctness", cfg, args.judge,
+        # Long-form: Joe's LLM judge is the only label. The judge is RESOLVED, not defaulted --
+        # see _resolve_judge() for why a forgettable flag was the wrong safeguard.
+        judge = _resolve_judge(args, cfg, key, "correctness")
+        judge_into(records, "correctness", cfg, judge,
                    strip_newlines=args.strip_newlines)
 
     # Re-save the records in place: the labels become part of the Tier-1 record, so

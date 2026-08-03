@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_R1_taxonomy
+#PBS -j oe
+
+# R1 — is the regime taxonomy decidable from UNLABELLED data? (prereg/R1_taxonomy_label_free.md)
+#
+# CPU-only and small by nature: it reads the cached per-token logprobs for 8 datasets and computes one
+# dimensionless statistic per example. No model load, no GPU, no pertok cache. Submitted as a job rather
+# than run inline only because LOGIN NODES ARE FOR EDITING AND qsub — reading ~8 record files and
+# reducing them is not heavy, but "it's probably light enough" is exactly how a login node gets loaded.
+
+cd "$PBS_O_WORKDIR" || exit 1
+source pbs/_env.sh && luq_activate
+
+echo "R1 taxonomy on $(hostname) at $(date)"
+python -u scripts/checks/taxonomy_label_free.py
+echo "DONE $(date). Read the PRIMARY line and the P2 length-confound line together — a pass on PRIMARY"
+echo "with length separating just as well is NOT support for the mechanism (prereg §4)."

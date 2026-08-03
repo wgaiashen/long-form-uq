@@ -1,0 +1,38 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=16:mem=96gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_R2b_ent
+#PBS -j oe
+
+# R2b -- B.3 (the one-sided entropy penalty) on the two SPREAD datasets, cnn_dailymail and samsum.
+# Pre-registered at prereg/R2b_entropy_penalty_spread.md.
+#
+# ⚠️ READ THE PREREG FIRST: this run CORRECTS the approved plan's justification. The plan said SPREAD is
+# "the regime where a sharpness penalty has a mechanism". It is the opposite. The loss is
+#     L = L_task + lambda * mean( relu(tau - H_norm)^2 )
+# which penalises entropy BELOW tau, i.e. BROADENS over-sharp attention, and is exactly zero for anything
+# already broader than tau. cnn has the HIGHEST normalised entropy of all 8 datasets (0.941), so it has
+# the LEAST headroom, not the most. b3_entropy_penalty.pbs said as much in its own header.
+#
+# So the registered prediction is a NULL (|delta| <= 0.01) accompanied by a LOW frac_bound -- the null and
+# its mechanism together. READ frac_bound_before FIRST: it is what makes the null informative rather than
+# vacuous. A delta beyond +/-0.01 WITH a low frac_bound would falsify the mechanism story and is the
+# outcome actually worth having.
+#
+# Same tau/lambda grid as the tested datasets -- a different grid would make this a tuning difference.
+# CPU by design (see punct_ablation.pbs): no GPU-shaped work, and the GPU queue only buys wait time.
+
+cd "$PBS_O_WORKDIR" || exit 1
+source pbs/_env.sh && luq_activate
+
+echo "R2b entropy penalty on SPREAD, host $(hostname), $(date)"
+python -u scripts/checks/entropy_penalty_ladder.py \
+    --evals cnn_dailymail,samsum \
+    --rungs ID \
+    --taus 0.5,0.6,0.7,0.8,0.9 \
+    --lambdas 0.5,1.0,2.0 \
+    --seeds 1 \
+    --layer 15 \
+    --out results/regime_R2b_entropy_penalty_spread__meta-llama_Meta-Llama-3.1-8B.csv
+
+echo "DONE $(date). Read frac_bound_before FIRST, then delta. Prereg: prereg/R2b_entropy_penalty_spread.md"
