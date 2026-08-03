@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_pdl1
+#PBS -j oe
+# LONG ladder, ONE eval per job (all 5 of its rungs), so the grid completes in parallel.
+#
+# ⚠️ WHY SPLIT. The single sequential job could not finish: measured on 2026-08-03, one OOD cell took
+# >79 minutes, so 42 cells would need ~50h against a 24h walltime. Each eval is 5 cells, so a per-eval
+# job is ~50min of cache loading + 5 cells ≈ 4-8h. Loading is NOT reduced by --evals (the driver loads
+# the union of LONG_SRC and evals at probedriftlong.py:108, which is REQUIRED for the OOD rungs to have
+# their training sources), so each job pays the full load. That duplication is the price of parallelism.
+#
+# 40gb not 32gb: the sequential run plateaued at 25.8GB and 32gb left little headroom.
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_one_eval.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+echo "=== PDL eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --baselines ptrue,lookback --evals "$EV" \
+    --out "results/pdl_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

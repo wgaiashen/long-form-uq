@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_xl1
+#PBS -j oe
+# XL ladder, ONE eval per job. Same reasoning as pdl_one_eval.pbs: the sequential XL job's SECOND cell
+# alone ran >79 minutes, so 50 cells could not fit a 24h walltime.
+# Runs BOTH XL drivers for this eval: contribution_ladder (wMSP + poolers + floors) and ood_onegrid
+# (the verified baseline ladder: SAPLMA/linear/ptrue/lookback + poolers).
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/xl_one_eval.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+echo "=== XL contribution eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/xlcontrib_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! contribution FAILED $EV"
+echo "=== XL onegrid eval=$EV at $(date) ===" >&2
+python -u scripts/checks/ood_onegrid.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/xlonegrid_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! onegrid FAILED $EV"
+echo "=== done $(date) ===" >&2

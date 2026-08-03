@@ -59,9 +59,10 @@ ID_ANCHOR = {"sciq": {"mean-pool+MLP": 0.907, "attention": 0.932, "linear": 0.61
 GATE_TOL = 0.03
 
 
-def cells():
+def cells(evals):
+    """`evals` passed in explicitly -- this is module-level, so `args` is NOT in scope here."""
     out = []
-    for X in EVALS:
+    for X in evals:
         out.append(("ID", X, [(X, None)]))                     # full train split
         for setting in ("OOD_LEAVE_ONE_OUT", "OOD_DIFF_TASK"):
             spec = [(s, n) for s, n in get_training_spec(X, setting) if s in AVAIL and s != X]
@@ -101,6 +102,11 @@ def _flush_rows(out, rows, fields):
 
 def main():
     ap = argparse.ArgumentParser()
+    # ⚠️ DEFAULT UNCHANGED (the original 3 evals) so every existing run stays byte-identical. The XL
+    # grid needs all 10, because this is the only driver that scores the SUPERVISED BASELINES
+    # (linear/ptrue/lookback/mean-pool+MLP) -- without extending it, 7 of 10 XL evals would have no
+    # baseline rows and the "beats existing probes" comparison would be missing its comparators.
+    ap.add_argument("--evals", default=",".join(EVALS))
     ap.add_argument("--seeds", default="1,2,3,4,5")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--out", default=None)
@@ -127,7 +133,7 @@ def main():
         print(f"  loaded {d}: {len(st)} rows", flush=True)
 
     out_rows = []
-    for setting, X, spec in cells():
+    for setting, X, spec in cells([e.strip() for e in args.evals.split(',') if e.strip()]):
         per_method = {m: [] for m in POOLERS + list(BASE)}
         for sd in seeds:
             # --- one shared subsample for THIS seed, used by every method (paired) ---
