@@ -49,6 +49,10 @@ TARGET_METHODS = [
     "ens{MSP,SAPLMA}", "ens{wMSP,SAPLMA}", "ens{wMSP,MSP}",  # last is NEW (3E)
 ]
 
+# Methods seen in a source CSV that ALIAS does not know about. Collected rather than swallowed and
+# printed at the end -- see the note at the read loop.
+_UNKNOWN_METHODS = set()
+
 # raw method-column value -> canonical row (None => intentionally ignored, e.g. fair_floor == floor_min)
 ALIAS = {
     "floor_sum": "msp_sum", "floor_ppl": "perplexity", "floor_min": "msp_min", "fair_floor": None,
@@ -93,6 +97,12 @@ def scan_dir(d, presence, sources):
                 m = (row.get("method") or "").strip()
                 if m.startswith("VERDICT:") or m == "":
                     continue
+                # ⚠️ Third instance of the same mechanism found on 2026-08-03 (after assemble_pdl_table
+                # and assemble_xl_table): an unrecognised method is dropped with no message, so a
+                # computed method silently vanishes and "not measured" becomes indistinguishable from
+                # "measured then discarded". Reported at the end of this script rather than swallowed.
+                if m not in ALIAS:
+                    _UNKNOWN_METHODS.add(m)
                 canon = ALIAS.get(m, "__skip__")
                 if canon is None or canon == "__skip__":
                     continue
@@ -185,5 +195,13 @@ def main():
     print(f"\nwrote {out_csv}")
 
 
+def _report_unknown_methods():
+    """Loud, at the end. Silence here is how ptrue/lookback/linear went missing from the master table."""
+    if _UNKNOWN_METHODS:
+        print(f"\n⚠️ {len(_UNKNOWN_METHODS)} METHOD(S) COMPUTED BUT NOT IN ALIAS -- dropped from this "
+              f"audit: {', '.join(sorted(_UNKNOWN_METHODS))}")
+
+
 if __name__ == "__main__":
     main()
+    _report_unknown_methods()
