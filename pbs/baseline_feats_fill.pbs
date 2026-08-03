@@ -1,6 +1,11 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l select=1:ncpus=4:mem=96gb:ngpus=1:gpu_type=A100
 #PBS -l walltime=08:00:00
+# ⚠️ RCS FALLBACK ONLY — this work went to DoC (job 3535876 was qdel'd after sitting 7h in v1_gpu72).
+# ⚠️ A100, not L40S: cnn_dailymail's longest sequence is 2467 tokens, capped to 2048, so lookback's
+# all-layer attention tensor is 32 x 32 x 2048^2 x 4B = 17.2 GB on top of ~32 GB fp32 weights = 49.2 GB,
+# over the 48 GB L40S/A40. NOTE RCS's A100 is a 40GB card, so this may not fit here EITHER — that is
+# precisely why the job belongs on DoC's 80GB A100. Re-check before relying on this file.
 #PBS -N luq_basefeats
 #PBS -j oe
 
@@ -37,8 +42,13 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU 
 IFS=',' read -ra DS_ARR <<< "$DATASETS"
 for DS in "${DS_ARR[@]}"; do
   echo "======== $DS : 01b_ptrue --name ptrue_accurate ======== $(date)"
+  # ⚠️ --store-layers 15 IS NOT OPTIONAL (caught on DoC 2026-08-03, verified here). 01b_ptrue defaults
+  # to `all`, writing real values for all 33 layers instead of NaN-padding to layer 15. The seven
+  # existing caches are (n, 33, 4096) with ONLY layer 15 finite, 33-44MB each; without the flag these
+  # would be ~2GB for cnn alone and NON-COMPARABLE with them, and verify_baseline_features.py would fail
+  # on the finite-layer pattern.
   python -u scripts/01b_ptrue.py --dataset "$DS" --ood ID --model "$MODEL" \
-      --name ptrue_accurate || echo "!!! ptrue_accurate FAILED for $DS"
+      --name ptrue_accurate --store-layers 15 || echo "!!! ptrue_accurate FAILED for $DS"
 
   echo "======== $DS : 01c_lookback ======== $(date)"
   python -u scripts/01c_lookback.py --dataset "$DS" --ood ID --model "$MODEL" \
