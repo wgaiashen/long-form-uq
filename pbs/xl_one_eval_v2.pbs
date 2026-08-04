@@ -20,6 +20,12 @@
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
 EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+# ⭐ COHORT GATE (2026-08-04). Exits 1 in seconds if a driver disagrees with the canonical
+# cohort. Three defects shipped because a driver's dataset list was quietly too small and the
+# result was a WRONG TABLE rather than an error. Hand-checking is what failed; this is the gate.
+python -u scripts/checks/preflight_cohort.py --driver contribution_ladder,ood_onegrid || exit 1
+
 echo "=== XL v2 contribution eval=$EV on $(hostname) at $(date) ===" >&2
 python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals "$EV" \
     --out "results/xlcontrib_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! contribution FAILED $EV"
