@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=48gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_pdlrec
+#PBS -j oe
+# LONG ladder RECOVERY: re-run only the rung(s) a walltime kill left behind.
+#
+# WHY. Job 3543815 (eval=xsum) was killed at `walltime 86459 exceeded limit 86400` — 59 seconds over its
+# 24h wall — with four of five rungs done. Per-cell flushing meant the 74 completed rows were already on
+# disk, so only `1ds-Diff-long` is missing. Re-running the whole eval would repeat ~23h of good compute to
+# recover one rung.
+#
+# ⚠️ WRITES TO A SUFFIXED PATH, NEVER THE MAIN ONE. probedriftlong rebuilds its CSV from an in-memory list
+# that starts EMPTY and rewrites the whole file at every cell. Pointing a single-rung run at
+# `pdl_fam_xsum__<slug>.csv` would therefore DESTROY the four completed rungs and replace them with one.
+# The suffixed name still matches the assembler's `pdl_fam_*__<slug>.csv` glob at the same priority, and it
+# fills a cell the main run never wrote, so there is no same-priority collision to resolve.
+#
+# ⚠️ 48gb (not the 40gb the main ladder used, which peaked at 24.9GB). Cheap insurance after the onegrid
+# jobs were found finishing within 1GB of their limit — a job killed for memory costs more than the RAM.
+#
+#   qsub -v LUQ_EVAL=xsum,LUQ_RUNGS=1ds-Diff pbs/pdl_rung_recover.pbs
+#
+# LUQ_RUNGS takes the BASE rung names (ID,SameTask,DiffTask,LOO,1ds-Diff); probedriftlong maps them to the
+# -long ladder names itself.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+RG="${LUQ_RUNGS:?set LUQ_RUNGS}"
+TAG=$(echo "$RG" | tr ',' '-' | tr -cd 'A-Za-z0-9-')
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong --skip-caches || exit 1
+
+echo "=== PDL recovery eval=$EV rungs=$RG on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$EV" --rungs "$RG" \
+    --baselines ptrue,lookback \
+    --out "results/pdl_fam_${EV}_${TAG}__meta-llama_Meta-Llama-3.1-8B.csv" \
+    || echo "!!! pdl-recovery FAILED $EV/$RG"
+echo "=== done $(date) ===" >&2
