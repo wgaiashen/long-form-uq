@@ -42,7 +42,7 @@ TARGET_CELLS = len(XL_EVALS) * len(RUNGS)          # 50
 # still emitted to the CSV — only the rendered headline table is filtered. A method that vanishes from
 # the repo cannot be pointed at in a viva, and B.1/B.2/B.3 are cited negative results.
 HEADLINE = ["msp_min", "perplexity", "msp_sum",                       # unsupervised floors
-            "SAPLMA", "linear probe", "P(True)", "Lookback Lens",     # supervised baselines
+            "SAPLMA", "linear probe", "P(True)", "P(True)-unsup", "Lookback Lens",     # supervised baselines
             "armB(mean-pool)", "armA(attention)",                     # aggregation controls
             "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",           # the contribution
             "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",   # prior-surprisal poolers
@@ -59,6 +59,10 @@ ALIAS = {
     # report's central claim is measured against never reach the table.
     "linear": "linear probe",
     "ptrue": "P(True)", "ptrue_accurate": "P(True)",
+    # The UNSUPERVISED P(True) (Kadavath): reads the emitted yes/no token, not the hidden
+    # state. It is the control for our supervised P(True) probe, so the two must be DISTINCT rows --
+    # collapsing them onto one label would hide exactly the comparison they exist to make.
+    "ptrue_unsup": "P(True)-unsup",
     "lookback": "Lookback Lens",
     "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",
     "attention": "armA(attention)", "armA": "armA(attention)",

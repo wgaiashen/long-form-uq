@@ -36,7 +36,7 @@ ORDER = ["msp_sum", "perplexity", "msp_min",
          "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",
          # The supervised baselines. ⚠️ A method absent from ORDER is not rendered even when ALIAS knows
          # it, so BOTH lists have to carry a new method -- adding it to only one is a silent half-fix.
-         "SAPLMA", "linear probe", "P(True)", "Lookback Lens",
+         "SAPLMA", "linear probe", "P(True)", "P(True)-unsup", "Lookback Lens",
          "armB(mean-pool)", "armA(attention)",
          "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",
          "multi-head(MH)", "multi-head-ablation(ABL)",
@@ -59,6 +59,10 @@ ALIAS = {
     # unknown method. So the report's central claim ("our method beats existing probes") had no existing
     # probes in its table, and nothing anywhere said so. `linear` was missing for the same reason.
     "ptrue": "P(True)", "ptrue_accurate": "P(True)",
+    # The UNSUPERVISED P(True) (Kadavath): reads the emitted yes/no token, not the hidden
+    # state. It is the control for our supervised P(True) probe, so the two must be DISTINCT rows --
+    # collapsing them onto one label would hide exactly the comparison they exist to make.
+    "ptrue_unsup": "P(True)-unsup",
     "lookback": "Lookback Lens",
     "linear": "linear probe",
     "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",

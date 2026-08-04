@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=24gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_vbf
+#PBS -j oe
+# Verify the six baseline feature files synced from DoC. A JOB, not a login-node run: the verifier
+# does feats[:, 15, :] on an (n, 33, 4096) array, which decompresses to ~2GB for cnn_dailymail.
+#
+# sha256 already matched on both sides, so the BYTES are provably identical to what DoC verified.
+# This confirms the stronger property the standing rule asks for: that they LOAD and are internally
+# consistent (stored-layer pattern == sciq's reference, row counts agree with the records AND the
+# sibling SAPLMA cache, lookback values in [0,1]). Presence and a matching hash are not evidence
+# that an array parses.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+python -u scripts/checks/verify_baseline_features.py --datasets cnn_dailymail med_quad samsum
+echo "exit=$?"

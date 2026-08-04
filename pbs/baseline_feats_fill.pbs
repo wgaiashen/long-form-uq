@@ -56,5 +56,9 @@ for DS in "${DS_ARR[@]}"; do
 done
 
 echo "======== VERIFY (never trust presence alone) ======== $(date)"
-python -u scripts/checks/verify_baseline_features.py || echo "!!! verify_baseline_features reported a problem"
+# ⚠️ --datasets IS REQUIRED. Without it the script prints usage, exits non-zero, and trips the `||`,
+# so the log reads "!!! ... reported a problem" when verification NEVER RAN — indistinguishable from a
+# genuinely corrupt cache. Same bug DoC found in the sbatch twin on 2026-08-04.
+python -u scripts/checks/verify_baseline_features.py --datasets "${DATASETS//,/ }" \
+    || echo "!!! verify_baseline_features reported a problem"
 echo "DONE $(date)"

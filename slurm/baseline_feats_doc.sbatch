@@ -65,7 +65,14 @@ for DS in $DATASETS; do
 done
 
 echo "======== VERIFY — presence is not evidence ======== $(date)"
-python -u scripts/checks/verify_baseline_features.py || echo "!!! verify_baseline_features reported a problem"
+# ⚠️ --datasets IS REQUIRED (bug found on DoC 2026-08-04, fixed here). Without it the script printed
+# its usage, exited non-zero, and tripped the `||` — so the log read "!!! verify_baseline_features
+# reported a problem" when verification had NEVER RUN. That is this project's recurring failure shape:
+# an ABSENT check presenting as a PERFORMED one, and a genuinely corrupt cache would have produced a
+# byte-identical log line. The `|| echo` is what makes the two indistinguishable, so the arguments have
+# to be right for the guard to mean anything.
+python -u scripts/checks/verify_baseline_features.py --datasets cnn_dailymail med_quad samsum \
+    || echo "!!! verify_baseline_features reported a problem"
 
 echo "======== SIZES + SHA256 for the sync back ======== $(date)"
 for DS in $DATASETS; do

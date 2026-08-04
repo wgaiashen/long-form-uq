@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=96gb:ngpus=1:gpu_type=A100
+#PBS -l walltime=08:00:00
+#PBS -N luq_ptunsup
+#PBS -j oe
+# FOLLOW-UP PASS: unsupervised P(True) for the 6 datasets that lack it.
+#
+# WHAT THIS IS. The ORIGINAL P(True) (Kadavath et al.): append the verification question, read the
+# model's OWN yes/no next-token probability, renormalise. No training, no labels -- an UNSUPERVISED
+# baseline like MSP. Distinct from our P(True) PROBE (01b), which reads the hidden state at the same
+# verdict position and trains on it.
+#
+# WHY IT MATTERS BEYOND "another baseline": it is the control for our own design choice. Same prompt,
+# same slot, one reading the emitted TOKEN and one the hidden STATE. framing.md flags that distinction
+# as load-bearing, and we currently assert the state is better without showing it. The 4 datasets that
+# do have it already hint at the answer (trivia: unsup 0.19 vs floors ~0.74).
+#
+# Already present: sciq, trivia_qa, pubmed_qa, xsum. Missing: the 6 below.
+# Writes ptrue_unsup / ptrue_unsup_mass back INTO the Tier-1 records in place, and is RESUMABLE.
+#
+# ⚠️ DOES NOT TOUCH THE LADDERS. Scoring is a separate CPU step (score_ptrue_unsup.py) that emits
+# per-eval CSVs the assemblers already glob, so no ladder needs re-running.
+#
+# ⚠️ A100 for the same reason as the baseline-feature job: cnn's ~2048-token sequences.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+echo "=== unsupervised P(True) fill on $(hostname) at $(date) ==="
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU)"
+run () {  # dataset, regime
+  echo "======== $1 ${2:+(regime $2)} ======== $(date)"
+  python -u scripts/01g_ptrue_unsup.py --model "$MODEL" --dataset "$1" --ood ID \
+      ${2:+--prompt-regime "$2"} || echo "!!! ptrue_unsup FAILED for $1"
+}
+run cnn_dailymail ""
+run med_quad ""
+run samsum ""
+run asqa asqa_rp12
+run expertqa expertqa_rp12
+run factscore factscore_rp12
+echo "=== DONE $(date) — then run: python scripts/checks/score_ptrue_unsup.py ==="
