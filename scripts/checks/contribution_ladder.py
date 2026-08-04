@@ -64,8 +64,16 @@ EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # ASQA + ExpertQA included (author's decision 2026-07-22): they are ORDINARY training sources, not
 # eval-only. Leaving them out here also silently starved canonical_ladder, which uses this as its
 # --sources default. See the loading guard added there.
+# ⚠️ factscore ADDED 2026-08-04. It was the only one of the ten missing, and that had two effects:
+#   * expertqa lost its SameTask rung ENTIRELY (4 rungs, not 5). After the family split, expertqa's
+#     same-family partner is factscore ALONE — so with factscore absent the rung had no sources and
+#     cells() dropped it silently. A missing source became a missing rung with nothing said.
+#   * every LOO / DiffTask pool across ALL TEN evals was composed without factscore, so the pools were
+#     not the ones the taxonomy specifies.
+# Results produced before this date are therefore on a different training population and must not be
+# mixed with results produced after it.
 CANDIDATE_SOURCES = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum",
-                     "expertqa", "asqa"]
+                     "expertqa", "asqa", "factscore"]
 # ID anchors (judge, from the aggregation table) the ID cells must reproduce.
 ID_ANCHOR = {"sciq": {"uniform": 0.913, "attention": 0.932},
              "trivia_qa": {"uniform": 0.815, "attention": 0.844},

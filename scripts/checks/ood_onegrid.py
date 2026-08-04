@@ -35,7 +35,8 @@ from transformers import AutoTokenizer  # noqa: E402
 from luq import cache, probe, results          # noqa: E402
 from luq.config import Config                   # noqa: E402
 from luq.features import saplma as saplma_feat  # noqa: E402
-from probe_drift.ood_settings import get_training_spec  # noqa: E402
+from probe_drift.ood_settings import get_training_spec  # noqa: E402  (kept: xl_cells uses it internally)
+from xl_rungs import cells as xl_cells  # noqa: E402  the SHARED rung builder — see cells() below
 from aggregation_table import (                 # noqa: E402
     load_per_token, build_arrays, conf_meanpool, conf_lasttoken, conf_persentence,
     conf_pertoken, attn_unc)
@@ -43,7 +44,20 @@ from attn_pool import train_attn, select_temperature  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
-AVAIL = ("sciq", "trivia_qa", "pubmed_qa", "xsum")
+# ⚠️ WIDENED 2026-08-04, and this fixed TWO defects at once.
+# It used to be the 4 sets ("sciq","trivia_qa","pubmed_qa","xsum"), which are both the datasets LOADED
+# and the pool `cells()` filtered its training sources to. Consequences, both found while assembling the
+# XL master table:
+#   (1) POPULATION MISMATCH. contribution_ladder draws OOD pools from all 10 datasets; this drew from 4.
+#       So "LOO/pubmed_qa" named a DIFFERENT training pool in the two files, and merging them at equal
+#       priority was a cross-population join — the assembler's cross-check caught 8 such cells, e.g.
+#       DiffTask/pubmed_qa/armA at +0.2984 vs +0.1408.
+#   (2) The supervised baselines (linear / ptrue_accurate / lookback) come ONLY from this driver, so
+#       whatever it does not cover, the XL table cannot show. At 4 datasets x 3 rungs they were stuck at
+#       9/50 cells — and they are exactly what "our method beats existing probes" is measured against.
+# The full 10 also require the *_rp12 namespace map, which load_per_token applies via Config.
+AVAIL = ("sciq", "trivia_qa", "pubmed_qa", "med_quad", "asqa",
+         "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore")
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # supervised baselines: name -> (pooled feature_method, layer, standardize)
 BASE = {"linear": ("saplma", 15, True), "ptrue_accurate": ("ptrue_accurate", 15, True),
@@ -60,14 +74,25 @@ GATE_TOL = 0.03
 
 
 def cells(evals):
-    """`evals` passed in explicitly -- this is module-level, so `args` is NOT in scope here."""
-    out = []
-    for X in evals:
-        out.append(("ID", X, [(X, None)]))                     # full train split
-        for setting in ("OOD_LEAVE_ONE_OUT", "OOD_DIFF_TASK"):
-            spec = [(s, n) for s, n in get_training_spec(X, setting) if s in AVAIL and s != X]
-            out.append(("LOO" if "LEAVE" in setting else "DiffTask", X, spec))
-    return out
+    """Rungs for this driver, delegated to the SHARED builder.
+
+    ⚠️ REWRITTEN 2026-08-04 to call `xl_rungs.cells`, the same function contribution_ladder uses.
+    It previously built its own: ID + LOO + DiffTask only, filtered to a 4-dataset pool. Two problems,
+    both fixed by delegating rather than by adding the missing rungs here:
+
+      * 3 RUNGS, not 5 — no SameTask, no OneDatasetDiffTask. Since linear/ptrue/lookback come only from
+        this driver, the supervised baselines could never exceed 30/50 XL cells no matter how many jobs
+        ran. They were sitting at 9/50.
+      * A SECOND DEFINITION of what a rung means. Two builders drifting apart is how the same cell name
+        ended up describing two different training pools; a shared builder makes that impossible by
+        construction, which is a stronger guarantee than keeping two copies in step.
+
+    ⚠️ The ID cell is `[(X, None)]` in BOTH builders, so the ID_ANCHOR gate values below are unaffected
+    by this change — that invariance is the control that the rewrite did not move the verified numbers.
+    The LOO/DiffTask pools DO change (4-dataset -> full pool); that is the point, and it is why runs
+    write to new files rather than over the historical ood_onegrid__*.csv.
+    """
+    return xl_cells(set(AVAIL), list(evals))
 
 
 def sampled_train_idx(split, seed, cap):
