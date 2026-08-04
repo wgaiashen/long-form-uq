@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_xl2
+#PBS -j oe
+# XL ladder, ONE eval per job — RERUN on the corrected drivers (git 7f79e19).
+#
+# WHY EVERYTHING IS RERUN, not just ood_onegrid. Three defects, all the same shape (a cohort quietly
+# too small), and the last one hits BOTH drivers:
+#   1. ood_onegrid built only 3 rungs -> linear/ptrue/lookback capped at 30/50 cells (were at 9/50).
+#   2. ood_onegrid drew training sources from 4 datasets while contribution_ladder used 9 -> the SAME
+#      rung name meant different pools, and merging them was a cross-population join (8 cells flagged).
+#   3. contribution_ladder's source list was missing FACTSCORE -> expertqa lost its SameTask rung
+#      entirely (its only same-family partner after the split IS factscore), and every LOO/DiffTask
+#      pool across all ten evals was composed without it.
+# (3) means the contribution numbers are on the wrong training population too, so a consistent table
+# requires both halves regenerated.
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/xl_one_eval_v2.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+echo "=== XL v2 contribution eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/contribution_ladder.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/xlcontrib_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! contribution FAILED $EV"
+echo "=== XL v2 onegrid eval=$EV at $(date) ===" >&2
+python -u scripts/checks/ood_onegrid.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/xlonegrid_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! onegrid FAILED $EV"
+echo "=== done $(date) ===" >&2
