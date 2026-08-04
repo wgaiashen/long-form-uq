@@ -46,13 +46,54 @@ XL_RUNGS = ["ID", "SameTask", "LOO", "DiffTask", "OneDatasetDiffTask"]
 MASS_WARN = 0.60
 
 
+SIDECAR_DIR = ROOT / "results" / "sidecar_ptrue_unsup"
+
+
+def _from_sidecar(ds, n_rows, recs):
+    """Read scores from a synced sidecar CSV instead of the records.
+
+    ⚠️ THIS IS WHY THE SCORER DOES NOT NEED THE MERGE TO HAVE HAPPENED. 01g writes into the Tier-1
+    records, but merging on RCS would (a) touch the canonical files while 20 ladder jobs are reading
+    them, and (b) bump the records mtime — which 04_eval.py treats as the signature of a RELABEL and
+    uses to invalidate cached probes. Adding an unrelated field is not a relabel, so that would be a
+    false staleness signal on every cached probe. Reading the sidecar avoids both; the merge becomes a
+    deliberate later step rather than a prerequisite.
+
+    Same alignment guard as the merge path: positional keying is only valid if both sides hold the same
+    file, so the row count and the gold-target fingerprint must both match.
+    """
+    p = SIDECAR_DIR / f"ptrue_unsup__{ds}.csv"
+    if not p.exists():
+        return None
+    import csv as _c
+    import hashlib
+    rows = list(_c.reader(open(p)))
+    if not rows or rows[0][0] != "#n_rows":
+        return None
+    if int(rows[0][1]) != n_rows:
+        sys.exit(f"{ds}: sidecar claims {rows[0][1]} rows, records have {n_rows}. Refusing to align.")
+    h = hashlib.sha256()
+    for r in recs:
+        h.update(repr(r.get("target", "")).encode("utf-8", "replace"))
+    if rows[0][3] != h.hexdigest()[:16]:
+        sys.exit(f"{ds}: sidecar target fingerprint != local records. Refusing to align.")
+    out = np.full(n_rows, np.nan)
+    for r in rows[2:]:
+        out[int(r[0])] = float(r[1])
+    return out
+
+
 def score_one(ds):
     cfg = Config(model_name=MODEL, dataset=ds, ood_setting="ID", prompt_regime=REGIME.get(ds, ""))
     recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, ds, "ID"))
     field = label_of(ds)
     unc = np.array([r.get("ptrue_unsup", np.nan) for r in recs], dtype=float)
     if not np.isfinite(unc).any():
-        return None, "no ptrue_unsup on the records — run pbs/ptrue_unsup_fill.pbs first"
+        side = _from_sidecar(ds, len(recs), recs)     # not merged yet? read the sidecar directly
+        if side is not None and np.isfinite(side).any():
+            unc = side
+    if not np.isfinite(unc).any():
+        return None, "no ptrue_unsup on the records and no sidecar — run slurm/ptrue_unsup_doc.sbatch"
     y = np.array([r.get(field, np.nan) for r in recs], dtype=float)
     split = np.array([r["split"] for r in recs])
     _tr, te = eval_split(split)
