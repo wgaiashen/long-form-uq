@@ -36,7 +36,7 @@ from luq import cache, probe, results          # noqa: E402
 from luq.config import Config                   # noqa: E402
 from luq.features import saplma as saplma_feat  # noqa: E402
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (kept: xl_cells uses it internally)
-from xl_rungs import cells as xl_cells  # noqa: E402  the SHARED rung builder — see cells() below
+from xl_rungs import cells as xl_cells, build_rows  # noqa: E402  the SHARED rung + row builders
 from aggregation_table import (                 # noqa: E402
     load_per_token, build_arrays, conf_meanpool, conf_lasttoken, conf_persentence,
     conf_pertoken, attn_unc)
@@ -97,8 +97,17 @@ def cells(evals):
 
 
 def sampled_train_idx(split, seed, cap):
-    """Indices of the train split, subsampled to `cap` with `seed` (cap=None -> all)."""
+    """Indices of the train split, subsampled to `cap` with `seed` (cap=None -> all).
+
+    ⚠️ The `len(tr) == 0` fallback matches contribution_ladder's (Round-3 Task A, 2026-07-27): a source
+    that is EVAL-ONLY (asqa/expertqa/factscore are all `split=="test"`) has no rows labelled `train` and
+    would otherwise contribute ZERO rows to a pool that names it — the V-A0 silent-admission bug. Drawing
+    from all rows is safe HERE because build_rows only routes a source through this function when
+    `d != X`, so the eval target's own test rows can never enter its training pool.
+    """
     tr = np.where(split == "train")[0]
+    if len(tr) == 0:
+        tr = np.arange(len(split))
     if cap is None or cap >= len(tr):
         return tr
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
@@ -183,11 +192,23 @@ def main():
         per_method = {m: [] for m in POOLERS + list(BASE)}
         for sd in seeds:
             # --- one shared subsample for THIS seed, used by every method (paired) ---
-            train_rows = []   # (dataset, idx)
-            for d, cap in spec:
-                for i in sampled_train_idx(PT[d][1], sd, cap):
-                    train_rows.append((d, i))
-            test_rows = [(X, i) for i in np.where(PT[X][1] == "test")[0]]
+            # ⚠️ USE THE SHARED build_rows (fixed 2026-08-04). This was an INLINE DUPLICATE that read the
+            # raw split column: `np.where(PT[X][1] == "test")` for the test rows and the bare sampler for
+            # the train rows. That is correct only for the five CORE sets, which carry a real baked-in
+            # train/test split. The five XL sets are SPLIT-LESS — med_quad and samsum are all `train`,
+            # asqa/expertqa/factscore are all `test` — so the duplicate produced ZERO test rows for the
+            # first pair and ZERO train rows for the second, and every one of those five jobs died in
+            # conf_persentence on an empty concatenate.
+            #
+            # The silent version of this bug would have been worse than the crash: for a test-only set the
+            # sampler's Task-A fallback draws from ALL rows, which OVERLAPS the carved test set — training
+            # on the examples you then evaluate on. build_rows prevents that by construction (ID cells draw
+            # from X_tr, never X_te) and it is what contribution_ladder already used, which is exactly why
+            # that driver succeeded on all ten while this one failed on precisely the five.
+            #
+            # Core sets are UNCHANGED: eval_split returns the baked-in split verbatim when one exists, so
+            # sciq/trivia_qa/pubmed_qa/xsum/cnn_dailymail must reproduce their existing numbers exactly.
+            train_rows, test_rows = build_rows(X, spec, PT, sd, sampled_train_idx)
             n_tr = len(train_rows)
             tr_idx, te_idx = list(range(n_tr)), list(range(n_tr, n_tr + len(test_rows)))
             allrows = train_rows + test_rows
