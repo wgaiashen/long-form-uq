@@ -176,6 +176,19 @@ def main():
         st, split, y, _, records = loaded
         if not np.isfinite(y).any():
             raise SystemExit(f"{d}: label field '{lab}' is entirely NaN in the records. Wrong field?")
+        # ⚠️ DROP UNLABELLED ROWS (added 2026-08-04). ExpertQA's factuality label is None on 292 of 2016
+        # rows and factscore's on 45 of 500. Keeping them puts NaN in the probe's TRAINING TARGET, and a
+        # probe fitted on NaN emits NaN for every example — so the whole cell came back NaN and both jobs
+        # died. contribution_ladder and probedriftlong have always filtered here; this driver never did,
+        # which is the fourth thing today that was missing from the one driver that kept its own copy.
+        # The filter must be applied to POOLED too: those arrays are indexed POSITIONALLY against the same
+        # record list, so filtering one and not the other would silently mis-pair features with labels —
+        # a well-formed, entirely wrong number rather than a crash.
+        keep = np.where(np.isfinite(y))[0]
+        n_drop = len(y) - len(keep)
+        if n_drop:
+            st = [st[k] for k in keep]; records = [records[k] for k in keep]
+            split = split[keep]; y = y[keep]
         PT[d] = (st, split, y, records)
         cd_d = Config(model_name=MODEL, dataset=d, ood_setting="ID",
                       prompt_regime=PROMPT_REGIME.get(d, "")).cache_dir
@@ -183,9 +196,15 @@ def main():
         POOLED[d] = {}
         for bm, (fm, layer, _std) in BASE.items():
             arr = cache.load_features(cd_d, key, fm)
-            POOLED[d][bm] = np.ascontiguousarray(arr[:, layer, :]); del arr
-        print(f"  loaded {d}: {len(st)} rows (label={lab}, "
-              f"{int(np.isfinite(y).sum())} labelled)", flush=True)
+            if arr.shape[0] != len(keep) + n_drop:
+                raise SystemExit(f"{d}/{fm}: feature cache has {arr.shape[0]} rows but the records have "
+                                 f"{len(keep) + n_drop}. Positional pairing is unsafe — refusing to guess.")
+            # SAME `keep` as PT above, applied BEFORE the layer slice, so feature row i and label i are
+            # the same example in both structures.
+            POOLED[d][bm] = np.ascontiguousarray(arr[keep, layer, :]); del arr
+        print(f"  loaded {d}: {len(st)} rows (label={lab}"
+              + (f", {n_drop} unlabelled DROPPED of {len(keep) + n_drop}" if n_drop else "") + ")",
+              flush=True)
 
     out_rows = []
     for setting, X, spec in cells([e.strip() for e in args.evals.split(',') if e.strip()]):
