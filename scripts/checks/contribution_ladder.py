@@ -195,7 +195,13 @@ def main():
         test_rows = [(X, int(i)) for i in X_te]
         if not test_rows:
             continue
-        xlbl = different_label_projection(X)                 # ExpertQA OOD rungs are cross-label (correctness->faithfulness)
+        # ⚠️ PER-RUNG, not per-eval (fixed 2026-08-04). This used to be `different_label_projection(X)`,
+        # which asks only "is the TARGET scored on a different projection?" and so flagged EVERY non-ID
+        # expertqa rung as cross-label. That became wrong the moment factscore joined the cohort: expertqa's
+        # SameTask rung now trains on factscore, which carries the SAME `factuality` projection, so that
+        # rung is same-label and the caveat would have wrongly discounted it. The honest question is
+        # whether any ACTUAL TRAINING SOURCE differs from the target.
+        xlbl = any(label_of(d) != label_of(X) for d, _c in spec)
         per_method = {m: [] for m in methods}
         unc_acc = {m: [] for m in methods}   # per-seed per-example uncertainty vectors (for the bootstrap)
         yte_ref = None                        # test labels (identical across seeds; the bootstrap target)
@@ -302,7 +308,8 @@ def main():
             print(f"    primary_floor = {bar} ({stats[bar][0]:+.3f}){note}", flush=True)
             out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{bar}",
                              "prr_mean": round(stats[bar][0], 4),
-                             "prr_std": round(stats[bar][1], 4), "n_seeds": len(seeds)})
+                             "prr_std": round(stats[bar][1], 4), "n_seeds": len(seeds),
+                             "different_label_projection": xlbl})   # was OMITTED -> blank in every old CSV
         for vk, a, b in COMPARISONS:
             if a in avg_unc and b in avg_unc and yte_ref is not None:
                 mg, lo, hi, p, sig = paired_bootstrap(yte_ref, avg_unc[a], avg_unc[b])
@@ -310,7 +317,8 @@ def main():
                       f"p={p:.3f} -> {'SIG' if sig else 'ns'}", flush=True)
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
-                                 "boot_p": round(p, 4), "significant": sig, "n_seeds": len(seeds)})
+                                 "boot_p": round(p, 4), "significant": sig, "n_seeds": len(seeds),
+                                 "different_label_projection": xlbl})   # was OMITTED -> blank in every old CSV
         # CRASH SAFETY: land this cell before starting the next. An interruption should cost the
         # current cell, never the whole run.
         _flush_rows(out_path, out_rows, CSV_FIELDS)

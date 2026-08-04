@@ -36,7 +36,7 @@ ORDER = ["msp_sum", "perplexity", "msp_min",
          "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",
          # The supervised baselines. ⚠️ A method absent from ORDER is not rendered even when ALIAS knows
          # it, so BOTH lists have to carry a new method -- adding it to only one is a silent half-fix.
-         "SAPLMA", "linear probe", "P(True)", "P(True)-unsup", "Lookback Lens",
+         "SAPLMA", "P(True)", "P(True)-unsup", "Lookback Lens",
          "armB(mean-pool)", "armA(attention)",
          "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",
          "multi-head(MH)", "multi-head-ablation(ABL)",
@@ -64,7 +64,13 @@ ALIAS = {
     # collapsing them onto one label would hide exactly the comparison they exist to make.
     "ptrue_unsup": "P(True)-unsup",
     "lookback": "Lookback Lens",
-    "linear": "linear probe",
+    # SUPPRESSED 2026-08-04 (author's decision): the `linear` logistic probe is not a baseline the
+    # report uses. It is still COMPUTED (a logistic regression on pooled vectors already in memory,
+    # seconds per cell) and its rows stay in the CSVs; None routes it through the EXISTING explicit-
+    # suppression path, so it is dropped on purpose rather than falling out as an unknown method.
+    # ⚠️ This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
+    # to "SAPLMA" below and above. `linear` is the author's own linear probe on the same features.
+    "linear": None,
     "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",
     "attention": "armA(attention)", "armA": "armA(attention)",
     "armC_content_mass": "armC:content-mass", "armC_nll": "armC:NLL",

@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_og
+#PBS -j oe
+# ood_onegrid ONLY, one eval per job.
+#
+# WHY THIS EXISTS. In pbs/xl_one_eval_v2.pbs the onegrid half runs AFTER contribution_ladder in the same
+# job. On 2026-08-04 that half crashed in all six finished jobs, ~4h in, with FileNotFoundError on
+# `cache/features/..._asqa__ID__saplma.npz`: ood_onegrid resolved its cache dir ONCE off dataset="sciq"
+# and reused it for all ten, but asqa/expertqa/factscore keep their caches in a prompt-regime namespace
+# (`cache/asqa_rp12/features/`). Widening AVAIL from 4 to 10 exposed it. Same failure family as the three
+# cohort defects: a value that was correct for the original four core sets and silently wrong afterwards.
+#
+# The contribution half of those six jobs COMPLETED and is already on disk (55 rows each), so re-running
+# the whole job would redo ~4h of good compute per eval. This runs the failed half alone.
+#
+#   qsub -v LUQ_EVAL=sciq pbs/onegrid_one_eval.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+# COHORT GATE + (new) CACHE-RESOLUTION GATE. The cache check is what would have caught the crash above at
+# submit time in seconds instead of four hours in, so it runs before any compute here.
+python -u scripts/checks/preflight_cohort.py --driver ood_onegrid || exit 1
+
+echo "=== onegrid eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/ood_onegrid.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/xlonegrid_fam_${EV}__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! onegrid FAILED $EV"
+echo "=== done $(date) ===" >&2

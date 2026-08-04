@@ -42,7 +42,7 @@ TARGET_CELLS = len(XL_EVALS) * len(RUNGS)          # 50
 # still emitted to the CSV — only the rendered headline table is filtered. A method that vanishes from
 # the repo cannot be pointed at in a viva, and B.1/B.2/B.3 are cited negative results.
 HEADLINE = ["msp_min", "perplexity", "msp_sum",                       # unsupervised floors
-            "SAPLMA", "linear probe", "P(True)", "P(True)-unsup", "Lookback Lens",     # supervised baselines
+            "SAPLMA", "P(True)", "P(True)-unsup", "Lookback Lens",     # supervised baselines
             "armB(mean-pool)", "armA(attention)",                     # aggregation controls
             "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",           # the contribution
             "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",   # prior-surprisal poolers
@@ -57,7 +57,13 @@ ALIAS = {
     "saplma": "SAPLMA", "mean-pool+MLP": "SAPLMA",
     # ⭐ THE THREE THE LONG ASSEMBLER DROPS ON THE FLOOR. Without these the supervised baselines the
     # report's central claim is measured against never reach the table.
-    "linear": "linear probe",
+    # SUPPRESSED 2026-08-04 (author's decision): the `linear` logistic probe is not a baseline the
+    # report uses. It is still COMPUTED (a logistic regression on pooled vectors already in memory,
+    # seconds per cell) and its rows stay in the CSVs; None routes it through the EXISTING explicit-
+    # suppression path, so it is dropped on purpose rather than falling out as an unknown method.
+    # ⚠️ This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
+    # to "SAPLMA" below and above. `linear` is the author's own linear probe on the same features.
+    "linear": None,
     "ptrue": "P(True)", "ptrue_accurate": "P(True)",
     # The UNSUPERVISED P(True) (Kadavath): reads the emitted yes/no token, not the hidden
     # state. It is the control for our supervised P(True) probe, so the two must be DISTINCT rows --

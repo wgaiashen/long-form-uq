@@ -1,0 +1,35 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_pdlbf
+#PBS -j oe
+# LONG ladder, ptrue + lookback ONLY — the baselines the main run could not compute.
+#
+# WHY. The eight long jobs launched Mon 3 Aug 21:42. The pooled ptrue_accurate/lookback feature caches for
+# cnn_dailymail, med_quad and samsum were built on DoC and did not land on RCS until Tue 4 Aug 09:35
+# (confirmed by ctime — `rsync -a` preserves mtime, so mtime says 19:48-03:38 and is misleading here).
+# So for ~12h of those runs the files genuinely were not there. The driver behaved correctly: it reported
+# each absence LOUDLY and left the cell BLANK rather than substituting a number. Result: ptrue and lookback
+# sit at 11/42 while every other method is at 40/42. Nothing is wrong with the numbers that exist; the
+# cells were simply uncomputable at the time.
+#
+# The caches are present now, so this re-runs ONLY those two methods. --skip-poolers --skip-wmsp drops the
+# two training bottlenecks, so this is a cheap pass, not a repeat of the 12-15h ladder.
+#
+# ⚠️ SEPARATE OUT PATH. probedriftlong rewrites its whole CSV from an in-memory list that starts empty, so
+# writing to the main pdl_fam_<eval> path would DESTROY the 40 completed cells. The `_base` suffix still
+# matches the assembler's `pdl_fam_*__<slug>.csv` glob at the same priority, and it only fills cells the
+# main run left blank, so there is no same-priority collision to resolve.
+#
+#   qsub -v LUQ_EVAL=cnn_dailymail pbs/pdl_baselines_fill.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong --skip-caches || exit 1
+
+echo "=== PDL baselines-only eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$EV" \
+    --baselines ptrue,lookback --skip-poolers --skip-wmsp \
+    --out "results/pdl_fam_${EV}_base__meta-llama_Meta-Llama-3.1-8B.csv" || echo "!!! pdl-baselines FAILED $EV"
+echo "=== done $(date) ===" >&2

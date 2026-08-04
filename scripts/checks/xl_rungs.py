@@ -46,7 +46,11 @@ FINE = {"sciq": "short_qa", "trivia_qa": "short_qa", "pubmed_qa": "long_qa", "me
 BROAD = {"short_qa": "qa", "long_qa": "qa", "summ": "summ", "factuality": "factuality"}
 
 KEYSTONES = {"sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"}   # -> get_training_spec (faithful)
-XL_EVALS = {"med_quad", "samsum", "expertqa", "asqa"}                    # -> rung_sources (taxonomy)
+# DERIVED, not re-typed (2026-08-04). It used to be the literal {med_quad, samsum, expertqa, asqa},
+# which omitted factscore — harmless only because the branch below tests `in KEYSTONES` and takes the
+# else. A constant that claims to be "the non-keystones" and isn't is a trap waiting for the first
+# `x in XL_EVALS`, and that is precisely the shape of the three defects this file was just fixed for.
+XL_EVALS = set(ALL) - KEYSTONES                                          # -> rung_sources (taxonomy)
 # TRAINING SOURCE POOL = every dataset (author's decision 2026-07-22): ASQA and ExpertQA are treated the
 # SAME as the rest, not eval-only. Consequence to keep visible: ExpertQA carries a FAITHFULNESS label while
 # the others carry correctness, so pools that include it are MIXED-LABEL. That is deliberate -- what used to

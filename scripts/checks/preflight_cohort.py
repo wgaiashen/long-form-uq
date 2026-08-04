@@ -81,9 +81,41 @@ def check_families():
     return fails
 
 
+def check_caches(datasets):
+    """Every cache file the run will open must EXIST, checked per dataset under its own prompt regime.
+
+    ADDED 2026-08-04, after the widened `ood_onegrid` crashed all six rerun jobs four hours in. It
+    resolved the cache dir ONCE off dataset="sciq" and reused it for all ten, so asqa/expertqa/factscore
+    -- whose caches live in a regime namespace (`cache/asqa_rp12/`) -- were looked up in the wrong
+    directory. Same family as the cohort defects: a value that was right for the original four core sets
+    and silently wrong once the cohort widened.
+
+    This only STATS the files (no loading), so it is safe on a login node and costs seconds.
+    """
+    from luq import cache as _cache
+    from luq.config import Config
+    from attn_pool import PROMPT_REGIME
+    MODEL = "meta-llama/Meta-Llama-3.1-8B"
+    NEEDED = ["saplma", "ptrue_accurate", "lookback"]
+    fails = []
+    for d in datasets:
+        cd = Config(model_name=MODEL, dataset=d, ood_setting="ID",
+                    prompt_regime=PROMPT_REGIME.get(d, "")).cache_dir
+        want = [cd / "pertok" / f"{_cache._slug(MODEL)}__{d}__ID__L15.npz"]
+        want += [cd / "features" / f"{_cache._slug(MODEL)}__{d}__ID__{fm}.npz" for fm in NEEDED]
+        miss = [p.name for p in want if not p.exists()]
+        if miss:
+            fails.append(f"{d}: {len(miss)} cache file(s) absent under {cd} -> {miss}")
+    if not fails:
+        print(f"  ✅ caches resolve for all {len(datasets)} datasets (pertok L15 + {len(NEEDED)} pooled)")
+    return fails
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--driver", required=True, help="comma-separated driver module names")
+    ap.add_argument("--skip-caches", action="store_true",
+                    help="skip the cache-existence check (for drivers that read neither cache)")
     args = ap.parse_args()
     names = [d.strip() for d in args.driver.split(",") if d.strip()]
     unknown = [d for d in names if d not in EXPECT]
@@ -95,6 +127,13 @@ def main():
     for n in names:
         fails += check_driver(n)
     fails += check_families()
+    if not args.skip_caches:
+        # Check the cohort each named driver actually reads, not a fixed list.
+        need = set()
+        for n in names:
+            for attr, want, _ in EXPECT[n]:
+                need |= want
+        fails += check_caches(sorted(need))
     if fails:
         print("\n❌ PREFLIGHT FAILED — refusing to start the job:")
         for f in fails:

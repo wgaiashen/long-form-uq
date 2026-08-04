@@ -40,10 +40,11 @@ from xl_rungs import cells as xl_cells  # noqa: E402  the SHARED rung builder �
 from aggregation_table import (                 # noqa: E402
     load_per_token, build_arrays, conf_meanpool, conf_lasttoken, conf_persentence,
     conf_pertoken, attn_unc)
-from attn_pool import train_attn, select_temperature  # noqa: E402
+from attn_pool import train_attn, select_temperature, PROMPT_REGIME  # noqa: E402
+from cohort import LABEL_FIELD  # noqa: E402  per-dataset label field, ONE definition
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
-LAB = "correctness"
+LAB = "correctness"  # legacy default; per-dataset reads go through cohort.LABEL_FIELD
 # ⚠️ WIDENED 2026-08-04, and this fixed TWO defects at once.
 # It used to be the 4 sets ("sciq","trivia_qa","pubmed_qa","xsum"), which are both the datasets LOADED
 # and the pool `cells()` filtered its training sources to. Consequences, both found while assembling the
@@ -142,20 +143,40 @@ def main():
     seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(MODEL)
-    cd = Config(model_name=MODEL, dataset="sciq", ood_setting="ID").cache_dir
     print(f"device {device} | seeds {seeds} | PINNED pools | paired | one harness", flush=True)
 
     # per-token states (poolers) + pooled vectors (baselines), per dataset, positionally aligned.
+    #
+    # ⚠️ TWO PER-DATASET FACTS, BOTH OF WHICH USED TO BE ONE GLOBAL CONSTANT (fixed 2026-08-04, same
+    # failure family as AVAIL itself — a value that was correct for the original four core sets and
+    # silently wrong once the cohort widened to ten):
+    #   * CACHE DIR. It was resolved ONCE off dataset="sciq" and reused for every dataset, so the
+    #     pooled-feature load looked in `cache/features/` for asqa/expertqa/factscore, whose caches
+    #     live in their prompt-regime namespace (`cache/asqa_rp12/features/`). That is what crashed
+    #     all six of the first rerun jobs. Resolve it PER DATASET, exactly as load_per_token does.
+    #   * LABEL FIELD. expertqa/factscore carry `factuality`, not `correctness`. Reading the global
+    #     LAB would have handed the probe an all-NaN target — a silent wrong number rather than a
+    #     crash, which is worse. cohort.LABEL_FIELD is the single definition.
     PT, POOLED = {}, {}
     for d in AVAIL:
-        st, split, y, _, records = load_per_token(MODEL, d, args.layer, LAB)
+        lab = LABEL_FIELD[d]
+        loaded = load_per_token(MODEL, d, args.layer, lab)
+        if loaded is None:
+            raise SystemExit(f"{d}: no per-token cache at layer {args.layer}. Refusing to skip the "
+                             f"dataset silently — a missing source changes every OOD pool.")
+        st, split, y, _, records = loaded
+        if not np.isfinite(y).any():
+            raise SystemExit(f"{d}: label field '{lab}' is entirely NaN in the records. Wrong field?")
         PT[d] = (st, split, y, records)
+        cd_d = Config(model_name=MODEL, dataset=d, ood_setting="ID",
+                      prompt_regime=PROMPT_REGIME.get(d, "")).cache_dir
         key = cache.run_key(MODEL, d, "ID")
         POOLED[d] = {}
         for bm, (fm, layer, _std) in BASE.items():
-            arr = cache.load_features(cd, key, fm)
+            arr = cache.load_features(cd_d, key, fm)
             POOLED[d][bm] = np.ascontiguousarray(arr[:, layer, :]); del arr
-        print(f"  loaded {d}: {len(st)} rows", flush=True)
+        print(f"  loaded {d}: {len(st)} rows (label={lab}, "
+              f"{int(np.isfinite(y).sum())} labelled)", flush=True)
 
     out_rows = []
     for setting, X, spec in cells([e.strip() for e in args.evals.split(',') if e.strip()]):
@@ -202,15 +223,24 @@ def main():
             mu, sd_ = stats[m]
             print(f"    {m:16s} {mu:+.3f} ± {sd_:.3f}", flush=True)
         if setting == "ID":
-            # HARD gate on the poolers (cross-dataset wiring check); WARN on baselines.
-            for m in ("mean-pool+MLP", "attention"):
-                d = abs(stats[m][0] - ID_ANCHOR[X][m])
-                assert d < GATE_TOL, f"ID-GATE FAIL {X}/{m}: {stats[m][0]:.3f} vs anchor {ID_ANCHOR[X][m]} (|d|={d:.3f})"
-            for m in BASE:
-                d = abs(stats[m][0] - ID_ANCHOR[X][m])
-                if d >= GATE_TOL:
-                    print(f"    [ID-WARN] {m}: {stats[m][0]:.3f} vs anchor {ID_ANCHOR[X][m]} (|d|={d:.3f})", flush=True)
-            print(f"    [ID-GATE OK] poolers reproduce anchors within {GATE_TOL}", flush=True)
+            # Anchors were recorded for the ORIGINAL three evals only. The other seven have no
+            # independently-established ID value to check against, so they are honestly reported as
+            # UNGATED rather than being silently treated as passing (2026-08-04). A bare
+            # `ID_ANCHOR[X][m]` would have KeyError'd on all seven — same story as the cache dir: a
+            # structure sized for three evals meeting a ten-eval cohort.
+            anch = ID_ANCHOR.get(X)
+            if anch is None:
+                print(f"    [ID-UNGATED] no recorded anchor for {X} — cell NOT wiring-checked", flush=True)
+            else:
+                # HARD gate on the poolers (cross-dataset wiring check); WARN on baselines.
+                for m in ("mean-pool+MLP", "attention"):
+                    d = abs(stats[m][0] - anch[m])
+                    assert d < GATE_TOL, f"ID-GATE FAIL {X}/{m}: {stats[m][0]:.3f} vs anchor {anch[m]} (|d|={d:.3f})"
+                for m in BASE:
+                    d = abs(stats[m][0] - anch[m])
+                    if d >= GATE_TOL:
+                        print(f"    [ID-WARN] {m}: {stats[m][0]:.3f} vs anchor {anch[m]} (|d|={d:.3f})", flush=True)
+                print(f"    [ID-GATE OK] poolers reproduce anchors within {GATE_TOL}", flush=True)
         for m in POOLERS + list(BASE):
             out_rows.append({"setting": setting, "eval": X, "method": m,
                              "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),

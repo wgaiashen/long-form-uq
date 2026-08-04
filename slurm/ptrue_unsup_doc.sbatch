@@ -13,8 +13,14 @@
 # reads the hidden state at the very same slot. framing.md calls that distinction load-bearing and we
 # have never shown it.
 #
-#   sbatch --export=ALL,DS=cnn_dailymail slurm/ptrue_unsup_doc.sbatch
-#   sbatch --export=ALL,DS=asqa,REG=asqa_rp12 slurm/ptrue_unsup_doc.sbatch
+#   DS=cnn_dailymail sbatch slurm/ptrue_unsup_doc.sbatch
+#   DS=asqa REG=asqa_rp12 sbatch slurm/ptrue_unsup_doc.sbatch
+#
+# ⚠️ USE THE CALLER-ENV FORM ABOVE, NOT `--export=ALL,DS=...` (corrected 2026-08-04 after running all
+# six on DoC). On this cluster the `--export=ALL,VAR=` form gets jobs HELD with "user env retrieval
+# failed" — the same failure we hit with LUQ_SMOKE. The comment previously documented that form, so
+# anyone following it got six held jobs and no error explaining why. Setting the variable in the
+# caller's environment and letting sbatch inherit it works and was what actually ran.
 #
 # ⚠️ ONE DATASET PER JOB, deliberately. The baseline-feature job (269813) finished with 25 SECONDS of
 # its 8h wall left because it did six datasets in one go. 01g IS resumable (it skips records already
