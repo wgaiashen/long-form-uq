@@ -147,8 +147,19 @@ def main():
     present_cells = {(rg, ev) for (rg, ev, _m) in best}
     missing = [(rg, ev) for ev in XL_EVALS for rg in RUNGS if (rg, ev) not in present_cells]
     methods = sorted({m for (_r, _e, m) in best})
-    print(f"XL master | {len(present_cells)}/{TARGET_CELLS} cells present "
-          f"({len(XL_EVALS)} evals x {len(RUNGS)} rungs), {len(methods)} methods")
+    # ⚠️ PER-METHOD, NOT "cells present" (fixed 2026-08-05). `len(present_cells)` counts a cell as
+    # covered if ANY ONE method landed in it, so it read 50/50 while six of seventeen methods had no
+    # data at all. That exact number was reported as "the XL grid is complete" on 2026-08-04 and was
+    # wrong. A grid is complete when EVERY method covers EVERY cell; anything else must be per method.
+    print(f"XL master | cells with >=1 method: {len(present_cells)}/{TARGET_CELLS} "
+          f"({len(XL_EVALS)} evals x {len(RUNGS)} rungs)  <- NOT a completeness claim")
+    print(f"XL master | PER-METHOD coverage over {TARGET_CELLS} cells:")
+    _full = 0
+    for _m in methods:
+        _have = sum(1 for ev in XL_EVALS for rg in RUNGS if (rg, ev, _m) in best)
+        _full += _have == TARGET_CELLS
+        print(f"     {'OK ' if _have == TARGET_CELLS else '.. '}{_m:26s} {_have:3d}/{TARGET_CELLS}")
+    print(f"XL master | {_full}/{len(methods)} methods cover the full grid")
     if missing:
         print(f"⚠️ {len(missing)} CELLS MISSING — named, not summarised:")
         for rg, ev in missing:
