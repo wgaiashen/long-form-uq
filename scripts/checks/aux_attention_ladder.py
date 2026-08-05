@@ -24,7 +24,36 @@ UNIFORM IMPROVEMENT EVERYWHERE IS SUSPICIOUS and should be treated as a bug unti
     python scripts/checks/aux_attention_ladder.py --targets nll,content_mass --seeds 1,2,3
 """
 import argparse
+import os
 import csv as _csv
+
+
+# Column order is FIXED here rather than taken from `rows[0]`. Deriving it from the first row meant the
+# header depended on whichever cell happened to finish first, and crashed outright on an empty run.
+_FIELDS = ["rung", "eval", "seed", "target", "K", "J_supervised", "head_attn_corr", "best_lambda",
+           "drop_epoch", "prr_baseline", "prr_real", "prr_shuffled", "real_minus_shuffled",
+           "real_minus_baseline", "n_target_fallback", "n_test"]
+
+
+def _out_path(args):
+    from pathlib import Path as _P
+    return _P(args.out) if args.out else ROOT / "results" / f"aux_attention{regime_tag()}__{SLUG}.csv"
+
+
+def _flush_rows(out, rows):
+    """Atomic per-cell write (temp + os.replace).
+
+    ⚠️ This driver ALSO wrote only at the very end until 2026-08-05. On that date nine 8-hour top-k jobs
+    were killed at the walltime having written nothing, because `fixed_prior_ladder` had the same defect.
+    All four ladder drivers were supposedly fixed on 3 August; this one and fixed_prior_ladder were both
+    missed. Checked and fixed here BEFORE the auxiliary-loss re-run rather than after losing another run.
+    """
+    tmp = str(out) + ".partial"
+    with open(tmp, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+    os.replace(tmp, out)
 import sys
 from pathlib import Path
 
@@ -184,11 +213,14 @@ def main():
                           f"λ={best_lam:.2f}  {ctxt}base {base:+.3f} real {real:+.3f} shuf {shuf:+.3f}  |  "
                           f"real-shuf {real-shuf:+.3f}", flush=True)
 
+        # PER-CELL FLUSH -- see _flush_rows. A walltime kill now costs the cell in progress, not the run.
+        if rows:
+            _flush_rows(_out_path(args), rows)
+            print(f"    [saved] {len(rows)} rows -> {_out_path(args).name}", flush=True)
+
     if not rows:
         raise SystemExit("no cells produced -- nothing to report")
-    out = Path(args.out) if args.out else ROOT / "results" / f"aux_attention{regime_tag()}__{SLUG}.csv"
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+    _flush_rows(_out_path(args), rows)
 
     print("\n=== SUMMARY (the decisive column is real_minus_shuffled) ===")
     for tname in targets:
