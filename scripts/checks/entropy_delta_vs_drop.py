@@ -291,7 +291,8 @@ def main():
             p_i, ns_i = prr[(d, "ID")]
             p_o, ns_o = prr[(d, rung)]
             de, dr = ne_o - ne_i, p_o - p_i
-            cells.append((d, de, dr, raw_o - raw_i, len_o))
+            cells.append({"ds": d, "rung": rung, "de": de, "dr": dr,
+                          "de_raw": raw_o - raw_i, "len": len_o})
             rows.append({"dataset": d, "rung": rung, "d_entropy": f"{de:.4f}",
                          "d_entropy_raw": f"{raw_o - raw_i:.4f}", "d_PRR": f"{dr:.4f}",
                          "ne_ID": f"{ne_i:.4f}", "ne_OOD": f"{ne_o:.4f}",
@@ -319,13 +320,13 @@ def main():
         write_csv(args.out, rows, stamps)
         return
 
-    de = [c[1] for c in cells]
-    dr = [c[2] for c in cells]
-    de_raw = [c[3] for c in cells]
-    lens = [c[4] for c in cells]
+    de = [c["de"] for c in cells]
+    dr = [c["dr"] for c in cells]
+    de_raw = [c["de_raw"] for c in cells]
+    lens = [c["len"] for c in cells]
 
     percell = corrs(de, dr)
-    (ax, ay), (wx, wy) = within_across([(c[0], c[1], c[2]) for c in cells])
+    (ax, ay), (wx, wy) = within_across([(c["ds"], c["de"], c["dr"]) for c in cells])
     across = corrs(ax, ay)
     within = corrs(wx, wy)
     raw_c = corrs(de_raw, dr)
@@ -350,11 +351,13 @@ def main():
     line("mean length vs d_PRR", len_c, "<- length as a competing explanation")
     line("mean length vs d_entropy", len_e)
 
+    breakdown(cells)
+
     # ---- the n=4 subset the prereg says must reproduce ----
     byd = {}
     for c in cells:
-        if c[0] in ("pubmed_qa", "xsum", "expertqa", "cnn_dailymail"):
-            byd.setdefault(c[0], []).append((c[1], c[2]))
+        if c["ds"] in ("pubmed_qa", "xsum", "expertqa", "cnn_dailymail"):
+            byd.setdefault(c["ds"], []).append((c["de"], c["dr"]))
     if byd:
         print("\n  ---- n=4 SUBSET CHECK (prereg tabled these from the E1 dump; they must reproduce) ----")
         print(f"  {'dataset':16s}{'d_entropy (mean over rungs)':>30s}{'d_PRR (mean)':>16s}")
@@ -387,6 +390,112 @@ def main():
 
     write_csv(args.out, rows, stamps)
     make_plot(args.plot, cells, percell, across)
+
+
+def breakdown(cells, n_perm=20000, seed=0):
+    """Is there a correlation in SOME slice, even if not in general? Split the 32 cells two ways.
+
+    BY RUNG (4 groups of 8 datasets): "within one severity of shift, do the datasets that flatten most
+    drop most?" This is the SWITCH-RELEVANT question -- a per-dataset switch fires within a rung, ranking
+    datasets against each other, so a per-rung rank correlation is what a router could actually exploit.
+
+    BY DATASET (8 groups of 4 rungs): "within one dataset, does the rung that flattens it most hurt it
+    most?" A correlation here CANNOT drive a switch (the switch chooses between datasets, not rungs) but
+    it would still be a real mechanism finding: flattening would track damage once dataset identity is
+    held fixed.
+
+    ⚠️ THE CONTROL IS THE POINT, not an afterthought. Twelve subgroup tests on 32 points will throw up a
+    strong-looking one by chance -- and the groups are tiny (n=8 and n=4; with n=4 there are only 4!=24
+    orderings, so |rho|=1.0 carries one-sided p=1/24=0.042 and is the WEAKEST possible "significant"
+    result). So we report the null distribution of the BEST-LOOKING subgroup: permute d_PRR across all 32
+    cells, recompute all twelve, take max|rho|, repeat. A GLOBAL permutation is used rather than a
+    within-group one because each cell belongs to one rung group AND one dataset group, so the twelve
+    tests are dependent and the null has to respect that. Observed max|rho| is read against that
+    distribution, not against 0.05.
+    """
+    from scipy import stats
+
+    def rho(pts):
+        if len(pts) < 3:
+            return None
+        x = [p[0] for p in pts]
+        y = [p[1] for p in pts]
+        if np.std(x) == 0 or np.std(y) == 0:
+            return None
+        return float(stats.spearmanr(x, y)[0])
+
+    groups = {}                                    # name -> [(d_entropy, d_PRR)]
+    for r in OOD_RUNGS:
+        pts = [(c["de"], c["dr"]) for c in cells if c["rung"] == r]
+        if pts:
+            groups[f"rung:{r}"] = pts
+    for d in sorted({c["ds"] for c in cells}):
+        pts = [(c["de"], c["dr"]) for c in cells if c["ds"] == d]
+        if pts:
+            groups[f"data:{d}"] = pts
+
+    print("\n  ================ BREAKDOWN — is there a correlation in SOME slice? ================")
+    print("  Registered sign is still NEGATIVE. Spearman (rank) is the switch-relevant statistic.\n")
+    print(f"  {'slice':28s}{'n':>4s}{'Spearman':>11s}{'Pearson':>10s}   interpretation")
+    obs = {}
+    for name, pts in groups.items():
+        s = rho(pts)
+        obs[name] = s
+        if s is None:
+            print(f"  {name:28s}{len(pts):>4d}{'--':>11s}{'--':>10s}   n<3, not computed")
+            continue
+        x = np.array([p[0] for p in pts]); y = np.array([p[1] for p in pts])
+        pr = float(stats.pearsonr(x, y)[0])
+        tag = "supports (negative)" if s < -0.5 else ("WRONG SIGN" if s > 0.5 else "flat")
+        print(f"  {name:28s}{len(pts):>4d}{s:+11.3f}{pr:+10.3f}   {tag}")
+
+    vals = {k: v for k, v in obs.items() if v is not None}
+    if not vals:
+        return
+    best = max(vals, key=lambda k: abs(vals[k]))
+    best_abs = abs(vals[best])
+
+    # ---- null distribution of the BEST subgroup, by global permutation of d_PRR ----
+    rng = np.random.RandomState(seed)
+    de_all = np.array([c["de"] for c in cells], float)
+    dr_all = np.array([c["dr"] for c in cells], float)
+    idx = {name: [i for i, c in enumerate(cells)
+                  if (c["rung"] == name.split(":", 1)[1] if name.startswith("rung:")
+                      else c["ds"] == name.split(":", 1)[1])]
+           for name in groups}
+    null_max = []
+    for _ in range(n_perm):
+        perm = rng.permutation(dr_all)
+        m = 0.0
+        for name, ii in idx.items():
+            if len(ii) < 3:
+                continue
+            x, y = de_all[ii], perm[ii]
+            if np.std(x) == 0 or np.std(y) == 0:
+                continue
+            m = max(m, abs(float(stats.spearmanr(x, y)[0])))
+        null_max.append(m)
+    null_max = np.array(null_max)
+    p_best = float((null_max >= best_abs).mean())
+    q95 = float(np.percentile(null_max, 95))
+
+    print(f"\n  STRONGEST SLICE: {best}  Spearman {vals[best]:+.3f}  (|rho| = {best_abs:.3f})")
+    print(f"  NULL for the strongest of {len(vals)} slices (global permutation of d_PRR, {n_perm} draws):")
+    print(f"    95th percentile of max|rho| under the null = {q95:.3f}")
+    print(f"    P(max|rho| >= {best_abs:.3f} by chance)      = {p_best:.3f}")
+    if p_best < 0.05 and vals[best] < 0:
+        print("  -> the strongest slice SURVIVES the multiple-comparisons null AND has the registered sign.")
+        print("     Worth following up; still one slice out of twelve, so treat as a lead, not a finding.")
+    elif p_best < 0.05:
+        print("  -> survives the null but has the WRONG SIGN, so it is not support for the hypothesis.")
+    else:
+        print("  -> does NOT survive. A slice this strong is what twelve tests on 32 points produce anyway,")
+        print("     so there is no subgroup in which flattening predicts the drop.")
+
+    n_neg = sum(1 for v in vals.values() if v < 0)
+    print(f"\n  SIGN COUNT across the {len(vals)} slices: {n_neg} negative (hypothesis direction), "
+          f"{len(vals) - n_neg} positive. Under the null this is a coin flip; "
+          f"a real effect should push most slices negative.")
 
 
 def verify_convention(datasets, ent):
@@ -435,14 +544,14 @@ def make_plot(path, cells, percell, across):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    ds = sorted({c[0] for c in cells})
+    ds = sorted({c["ds"] for c in cells})
     cmap = plt.get_cmap("tab10")
     colour = {d: cmap(i % 10) for i, d in enumerate(ds)}
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     a = axes[0]
     for d in ds:
-        pts = [(c[1], c[2]) for c in cells if c[0] == d]
+        pts = [(c["de"], c["dr"]) for c in cells if c["ds"] == d]
         a.scatter([p[0] for p in pts], [p[1] for p in pts], s=55, color=colour[d], label=d, alpha=0.85)
     a.axhline(0, lw=0.7, color="0.6")
     a.axvline(0, lw=0.7, color="0.6")
@@ -456,7 +565,7 @@ def make_plot(path, cells, percell, across):
 
     b = axes[1]
     for d in ds:
-        pts = [(c[1], c[2]) for c in cells if c[0] == d]
+        pts = [(c["de"], c["dr"]) for c in cells if c["ds"] == d]
         mx, my = np.mean([p[0] for p in pts]), np.mean([p[1] for p in pts])
         b.scatter(mx, my, s=110, color=colour[d], label=d)
         b.annotate(d, (mx, my), fontsize=7, xytext=(4, 4), textcoords="offset points")
