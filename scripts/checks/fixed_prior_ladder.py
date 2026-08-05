@@ -19,6 +19,7 @@ CPU/GPU job -> qsub / DoC, NOT the login node (it trains poolers per cell).
         --priors content_mass,nll --seeds 1,2,3
 """
 import argparse
+import os
 import csv as _csv
 import hashlib
 import socket
@@ -55,6 +56,36 @@ def c3_attention_prr(eval_, rung):
         if r["rung"] == rung and r["method"] == "attention":
             return float(r["prr_mean"])
     return None
+
+
+_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
+           "bar_msp_min", "ci_lo", "ci_hi", "boot_p", "significant",
+           "cluster", "env_hash", "commit", "seeds"]
+
+
+def out_path(args):
+    return Path(args.out) if args.out else (ROOT / "results" / f"fixed_prior_ladder__{cache._slug(MODEL)}.csv")
+
+
+def _flush_rows(out, rows):
+    """Write everything accumulated SO FAR, atomically (temp + os.replace). CALLED PER CELL.
+
+    ⚠️ THIS DRIVER WROTE ONLY AT THE VERY END until 2026-08-05, and it is the LAST of the four ladders to
+    be fixed -- probedriftlong, contribution_ladder and ood_onegrid all got this on 2026-08-03 after a
+    16-hour run was killed at hour 15 and lost everything. On 2026-08-05 the same thing happened here:
+    nine S4 top-k jobs ran ~8 hours each, hit the 8h walltime, and produced NO csv at all, because every
+    row was still in RAM. The per-cell verdicts survived only in the job logs.
+
+    temp-then-replace so a crash mid-write cannot leave a TRUNCATED csv, which would read as a
+    short-but-valid grid. A half-written table is worse than no table: it looks complete.
+    """
+    tmp = Path(str(out) + ".partial")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    with open(tmp, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+    os.replace(tmp, out)
 
 
 def main():
@@ -203,6 +234,11 @@ def main():
                                      "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                      "boot_p": round(pv, 4), "significant": bool(sig), "n_seeds": len(seeds), **prov})
 
+        # PER-CELL FLUSH. Everything completed so far is on disk before the next cell starts, so a
+        # walltime kill costs at most the cell in progress rather than the whole run.
+        _flush_rows(out_path(args), out_rows)
+        print(f"    [saved] {len(out_rows)} rows -> {out_path(args).name}", flush=True)
+
     print("\n=== ARM-A REPRODUCTION GATE (arm A vs §C.3 attention, tol " + f"{GATE_TOL}) ===", flush=True)
     allok = True
     for X, rung, got, tgt, d_, ok in gate_rows:
@@ -219,13 +255,8 @@ def main():
             print(f"\nPRIOR '{p}' COVERAGE: ran on {len(ran)} cells {sorted(f'{e}/{rg}' for e, rg in ran)}; "
                   f"SKIPPED {len(sk)} for coverage {sk}", flush=True)
 
-    out = Path(args.out) if args.out else (ROOT / "results" / f"fixed_prior_ladder__{cache._slug(MODEL)}.csv")
-    with open(out, "w", newline="") as f:
-        w = _csv.DictWriter(f, fieldnames=["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
-                                           "bar_msp_min", "ci_lo", "ci_hi", "boot_p", "significant",
-                                           "cluster", "env_hash", "commit", "seeds"])
-        w.writeheader(); w.writerows(out_rows)
-    print(f"\nwrote {out}", flush=True)
+    _flush_rows(out_path(args), out_rows)
+    print(f"\nwrote {out_path(args)}", flush=True)
 
 
 if __name__ == "__main__":
