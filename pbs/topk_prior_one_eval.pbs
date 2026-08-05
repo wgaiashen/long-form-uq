@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l select=1:ncpus=4:mem=200gb
 #PBS -l walltime=08:00:00
 #PBS -N luq_topk
 #PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
