@@ -81,7 +81,7 @@ LAMBDAS = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
 VAL_FRAC = 0.2
 
 
-def val_split_lodo(tr_idx, train_rows, seed):
+def val_split_held_out_source(tr_idx, train_rows, seed):
     """λ-selection split that holds out a WHOLE SOURCE DATASET, not a random slice.
 
     ⚠️ THIS IS THE MOST IMPORTANT CHANGE IN THE B.1 RE-RUN. The original screen carved a random 20% of the
@@ -109,7 +109,7 @@ def val_split_lodo(tr_idx, train_rows, seed):
     sub_tr = [i for i in tr_idx if datasets[i] != held]
     sub_val = [i for i in tr_idx if datasets[i] == held]
     if not sub_tr or not sub_val:                          # cannot happen with >=2 sources; refuse to guess
-        raise SystemExit(f"val_split_lodo: holding out {held} left {len(sub_tr)} train / {len(sub_val)} val")
+        raise SystemExit(f"val_split_held_out_source: holding out {held} left {len(sub_tr)} train / {len(sub_val)} val")
     return sub_tr, sub_val, held
 
 
@@ -212,9 +212,9 @@ def main():
                     print(f"  [{rung}/{X}] target {tname}: UNAVAILABLE ({type(e).__name__}: {e}) -> cell "
                           "left BLANK", flush=True)
                     continue
-                # λ selected by holding out a WHOLE SOURCE DATASET (see val_split_lodo). Same-dataset
+                # λ selected by holding out a WHOLE SOURCE DATASET (see val_split_held_out_source). Same-dataset
                 # validation structurally cannot see an OOD-robustness gain bought at an ID cost.
-                sub_tr, sub_val, held_out = val_split_lodo(tr_idx, train_rows, sd)
+                sub_tr, sub_val, held_out = val_split_held_out_source(tr_idx, train_rows, sd)
                 if held_out is None:
                     print(f"  [{rung}/{X}] λ-selection FELL BACK to a random carve (single-source pool; "
                           "an ID cell cannot pose an OOD question) — read this λ as the weaker criterion",
