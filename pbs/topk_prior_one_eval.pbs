@@ -1,0 +1,44 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_topk
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# S4 — top-k surprisal prior, ONE eval per job (pre-registered: prereg/S4_topk_surprisal_prior.md).
+#
+# Pass with -v:  EVAL=<eval>  [PRIORS=<specs joined by '+'>]  [OUT=<abs path>]
+# '+' joins the priors list because PBS -v splits its own variables on commas; converted below.
+#
+# ⚠️ WIRING NOTE, and it is the reason this script exists rather than reusing arm_mh_fill.pbs:
+# on RCS `_env.sh` sets LUQ_REPO=${PBS_O_WORKDIR}, so the job runs THE CODE OF THE DIRECTORY IT WAS
+# SUBMITTED FROM. This must be submitted from the checkout that actually contains the topk builder,
+# and the script prints the resolved repo + the commit so the log proves which code ran. arm_mh_fill.pbs
+# also hardcodes `--priors content_mass,nll`, so it cannot express this run at all.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+: "${PRIORS:=nll+topk:1+topk:5+topk:25+topk:0.25+topk:5:floor=0.05+topk:5:shuf}"
+RESULTS_DIR="${RESULTS_DIR:-/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results}"
+: "${OUT:=$RESULTS_DIR/s4_topk_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv}"
+
+echo "[s4] host $(hostname)  EVAL=$EVAL"
+echo "[s4] LUQ_REPO=$LUQ_REPO  commit=$(git -C "$LUQ_REPO" rev-parse --short HEAD 2>/dev/null)"
+echo "[s4] PRIORS=${PRIORS//+/,}"
+echo "[s4] OUT=$OUT"
+
+# Guard 1: the builder must exist in the code that is about to run, or this is the wrong checkout.
+grep -q "def build_topk_surprisal" "$LUQ_REPO/scripts/checks/prior_builders.py" || {
+  echo "FATAL: build_topk_surprisal absent from $LUQ_REPO — submitted from a checkout without the S4 builder"; exit 2; }
+
+# Guard 2: never clobber. A re-run must go to a new path so two populations cannot merge silently.
+if [ -e "$OUT" ]; then echo "FATAL: target exists, refusing to clobber: $OUT"; exit 3; fi
+
+# Guard 3: the canonical prior ladder must be byte-identical afterwards (it is a different population).
+PROT="$RESULTS_DIR/fixed_prior_ladder__meta-llama_Meta-Llama-3.1-8B.csv"
+[ -e "$PROT" ] && echo "[s4] PROT size BEFORE=$(stat -c%s "$PROT")"
+
+python -u scripts/checks/fixed_prior_ladder.py \
+  --evals "$EVAL" --seeds 1,2,3 --priors "${PRIORS//+/,}" --out "$OUT"
+RC=$?
+
+echo "[s4] DONE rc=$RC -> $OUT ($(wc -l <"$OUT" 2>/dev/null) rows)"
+[ -e "$PROT" ] && echo "[s4] PROT size AFTER=$(stat -c%s "$PROT")  (must equal BEFORE)"
