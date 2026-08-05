@@ -58,3 +58,21 @@ Commits touching `contribution_ladder.py`, `xl_rungs.py`, `weighted_msp.py`, `at
 
 The environment. `env_hash` was not recorded either, so the installed package set at run time is not
 pinned for these rows. Future runs capture it.
+
+
+---
+
+## Addendum (2026-08-05 10:35) — the `dirty=1` rows in `xlonegrid_fam_{med_quad,asqa,samsum}`
+
+117 rows stamp `git_sha=f10cf167` with `dirty=1`, because those three jobs started at ~02:45 while the
+provenance change itself was still uncommitted. **The numbers are sound and this is provable:** the diff
+that was outstanding is exactly commit `fe55cf1`, and `git show --stat fe55cf1` is three files — a new
+`provenance.py`, plus an import, four CSV field names, one `provenance()` call and a `{**PROV, ...}`
+spread in each driver. No expression that produces a PRR was touched. So the code those jobs ran is
+`f10cf167` for every numerical purpose.
+
+Corroboration: of the 96 XL cells written by more than one file, **zero disagree**, and the overlap
+includes cells from these three files against the contribution ladder's independent runs.
+
+The `dirty=1` flag is doing what it was added for — it made a question askable that, a day earlier, could
+not even be posed.
