@@ -166,6 +166,49 @@ def normalise_target(D, mask):
     return D / s
 
 
+def aux_penalty(a, D, mask, normalise=False):
+    """The paper's squared-error attention penalty, optionally referenced to UNIFORM attention.
+
+    Returns (penalty, n_dropped). `normalise=False` is the paper's raw sum and is BYTE-IDENTICAL to what
+    this file did before, so every existing caller is unchanged.
+
+    WHY THE NORMALISED FORM EXISTS. For `a` uniform and a flat k-sparse `D` over n real tokens the raw sum
+    has a closed form:
+
+        Σᵢ (aᵢ − Dᵢ)²  =  k(1/k − 1/n)² + (n−k)(1/n)²  =  1/k − 1/n
+
+    It splits on **k**, not n. A SPARSE target (k fixed) is therefore already length-invariant; only a
+    DENSE target (k = αn) scales as 1/n. So a plain `.mean()` would be the wrong fix -- it squares the
+    dense problem AND injects length-dependence into the sparse targets. Dividing by the same quantity
+    evaluated at uniform attention fixes both at once:
+
+        aux_ref = Σᵢ (1/n − Dᵢ)²  ==  ΣD² − 1/n        (the same identity)
+
+    The ratio is 1.0 when attention is uniform, 0.0 when it matches the target, and dimensionless -- so one
+    lambda means the same thing on a 56-token xsum answer and a 768-token med_quad one, and lambda=1.0 is
+    genuine equal weighting against a BCE of ~0.7, which is the paper's operating regime. Under the raw
+    sum it was not: at a fixed lambda the supervision strength varied with output length, confounding it
+    with the very variable the ID headline rests on.
+
+    ⚠️ NO clamp_min ON THE DENOMINATOR. `aux_ref` is exactly 0 when D is uniform, which is the documented
+    degenerate case the content-mass builder falls back to. Clamping would turn 0/0 into a large finite
+    penalty, handing rows that carry NO target the largest gradient in the batch -- the "silent default
+    that returns a plausible number" class this project bans. Those rows are DROPPED from the penalty and
+    COUNTED, so the caller can report them; a dropped row is visibly not-measured, never quietly weighted.
+    """
+    raw = ((a - D) ** 2 * mask).sum(1)
+    if not normalise:
+        return raw.mean(), 0
+    n_real = mask.sum(1, keepdim=True).clamp(min=1.0)
+    uni = mask / n_real
+    ref = ((uni - D) ** 2 * mask).sum(1)
+    keep = ref > 1e-12                       # uniform target -> no shape to supervise toward
+    n_dropped = int((~keep).sum())
+    if not bool(keep.any()):
+        return raw.sum() * 0.0, n_dropped    # whole batch degenerate: contribute nothing, still counted
+    return (raw[keep] / ref[keep]).mean(), n_dropped
+
+
 def shuffle_target(D, mask, generator):
     """Permute each row's target WITHIN its real tokens -- the paper's randomised control.
 
@@ -391,7 +434,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                epochs=60, bs=32, lr=1e-3, shrink_lambda=0.0,
                prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
                aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False,
-               aux_heads=None, ent_lambda=0.0, ent_threshold=0.7, head_hidden=None):
+               aux_heads=None, aux_normalise=False, aux_dropped=None,
+               ent_lambda=0.0, ent_threshold=0.7, head_hidden=None):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -443,6 +487,10 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     # separate generator for the shuffled-target control, so turning the control on cannot perturb the
     # batch order and thereby change the run for a reason unrelated to the shuffling
     g_shuf = torch.Generator().manual_seed(seed + 10_000)
+    # Mutable one-slot counter so the degenerate-target rows the penalty DROPS are visible to the caller
+    # (a dropped row must read as not-measured, never as measured-and-zero). Caller may pass its own list.
+    if aux_dropped is None:
+        aux_dropped = [0]
     if aux_lambda > 0 and aux_target is None:
         raise SystemExit("aux_lambda > 0 with aux_target=None: refusing to run a 'supervised' arm with no "
                          "target, which would silently be the unsupervised baseline under another name.")
@@ -475,7 +523,9 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                         if aux_shuffle:
                             D = shuffle_target(D, mask, g_shuf)
                         # (λ/J)·Σ_h Σ_i (a_hi − d_i)², i.e. the paper's form with H = heads SUPERVISED
-                        pen = sum((((a[:, :, h] - D) ** 2) * mask).sum(1).mean() for h in range(J)) / J
+                        terms = [aux_penalty(a[:, :, h], D, mask, normalise=aux_normalise) for h in range(J)]
+                        aux_dropped[0] += sum(t[1] for t in terms)
+                        pen = sum(t[0] for t in terms) / J
                         loss = loss + aux_lambda * pen
             else:
                 loss = lossf(logit, yt[idx])
@@ -509,8 +559,12 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                     if aux_shuffle:
                         D = shuffle_target(D, mask, g_shuf)
                     # (λ/H)·Σ_i (a_i − d_i)², H=1 on this single-head path; summed over tokens, mean over
-                    # the batch. Masked so padding contributes nothing.
-                    loss = loss + aux_lambda * (((a - D) ** 2) * mask).sum(1).mean()
+                    # the batch. Masked so padding contributes nothing. aux_normalise=True divides by the
+                    # same quantity at uniform attention (see aux_penalty) so λ is comparable across
+                    # dataset length and target density.
+                    pen, nd = aux_penalty(a, D, mask, normalise=aux_normalise)
+                    aux_dropped[0] += nd
+                    loss = loss + aux_lambda * pen
             loss.backward()
             opt.step()
     return model
