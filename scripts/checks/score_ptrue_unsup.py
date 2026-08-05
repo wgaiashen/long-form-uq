@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 from luq.config import Config  # noqa: E402
 from luq import cache, results  # noqa: E402
 from xl_rungs import eval_split, label_of  # noqa: E402
+from provenance import provenance  # noqa: E402  stamp, so these rows are traceable like every other
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 SLUG = cache._slug(MODEL)
@@ -110,6 +111,7 @@ def score_one(ds):
 
 def main():
     print(f"Unsupervised P(True) — floor scoring (no training, no ladder re-run)\n")
+    PROV = provenance(strict=False)
     rows_long, rows_xl = [], []
     for ds in LONG + SHORT:
         res, err = score_one(ds)
@@ -120,11 +122,11 @@ def main():
         print(f"  {ds:14s} PRR {res['prr']:+.4f}  n={res['n']} (dropped {res['dropped']})  "
               f"label={res['field']}  verdict-mass p50={res['mass_p50']:.3f}{warn}")
         for rg in (LONG_RUNGS if ds in LONG else ["Long->Short"]):
-            rows_long.append({"rung": rg, "eval": ds, "train": "(floor: eval set only)",
+            rows_long.append({**PROV, "rung": rg, "eval": ds, "train": "(floor: eval set only)",
                               "method": "ptrue_unsup", "prr_mean": round(res["prr"], 4),
                               "prr_std": 0.0, "n_seeds": 1})
         for rg in XL_RUNGS:
-            rows_xl.append({"rung": rg, "eval": ds, "train": "(floor: eval set only)",
+            rows_xl.append({**PROV, "rung": rg, "eval": ds, "train": "(floor: eval set only)",
                             "method": "ptrue_unsup", "prr_mean": round(res["prr"], 4),
                             "prr_std": 0.0, "n_seeds": 1})
 
