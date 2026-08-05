@@ -15,6 +15,7 @@ Coverage is reported up front; genuinely-absent cells stay BLANK (never zero-fil
 (soft-Orgad restricted, the broad-LOO router) are NOT joined here -- they live in their own captioned tables.
 """
 import argparse
+import collections
 import csv
 import glob
 from collections import defaultdict
@@ -88,6 +89,26 @@ ALIAS = {
     "zavg_floor_min+saplma": "ens-z{MSP,SAPLMA}", "zavg_wmsp+saplma": "ens-z{wMSP,SAPLMA}",
     "zavg_wmsp+floor_min": "ens-z{wMSP,MSP}",
 }
+
+# ---- STALE SOURCES -------------------------------------------------------------------------------
+# A source file whose numbers were computed BEFORE a fix that changed their inputs. Declared here, by
+# filename stem, so the renderer can MARK every row that came from one. Deleting the file instead would
+# lose the record of what was run; leaving it unmarked is worse, because a stale figure sitting beside a
+# fresh one in the same column reads as comparable.
+#
+# Rule for adding an entry: state WHAT changed and WHEN, not just "old". A reader needs to know whether
+# the staleness matters for their question.
+STALE = {
+    "ensemble_wmsp_saplma_full": (
+        "written 2026-07-29 22:56, with NO git_sha stamped. Its wMSP inputs predate the all-excluded "
+        "softmax NaN fix of 2026-08-03, so every ensemble built on wMSP is stale. Measured against the "
+        "finished grid: 12 of 40 wMSP cells differ by >0.02, and asqa/ID differs by 0.52 "
+        "(-0.044 stale vs +0.477 fresh, the NaN signature). LOO-long is understated on 6 of 8 datasets. "
+        "NOT being re-run (author's decision 2026-08-05: the ensembles are not a focus). The non-wMSP "
+        "ensembles, ens{MSP,SAPLMA} and ens-z{MSP,SAPLMA}, are affected only via their shared cells "
+        "and are flagged with the rest rather than picked apart."),
+}
+STALE_FLAG = "‡STALE"
 
 # (glob, priority, seed_regime). Lower priority number wins on a shared cell. Base is authoritative for
 # floors/poolers/wMSP/SAPLMA; fixed_prior/mh add arm rows; ensemble adds ensemble rows; 3A/router add seed-1 rows.
@@ -224,6 +245,31 @@ def main():
     else:
         lines.append("\nCross-check: no same-priority source disagreed >0.02 on any shared cell (armA/floor overlaps agree).")
 
+    # ---- STALE-SOURCE BANNER -------------------------------------------------------------------
+    # Rendered INTO the table, because a caveat that lives only in a chat message or a commit note is a
+    # caveat nobody reading the table will see. Rows whose numbers come from a source listed in STALE
+    # are marked with the flag below, so a stale figure can never be mistaken for a fresh one.
+    stale_rows = collections.defaultdict(set)          # method -> {source stems actually used}
+    for (_rg, _ev, m), (_v, _p, _s, src, _n) in grid.items():
+        for stem, _why in STALE.items():
+            if src.startswith(stem):
+                stale_rows[m].add(stem)
+    if stale_rows:
+        lines.append("\n> ## ⚠️ STALE NUMBERS IN THIS TABLE — READ THIS BEFORE THE ROWS BELOW")
+        lines.append(">")
+        lines.append("> The rows listed here were computed BEFORE a fix that changed their inputs. They are "
+                     "kept rather than deleted so the table still shows what was run, but they are **not "
+                     "current** and must not be compared against the fresh rows. Every affected row is "
+                     f"marked **{STALE_FLAG}** in the per-rung tables.")
+        lines.append(">")
+        for stem, why in STALE.items():
+            ms = sorted(m for m, s in stale_rows.items() if stem in s)
+            if not ms:
+                continue
+            lines.append(f"> **`{stem}`** — {why}")
+            lines.append(f">   affected rows ({len(ms)}): " + ", ".join(f"`{m}`" for m in ms))
+            lines.append(">")
+
     def fmt(v):
         return f"{v:+.3f}" if v is not None else "  ·  "
 
@@ -238,7 +284,8 @@ def main():
         best = {}
         for ev in LONG_EVALS:
             vals = [(m, grid[(rg, ev, m)][0]) for m in ORDER
-                    if (rg, ev, m) in grid and grid[(rg, ev, m)][2] == "3seed"]
+                    if (rg, ev, m) in grid and grid[(rg, ev, m)][2] == "3seed"
+                    and m not in stale_rows]      # never bold a stale cell as the column winner
             if vals:
                 best[ev] = max(vals, key=lambda t: t[1])[0]
         prev_floor = True
@@ -246,6 +293,7 @@ def main():
             if prev_floor and m not in FLOORS:
                 lines.append("| *— supervised —* |" + " |" * len(LONG_EVALS))
                 prev_floor = False
+            label = f"{m} {STALE_FLAG}" if m in stale_rows else m
             cells = []
             for ev in LONG_EVALS:
                 if (rg, ev, m) in grid:
@@ -258,7 +306,7 @@ def main():
                     cells.append(s)
                 else:
                     cells.append(" · ")
-            lines.append(f"| {m} | " + " | ".join(cells) + " |")
+            lines.append(f"| {label} | " + " | ".join(cells) + " |")
     lines.append("\n† = seed-1 post-hoc read (3A/router); all other rows are 3-seed. Blank = not measured.")
 
     # ---- cross-dataset aggregate (THE OBJECTIVE): OOD rungs, on a COMMON cell set to avoid cross-population means ----
@@ -299,7 +347,7 @@ def main():
     core.sort(key=lambda t: -t[1][1])
     for m, (nc, mean, lo, hi, wmin, nmin, wsap, nsap) in core:
         cov = f"{nc}/{len(COMMON)}" + ("" if nc == len(COMMON) else " ⚠")
-        lines.append(f"| {m} | {cov} | {mean:+.3f} | [{lo:+.3f},{hi:+.3f}] | {wmin}/{nmin} | {wsap}/{nsap} |")
+        lines.append(f"| {m}{' ' + STALE_FLAG if m in stale_rows else ''} | {cov} | {mean:+.3f} | [{lo:+.3f},{hi:+.3f}] | {wmin}/{nmin} | {wsap}/{nsap} |")
 
     # seed-1 supplementary methods: their OWN cell set, explicitly NOT comparable to the block above
     lines.append("\n**Seed-1 supplementary methods** (post-hoc reads / router; a DIFFERENT, smaller cell set and "
@@ -319,7 +367,7 @@ def main():
         wsap = sum(1 for ev, rg in own if cell_val(rg, ev, "SAPLMA") is not None
                    and cell_val(rg, ev, m) > cell_val(rg, ev, "SAPLMA"))
         nsap = sum(1 for ev, rg in own if cell_val(rg, ev, "SAPLMA") is not None)
-        lines.append(f"| {m} | {len(own)} | {vals.mean():+.3f} | {wmin}/{nmin} | {wsap}/{nsap} |")
+        lines.append(f"| {m}{' ' + STALE_FLAG if m in stale_rows else ''} | {len(own)} | {vals.mean():+.3f} | {wmin}/{nmin} | {wsap}/{nsap} |")
 
     with open(md_path, "w") as fh:
         fh.write("\n".join(lines) + "\n")
