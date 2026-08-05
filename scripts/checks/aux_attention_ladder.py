@@ -81,7 +81,39 @@ LAMBDAS = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
 VAL_FRAC = 0.2
 
 
-def val_split(tr_idx, seed):
+def val_split_lodo(tr_idx, train_rows, seed):
+    """λ-selection split that holds out a WHOLE SOURCE DATASET, not a random slice.
+
+    ⚠️ THIS IS THE MOST IMPORTANT CHANGE IN THE B.1 RE-RUN. The original screen carved a random 20% of the
+    training pool, so the validation rows came from the SAME datasets as the training rows. A loss whose
+    benefit is out-of-distribution robustness -- bought, as in the paper, at a small in-distribution cost --
+    is invisible to that criterion: same-distribution validation sees only the cost. Selection duly chose
+    λ=0 once it was offered, and that was recorded as evidence the method does nothing. It is equally
+    consistent with the selection rule being unable to see the benefit.
+
+    Here one source dataset is held out entirely (rotated by seed, so three seeds probe three different
+    held-out sources), which makes the selection criterion a genuine shift -- the thing λ is meant to buy.
+
+    Falls back to the random carve ONLY when the pool has a single source (every ID cell, by construction),
+    and says so LOUDLY rather than silently degrading: an ID cell cannot pose an out-of-distribution
+    question, so its λ is selected on the weaker criterion and must be read as such.
+
+    Returns (sub_train_idx, sub_val_idx, held_out_name).
+    """
+    datasets = [d for d, _i in train_rows]
+    uniq = sorted(set(datasets))
+    if len(uniq) < 2:
+        sub_tr, sub_val = _val_split_random(tr_idx, seed)
+        return sub_tr, sub_val, None                      # caller prints the fallback
+    held = uniq[seed % len(uniq)]
+    sub_tr = [i for i in tr_idx if datasets[i] != held]
+    sub_val = [i for i in tr_idx if datasets[i] == held]
+    if not sub_tr or not sub_val:                          # cannot happen with >=2 sources; refuse to guess
+        raise SystemExit(f"val_split_lodo: holding out {held} left {len(sub_tr)} train / {len(sub_val)} val")
+    return sub_tr, sub_val, held
+
+
+def _val_split_random(tr_idx, seed):
     """Carve a validation slice from TRAIN for λ selection. Never touches test."""
     perm = np.random.RandomState(seed).permutation(len(tr_idx))
     n_val = max(1, int(round(len(tr_idx) * VAL_FRAC)))
@@ -109,6 +141,12 @@ def main():
                     help="B.2: comma-separated J values -- supervise only the first J of K heads, leaving "
                          "the rest free. The paper supervised 3 of 12 and found supervising ALL was worse "
                          "than a subset. J=0 is the unsupervised multi-head baseline. Requires --n-query>1.")
+    ap.add_argument("--aux-normalise", action="store_true",
+                    help="divide the auxiliary penalty by its value at UNIFORM attention (see "
+                         "attn_pool.aux_penalty). Makes lambda comparable across dataset length AND target "
+                         "density; without it a single lambda supervises a 56-token xsum answer far more "
+                         "strongly than a 768-token med_quad one. Default off = the paper's raw sum, "
+                         "byte-identical to the original B.1 screen.")
     ap.add_argument("--seeds", default="1")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--out", default=None)
@@ -174,19 +212,24 @@ def main():
                     print(f"  [{rung}/{X}] target {tname}: UNAVAILABLE ({type(e).__name__}: {e}) -> cell "
                           "left BLANK", flush=True)
                     continue
-                # λ selected on a validation slice carved from TRAIN
-                sub_tr, sub_val = val_split(tr_idx, sd)
+                # λ selected by holding out a WHOLE SOURCE DATASET (see val_split_lodo). Same-dataset
+                # validation structurally cannot see an OOD-robustness gain bought at an ID cost.
+                sub_tr, sub_val, held_out = val_split_lodo(tr_idx, train_rows, sd)
+                if held_out is None:
+                    print(f"  [{rung}/{X}] λ-selection FELL BACK to a random carve (single-source pool; "
+                          "an ID cell cannot pose an OOD question) — read this λ as the weaker criterion",
+                          flush=True)
                 # λ is selected on the SAME architecture it will be used with (mh_kw threaded through),
                 # otherwise K=4 runs would inherit a λ tuned on a 1-head model. Selection supervises all
                 # K heads; J is varied afterwards, so λ is not tuned per-J -- stated rather than hidden,
                 # and it is the conservative direction (J<K is not given its own tuned λ).
                 curve = {lam: fit_and_score(states, y, sub_tr, sub_val, device, sd, best_T,
                                             aux_target=tgt, aux_lambda=lam,
-                                            aux_drop_epoch=args.drop_epoch, **mh_kw)
+                                            aux_drop_epoch=args.drop_epoch, aux_normalise=args.aux_normalise, **mh_kw)
                          for lam in lambdas}
                 best_lam = max(curve, key=curve.get)
                 for J in Js:
-                    kwJ = dict(aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch, **mh_kw)
+                    kwJ = dict(aux_lambda=best_lam, aux_drop_epoch=args.drop_epoch, aux_normalise=args.aux_normalise, **mh_kw)
                     if mh_kw:
                         kwJ["aux_heads"] = J
                     real, m_real = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T,
