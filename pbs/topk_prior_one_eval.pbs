@@ -2,8 +2,14 @@
 #PBS -l select=1:ncpus=4:mem=64gb
 #PBS -l walltime=08:00:00
 #PBS -N luq_topk
-#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
 #PBS -j oe
+# ⚠️ THE -o PATH IS PERSISTENT HOME, DELIBERATELY, NOT EPHEMERAL SCRATCH. The ephemeral volume is
+# PURGEABLE, and this project has already lost artifacts to it once (20 result CSVs that existed only
+# there). PBS also writes -o only at job EXIT, so an ephemeral -o means that during a long run there is
+# no way to see progress at all -- which cost a debugging cycle earlier today. The `tee` below fixes the
+# second half of that: the log is written line by line to persistent storage WHILE the job runs, so an
+# interrupted job still leaves everything it had printed.
 # S4 — top-k surprisal prior, ONE eval per job (pre-registered: prereg/S4_topk_surprisal_prior.md).
 #
 # Pass with -v:  EVAL=<eval>  [PRIORS=<specs joined by '+'>]  [OUT=<abs path>]
@@ -19,6 +25,11 @@ cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO";
 : "${PRIORS:=nll+topk:1+topk:5+topk:25+topk:0.25+topk:5:floor=0.05+topk:5:shuf}"
 RESULTS_DIR="${RESULTS_DIR:-/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results}"
 : "${OUT:=$RESULTS_DIR/s4_topk_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv}"
+
+: "${LOGDIR:=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs}"
+mkdir -p "$LOGDIR"
+# Live, persistent, line-buffered log. Survives a kill; readable DURING the run (PBS's own -o is not).
+exec > >(tee -a "$LOGDIR/s4_topk_${EVAL}_${PBS_JOBID%%.*}.log") 2>&1
 
 echo "[s4] host $(hostname)  EVAL=$EVAL"
 echo "[s4] LUQ_REPO=$LUQ_REPO  commit=$(git -C "$LUQ_REPO" rev-parse --short HEAD 2>/dev/null)"

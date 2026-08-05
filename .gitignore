@@ -23,3 +23,6 @@ logs/
 
 # macOS
 .DS_Store
+
+# PBS job logs (persistent by design -- see pbs/topk_prior_one_eval.pbs -- but not artifacts to track)
+logs/
