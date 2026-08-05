@@ -1,0 +1,36 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=48gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_segsm
+#PBS -j oe
+# LONG ladder: re-run ONLY `wmsp_seg_softmax`, after the all-excluded NaN fix (git 184686f).
+#
+# WHY. `_segment_softmax_weights` pushed every zero-kept-token segment to -inf before its softmax. When an
+# example had NO kept tokens at all, EVERY segment went to -inf and softmax(all -inf) = NaN — the same bug
+# fixed in the token-level path on 2026-08-03, left unchased in the segment path. It is why this one
+# variant returned NaN on 17 of its 42 long cells while the other seven wMSP variants were clean.
+#
+# The NaNs were never silently scored: prr() refuses a non-finite input and returns NaN rather than a
+# ranking, so the cells read as NOT MEASURED. Nothing already reported has to be withdrawn — but this
+# variant's 25 finite cells and its 17 NaN cells were produced by the same run, so re-run ALL 42 rather
+# than patching in the missing 17, otherwise the row would mix two code states.
+#
+# --wmsp-only isolates the one variant and --skip-poolers drops the other training bottleneck, so this is
+# a fraction of a full ladder.
+#
+# ⚠️ SUFFIXED OUT PATH: probedriftlong rewrites its whole CSV from an empty in-memory list, so writing to
+# the main pdl_fam_<eval> path would destroy every other method's rows.
+#
+#   qsub -v LUQ_EVAL=xsum pbs/pdl_segsoftmax_refill.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong --skip-caches || exit 1
+
+echo "=== PDL seg_softmax refill eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$EV" \
+    --wmsp-only wmsp_seg_softmax --skip-poolers \
+    --out "results/pdl_fam_${EV}_segsm__meta-llama_Meta-Llama-3.1-8B.csv" \
+    || echo "!!! pdl-segsoftmax FAILED $EV"
+echo "=== done $(date) ===" >&2
