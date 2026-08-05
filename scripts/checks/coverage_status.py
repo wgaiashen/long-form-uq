@@ -24,6 +24,7 @@ does not appear in the completion accounting or any reported table.
 """
 import argparse
 import collections
+import math
 import csv
 import glob
 import sys
@@ -43,19 +44,35 @@ LONG_CELLS = ([(e, r) for e in LONG_8 for r in LONG_RUNGS]
 
 
 def scan(patterns):
-    """method -> set of (eval, rung) present."""
+    """method -> (measured cells, NaN cells).
+
+    ⚠️ A CELL COUNTS ONLY IF IT HOLDS A FINITE NUMBER (fixed 2026-08-05). This used to count any row whose
+    key existed, so a cell written as `nan` scored as covered. That is the SAME error as the "50/50 cells"
+    claim it was written to replace — presence is not measurement. It mattered immediately:
+    `wmsp_seg_softmax` reported 42/42 while 17 of those 42 were NaN, and that would have gone into the
+    stocktake as a complete method.
+    """
     got = collections.defaultdict(set)
+    bad = collections.defaultdict(set)
     for pat in patterns:
         for f in sorted(glob.glob(str(RES / pat))):
             for r in csv.DictReader(open(f)):
                 rk = "rung" if "rung" in r else "setting"
                 if not r.get("method") or not r.get("eval") or not r.get(rk):
                     continue
-                got[r["method"]].add((r["eval"], r[rk]))
-    return got
+                cell = (r["eval"], r[rk])
+                v = r.get("prr_mean", "")
+                try:
+                    ok = v not in ("", "None") and math.isfinite(float(v))
+                except ValueError:
+                    ok = False
+                (got if ok else bad)[r["method"]].add(cell)
+    for m in bad:                       # a cell that is NaN somewhere and finite elsewhere is measured
+        bad[m] -= got[m]
+    return got, bad
 
 
-def report(title, got, cells, groups, show_missing):
+def report(title, got, bad, cells, groups, show_missing):
     n = len(cells)
     cellset = set(cells)
     evals = list(dict.fromkeys(e for e, _ in cells))
@@ -69,7 +86,9 @@ def report(title, got, cells, groups, show_missing):
             pct = 100.0 * len(have) / n
             bar = "#" * int(round(pct / 5)) + "." * (20 - int(round(pct / 5)))
             mark = "OK  " if len(have) == n else ("--  " if not have else "..  ")
+            nbad = len(bad.get(m, set()) & cellset)
             print(f"    {mark}{m:26s} {len(have):3d}/{n}  [{bar}] {pct:5.1f}%"
+                  + (f"   ⚠️ {nbad} cell(s) NaN — computed but NOT measured" if nbad else "")
                   + (f"   !! {len(stray)} row(s) outside the grid" if stray else ""))
             if show_missing and have and len(have) < n:
                 miss = sorted(cellset - have)
@@ -99,8 +118,8 @@ def main():
     ap.add_argument("--missing", action="store_true", help="list the absent cells per method")
     args = ap.parse_args()
 
-    xl = scan(["xlcontrib_fam_*meta-llama*.csv", "xlonegrid_fam_*meta-llama*.csv"])
-    report("XL GRID (ProbeDrift-XL)", xl, XL_CELLS, [
+    xl, xl_bad = scan(["xlcontrib_fam_*meta-llama*.csv", "xlonegrid_fam_*meta-llama*.csv"])
+    report("XL GRID (ProbeDrift-XL)", xl, xl_bad, XL_CELLS, [
         ("poolers / aggregation", ["uniform", "attention", "mean-pool+MLP", "last-token",
                                    "per-sentence", "per-token"]),
         ("contribution (weighted MSP)", ["weighted_msp_norm", "weighted_msp_unc"]),
@@ -110,8 +129,8 @@ def main():
                                          "VERDICT:wmsp_norm_vs_attention"]),
     ], args.missing)
 
-    pdl = scan(["pdl_fam_*meta-llama*.csv"])
-    report("LONG GRID (ProbeDriftLong)", pdl, LONG_CELLS, [
+    pdl, pdl_bad = scan(["pdl_fam_*meta-llama*.csv"])
+    report("LONG GRID (ProbeDriftLong)", pdl, pdl_bad, LONG_CELLS, [
         ("poolers / aggregation", ["uniform", "attention"]),
         ("contribution (weighted MSP)", ["wmsp_norm", "wmsp_shrink2", "wmsp_shrink10", "wmsp_blondel",
                                          "wmsp_shrink2_blondel", "wmsp_shrink10_blondel",

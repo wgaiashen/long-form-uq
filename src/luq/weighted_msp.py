@@ -267,6 +267,15 @@ def _segment_softmax_weights(raw, sid, keep=None):
     # path gets from _weights_from_raw's -inf masking. Default (all-ones) = every token kept.
     if keep is None:
         keep = torch.ones_like(raw)
+    # ⚠️ THE SAME EVERY-TOKEN-EXCLUDED NaN AS THE TOKEN PATH (fixed 2026-08-05). When `keep` is all-zero
+    # every segment gets `counts == 0`, so the `torch.where` below sets EVERY seg_mean to -inf and
+    # softmax(all -inf) = NaN. That was left unchased when the token-level case was fixed on 2026-08-03,
+    # and it is why `wmsp_seg_softmax` alone came back NaN on 17 of its 42 long cells while the other
+    # seven wMSP variants were clean. Same honest fallback as the token path: with no token judged
+    # keepable there is no basis to prefer any, so weight uniformly (wMSP reduces to plain MSP for that
+    # example) rather than emit a NaN that prr() must then refuse.
+    if float(keep.sum()) < 0.5:
+        return torch.ones_like(raw)
     kraw = raw * keep
     sums = torch.zeros(n_seg, dtype=raw.dtype, device=raw.device).index_add_(0, sid, kraw)
     counts = torch.zeros(n_seg, dtype=raw.dtype, device=raw.device).index_add_(0, sid, keep)  # KEPT count/segment
