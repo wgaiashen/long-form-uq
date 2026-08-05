@@ -42,6 +42,7 @@ from aggregation_table import (                 # noqa: E402
     conf_pertoken, attn_unc)
 from attn_pool import train_attn, select_temperature, PROMPT_REGIME  # noqa: E402
 from cohort import LABEL_FIELD  # noqa: E402  per-dataset label field, ONE definition
+from provenance import provenance  # noqa: E402  ONE provenance stamp, shared by every driver
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"  # legacy default; per-dataset reads go through cohort.LABEL_FIELD
@@ -113,7 +114,11 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
-CSV_FIELDS = ["setting", "eval", "method", "prr_mean", "prr_std", "n_seeds"]
+CSV_FIELDS = ["setting", "eval", "method", "prr_mean", "prr_std", "n_seeds",
+              # PROVENANCE (added 2026-08-05). This file had NONE, which is why three jobs running
+              # pre-filter code produced NaN cells that no artifact could be traced to. See
+              # scripts/checks/provenance.py for the full story.
+              "git_sha", "cluster", "env_hash", "dirty"]
 
 
 def _flush_rows(out, rows, fields):
@@ -147,6 +152,7 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     # Resolved BEFORE the loop so the crash-safety flush has a target.
+    PROV = provenance(strict=False)   # non-strict: see provenance.py — jobs are already queued
     out_path = Path(args.out) if args.out else (
         ROOT / "results" / f"ood_onegrid__{cache._slug(MODEL)}.csv")
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -282,7 +288,7 @@ def main():
                         print(f"    [ID-WARN] {m}: {stats[m][0]:.3f} vs anchor {anch[m]} (|d|={d:.3f})", flush=True)
                 print(f"    [ID-GATE OK] poolers reproduce anchors within {GATE_TOL}", flush=True)
         for m in POOLERS + list(BASE):
-            out_rows.append({"setting": setting, "eval": X, "method": m,
+            out_rows.append({**PROV, "setting": setting, "eval": X, "method": m,
                              "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                              "n_seeds": len(seeds)})
 

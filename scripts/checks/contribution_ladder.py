@@ -55,6 +55,7 @@ from attn_pool import train_attn, select_temperature  # noqa: E402
 # keystone->get_training_spec (faithful), XL->family taxonomy; `eval_split` carves the XL eval test set;
 # `label_of` gives the per-target label (ExpertQA=faithfulness); `different_label_projection` flags the ExpertQA OOD case.
 from xl_rungs import cells as xl_cells, eval_split, label_of, different_label_projection, build_rows  # noqa: E402
+from provenance import provenance  # noqa: E402  ONE provenance stamp, shared by every driver
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
@@ -113,7 +114,9 @@ def sampled_train_idx(split, seed, cap):
     return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
-CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
+CSV_FIELDS = ["git_sha", "cluster", "env_hash", "dirty",   # PROVENANCE (added 2026-08-05): this
+              # driver stamped NOTHING, so its 550 XL cells could not be traced to a code state.
+              "rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
               "different_label_projection", "eval_med_len", "train_med_len", "train_max_len",
               "ci_lo", "ci_hi", "boot_p", "significant"]
 
@@ -151,6 +154,7 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     # Resolved BEFORE the cell loop so the per-cell crash-safety flush has somewhere to write.
+    PROV = provenance(strict=False)   # non-strict: see provenance.py — jobs may already be queued
     out_path = Path(args.out) if args.out else (
         ROOT / "results" / f"contribution_ladder__{cache._slug(MODEL)}.csv")
     EVALS = args.evals.split(",")
@@ -280,7 +284,7 @@ def main():
                  "train_max_len": int(max(_tl)) if _tl else ""}
         for m in methods:
             if m in stats:
-                out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
+                out_rows.append({**PROV, "rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
                                  "n_seeds": len(per_method[m]),
                                  "different_label_projection": (xlbl and rung != "ID"), **_lens})   # ExpertQA OOD = cross-label
@@ -306,7 +310,7 @@ def main():
             if strongest != bar:
                 note += f"  (strongest free = {strongest} {stats[strongest][0]:+.3f}; DUAL-REPORT)"
             print(f"    primary_floor = {bar} ({stats[bar][0]:+.3f}){note}", flush=True)
-            out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{bar}",
+            out_rows.append({**PROV, "rung": rung, "eval": X, "train": srcs, "method": f"fair_floor:{bar}",
                              "prr_mean": round(stats[bar][0], 4),
                              "prr_std": round(stats[bar][1], 4), "n_seeds": len(seeds),
                              "different_label_projection": xlbl})   # was OMITTED -> blank in every old CSV
@@ -315,7 +319,7 @@ def main():
                 mg, lo, hi, p, sig = paired_bootstrap(yte_ref, avg_unc[a], avg_unc[b])
                 print(f"    [verdict] {vk:24s} margin {mg:+.3f}  95%CI [{lo:+.3f},{hi:+.3f}]  "
                       f"p={p:.3f} -> {'SIG' if sig else 'ns'}", flush=True)
-                out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
+                out_rows.append({**PROV, "rung": rung, "eval": X, "train": srcs, "method": f"VERDICT:{vk}",
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": sig, "n_seeds": len(seeds),
                                  "different_label_projection": xlbl})   # was OMITTED -> blank in every old CSV
