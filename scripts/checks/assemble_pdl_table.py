@@ -97,7 +97,14 @@ SOURCES = [
     # -- these supersede the pre-split numbers for every cell involving expertqa/factscore/asqa, whose
     # rung composition changed when factuality became its own family.
     ("pdl_fam_*__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
-    ("probedriftlong_*_widened_wmsp__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
+    # ⚠️ DEMOTED TO PRIORITY 1 (2026-08-05). These are the PRE-family-split, PRE-NaN-fix runs of 29 July
+    # (git 4c8f102a). They were left at priority 0 alongside pdl_fam_*, so "supersedes" was achieved only by
+    # being listed second and by `prio < pp` being a STRICT comparison. The outcome happened to be right —
+    # 0 master cells came from these files — but it rested on list order rather than on a stated rule, and
+    # it printed 54 same-priority conflicts that a reader cannot distinguish from a genuine disagreement.
+    # Worst of them: asqa/ID/wMSP-norm reads -0.044 here (the all-excluded softmax NaN, fixed 2026-08-03)
+    # against +0.477 fresh. Demoting makes the supersession explicit and silences a warning that was noise.
+    ("probedriftlong_*_widened_wmsp__" + SLUG + ".csv", 1, "3seed", "prr_mean"),
     ("fixed_prior_ladder__" + SLUG + ".csv", 1, "3seed", "prr_mean"),
     ("fixed_prior_ladder_factscore__" + SLUG + ".csv", 1, "3seed", "prr_mean"),
     ("fixed_prior_fill_*__" + SLUG + ".csv", 1, "3seed", "prr_mean"),          # all-5-rungs fills (this phase)
