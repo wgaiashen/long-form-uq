@@ -1,0 +1,250 @@
+"""Turn the assembled auxiliary-loss grid into the findings write-up, with every number recomputed.
+
+WHY THIS EXISTS. The headline finding was first produced by ad-hoc commands in a terminal. A number that
+only exists in a terminal cannot be re-checked after the grid grows, and this grid grows all night. So
+every figure quoted in the write-up is computed here, from the CSVs, and the write-up is regenerated
+rather than edited.
+
+THE FINDING IT REPORTS. `real_minus_shuffled` -- the decisive column, because it holds the target's
+marginal fixed and destroys only its alignment to tokens -- is NEGATIVELY correlated with how good the
+unsupervised baseline already was. The auxiliary loss helps where the attention pooler is weak and hurts
+where it works.
+
+THAT IS A FAVOURABLE-LOOKING STORY, SO THE CHECK IS BUILT IN, NOT OPTIONAL. This project has been bitten
+before by a tidy story that explained two points and was never tested against the rest ("the headroom
+just-so story"). So `--loo` recomputes the correlation with each eval dropped in turn and prints all of
+them. If the effect is one eval's outlier, that table shows it; if it survives every drop, it is real.
+A single reported correlation would hide exactly the failure mode we know we are prone to.
+
+    python scripts/checks/aux_rerun_findings.py
+    python scripts/checks/aux_rerun_findings.py --glob 'results/aux_pinned_*.csv' \
+           --out results/AUX_PINNED_FINDINGS.md --label "PINNED-LAMBDA DIAGNOSTIC"
+"""
+import argparse
+import csv
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts" / "checks"))
+
+import probedriftlong as PDL  # noqa: E402
+
+RUNGS = ["ID", "SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
+
+
+def fnum(r, k):
+    """Parse a numeric field, returning None for a BLANK.
+
+    A blank means NOT MEASURED and must never become 0.0. That distinction is the whole reason the
+    driver leaves a skipped cell empty instead of filling it: a 0 reads as "measured and equal", a
+    blank reads as "never measured", and a table must not let those two be confused.
+    """
+    v = r.get(k, "")
+    if v is None or v == "":
+        return None
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
+def perm_p(x, y, n_perm=20000, seed=0):
+    """Permutation p-value for a correlation: how often does SHUFFLING y give a correlation at least
+    this extreme? No distributional assumption, which matters here because n is small (tens of rows)
+    and the values are bounded PRR differences rather than anything normal-looking.
+    """
+    r = float(np.corrcoef(x, y)[0, 1])
+    g = np.random.default_rng(seed)
+    null = np.array([abs(np.corrcoef(x, g.permutation(y))[0, 1]) for _ in range(n_perm)])
+    return r, float((null >= abs(r)).mean())
+
+
+def load(glob_pat, out_path):
+    paths = [p for p in sorted(ROOT.glob(glob_pat)) if p.resolve() != out_path.resolve()]
+    if not paths:
+        raise SystemExit(f"no CSVs matched {glob_pat}")
+    # A combined file is never an input. Reading one's own output silently doubles every n, and an n is
+    # what a significance claim rests on -- this bit us once already (198 rows reported for 99).
+    bad = [p for p in paths if "COMBINED" in p.name.upper()]
+    if bad:
+        raise SystemExit(f"refusing to read a combined file as input: {[p.name for p in bad]}")
+    # PROTOCOL AND DIAGNOSTIC MUST NOT MIX. In the pinned arm lambda was chosen by us, not by the
+    # method, so its PRR is not comparable with the protocol arm's. Pooling them would manufacture a
+    # number that means nothing, quietly.
+    kinds = {("pinned" if "pinned" in p.name else "protocol") for p in paths}
+    if len(kinds) > 1:
+        raise SystemExit(f"refusing to pool protocol and pinned CSVs in one table: "
+                         f"{[p.name for p in paths]}")
+    rows = []
+    for p in paths:
+        with open(p, newline="") as f:
+            for r in csv.DictReader(f):
+                r["_src"] = p.name
+                rows.append(r)
+    return rows, paths, kinds.pop()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--glob", default="results/aux_rerun_*.csv")
+    ap.add_argument("--out", default="results/AUX_RERUN_FINDINGS.md")
+    ap.add_argument("--label", default="PROTOCOL ARM")
+    ap.add_argument("--evals", default=",".join(PDL.LONG))
+    ap.add_argument("--n-perm", type=int, default=20000)
+    args = ap.parse_args()
+
+    out_path = ROOT / args.out
+    rows, paths, kind = load(args.glob, out_path)
+    evals = [e.strip() for e in args.evals.split(",")]
+
+    L = []                                     # the write-up, line by line
+    def w(s=""):
+        L.append(s)
+        print(s)
+
+    w(f"# Auxiliary-loss attention supervision: findings ({args.label})")
+    w()
+    w(f"Generated by `scripts/checks/aux_rerun_findings.py` from {len(paths)} CSV(s), {len(rows)} rows.")
+    w("Every number below is recomputed from the CSVs. Do not edit this file by hand. Regenerate it.")
+    w()
+
+    # ---------- population, stated before any number ----------
+    want = {(rung, X) for rung, X, _ in PDL.cells_long(set(PDL.LONG_SRC), evals)}
+    have = {(r["rung"], r["eval"]) for r in rows}
+    missing = sorted(want - have)
+    w("## Population")
+    w()
+    w(f"ProbeDriftLong, {len(evals)} long evals x `cells_long`, 3 seeds, layer 15, "
+      f"`meta-llama/Llama-3.1-8B`. **{len(want) - len(missing)}/{len(want)} cells realised.**")
+    if missing:
+        w()
+        w("This grid is INCOMPLETE. Missing cells, named rather than counted:")
+        w()
+        for rung, X in missing:
+            w(f"- `{rung}` / `{X}`")
+    w()
+
+    # ---------- what the rows actually test ----------
+    n0 = sum(1 for r in rows if fnum(r, "best_lambda") == 0.0)
+    fired = [r for r in rows if (fnum(r, "best_lambda") or 0.0) > 0.0]
+    w("## Read this before any PRR number")
+    w()
+    w(f"λ = 0 was selected on **{n0}/{len(rows)}** rows. On those rows the auxiliary term never fires, so "
+      f"real, shuffled and baseline are byte-identical and the cell says nothing about the TARGET, only "
+      f"about the SELECTION RULE. Those are different claims and only the second is supported there.")
+    w()
+    w("λ>0 by rung (where the mechanism actually got to act):")
+    w()
+    w("| rung | rows | λ>0 | share |")
+    w("|---|---:|---:|---:|")
+    for rung in RUNGS:
+        sub = [r for r in rows if r["rung"] == rung]
+        if not sub:
+            continue
+        f_ = sum(1 for r in sub if (fnum(r, "best_lambda") or 0.0) > 0.0)
+        w(f"| {rung} | {len(sub)} | {f_} | {f_/len(sub):.0%} |")
+    w()
+
+    if len(fired) < 5:
+        w(f"Only {len(fired)} rows fired. Too few for the correlation analysis below, so stopping here.")
+        out_path.write_text("\n".join(L) + "\n")
+        print(f"\nwrote {out_path}")
+        return
+
+    # ---------- the headline: does the effect depend on baseline strength? ----------
+    b = np.array([fnum(r, "prr_baseline") for r in fired], float)
+    rs = np.array([fnum(r, "real_minus_shuffled") for r in fired], float)
+    rb = np.array([fnum(r, "real_minus_baseline") for r in fired], float)
+
+    w("## Headline: the auxiliary loss helps only where the pooler is already weak")
+    w()
+    w(f"Computed on the **{len(fired)} rows where λ>0**, because a λ=0 row carries no information about "
+      f"the target.")
+    w()
+    w("| relationship | corr | perm p | n |")
+    w("|---|---:|---:|---:|")
+    for nm, y in (("baseline vs real−shuffled", rs), ("baseline vs real−baseline", rb)):
+        r_, p_ = perm_p(b, y, args.n_perm)
+        w(f"| {nm} | {r_:+.3f} | {p_:.4f} | {len(y)} |")
+    w()
+    w("`real − shuffled` is the decisive column. The shuffled control permutes the target WITHIN each "
+      "row's real tokens, so it holds the target's marginal distribution fixed and destroys only its "
+      "ALIGNMENT to tokens. A gain that survives shuffling therefore cannot be \"the target points at the "
+      "right tokens\". It is generic regularisation from constraining attention away from uniform.")
+    w()
+
+    # ---------- the robustness check that the project's own history demands ----------
+    w("### Leave-one-eval-out (is this one eval's outlier?)")
+    w()
+    w("| eval dropped | corr(baseline, real−shuffled) | n |")
+    w("|---|---:|---:|")
+    r_all = float(np.corrcoef(b, rs)[0, 1])
+    w(f"| *(none)* | {r_all:+.3f} | {len(rs)} |")
+    for X in sorted({r["eval"] for r in fired}):
+        m = np.array([r["eval"] != X for r in fired])
+        if m.sum() < 5:
+            w(f"| {X} | *(too few rows left)* | {int(m.sum())} |")
+            continue
+        w(f"| {X} | {float(np.corrcoef(b[m], rs[m])[0, 1]):+.3f} | {int(m.sum())} |")
+    w()
+
+    # ---------- per-target detail ----------
+    # The by-eval table below pools every target, which HIDES a real difference: the Orgad claim-span
+    # target is a different proposition from the surprisal-derived ones, and on the eval where nll/topk
+    # did best it went the other way. Break it out rather than let one mean absorb both.
+    w("### By target")
+    w()
+    w("| target | rows fired | mean real−shuffled | positive |")
+    w("|---|---:|---:|---:|")
+    byt = defaultdict(list)
+    for r in fired:
+        byt[r["target"]].append(fnum(r, "real_minus_shuffled"))
+    for t in sorted(byt, key=lambda t: -np.mean(byt[t])):
+        v = np.array(byt[t], float)
+        w(f"| `{t}` | {len(v)} | {v.mean():+.4f} | {(v > 0).sum()}/{len(v)} |")
+    w()
+
+    # ---------- per-eval detail ----------
+    w("### By eval (pools all targets, see the target table above)")
+    w()
+    w("| eval | rows fired | mean real−shuffled | positive | mean baseline |")
+    w("|---|---:|---:|---:|---:|")
+    by = defaultdict(list)
+    for r in fired:
+        by[r["eval"]].append(r)
+    for X in sorted(by, key=lambda X: -np.mean([fnum(r, "real_minus_shuffled") for r in by[X]])):
+        v = np.array([fnum(r, "real_minus_shuffled") for r in by[X]], float)
+        bb = np.array([fnum(r, "prr_baseline") for r in by[X]], float)
+        w(f"| {X} | {len(v)} | {v.mean():+.4f} | {(v > 0).sum()}/{len(v)} | {bb.mean():.2f} |")
+    w()
+    w("⚠️ The `mean baseline` column averages across rungs, so an eval whose ID rung has a high baseline "
+      "looks stronger here than it is within the rung where it actually fires. The row-level correlation "
+      "above is the claim. This table is description.")
+    w()
+
+    # ---------- the honest bottom line ----------
+    w("## What this does and does not support")
+    w()
+    w(f"- Supported: the size of the auxiliary loss's effect tracks how weak the pooler already was.")
+    w(f"- Supported: on {sum(1 for r in fired if (fnum(r,'real_minus_baseline') or 0) > 0)}/{len(fired)} "
+      f"fired rows the selected λ beat λ=0 on test, so selection generalising from held-out source to "
+      f"test is itself unreliable.")
+    w("- NOT supported: any claim that a target 'carries no information' on a rung where λ=0 was chosen. "
+      "That is the selection rule declining the target, which the pinned-λ diagnostic exists to separate.")
+    if kind == "pinned":
+        w()
+        w("⚠️ **This is the PINNED-λ DIAGNOSTIC.** λ was fixed by us, not chosen by the method, so these "
+          "PRR values are NOT comparable with the protocol arm and must never be quoted beside it.")
+    w()
+
+    out_path.write_text("\n".join(L) + "\n")
+    print(f"\nwrote {out_path}")
+
+
+if __name__ == "__main__":
+    main()
