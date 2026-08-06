@@ -24,7 +24,14 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-RESULTS = ROOT / "results"
+# ⚠️ `results/` is gitignored and lives in the MAIN CHECKOUT only. A git worktree gets its own empty
+# results/ dir, and resolving relative to __file__ then silently reads almost nothing -- this assembler
+# was run from a worktree once and produced a table where every arm row was blank, which reads as
+# "not measured" rather than "not found". Prefer the local dir only if it actually holds the master
+# sources; otherwise fall back to the canonical path. Same trap as the attention sidecars.
+_BASE_RESULTS = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results")
+_local = ROOT / "results"
+RESULTS = _local if list(_local.glob("pdl_fam_*.csv")) else _BASE_RESULTS
 EPHEM = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 
@@ -40,6 +47,15 @@ ORDER = ["msp_sum", "perplexity", "msp_min",
          "SAPLMA", "P(True)", "P(True)-unsup", "Lookback Lens",
          "armB(mean-pool)", "armA(attention)",
          "armC:content-mass", "armC:NLL", "armD:content-mass", "armD:NLL",
+         # S4 top-k surprisal prior (complete 8x5 grid, 2026-08-06). The SHUFFLED rows are the
+         # control, not a method: same number of tokens, random positions. They belong in the
+         # table because the top-k rows are only interpretable against them.
+         "armC:top-1", "armD:top-1",
+         "armC:top-5", "armD:top-5",
+         "armC:top-25", "armD:top-25",
+         "armC:top-25%", "armD:top-25%",
+         "armC:top-5+floor", "armD:top-5+floor",
+         "armC:top-5-SHUFFLED-ctrl", "armD:top-5-SHUFFLED-ctrl",
          "multi-head(MH)", "multi-head-ablation(ABL)",
          "MultiMax", "Max-of-Rolling-Means(w10)",
          "score-std:V2(entropy-solve)", "score-std:LayerNorm-ctrl",
@@ -76,6 +92,13 @@ ALIAS = {
     "attention": "armA(attention)", "armA": "armA(attention)",
     "armC_content_mass": "armC:content-mass", "armC_nll": "armC:NLL",
     "armD_content_mass": "armD:content-mass", "armD_nll": "armD:NLL",
+    "armC_topk:1": "armC:top-1", "armD_topk:1": "armD:top-1",
+    "armC_topk:5": "armC:top-5", "armD_topk:5": "armD:top-5",
+    "armC_topk:25": "armC:top-25", "armD_topk:25": "armD:top-25",
+    "armC_topk:0.25": "armC:top-25%", "armD_topk:0.25": "armD:top-25%",
+    "armC_topk:5:floor=0.05": "armC:top-5+floor", "armD_topk:5:floor=0.05": "armD:top-5+floor",
+    "armC_topk:5:shuf": "armC:top-5-SHUFFLED-ctrl", "armD_topk:5:shuf": "armD:top-5-SHUFFLED-ctrl",
+
     "mh": "multi-head(MH)", "ablation": "multi-head-ablation(ABL)",
     "multimax": "MultiMax", "rolling_w10": "Max-of-Rolling-Means(w10)",
     "zstd_V2": "score-std:V2(entropy-solve)", "layernorm_ctrl": "score-std:LayerNorm-ctrl",
@@ -134,6 +157,10 @@ SOURCES = [
     ("ensemble_wmsp_saplma_full__" + SLUG + ".csv", 2, "3seed", "prr_mean"),   # 3E: all 8 evals + {wMSP,MSP}
     ("ensemble_wmsp_saplma__" + SLUG + ".csv", 2, "3seed", "prr_mean"),        # 6-eval predecessor (overlaps agree)
     ("aggregation_variants_3A__" + SLUG + ".csv", 3, "seed1", "prr"),
+    # S4 top-k (2026-08-06). Priority 4 = LOWEST, deliberately: these files also carry
+    # floor_min/armA/armB/armC_nll/armD_nll, and those must keep coming from the authoritative
+    # sources above. Only the topk_* rows are new, so this adds without ever overriding.
+    ("s4_topk_*__" + SLUG + ".csv", 4, "3seed", "prr_mean"),
 ]
 ROUTER_GLOB = "router_pdl__" + SLUG + ".csv"
 
