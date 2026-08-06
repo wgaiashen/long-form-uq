@@ -146,7 +146,15 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 # the important-token CONCEPT becomes the SET of claim-bearing spans (the verdict PLUS the findings/
 # entities/numbers), exactly like the summary variant but keeping the yes/no verdict. Returns a list.
 # --------------------------------------------------------------------------------------------------
-LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa"}
+# ⚠️ A DATASET MISSING FROM THIS SET DOES NOT FAIL -- IT SILENTLY GETS THE WRONG PROMPT. `extract_important`
+# falls through to `extract_model_answer`, the SHORT-ANSWER prompt, which asks for "the short answer" to a
+# question. On a biography or a long-form QA answer that mostly returns "NO ANSWER", so the run completes,
+# costs real money, and writes a cache that looks fine and is nearly empty. Caught 2026-08-06 before
+# spending on factscore/asqa. Anything long-form and claim-bearing belongs here.
+#   asqa      -- long-form QA, answers carry multiple verifiable claims
+#   factscore -- biographies; not literally "QA", but the claim-span prompt (entities, dates, numbers) is
+#                exactly right for them, and the short-answer prompt is exactly wrong
+LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa", "asqa", "factscore"}
 
 LONGFORM_QA_PROMPT = """Extract from the following answer the claim-bearing terms a reader would need to verify to judge whether the answer is correct: any explicit yes/no verdict, the key findings or conclusions, and the specific entities (drugs, genes, conditions, procedures), numbers, and dates. Copy each term verbatim from the answer, one per line, and keep each term SHORT -- a word or short phrase, NOT a whole sentence. If the answer states nothing verifiable, output NO ANSWER.
 
