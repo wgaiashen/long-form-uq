@@ -26,3 +26,8 @@ logs/
 
 # PBS job logs (persistent by design -- see pbs/topk_prior_one_eval.pbs -- but not artifacts to track)
 logs/
+
+# The worktree's cache is a SYMLINK to the main checkout's cache, so the existing 'cache/'
+# pattern (which matches directories) never matched it and it sat untracked forever. A permanently
+# dirty 'git status' is not cosmetic here: the untracked-file sweep in CLAUDE.md relies on it.
+cache
