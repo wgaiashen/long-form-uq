@@ -30,9 +30,52 @@ import csv as _csv
 
 # Column order is FIXED here rather than taken from `rows[0]`. Deriving it from the first row meant the
 # header depended on whichever cell happened to finish first, and crashed outright on an empty run.
-_FIELDS = ["rung", "eval", "seed", "target", "K", "J_supervised", "head_attn_corr", "best_lambda",
+_FIELDS = ["rung", "eval", "seed", "target", "K", "J_supervised", "head_selection",
+           "head_attn_corr", "head_corr_sup_free", "head_corr_within_sup", "head_corr_within_free",
+           "best_lambda", "lambda_selection", "held_out_dataset", "n_pool_sources",
            "drop_epoch", "prr_baseline", "prr_real", "prr_shuffled", "real_minus_shuffled",
            "real_minus_baseline", "n_target_fallback", "n_test"]
+# `lambda_selection` records WHICH criterion picked this row's λ: `held_out_source` (a whole source dataset
+# was held out) or `same_dataset_slice` (a random carve, the only option when the pool has ONE source --
+# every ID cell and every 1ds-Diff cell, by construction, plus factscore's SameTask whose family is just
+# {expertqa, factscore}). 9 of the 20 cells in this run are single-source.
+#
+# ⚠️ READ THE TWO CLAIMS SEPARATELY. The auxiliary LOSS is tested on all 20 cells -- `real_minus_shuffled`
+# is valid everywhere, because the shuffled control is run under whatever λ was chosen. The new
+# λ-SELECTION criterion is tested on only the 11 multi-source cells. A fallback row is evidence about the
+# loss, just not about the criterion, so never pool the two when reporting the criterion.
+#
+# LIMITATION FOUND BEFORE LAUNCH (2026-08-05): §5 pre-registers that the loss should help MOST at the
+# narrow-pool rungs (1ds-Diff, SameTask) -- which are exactly the cells that cannot hold a source out.
+# The rungs the prediction leans on are the ones the new criterion cannot reach. Recorded here rather
+# than discovered in the results.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────
+# HEAD-SUBSET ARM: `head_selection` is ALWAYS "arbitrary_J", never "greedy". The paper picks the top J
+# heads by supervising each individually and ranking them. That is NOT what runs here, and the honest
+# label is more informative than the paper's would be:
+#
+#   Greedy per-head ranking was not implemented. At zero-init the heads are exchangeable, so first-J is
+#   an arbitrary-J draw; B.2 established that the heads do not diverge under a shared training
+#   condition, so a ranking would have nothing to sort.
+#
+# The paper's rationale does not transfer. Its 12 heads sit inside a FINE-TUNED BERT -- trained, and so
+# specialised, which makes ranking them a ranking of genuinely different objects. Ours sit on a FROZEN
+# Llama, are initialised identically, and B.2 measured them collapsing to 0.996-1.000 correlation
+# whenever they share a training condition. Implementing greedy would sort objects already measured to
+# be indistinguishable. Put this line in every caption for a K>1 row.
+#
+# THE GUARD (`head_corr_sup_free`). The arm exists to test the paper's STRUCTURAL claim: that leaving
+# some heads free while supervising others beats supervising all of them. That comparison only means
+# something if the free heads actually diverge from the supervised ones under this loss -- which B.2
+# says they may not. So the supervised x free correlation block is reported ALONGSIDE the PRR.
+#
+#   ⚠️ PRE-REGISTERED READING RULE: if head_corr_sup_free comes back at ~0.99, this arm did NOT test the
+#   paper's claim. It re-confirmed that the heads will not diverge, and must be written up that way --
+#   NOT as "subset-of-heads does not help". Same numbers, two very different conclusions.
+#
+# Blank (not 0) when J==0 or J==K: there is no supervised/free split to measure, and a blank reads as
+# not-measured while a 0 would read as measured-and-uncorrelated.
 
 
 def _out_path(args):
@@ -118,6 +161,38 @@ def _val_split_random(tr_idx, seed):
     perm = np.random.RandomState(seed).permutation(len(tr_idx))
     n_val = max(1, int(round(len(tr_idx) * VAL_FRAC)))
     return [tr_idx[i] for i in perm[n_val:]], [tr_idx[i] for i in perm[:n_val]]
+
+
+def _blockmeans(M, J, K):
+    """Split the K x K head-correlation matrix into supervised (0..J-1) x free (J..K-1) blocks.
+
+    THE POINT OF THE ARM. Supervising a SUBSET only differs from supervising ALL if the free heads end up
+    doing something different from the supervised ones. This returns the number that says whether they
+    did. `head_attention_correlation` already computes the full matrix and the driver used to throw it
+    away, so nothing new is measured here -- it is sliced.
+
+    Returns (sup_x_free, within_sup, within_free), each None when that block does not exist. None ->
+    written as BLANK, never 0: "no supervised/free split" and "split exists and is uncorrelated" must not
+    look the same in the CSV.
+    """
+    import numpy as _np
+    if M is None or J is None or not (0 < J < K):     # J=0 (all free) or J=K (all supervised): no split
+        return None, None, None
+    sup, free = list(range(J)), list(range(J, K))
+    sup_free = float(_np.nanmean(M[_np.ix_(sup, free)]))
+
+    def _within(g):                                   # off-diagonal mean within one group; needs >=2 heads
+        if len(g) < 2:
+            return None
+        sub = M[_np.ix_(g, g)]
+        off = ~_np.eye(len(g), dtype=bool)
+        return float(_np.nanmean(sub[off]))
+    return sup_free, _within(sup), _within(free)
+
+
+def _r4(x):
+    """Round for the CSV, but keep None/NaN as BLANK rather than letting them become a number."""
+    return "" if x is None or x != x else round(x, 4)
 
 
 def fit_and_score(states, y, tr, te, device, seed, best_T, return_model=False, **kw):
@@ -215,10 +290,12 @@ def main():
                 # λ selected by holding out a WHOLE SOURCE DATASET (see val_split_held_out_source). Same-dataset
                 # validation structurally cannot see an OOD-robustness gain bought at an ID cost.
                 sub_tr, sub_val, held_out = val_split_held_out_source(tr_idx, train_rows, sd)
+                n_pool_sources = len(set(d for d, _i in train_rows))
                 if held_out is None:
-                    print(f"  [{rung}/{X}] λ-selection FELL BACK to a random carve (single-source pool; "
-                          "an ID cell cannot pose an OOD question) — read this λ as the weaker criterion",
-                          flush=True)
+                    print(f"  [{rung}/{X}] λ-selection FELL BACK to a random carve (single-source pool: "
+                          f"{sorted(set(d for d, _i in train_rows))}) — this row's λ comes from the WEAKER "
+                          "criterion; `real_minus_shuffled` still tests the loss, but the row is not "
+                          "evidence about held-out-source selection", flush=True)
                 # λ is selected on the SAME architecture it will be used with (mh_kw threaded through),
                 # otherwise K=4 runs would inherit a λ tuned on a 1-head model. Selection supervises all
                 # K heads; J is varied afterwards, so λ is not tuned per-J -- stated rather than hidden,
@@ -240,18 +317,36 @@ def main():
                     # heads prevents the collapse we already measured at 0.996-1.000. If the heads still
                     # collapse, the PRR is uninformative -- a difference between arms with identical
                     # attention is a difference in the classifier, not the aggregation.
-                    corr = (head_attention_correlation(m_real, states, te_idx, device)[0]
-                            if args.n_query > 1 else float("nan"))
+                    if args.n_query > 1:
+                        corr, cmat = head_attention_correlation(m_real, states, te_idx, device)
+                    else:
+                        corr, cmat = float("nan"), None
+                    # supervised x free block -- the guard that says whether this arm tested the paper's
+                    # structural claim at all (see the header note on the pre-registered reading rule)
+                    c_sf, c_ws, c_wf = _blockmeans(cmat, J, args.n_query)
                     rows.append({"rung": rung, "eval": X, "seed": sd, "target": tname,
                                  "K": args.n_query, "J_supervised": J,
-                                 "head_attn_corr": (round(corr, 4) if corr == corr else ""),
-                                 "best_lambda": best_lam, "drop_epoch": args.drop_epoch,
+                                 # never "greedy": the paper's ranking step is not implemented, and at
+                                 # zero-init the heads are exchangeable so first-J is an arbitrary draw
+                                 "head_selection": ("arbitrary_J" if args.n_query > 1 else ""),
+                                 "head_attn_corr": _r4(corr),
+                                 "head_corr_sup_free": _r4(c_sf),
+                                 "head_corr_within_sup": _r4(c_ws),
+                                 "head_corr_within_free": _r4(c_wf),
+                                 "best_lambda": best_lam,
+                                 "lambda_selection": ("same_dataset_slice" if held_out is None
+                                                      else "held_out_source"),
+                                 "held_out_dataset": (held_out or ""),
+                                 "n_pool_sources": n_pool_sources,
+                                 "drop_epoch": args.drop_epoch,
                                  "prr_baseline": round(base, 4), "prr_real": round(real, 4),
                                  "prr_shuffled": round(shuf, 4),
                                  "real_minus_shuffled": round(real - shuf, 4),
                                  "real_minus_baseline": round(real - base, 4),
                                  "n_target_fallback": int(n_fb), "n_test": len(te_idx)})
                     ctxt = f"corr {corr:+.4f}  " if corr == corr else ""
+                    if c_sf is not None:
+                        ctxt += f"sup|free {c_sf:+.4f}  "
                     print(f"  [{rung:14s}] {X:<13} {tname:<12} s{sd} K={args.n_query} J={J} "
                           f"λ={best_lam:.2f}  {ctxt}base {base:+.3f} real {real:+.3f} shuf {shuf:+.3f}  |  "
                           f"real-shuf {real-shuf:+.3f}", flush=True)
@@ -280,7 +375,7 @@ def main():
                  if idc else ""))
     print("\nCarry-forward decision is on the COUNT (and the ID cells), not the mean -- only ID cells of "
           "the non-regenerating datasets are permanent.")
-    print(f"wrote {out}")
+    print(f"wrote {_out_path(args)}")
 
 
 if __name__ == "__main__":
