@@ -156,7 +156,75 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 #                exactly right for them, and the short-answer prompt is exactly wrong
 LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa", "asqa", "factscore"}
 
-LONGFORM_QA_PROMPT = """Extract from the following answer the claim-bearing terms a reader would need to verify to judge whether the answer is correct: any explicit yes/no verdict, the key findings or conclusions, and the specific entities (drugs, genes, conditions, procedures), numbers, and dates. Copy each term verbatim from the answer, one per line, and keep each term SHORT -- a word or short phrase, NOT a whole sentence. If the answer states nothing verifiable, output NO ANSWER.
+# ⚠️ DOMAIN-NEUTRAL BY DESIGN (rewritten 2026-08-06). The first version named medical entity types
+# explicitly -- "drugs, genes, conditions, procedures" -- and BOTH few-shot examples were biomedical
+# (DMSO/telomerase, ETHE1). That was written when this path served pubmed_qa and med_quad only. Applied to
+# a BIOGRAPHY (factscore) it asks for drugs and genes when the claim-bearing terms are names, dates, places
+# and roles; applied to open-domain QA (asqa) it steers the same way. In-context examples shape the output
+# strongly, so this was not cosmetic -- it would have produced systematically wrong spans on every
+# non-medical dataset, and expertqa (CROSS-DOMAIN expert QA) had already been extracted under it.
+# The entity list is now generic and the three examples span biomedical / biographical / general knowledge,
+# so no single domain dominates the demonstration.
+LONGFORM_QA_PROMPT = """Extract from the following answer the claim-bearing terms a reader would need to verify to judge whether the answer is correct: any explicit yes/no verdict, the key findings or conclusions, and the specific entities (people, places, organisations, works, substances, or other named things), numbers, and dates. Copy each term verbatim from the answer, one per line, and keep each term SHORT -- a word or short phrase, NOT a whole sentence. If the answer states nothing verifiable, output NO ANSWER.
+
+Question: Does dimethyl sulfoxide (DMSO) cause a reversible inhibition of telomerase activity?
+Answer: Yes, DMSO causes a reversible inhibition of telomerase activity in a Burkitt lymphoma cell line.
+Spans:
+Yes
+reversible inhibition
+telomerase activity
+Burkitt lymphoma
+
+Question: Tell me a bio of Ada Lovelace.
+Answer: Ada Lovelace was an English mathematician born in 1815, the daughter of the poet Lord Byron. She worked with Charles Babbage on the Analytical Engine and is often described as the first computer programmer.
+Spans:
+English
+mathematician
+1815
+Lord Byron
+Charles Babbage
+Analytical Engine
+first computer programmer
+
+Question: Where was the 1936 Summer Olympics held?
+Answer: The 1936 Summer Olympics were held in Berlin, Germany, from 1 to 16 August 1936. They were the first Olympics to be televised.
+Spans:
+1936 Summer Olympics
+Berlin
+Germany
+1 to 16 August 1936
+first Olympics to be televised
+
+Question: {question}
+Answer: {model_answer}
+Spans:"""
+
+
+# ⚠️ PER-DOMAIN PROMPT SPLIT (author's decision, 2026-08-06). The claim-span prompt comes in two forms and
+# the dataset chooses. This is a DELIBERATE, RECORDED inconsistency, not an accident, and it must be stated
+# in any table caption that uses Orgad masks:
+#   MEDICAL_QA_DATASETS  -> the biomedical prompt (drugs/genes/conditions/procedures, biomedical examples).
+#                           Correct for pubmed_qa and med_quad, which ARE biomedical, and their existing
+#                           masks were built with it, so they need no re-extraction.
+#   everything else      -> the domain-neutral prompt (people/places/organisations/works/substances, with
+#                           biomedical + biographical + general-knowledge examples).
+# ⚠️ expertqa is NOT medical -- it is multi-domain expert QA (law, engineering, healthcare, and more) -- so
+# it moves to the neutral prompt and its old masks are DISCARDED and re-extracted. Extracting cross-domain
+# answers under a prompt that names only biomedical entity types would bias every span it produced.
+MEDICAL_QA_DATASETS = {"pubmed_qa", "med_quad"}
+
+
+def is_medical_qa(dataset):
+    return dataset in MEDICAL_QA_DATASETS
+
+
+def is_longform_qa(dataset):
+    return dataset in LONGFORM_QA_DATASETS
+
+
+# The ORIGINAL biomedical form, kept verbatim so pubmed_qa/med_quad masks stay reproducible from the code
+# that made them. Do NOT "improve" it -- their cached masks were extracted under exactly this text.
+MEDICAL_QA_PROMPT = """Extract from the following answer the claim-bearing terms a reader would need to verify to judge whether the answer is correct: any explicit yes/no verdict, the key findings or conclusions, and the specific entities (drugs, genes, conditions, procedures), numbers, and dates. Copy each term verbatim from the answer, one per line, and keep each term SHORT -- a word or short phrase, NOT a whole sentence. If the answer states nothing verifiable, output NO ANSWER.
 
 Question: Does dimethyl sulfoxide (DMSO) cause a reversible inhibition of telomerase activity?
 Answer: Yes, DMSO causes a reversible inhibition of telomerase activity in a Burkitt lymphoma cell line.
@@ -179,17 +247,14 @@ Answer: {model_answer}
 Spans:"""
 
 
-def is_longform_qa(dataset):
-    return dataset in LONGFORM_QA_DATASETS
-
-
-def extract_longform_qa_spans(question, model_answer, model="gpt-5-mini", max_retries=4):
+def extract_longform_qa_spans(question, model_answer, model="gpt-5-mini", max_retries=4, medical=False):
     """Refined important-token extraction for LONG-FORM QA: the SET of claim-bearing spans (verdict +
     findings + entities + numbers). Returns a list of validated spans (each a non-empty substring of the
     model answer; possibly empty). Same validity rule as the summary/exact-answer variants."""
     if not isinstance(model_answer, str) or not model_answer.strip():
         return []
-    prompt = LONGFORM_QA_PROMPT.format(question=str(question), model_answer=model_answer)
+    tmpl = MEDICAL_QA_PROMPT if medical else LONGFORM_QA_PROMPT
+    prompt = tmpl.format(question=str(question), model_answer=model_answer)
     client = _get_client()
     for _ in range(max_retries):
         try:
@@ -223,7 +288,7 @@ def extract_important(dataset, question, model_answer, model="gpt-5-mini", varia
     if is_summarisation(dataset):
         return extract_summary_spans(model_answer, model=model)
     if variant == "broad" and is_longform_qa(dataset):
-        return extract_longform_qa_spans(question, model_answer, model=model)
+        return extract_longform_qa_spans(question, model_answer, model=model, medical=is_medical_qa(dataset))
     return extract_model_answer(question, model_answer, model=model)
 
 
