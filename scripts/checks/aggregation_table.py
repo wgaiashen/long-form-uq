@@ -99,7 +99,8 @@ def paired_bootstrap(yte, unc_a, unc_b, b=BOOT_B):
 
 
 @torch.no_grad()
-def attn_unc(model, states, te_idx, device, answer_only=False, bs=64, prior_list=None):
+def attn_unc(model, states, te_idx, device, answer_only=False, bs=64, prior_list=None,
+             head_priors=None):
     """Per-example uncertainty vector (1 - sigmoid(logit)) for a trained AttnPool on te_idx -- the
     same computation as attn_pool.attn_prr but returning the predictions (needed for the bootstrap).
     `prior_list` (S3): per-example prior weight vectors aligned to `states`; passed to forward for the
@@ -113,6 +114,9 @@ def attn_unc(model, states, te_idx, device, answer_only=False, bs=64, prior_list
             mask = _mask_answer_only(mask)
         prior_b = (pad_prior([prior_list[i] for i in idx], X.shape[1], device)
                    if prior_list is not None else None)
+        if head_priors is not None:              # S7: (B, T, Q) per-head recipes, same as training
+            from attn_pool import pad_head_priors
+            prior_b = pad_head_priors(head_priors, idx, X.shape[1], device)
         logit, _ = model(X, mask, pos, prior=prior_b)
         p = torch.sigmoid(logit)
         if p.dim() == 2:                     # S6 multi-head: ensemble by mean-of-sigmoids

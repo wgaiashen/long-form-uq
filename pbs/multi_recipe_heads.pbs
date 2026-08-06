@@ -1,0 +1,61 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=48:00:00
+#PBS -N luq_mrh
+#PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
+#PBS -j oe
+# ⚠️ 48h, NOT 24h. On 2026-08-05 four S4 jobs were killed at a 24h wall with two rungs still to compute,
+# and the LOO rung (train on all seven other datasets) is the expensive one in every ladder we have run.
+# RCS has 72h queues, so a 24h request was never a constraint -- just a bad default. The -o path is
+# persistent home, not purgeable scratch, and the log is tee'd LIVE so progress is visible during the run
+# and survives a kill; PBS writes its own -o only at job exit.
+#
+# S7 — pooling heads with different FIXED recipes (pre-registered: prereg/S7_multi_recipe_heads.md).
+#
+# Pass with -v:  EVAL=<eval>  [RECIPES=<specs joined by '+'>]  [RUNGS=<base rungs joined by '+'>]  [OUT=<abs>]
+# '+' joins list values because PBS -v splits its own variables on commas.
+#
+#   qsub -v EVAL=xsum pbs/multi_recipe_heads.pbs
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+
+: "${RECIPES:=nll+topk:25+content_mass}"
+: "${RUNGS:=}"
+RESULTS_DIR="${RESULTS_DIR:-/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results}"
+: "${OUT:=$RESULTS_DIR/s7_mrh_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv}"
+
+: "${LOGDIR:=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs}"
+mkdir -p "$LOGDIR"
+exec > >(tee -a "$LOGDIR/s7_mrh_${EVAL}_${PBS_JOBID%%.*}.log") 2>&1
+
+echo "[s7] host $(hostname)  EVAL=$EVAL"
+echo "[s7] LUQ_REPO=$LUQ_REPO  commit=$(git -C "$LUQ_REPO" rev-parse --short HEAD 2>/dev/null)"
+echo "[s7] RECIPES=${RECIPES//+/,}   RUNGS=${RUNGS//+/,}"
+echo "[s7] OUT=$OUT"
+
+# Guard 1: the S7 code must exist in the checkout this job actually resolved to (LUQ_REPO is set from
+# PBS_O_WORKDIR), or the run silently measures something else.
+grep -q "def pad_head_priors" "$LUQ_REPO/scripts/checks/attn_pool.py" || {
+  echo "FATAL: pad_head_priors absent from $LUQ_REPO — submitted from a checkout without S7"; exit 2; }
+
+# Guard 2: the pre-registration must be present. This arm's thresholds are only meaningful if they were
+# fixed before the numbers existed, and the file being in the tree is the cheapest evidence of that.
+[ -f "$LUQ_REPO/prereg/S7_multi_recipe_heads.md" ] || {
+  echo "FATAL: prereg/S7_multi_recipe_heads.md missing — refusing to run an unregistered arm"; exit 3; }
+
+# Guard 3: never clobber. A re-run goes to a new path so two populations cannot merge silently.
+if [ -e "$OUT" ]; then echo "FATAL: target exists, refusing to clobber: $OUT"; exit 4; fi
+
+# Guard 4: the canonical ladders are a DIFFERENT population and must be byte-identical afterwards.
+PROT="$RESULTS_DIR/fixed_prior_ladder__meta-llama_Meta-Llama-3.1-8B.csv"
+[ -e "$PROT" ] && echo "[s7] PROT size BEFORE=$(stat -c%s "$PROT")"
+
+RUNG_ARGS=()
+if [ -n "$RUNGS" ]; then RUNG_ARGS=(--rungs "${RUNGS//+/,}"); fi
+
+python -u scripts/checks/multi_recipe_heads.py \
+  --evals "$EVAL" --seeds 1,2,3 --recipes "${RECIPES//+/,}" --out "$OUT" "${RUNG_ARGS[@]}"
+RC=$?
+
+echo "[s7] DONE rc=$RC -> $OUT ($(wc -l <"$OUT" 2>/dev/null) rows)"
+[ -e "$PROT" ] && echo "[s7] PROT size AFTER=$(stat -c%s "$PROT")  (must equal BEFORE)"

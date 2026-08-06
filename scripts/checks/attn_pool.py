@@ -144,6 +144,20 @@ def pad_prior(priors_list, tmax, device):
     return P.to(device)
 
 
+def pad_head_priors(head_priors, idx, tmax, device):
+    """S7 — stack per-HEAD recipes into the (B, T, Q) tensor the multi-head forward expects.
+
+    `head_priors` is a list of length Q, one entry per query head: either a per-example prior list (a
+    fixed recipe) or None (a free, learned head). A free head's column is filled with zeros and is never
+    read, because only the indices in `frozen_heads` are substituted -- but the column must still exist so
+    the tensor's head axis lines up with the attention's, rather than being silently re-indexed.
+    """
+    cols = [(pad_prior([hp[i] for i in idx], tmax, device) if hp is not None
+             else torch.zeros(len(idx), tmax, device=device))
+            for hp in head_priors]
+    return torch.stack(cols, dim=2)                                  # (B, T, Q)
+
+
 def normalise_target(D, mask):
     """Row-normalise a padded target to a DISTRIBUTION over real tokens, so it is on the same footing as
     the attention `a` (a softmax, which already sums to 1 over real tokens).
@@ -268,7 +282,7 @@ def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False)
     return float(e.mean()) if len(e) else 0.0
 
 
-def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False):
+def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False, head_priors=None):
     """B.2's PRIMARY diagnostic: do the K attention heads actually differ after training?
 
     ⚠️ This, not PRR, is the question. We already measured the heads collapsing to pairwise correlation
@@ -292,7 +306,13 @@ def head_attention_correlation(model, states, idx, device, bs=64, answer_only=Fa
             X, mask, pos = pad_batch(sub, device)
             if answer_only:
                 mask = _mask_answer_only(mask)
-            _logit, a = model(X, mask, pos)                     # (B, T, K)
+            # S7: a pooler with frozen recipe heads REQUIRES its per-head prior, so the diagnostic must
+            # pass the same recipes the model was trained with. Calling it without them raised, which
+            # would have taken out the one measurement that decides whether the heads really differ.
+            sub_idx = idx[b:b + bs]
+            prior_b = (pad_head_priors(head_priors, sub_idx, X.shape[1], device)
+                       if head_priors is not None else None)
+            _logit, a = model(X, mask, pos, prior=prior_b)      # (B, T, K)
             a = a.detach().cpu().numpy(); m = mask.detach().cpu().numpy().astype(bool)
             for j in range(a.shape[0]):
                 real = m[j]
@@ -360,7 +380,8 @@ class AttnPool(nn.Module):
     """
 
     def __init__(self, d, temperature=1.0, use_position=False, freeze_query=False,
-                 frozen_prior=False, beta=1.0, n_query=1, n_head=1, head_hidden=None):
+                 frozen_prior=False, beta=1.0, n_query=1, n_head=1, head_hidden=None,
+                 frozen_heads=()):
         super().__init__()
         self.q = nn.Parameter(torch.zeros(d))       # primary learned query (init 0 => starts at mean-pool)
         if freeze_query or frozen_prior:
@@ -385,6 +406,14 @@ class AttnPool(nn.Module):
         self.n_head = n_head
         self.q_rest = nn.Parameter(torch.randn(n_query - 1, d) * 0.02) if n_query > 1 else None
         self.heads_rest = nn.ModuleList([_make_head(d, head_hidden) for _ in range(n_head - 1)]) if n_head > 1 else None
+        # S7 (Joe ideas 3+4 — heads with DIFFERENT FIXED recipes): indices of query heads whose attention
+        # IS a supplied recipe rather than a learned query. This is the whole point of the arm: B.2 measured
+        # heads that share a condition collapsing to pairwise correlation 1.0000, and recipes CANNOT collapse
+        # into each other because what makes them differ is not learned. Empty tuple => nothing changes and
+        # every pre-S7 caller (arms A/B/C/D, the B.2 multi-head sweep) takes exactly its old path.
+        self.frozen_heads = tuple(sorted(set(int(h) for h in frozen_heads)))
+        if self.frozen_heads and (min(self.frozen_heads) < 0 or max(self.frozen_heads) >= n_query):
+            raise ValueError(f"frozen_heads={self.frozen_heads} outside 0..{n_query - 1}")
 
     def forward(self, X, mask, posfeat, prior=None):
         # arm C (frozen prior): attention IS the renormalised prior over real tokens; the query is unused.
@@ -413,6 +442,22 @@ class AttnPool(nn.Module):
             scores = scores + self.pos(posfeat)                         # (B, T, 1) broadcast over Q
         scores = scores.masked_fill(mask.unsqueeze(-1) == 0, float("-inf"))
         a = torch.softmax(scores, dim=1)                                # (B, T, Q)
+        # S7 — substitute the FIXED RECIPE for the learned attention on the frozen heads. `prior` is
+        # (B, T, Q) here, one recipe per query head, and only the columns named in `frozen_heads` are
+        # replaced; the rest keep their learned query, so a mixed "3 recipes + 1 free head" pooler is
+        # expressible. The replaced columns never enter the loss through `scores`, so their rows of
+        # `q_rest` receive no gradient -- frozen without needing per-row requires_grad.
+        # `normalise_target` is reused deliberately: it RAISES on a zero-mass row instead of clamping to a
+        # near-zero denominator. A clamp here would hand a recipe that selected nothing an all-but-zero
+        # attention row and a zero pooled vector, i.e. a plausible number in place of an absence.
+        if self.frozen_heads:
+            if prior is None:
+                raise ValueError("frozen_heads set but no prior supplied — the recipe heads have no recipe")
+            if prior.dim() != 3 or prior.shape[2] != a.shape[2]:
+                raise ValueError(f"per-head prior must be (B, T, Q={a.shape[2]}), got {tuple(prior.shape)}")
+            cols = [normalise_target(prior[:, :, q], mask) if q in self.frozen_heads else a[:, :, q]
+                    for q in range(a.shape[2])]
+            a = torch.stack(cols, dim=2)
         pooled = torch.einsum("btq,btd->bqd", a, X)                     # (B, Q, d)
         heads_all = [self.head] + (list(self.heads_rest) if self.heads_rest is not None else [])
         logits = []
@@ -435,7 +480,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                prior_list=None, frozen_prior=False, beta=1.0, n_query=1, n_head=1,
                aux_target=None, aux_lambda=0.0, aux_drop_epoch=None, aux_shuffle=False,
                aux_heads=None, aux_normalise=False, aux_dropped=None,
-               ent_lambda=0.0, ent_threshold=0.7, head_hidden=None):
+               ent_lambda=0.0, ent_threshold=0.7, head_hidden=None,
+               head_priors=None, frozen_heads=()):
     """`n_query`/`n_head` (S6 multi-head, both default 1 = the single-head pooler, unchanged): MH = n_query=n_head=K
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
@@ -470,7 +516,18 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     model = AttnPool(d, temperature=temperature, use_position=use_position,
                      freeze_query=freeze_query or frozen_prior,
                      frozen_prior=frozen_prior, beta=beta, n_query=n_query, n_head=n_head,
-                     head_hidden=head_hidden).to(device)
+                     head_hidden=head_hidden, frozen_heads=frozen_heads).to(device)
+    # S7: `head_priors` (one recipe per query head, None = free head) is the multi-head sibling of
+    # `prior_list`. Passing both is a wiring mistake, not a valid configuration -- `prior_list` is the
+    # single-head (B, T) convention and would be silently ignored on the multi-head path.
+    if head_priors is not None:
+        if prior_list is not None:
+            raise SystemExit("train_attn: pass head_priors OR prior_list, not both")
+        if len(head_priors) != n_query:
+            raise SystemExit(f"head_priors has {len(head_priors)} entries for n_query={n_query}")
+        for h in frozen_heads:
+            if head_priors[int(h)] is None:
+                raise SystemExit(f"head {h} is in frozen_heads but its recipe is None")
     # Separate param groups: the heads (and positional bias) get weight decay against p >> n, but the
     # queries are left UN-decayed (wd_query=0) so they can actually move off zero -- with decay on them, the
     # query collapsed to 0 and the attention stayed uniform (the first run's diagnostic showed this).
@@ -503,6 +560,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                 mask = _mask_answer_only(mask)
             prior_b = (pad_prior([prior_list[i] for i in idx], X.shape[1], device)
                        if prior_list is not None else None)
+            if head_priors is not None:                 # S7: (B, T, Q) per-head recipes
+                prior_b = pad_head_priors(head_priors, idx, X.shape[1], device)
             opt.zero_grad()
             logit, a = model(X, mask, pos, prior=prior_b)
             if logit.dim() == 2:                        # S6 multi-head (B,H): mean of the per-head BCE losses

@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=8gb
+#PBS -l walltime=00:20:00
+#PBS -N luq_s7test
+#PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
+#PBS -j oe
+# S7 self-test — the cheap gate on the per-head fixed-recipe pooler, BEFORE any real cell runs.
+#
+# WHY A JOB FOR SOMETHING THIS SMALL. It is seconds of work, but it imports torch and trains a pooler,
+# and torch's default thread pool opened 64 threads when this was tried on the login node. Login nodes
+# are for editing and qsub only; RCS IT have killed this user's processes for loading one before. The
+# script also pins torch to one thread, so the cost here is genuinely trivial -- 2 cpus is generous.
+#
+#   qsub pbs/s7_selftest.pbs
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+
+: "${LOGDIR:=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs}"
+mkdir -p "$LOGDIR"
+exec > >(tee -a "$LOGDIR/s7_selftest_${PBS_JOBID%%.*}.log") 2>&1
+
+echo "[s7] host $(hostname)  LUQ_REPO=$LUQ_REPO  commit=$(git -C "$LUQ_REPO" rev-parse --short HEAD 2>/dev/null)"
+
+# Guard: the S7 code must exist in the checkout this job resolved to, or the test is vacuous.
+grep -q "def pad_head_priors" "$LUQ_REPO/scripts/checks/attn_pool.py" || {
+  echo "FATAL: pad_head_priors absent from $LUQ_REPO — submitted from a checkout without S7"; exit 2; }
+
+python -u scripts/checks/s7_head_recipe_selftest.py
+echo "[s7] DONE rc=$?"
