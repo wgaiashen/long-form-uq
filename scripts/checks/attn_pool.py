@@ -393,8 +393,14 @@ class AttnPool(nn.Module):
         self.pos = nn.Linear(2, 1) if use_position else None
         # S3 (prior-init pooling): a per-token PRIOR weight can replace / seed the learned query.
         #   frozen_prior=True  -> attention IS the renormalised prior; head-only training (arm C, ours).
-        #   frozen_prior=False + prior given -> annealed additive log-prior: scores = X@q + beta*log(prior)
+        #   frozen_prior=False + prior given -> CONSTANT additive log-prior: scores = X@q + beta*log(prior)
         #     (arm D, Joe's "start from a distribution, then learn away"; beta scales the prior's pull).
+        #     ⚠️ beta is a CONSTANT, not a schedule -- this used to be described as "annealed", which is
+        #     wrong and was corrected 2026-08-06. `q` is initialised to ZEROS, so at step 0 the attention is
+        #     exactly softmax(beta*log(prior)) = the renormalised prior at beta=1, i.e. arm D starts exactly
+        #     where arm C sits. It "learns away" because `q` moves and X@q grows to overwhelm a FIXED tilt,
+        #     not because beta decays. (The only real schedule in this file is `aux_drop_epoch`, on the
+        #     auxiliary loss, which is a different mechanism.)
         self.frozen_prior = frozen_prior
         self.beta = beta
         # S6 (Joe idea 2 — multi-head): ADDITIONAL queries/heads beyond the primary, created ONLY when K>1, so
@@ -427,7 +433,7 @@ class AttnPool(nn.Module):
             scores = (X @ self.q) / (self.scale * self.temperature)     # (B, T)
             if self.use_position:
                 scores = scores + self.pos(posfeat).squeeze(-1)
-            if prior is not None:                                       # arm D: annealed additive log-prior tilt
+            if prior is not None:                                       # arm D: CONSTANT additive log-prior tilt
                 scores = scores + self.beta * torch.log(prior.clamp(min=1e-9))
             scores = scores.masked_fill(mask == 0, float("-inf"))
             a = torch.softmax(scores, dim=1)                            # (B, T)
@@ -486,7 +492,8 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
     (K queries, K heads, ensembled by mean-of-sigmoids); ABLATION = n_query=1, n_head=K (one attention, K heads)."""
     """`prior_list` (S3) = per-example prior weight vectors aligned to `states` (length G+1 each). With
     frozen_prior=True the attention IS the renormalised prior and only the head trains (arm C); with
-    frozen_prior=False it is an annealed additive log-prior tilt on the learned query (arm D). prior_list=None
+    frozen_prior=False it is a CONSTANT additive log-prior tilt on the learned query (arm D; beta does
+    NOT decay -- see the note in __init__). prior_list=None
     keeps the plain learned/frozen-query pooler (arms A/B) unchanged."""
     """`shrink_lambda` > 0 = H5 (shrink-the-pooler): add a shrink-to-uniform penalty on the attention weights
     to the BCE loss, pulling the learned attention toward mean-pool (its unsupervised prior). Tests whether
