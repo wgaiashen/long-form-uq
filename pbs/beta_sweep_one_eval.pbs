@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=48:00:00
+#PBS -N luq_beta
+#PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
+#PBS -j oe
+# ⚠️ THE -o PATH IS PERSISTENT HOME, DELIBERATELY, NOT EPHEMERAL SCRATCH. The ephemeral volume is
+# PURGEABLE, and this project has already lost artifacts to it once (20 result CSVs that existed only
+# there). PBS also writes -o only at job EXIT, so an ephemeral -o means that during a long run there is
+# no way to see progress at all -- which cost a debugging cycle earlier today. The `tee` below fixes the
+# second half of that: the log is written line by line to persistent storage WHILE the job runs, so an
+# interrupted job still leaves everything it had printed.
+# S8 — beta sweep of the prior tilt (pre-registered: prereg/S8_beta_sweep.md).
+#
+# Pass with -v:  EVAL=<eval>  [PRIORS=<specs joined by '+'>]  [OUT=<abs path>]
+# '+' joins the priors list because PBS -v splits its own variables on commas; converted below.
+#
+# ⚠️ WIRING NOTE, and it is the reason this script exists rather than reusing arm_mh_fill.pbs:
+# on RCS `_env.sh` sets LUQ_REPO=${PBS_O_WORKDIR}, so the job runs THE CODE OF THE DIRECTORY IT WAS
+# SUBMITTED FROM. This must be submitted from the checkout that actually contains the topk builder,
+# and the script prints the resolved repo + the commit so the log proves which code ran. arm_mh_fill.pbs
+# also hardcodes `--priors content_mass,nll`, so it cannot express this run at all.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+: "${PRIORS:=nll}"
+# BETAS: the sweep. MUST contain 0 -- the driver refuses otherwise, because a grid without
+# "no prior" cannot express "the prior does not help". Same trap the auxiliary-loss screen hit
+# by omitting lambda=0.
+: "${BETAS:=0+0.25+0.5+1+2+4}"
+# RUNGS: optional base-rung filter, e.g. RUNGS=LOO or RUNGS='LOO+1ds-Diff' ('+' joined, PBS -v splits on
+# commas). Empty = the full grid, which is the original behaviour. This exists so a run killed by the
+# walltime can be finished ONE RUNG AT A TIME rather than repeating the cells that already landed.
+# ⚠️ The driver ALWAYS runs the ID rung regardless of this filter (fixed_prior_ladder.py:156 exempts it),
+# so a recovery file carries a duplicate ID cell. That is deliberate slack, not a bug: ID is the cheapest
+# cell and the duplicate is a free reproducibility check against the original run. Dedupe when merging.
+: "${RUNGS:=}"
+RESULTS_DIR="${RESULTS_DIR:-/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results}"
+: "${OUT:=$RESULTS_DIR/s8_beta_${EVAL}__meta-llama_Meta-Llama-3.1-8B.csv}"
+
+: "${LOGDIR:=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs}"
+mkdir -p "$LOGDIR"
+# Live, persistent, line-buffered log. Survives a kill; readable DURING the run (PBS's own -o is not).
+exec > >(tee -a "$LOGDIR/s8_beta_${EVAL}_${PBS_JOBID%%.*}.log") 2>&1
+
+echo "[s8] host $(hostname)  EVAL=$EVAL"
+echo "[s8] LUQ_REPO=$LUQ_REPO  commit=$(git -C "$LUQ_REPO" rev-parse --short HEAD 2>/dev/null)"
+echo "[s8] PRIORS=${PRIORS//+/,}"
+echo "[s8] OUT=$OUT"
+echo "[s8] BETAS=${BETAS//+/,}"
+echo "[s8] RUNGS=${RUNGS//+/,}${RUNGS:+  (RECOVERY: partial grid, merge with the base file)}"
+
+# Guard 1: the builder must exist in the code that is about to run, or this is the wrong checkout.
+grep -q -- "--betas" "$LUQ_REPO/scripts/checks/fixed_prior_ladder.py" || {
+  echo "FATAL: --betas absent from $LUQ_REPO — this checkout cannot sweep beta and would silently
+run a SINGLE beta under an S8 filename"; exit 2; }
+[ -f "$LUQ_REPO/prereg/S8_beta_sweep.md" ] || {
+  echo "FATAL: prereg/S8_beta_sweep.md missing — refusing to run an unregistered sweep"; exit 5; }
+
+# Guard 2: never clobber. A re-run must go to a new path so two populations cannot merge silently.
+if [ -e "$OUT" ]; then echo "FATAL: target exists, refusing to clobber: $OUT"; exit 3; fi
+
+# Guard 3: the canonical prior ladder must be byte-identical afterwards (it is a different population).
+PROT="$RESULTS_DIR/fixed_prior_ladder__meta-llama_Meta-Llama-3.1-8B.csv"
+[ -e "$PROT" ] && echo "[s8] PROT size BEFORE=$(stat -c%s "$PROT")"
+
+# Guard 4: if a rung filter was asked for, the driver MUST support it. Without this the flag would be
+# silently ignored and the job would quietly run the FULL grid — the exact failure this recovery path is
+# meant to escape, and it would hit the same walltime again. Fail loud instead.
+RUNG_ARGS=()
+if [ -n "$RUNGS" ]; then
+  grep -q '"--rungs"' "$LUQ_REPO/scripts/checks/fixed_prior_ladder.py" || {
+    echo "FATAL: RUNGS=$RUNGS requested but the driver has no --rungs flag — it would run the full grid"; exit 4; }
+  RUNG_ARGS=(--rungs "${RUNGS//+/,}")
+fi
+
+python -u scripts/checks/fixed_prior_ladder.py \
+  --evals "$EVAL" --seeds 1,2,3 --priors "${PRIORS//+/,}" --betas "${BETAS//+/,}" \
+  --out "$OUT" "${RUNG_ARGS[@]}"
+RC=$?
+
+echo "[s8] DONE rc=$RC -> $OUT ($(wc -l <"$OUT" 2>/dev/null) rows)"
+[ -e "$PROT" ] && echo "[s8] PROT size AFTER=$(stat -c%s "$PROT")  (must equal BEFORE)"

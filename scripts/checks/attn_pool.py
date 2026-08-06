@@ -254,7 +254,7 @@ def normalised_entropy(a, mask, eps=1e-9):
     return H / torch.log(T)
 
 
-def attention_entropies(model, states, idx, device, bs=64, answer_only=False):
+def attention_entropies(model, states, idx, device, bs=64, answer_only=False, prior_list=None):
     """PER-EXAMPLE normalised attention entropy over `idx`, as an array.
 
     B.3 needs the DISTRIBUTION, not just the mean. A one-sided sharpness penalty can only act on the
@@ -267,18 +267,25 @@ def attention_entropies(model, states, idx, device, bs=64, answer_only=False):
             X, mask, pos = pad_batch([states[i] for i in idx[b:b + bs]], device)
             if answer_only:
                 mask = _mask_answer_only(mask)
-            _l, a = model(X, mask, pos)
+            # The PRIOR ARMS need their prior here. Arms C and D only produce their real attention when
+            # the prior is supplied; calling the model without it measures the entropy of a DIFFERENT
+            # (untilted) distribution and reports it as the arm's. Same defect that was fixed in
+            # head_attention_correlation. None = arms A/B, unchanged.
+            prior_b = (pad_prior([prior_list[i] for i in idx[b:b + bs]], X.shape[1], device)
+                       if prior_list is not None else None)
+            _l, a = model(X, mask, pos, prior=prior_b)
             if a.dim() == 3:                            # multi-head: average over heads
                 a = a.mean(dim=2)
             out.append(normalised_entropy(a, mask).cpu().numpy())
     return np.concatenate(out) if out else np.array([])
 
 
-def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False):
+def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False, prior_list=None):
     """Mean normalised attention entropy over `idx`. B.3 reports this PER ARM, so we can tell whether
     the penalty actually did what it claims INDEPENDENTLY of whether PRR moved -- a null is only
     interpretable if we know the constraint bound."""
-    e = attention_entropies(model, states, idx, device, bs=bs, answer_only=answer_only)
+    e = attention_entropies(model, states, idx, device, bs=bs, answer_only=answer_only,
+                            prior_list=prior_list)
     return float(e.mean()) if len(e) else 0.0
 
 

@@ -35,7 +35,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 from luq import cache, msp, results                                          # noqa: E402
 from aggregation_table import attn_unc, paired_bootstrap, load_per_token     # noqa: E402
-from attn_pool import train_attn, select_temperature                         # noqa: E402
+from attn_pool import train_attn, select_temperature, mean_attention_entropy  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of                        # noqa: E402
 import probedriftlong as pdl                                                 # noqa: E402
 from prior_builders import build_prior, OrgadCoverageError                   # noqa: E402
@@ -58,7 +58,7 @@ def c3_attention_prr(eval_, rung):
     return None
 
 
-_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
+_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds", "attn_entropy",
            "bar_msp_min", "ci_lo", "ci_hi", "boot_p", "significant",
            "cluster", "env_hash", "commit", "seeds"]
 
@@ -93,7 +93,11 @@ def main():
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--evals", default=",".join(DEFAULT_EVALS))
     ap.add_argument("--priors", default="content_mass,nll")
-    ap.add_argument("--beta", type=float, default=1.0, help="arm D annealed log-prior weight")
+    ap.add_argument("--beta", type=float, default=1.0, help="arm D log-prior tilt weight (CONSTANT, not annealed)")
+    ap.add_argument("--betas", default=None,
+                    help="S8: sweep the arm-D tilt, e.g. 0,0.25,0.5,1,2,4. MUST include 0 (= pure learned\n"
+                         "attention), or the sweep cannot express 'the prior does not help'. Omitted = the\n"
+                         "single --beta, and the arm keeps its original armD_<prior> name.")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--rungs", default="", help="base-rung filter (e.g. DiffTask,LOO); '' = all long OOD + ID")
     ap.add_argument("--restricted-ood", action="store_true",
@@ -106,6 +110,10 @@ def main():
     evals = args.evals.split(","); seeds = [int(s) for s in args.seeds.split(",")]
     priors = [p for p in args.priors.split(",") if p]
     want = set(r for r in args.rungs.split(",") if r)
+    betas = ([float(b) for b in args.betas.split(",") if b != ""] if args.betas else [args.beta])
+    if args.betas and 0.0 not in betas:
+        raise SystemExit("--betas must include 0 (pure learned attention). Without it the sweep cannot "
+                         "choose 'no prior', which is how the auxiliary-loss screen manufactured a null.")
     device = "cuda" if torch.cuda.is_available() else "cpu"
     host = socket.gethostname()
     cluster = "RCS" if (host.startswith("login-") or "cx3" in host) else ("DoC" if ("cloud-vm" in host or host.startswith("gpu")) else host)
@@ -141,7 +149,9 @@ def main():
     sources = set(PT)
 
     ARMS_PRIORLESS = ["floor_min", "armA", "armB"]
-    ARMS_PRIOR = [f"{a}_{p}" for p in priors for a in ("armC", "armD")]
+    ARMS_PRIOR = ([f"armC_{p}" for p in priors]
+                  + [(f"armD_{p}" if len(betas) == 1 else f"armD_{p}_b{b:g}")
+                     for p in priors for b in betas])
     all_methods = ARMS_PRIORLESS + ARMS_PRIOR
     out_rows = []; gate_rows = []; skipped = set()
 
@@ -159,6 +169,7 @@ def main():
         if len(X_te) == 0:
             continue
         per = {m: [] for m in all_methods}; acc = {m: [] for m in all_methods}
+        ent = {}                      # S8: mean attention entropy per arm, so a null is interpretable
         fb_count = {p: 0 for p in priors}; fb_total = {p: 0 for p in priors}
         yte_ref = None
         for sd in seeds:
@@ -190,9 +201,26 @@ def main():
                 pc = train_attn(states, y, tr_idx, device, seed=sd, prior_list=priors_cell, frozen_prior=True)
                 assert int(torch.count_nonzero(pc.q)) == 0, "arm C query moved off init — freeze failed!"
                 v[f"armC_{p}"] = np.asarray(attn_unc(pc, states, te_idx, device, prior_list=priors_cell), float)
-                pd_ = train_attn(states, y, tr_idx, device, seed=sd, prior_list=priors_cell,
-                                 frozen_prior=False, beta=args.beta)
-                v[f"armD_{p}"] = np.asarray(attn_unc(pd_, states, te_idx, device, prior_list=priors_cell), float)
+                # S8 — BETA SWEEP. beta scales the log-prior tilt: scores = X@q + beta*log(prior).
+                # beta=0 is EXACTLY arm A (pure learned attention, the prior contributes nothing) and
+                # beta->large drives the attention toward the prior, i.e. toward arm C. So beta is the
+                # dial between the two arms we have been reporting as separate methods, and until now
+                # every number in this project sat at the single hardcoded beta=1.0.
+                # beta=0 MUST stay in the grid: without it the sweep cannot express "the prior does not
+                # help", which is the same trap the auxiliary-loss run hit by omitting lambda=0.
+                # Single-beta runs keep the ORIGINAL `armD_{p}` name, so every existing result and every
+                # driver that reads these CSVs is byte-identical.
+                for bta in betas:
+                    name = f"armD_{p}" if len(betas) == 1 else f"armD_{p}_b{bta:g}"
+                    pd_ = train_attn(states, y, tr_idx, device, seed=sd, prior_list=priors_cell,
+                                     frozen_prior=False, beta=bta)
+                    v[name] = np.asarray(attn_unc(pd_, states, te_idx, device, prior_list=priors_cell), float)
+                    # Report the attention entropy beside the PRR. A beta that moves PRR without moving
+                    # the attention would mean the tilt is not the cause, and a beta that flattens or
+                    # sharpens the attention with no PRR change is equally worth seeing -- a null is only
+                    # interpretable once we know whether the knob actually bound.
+                    ent.setdefault(name, []).append(
+                        mean_attention_entropy(pd_, states, te_idx, device, prior_list=priors_cell))
             for m in v:                      # only the methods actually computed (Orgad-skipped arms absent)
                 per[m].append(results.prr(yte, v[m])); acc[m].append(v[m])
         if yte_ref is None:
@@ -220,7 +248,9 @@ def main():
                 print(f"    {m:18s} {stats[m][0]:+.3f} +/- {stats[m][1]:.3f}", flush=True)
                 out_rows.append({"rung": rung, "eval": X, "train": srcs, "method": m,
                                  "prr_mean": round(stats[m][0], 4), "prr_std": round(stats[m][1], 4),
-                                 "n_seeds": len(per[m]), "bar_msp_min": round(bar, 4), **prov})
+                                 "n_seeds": len(per[m]), "bar_msp_min": round(bar, 4),
+                                 "attn_entropy": (round(float(np.mean(ent[m])), 4) if ent.get(m) else ""),
+                                 **prov})
         # verdicts: each prior arm vs the floor bar, vs arm A, vs arm B
         for p in priors:
             for arm in (f"armC_{p}", f"armD_{p}"):
