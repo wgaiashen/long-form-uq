@@ -161,7 +161,10 @@ def main():
     rs = np.array([fnum(r, "real_minus_shuffled") for r in fired], float)
     rb = np.array([fnum(r, "real_minus_baseline") for r in fired], float)
 
-    w("## Headline: the auxiliary loss helps only where the pooler is already weak")
+    # ⚠️ The heading must not assert the conclusion. It once read "the auxiliary loss helps only where the
+    # pooler is already weak", which was true of n=44 and false by n=77 -- and a hard-coded heading keeps
+    # asserting it while the table underneath quietly stops supporting it.
+    w("## Does the size of the effect depend on how strong the baseline already was?")
     w()
     w(f"Computed on the **{len(fired)} rows where λ>0**, because a λ=0 row carries no information about "
       f"the target.")
@@ -192,6 +195,44 @@ def main():
             continue
         w(f"| {X} | {float(np.corrcoef(b[m], rs[m])[0, 1]):+.3f} | {int(m.sum())} |")
     w()
+
+    # ---------- THE CONFOUND CHECK THAT SHOULD HAVE BEEN HERE FROM THE START ----------
+    # `prr_baseline` is strongly tied to RUNG (ID baselines are high, OOD baselines are low), so a pooled
+    # correlation between baseline and effect can be a RUNG effect wearing a baseline costume. Reported at
+    # n=44 the pooled figure was -0.382 (p=0.003) and it read as a finding; by n=77 it was -0.171 (p=0.14)
+    # and the WITHIN-RUNG correlations turned out to flip sign. Pooling hid that. So the breakdown is
+    # printed every time, not on request.
+    w("### ⚠️ Confound check: is this a baseline effect or a RUNG effect?")
+    w()
+    rung_of = np.array([r["rung"].strip() for r in fired])
+    w("| rung | n | mean baseline | corr(baseline, real−shuffled) |")
+    w("|---|---:|---:|---:|")
+    tot = wsum = 0.0
+    for R in RUNGS:
+        m = rung_of == R
+        if not m.sum():
+            continue
+        if m.sum() < 6:
+            w(f"| {R} | {int(m.sum())} | {b[m].mean():.3f} | *(too few to correlate)* |")
+            continue
+        c = float(np.corrcoef(b[m], rs[m])[0, 1])
+        w(f"| {R} | {int(m.sum())} | {b[m].mean():.3f} | {c:+.3f} |")
+        tot += c * m.sum(); wsum += m.sum()
+    w()
+    if wsum:
+        wm = tot / wsum
+        w(f"n-weighted mean within-rung correlation: **{wm:+.3f}**, against a pooled **{r_all:+.3f}**.")
+        w()
+        signs = []
+        for R in RUNGS:
+            m = rung_of == R
+            if m.sum() >= 6:
+                signs.append(float(np.corrcoef(b[m], rs[m])[0, 1]))
+        if signs and (max(signs) > 0 and min(signs) < 0):
+            w("🔴 **THE SIGN FLIPS BETWEEN RUNGS.** The pooled correlation is therefore NOT a general law "
+              "about baseline strength. Report it as a pattern inside the rung where it holds, naming that "
+              "rung, and say plainly that it reverses elsewhere. Do not quote the pooled figure alone.")
+        w()
 
     # ---------- per-target detail ----------
     # The by-eval table below pools every target, which HIDES a real difference: the Orgad claim-span
