@@ -18,8 +18,20 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def load_model(name: str, attn_implementation: str | None = None,
-               dtype: torch.dtype | None = None):
+               dtype: torch.dtype | None = None,
+               device_map="cuda", max_memory=None):
     """Load a frozen causal LM on the GPU. We never train the base model.
+
+    device_map / max_memory: passed straight to `from_pretrained`. The DEFAULT IS
+    UNCHANGED ("cuda" = everything on one GPU), so every existing run stays
+    byte-identical. Pass device_map="auto" to shard across several GPUs, which is what
+    a model too big for one card needs (fp32 Qwen-14B is ~59GB vs the L40S's 48GB).
+
+    ⚠️ device_map="auto" ALONE DOES NOT GUARANTEE SHARDING: accelerate fills GPU 0
+    first, so a 32GB fp32 Llama-8B lands entirely on one 48GB card and any
+    "sharding test" built on that is vacuous. Pass max_memory to FORCE a real split,
+    e.g. max_memory={0: "20GiB", 1: "20GiB"}, and assert afterwards that
+    len(set(model.hf_device_map.values())) > 1.
 
     attn_implementation: pass "eager" when you need attention weights
     (output_attentions=True). The default fast backend (SDPA) does not return them,
@@ -44,7 +56,9 @@ def load_model(name: str, attn_implementation: str | None = None,
     if attn_implementation is None and is_gemma:
         attn_implementation = "eager"
     tok = AutoTokenizer.from_pretrained(name)
-    kwargs = dict(dtype=dtype, device_map="cuda")
+    kwargs = dict(dtype=dtype, device_map=device_map)
+    if max_memory is not None:
+        kwargs["max_memory"] = max_memory
     if attn_implementation is not None:
         kwargs["attn_implementation"] = attn_implementation
     model = AutoModelForCausalLM.from_pretrained(name, **kwargs)

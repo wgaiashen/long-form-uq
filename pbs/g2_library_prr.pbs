@@ -1,0 +1,49 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_g2_relib
+#PBS -j oe
+
+# GATE 2 — confirm the ProbeDriftLong library move did not change any PRR.
+#
+# Gate 1 (scripts/checks/library_equivalence.py) already proved the stronger, cheaper thing:
+# all 126 cell x seed row lists are BYTE-IDENTICAL under carve='legacy'. Since PRR is a
+# deterministic function of (which rows, which labels, which scores), identical row lists mean no
+# PRR can move. This job is the end-to-end confirmation of that argument, not the argument itself.
+#
+# ⚠️ LUQ_CARVE=legacy IS THE POINT. The carve-then-filter change (gate 3) is a SEPARATE, DELIBERATE
+# change to expertqa + factscore. Conflating the two is how a packaging bug would hide inside a
+# legitimate revision, so gate 2 runs the OLD rule and must reproduce the OLD numbers exactly.
+#
+# ⚠️ WRITES TO NEW FILES. results/pdl_fam_*.csv are the frozen sources of the 1,664-cell master
+# table and are never overwritten here -- the whole point is to diff against them.
+#
+# METHOD SET = the paper set only (author's instruction 2026-08-08), not the 42-arm grid:
+#   floors (msp_sum/perplexity/msp_min) + fair_floor + SAPLMA + attention pooler + mean-pool
+#   control + wmsp_norm/shrink2/shrink10 + the ptrue and lookback baselines.
+# Trimming wMSP from 8 arms to 3 removes the dominant cost (each arm is a separate MLP fit).
+#
+#   qsub -v LUQ_EVAL=samsum   pbs/g2_library_prr.pbs
+#   qsub -v LUQ_EVAL=factscore pbs/g2_library_prr.pbs
+# then:  python scripts/checks/gate2_prr_diff.py
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+export LUQ_CARVE=legacy          # explicit, not inherited — gate 2 tests the OLD rule
+
+# Cohort gate: exits in seconds if a driver disagrees with the canonical cohort.
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+echo "=== GATE 2 eval=$EV carve=$LUQ_CARVE on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --baselines ptrue,lookback \
+    --wmsp-only wmsp_norm,wmsp_shrink2,wmsp_shrink10 \
+    --out "results/g2_relib_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+STATUS=$?
+echo "=== done status=$STATUS at $(date) ===" >&2
+exit $STATUS

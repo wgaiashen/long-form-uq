@@ -20,9 +20,22 @@ Two per-target properties the ladders must respect:
 """
 import os
 
-import numpy as np
-
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrift's faithful rung spec)
+
+# ⚠️ SHIM AS OF 2026-08-08. The shared pieces below — `label_of`, `different_label_projection`,
+# `eval_split`, `build_rows` — now live in the installed `probe_drift_long` library and are
+# re-exported here so the ~43 modules importing this file keep working unchanged. Their
+# signatures are preserved EXACTLY (verified: no caller passes a positional second argument to
+# `eval_split`, and every `build_rows` call uses the 5-positional PT form).
+#
+# What stays here: the XL grid (`ALL`, `FINE`, `BROAD`, `KEYSTONES`, `SETTINGS`, `rung_sources`,
+# `cells`). That is a DIFFERENT and broader benchmark than ProbeDriftLong — 10 datasets including
+# the short-form ones, with its own family names ("long_qa" where the long grid says
+# "correctness_qa"). Merging the two taxonomies would be wrong, not tidy; `preflight_cohort.py`
+# exists to check their GROUPINGS agree despite the naming, and it still should.
+#
+# New work should import from `probe_drift_long` directly rather than through this shim.
+import probe_drift_long as _pdl  # noqa: E402
 
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
 ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa",
@@ -85,6 +98,20 @@ if _EXPERTQA_LABEL not in ("factuality", "consistency"):
     raise SystemExit(f"LUQ_EXPERTQA_LABEL must be factuality|consistency, got {_EXPERTQA_LABEL!r}")
 _LABEL_OF = {"expertqa": _EXPERTQA_LABEL, "factscore": "factuality"}   # factscore = ExpertQA's factuality partner
 
+# ---- WHICH CARVE RULE IS IN FORCE (added 2026-08-08) ---------------------------------------------
+# "legacy"   : drop unlabelled rows, THEN carve 30% for test. What produced every committed number
+#              up to and including the 1,664-cell master table.
+# "all-rows" : carve 30% from ALL rows, THEN score whichever carry labels. Model-independent test
+#              ROW SET, so two models are compared on the same rows. Changes expertqa + factscore
+#              ONLY (verified: med_quad/samsum/asqa are byte-identical either way).
+# Default stays LEGACY on purpose: flipping it would silently re-point every existing driver at a
+# different population. The switch is deliberate and per-run, and the driver STAMPS it into the
+# results CSV so a file can never be ambiguous about which rule produced it.
+#     LUQ_CARVE=all-rows python scripts/checks/<driver>.py ...
+CARVE = os.environ.get("LUQ_CARVE", "legacy")
+if CARVE not in ("legacy", "all-rows"):
+    raise SystemExit(f"LUQ_CARVE must be legacy|all-rows, got {CARVE!r}")
+
 
 def label_of(dataset):
     """The correctness signal to score `dataset` on (default `correctness`; ExpertQA -> `factuality`)."""
@@ -112,18 +139,23 @@ def different_label_projection(eval_dataset):
 
 
 # ---- eval-target train/test split ----------------------------------------------------------------
-def eval_split(split, seed=0, test_frac=XL_TEST_FRAC):
-    """(train_idx, test_idx) for an EVAL TARGET. If the dataset has a real baked-in train/test split (the
-    core datasets), use it. If it is split-less (an XL set — all one split), carve a FIXED deterministic
-    train/test (seed=0) so, exactly like the core datasets, there is ONE stable test set: the per-run seed
-    then varies only the training subsample, never the test set."""
-    split = np.asarray(split)
-    if len(np.unique(split)) >= 2:
-        return np.where(split == "train")[0], np.where(split == "test")[0]
-    n = len(split)
-    perm = np.random.RandomState(seed).permutation(n)
-    n_te = int(round(n * test_frac))
-    return perm[n_te:], perm[:n_te]
+def eval_split(split, seed=0, test_frac=XL_TEST_FRAC, labelled=None):
+    """(train_idx, test_idx) for an EVAL TARGET. Signature preserved; body delegates to the library.
+
+    `labelled` is optional and only meaningful under LUQ_CARVE=all-rows, where `split` must be the
+    FULL (unfiltered) array and the returned indices are positions in it. Under the default
+    legacy carve this behaves exactly as it always did.
+    """
+    if CARVE == "all-rows":
+        if labelled is None:
+            raise SystemExit(
+                "LUQ_CARVE=all-rows needs the `labelled` mask and the UNFILTERED split array. "
+                "This caller still pre-filters unlabelled rows, so it cannot honour the new carve "
+                "— run it under the default LUQ_CARVE=legacy, or update it to pass masks. "
+                "(Refusing rather than silently falling back: a quiet fallback here would score "
+                "the legacy population while the CSV claimed the new rule.)")
+        return _pdl.eval_split(split, labelled, seed=seed, test_frac=test_frac, carve="all-rows")
+    return _pdl.eval_split(split, seed=seed, test_frac=test_frac, carve="legacy")
 
 
 # ---- rung generation -----------------------------------------------------------------------------
@@ -149,28 +181,25 @@ def rung_sources(X):
     return {"SameTask": same, "DiffTask": diff, "LOO": loo, "OneDatasetDiffTask": one_diff}
 
 
-def build_rows(X, spec, PT, seed, sampled_fn):
-    """Build (train_rows, test_rows) for one cell, as lists of (dataset, idx). The EVAL TARGET X uses its
-    fixed eval_split (baked for core, deterministic carve for XL); OOD sources use `sampled_fn(split, seed,
-    cap)` (unchanged for the core). This centralises the XL-aware split logic so every ladder wires the same
-    way. `PT[d]` must be `(states, split, y, records)` (split is index [1])."""
-    X_tr, X_te = eval_split(PT[X][1])
-    test_rows = [(X, int(i)) for i in X_te]
-    train_rows = []
-    for d, cap in spec:
-        if d == X:                                    # ID cell: train on the eval target's OWN train split
-            idx = list(X_tr if cap is None else np.asarray(X_tr)[:cap])
-        else:                                         # OOD source: sampler draws its source rows. Task A
-            idx = list(sampled_fn(PT[d][1], seed, cap))   # (2026-07-27): eval-only sets have no split=="train",
-        # BUILD-TIME GUARD (Round-3 Task A / V-A0): a NAMED source (d != X) contributing ZERO realised rows is
-        # the silent-admission bug -- a pool label that overstates its contents. Fail loud rather than train on
-        # a smaller-than-labelled pool. Post-fix every listed source draws its rows (eval-only sets from all
-        # rows, source != eval enforced by cells()), so a 0 here is a genuine bug worth crashing on.
-        if d != X and len(idx) == 0:
-            raise SystemExit(f"build_rows: source '{d}' for eval '{X}' contributed 0 rows (cap={cap}). "
-                             f"Eval-only sets must draw from ALL rows via the Task-A sampler fix; see V-A0.")
-        train_rows += [(d, int(i)) for i in idx]
-    return train_rows, test_rows
+def build_rows(X, spec, PT, seed, sampled_fn, labelled=None):
+    """Build (train_rows, test_rows) for one cell, as lists of (dataset, idx). Signature preserved.
+
+    `PT[d]` must be `(states, split, y, records)` — only index [1], the split array, is ever read.
+    `labelled` ({dataset: bool mask}) is required only under LUQ_CARVE=all-rows, where PT must hold
+    the UNFILTERED arrays.
+
+    Delegates to `probe_drift_long.build_rows`, which owns the guard that a NAMED source
+    contributing zero rows is a crash, not a quietly smaller pool.
+    """
+    splits = {d: PT[d][1] for d in PT}
+    if CARVE == "all-rows":
+        if labelled is None:
+            raise SystemExit(
+                "LUQ_CARVE=all-rows needs `labelled` masks and UNFILTERED PT arrays; this caller "
+                "supplies neither. Run under LUQ_CARVE=legacy or update the caller.")
+        return _pdl.build_rows(X, spec, splits, seed, sampled_fn, labelled=labelled,
+                               carve="all-rows")
+    return _pdl.build_rows(X, spec, splits, seed, sampled_fn, carve="legacy")
 
 
 def cells(sources, evals):

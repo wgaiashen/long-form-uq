@@ -41,23 +41,22 @@ from attn_pool import train_attn, select_temperature, pad_batch, regime_tag, PRO
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
-LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
-# Training sources for the long-only ladder. ASQA and ExpertQA are ordinary sources here, same as the rest
-# (author's decision 2026-07-22) -- so the long pool is MIXED-LABEL by default (ExpertQA = faithfulness,
-# the others = correctness). Cells are still tagged `different_label_projection` so they stay identifiable. A dataset is
-# always excluded from its OWN eval's sources by cells_long(), so this never leaks train into test.
-LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
-SHORT = ["sciq", "trivia_qa"]
-# FINE families (2026-07-27 FACTUALITY-FAMILY SPLIT): correctness-QA (correctness vs a gold answer) is kept
-# SEPARATE from factuality (claim-support vs an external reference), so SameTask means same PROPERTY. asqa
-# stays with pubmed/med_quad (correctness QA, per author); expertqa pairs with factscore (factuality).
-# ⚠️ The factuality family is {expertqa, factscore}, so a factuality eval's SameTask-long is EMPTY until
-# factscore's cache lands on RCS (post-DoC-rsync). Re-run §C.3 for the affected long evals (pubmed/med_quad/
-# asqa lose expertqa from SameTask; expertqa/factscore gain each other) once factscore is cached.
-FINE = {"pubmed_qa": "correctness_qa", "med_quad": "correctness_qa", "asqa": "correctness_qa",
-        "expertqa": "factuality", "factscore": "factuality",
-        "xsum": "summ", "cnn_dailymail": "summ", "samsum": "summ"}
-XL_TOTAL = 1800
+
+# ⚠️ SHIM AS OF 2026-08-08 — the long-form GRID now lives in the installed `probe_drift_long`
+# library and is re-exported here under its historical names, so the ~19 modules doing
+# `import probedriftlong as pdl` and reaching for `pdl.LONG_SRC` / `pdl.cells_long` /
+# `pdl.sampled_train_idx` keep working unchanged.
+#
+# Gate 1 (`scripts/checks/library_equivalence.py`) proves the move changed nothing: the taxonomy
+# matches, the 42-cell grid is identical, and all 126 cell x seed row lists are BYTE-IDENTICAL.
+# Re-run it after touching either side.
+#
+# ⚠️ Importing THIS module still costs a full torch + transformers import, because the method half
+# below needs them. If all you want is the grid, `import probe_drift_long` instead — it is
+# numpy-only. That is the whole reason the split exists.
+from probe_drift_long import (LONG_DATASETS as LONG, LONG_SRC, SHORT_DATASETS as SHORT,   # noqa: E402
+                              FINE_FAMILIES as FINE, XL_TOTAL, cells_long, rung_sources_long,
+                              sampled_train_idx)
 EVALS = LONG + SHORT
 # wMSP KEEP variants: (col name, kwargs to weighted_msp_unc)  [all length_normalise=True]
 WMSP = [("wmsp_norm", {"weight_mode": "normalised"}),
@@ -83,13 +82,6 @@ FLOORS = ["floor_sum", "floor_ppl", "floor_min"]
 # long-form grid, and dropped by decision on 2026-07-31 for time. Say so in the write-up.
 BASE_FEATS = {"ptrue": ("ptrue_accurate", 15, True), "lookback": ("lookback", 0, False)}
 METHODS = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in WMSP]
-
-
-def rung_sources_long(X):
-    same = [d for d in LONG_SRC if d != X and FINE[d] == FINE[X]]
-    diff = [d for d in LONG_SRC if d != X and FINE[d] != FINE[X]]
-    loo = [d for d in LONG_SRC if d != X]
-    return {"SameTask-long": same, "DiffTask-long": diff, "LOO-long": loo, "1ds-Diff-long": diff[:1]}
 
 
 CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
@@ -120,43 +112,6 @@ def _flush_rows(out, rows, prov):
         w.writeheader(); w.writerows(rows)
     os.replace(tmp, out)
 
-
-def cells_long(sources, evals):
-    out = []
-    for X in evals:
-        if X not in sources:
-            continue
-        if X in LONG:
-            out.append(("ID", X, [(X, None)]))
-            rs = rung_sources_long(X)
-            for tag in ("SameTask-long", "DiffTask-long", "LOO-long"):
-                srcs = [d for d in rs[tag] if d in sources]
-                if srcs:
-                    cap = max(1, XL_TOTAL // len(srcs))
-                    out.append((tag, X, [(d, cap) for d in srcs]))
-            one = [d for d in rs["1ds-Diff-long"] if d in sources]
-            if one:
-                out.append(("1ds-Diff-long", X, [(one[0], XL_TOTAL)]))
-        elif X in SHORT:                                   # long -> short transfer
-            srcs = [d for d in LONG_SRC if d in sources]
-            if srcs:
-                cap = max(1, XL_TOTAL // len(srcs))
-                out.append(("Long->Short", X, [(d, cap) for d in srcs]))
-    return out
-
-
-def sampled_train_idx(split, seed, cap):
-    # Round-3 Task A (2026-07-27): the defect was this filter returning EMPTY for eval-only sources (all
-    # split=="test"), so a listed source like `expertqa:360` silently contributed 0 rows (V-A0). A dataset used
-    # as a SOURCE for ANOTHER eval leaks nothing regardless of split label (source != eval is enforced by
-    # cells_long), so draw from ALL its rows when it has no dedicated train split. Core sets (with a train
-    # split) are UNCHANGED -- they still draw train-only.
-    tr = np.where(split == "train")[0]
-    if len(tr) == 0:                                  # eval-only source: use its full row set as source rows
-        tr = np.arange(len(split))
-    if cap is None or cap >= len(tr):
-        return tr
-    return tr[np.random.RandomState(seed).permutation(len(tr))[:cap]]
 
 
 def _provenance():

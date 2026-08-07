@@ -1,0 +1,52 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N luq_g1_shard
+#PBS -j oe
+
+# G1 — the gate that must pass before the second model (Qwen2.5-14B) touches a GPU.
+#
+# WHY: fp32 Qwen-14B is ~59GB and no RCS card is bigger than 48GB (L40S/A40 — RCS has NO 80GB GPU),
+# so the second model MUST be sharded across two GPUs. fp32 + eager is not negotiable: it is what
+# every canonical Llama long-eval extraction used (llama_keystone.pbs:44, llama_xsum.sbatch:22,
+# keystone_newprompts.sbatch:41, expertqa_full.sbatch:38, asqa_full.sbatch:36,
+# extract_neighbour.pbs:48), and token logprobs ARE the msp_min signal, so a precision or layout
+# change would confound exactly the claims R1-R4 are testing.
+#
+# So: prove sharding is numerically inert on a model whose numbers are frozen and known
+# (Llama-3.1-8B), BEFORE trusting it on one whose numbers we do not know.
+#
+# 2 GPUs is the point, not a convenience — arm 1 is single-GPU, arm 2 is sharded, same node, same
+# code path, and the script ASSERTS the sharded arm genuinely spans >1 device (accelerate fills
+# GPU 0 first, so a 32GB fp32 8B would otherwise sit entirely on one 48GB card and the test would
+# pass vacuously).
+#
+#   qsub pbs/g1_shard_check.pbs                        # the real gate
+#   qsub -v G1_LIMIT=50 pbs/g1_shard_check.pbs         # quick smoke, NOT the gate
+#
+# Reads only frozen caches; writes only results/g1_shard_equivalence.json. Nothing is overwritten.
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+LIMIT="${G1_LIMIT:-0}"
+
+echo "=== G1 shard-equivalence on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader || true
+
+python -u scripts/checks/shard_equivalence.py \
+    --datasets pubmed_qa,factscore \
+    --limit "$LIMIT" \
+    --tol 1e-6
+STATUS=$?
+
+echo "=== G1 exit status $STATUS at $(date) ===" >&2
+if [ "$STATUS" -ne 0 ]; then
+  echo "❌ G1 FAILED — do NOT start the Qwen extraction on this path." >&2
+fi
+exit $STATUS
