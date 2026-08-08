@@ -77,7 +77,22 @@ def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
     empty = np.array([len(t.strip()) == 0 for t in texts])
     sev = np.array([degeneracy.is_severe(t) for t in texts])
     deg = np.array([degeneracy.is_degraded(t) for t in texts])
-    gl = [len(g.split()) for g in (gold_text(r) for r in recs)]   # words; token count needs a tokeniser
+    golds = [gold_text(r) for r in recs]
+    gl = [len(g.split()) for g in golds]   # words; token count needs a tokeniser
+    # Gold length in TOKENS, via the `tok` hook that had been declared but never wired (2026-08-08).
+    # ⚠️ THIS IS THE COLUMN THE BUDGET DECISION NEEDS. `budget` is a token count, so budget/gold_words
+    # is a units mismatch. The words->tokens factor is NOT a safe constant: measured on this gold with
+    # the Qwen tokeniser it ranges 1.24 (samsum) to 1.45 (asqa), and using a single ~1.31 factor flips
+    # asqa's verdict from 0.96x (below the gate) to 1.06x (above it) -- i.e. the approximation fails
+    # precisely on the one marginal dataset the gate exists to catch. Measure, do not scale.
+    # Without a tokeniser this stays None -- NOT zero. A not-measured cell that reads as a number is
+    # how a budget gets declared adequate on evidence nobody produced.
+    if tok is not None:
+        gt = [len(tok(g, add_special_tokens=False)["input_ids"]) for g in golds]
+        gold_tok = {"gold_tok_p50": float(np.percentile(gt, 50)),
+                    "gold_tok_p90": float(np.percentile(gt, 90))}
+    else:
+        gold_tok = {"gold_tok_p50": None, "gold_tok_p90": None}
     fab = [fabrication(t) for t in texts]
     has_fab = np.array([f[0] for f in fab])
     answer_frac = np.array([f[1] for f in fab])
@@ -90,7 +105,8 @@ def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
             "pct_empty": round(100 * float(empty.mean()), 2),
             "pct_severe": round(100 * float(sev.mean()), 2),
             "pct_degraded": round(100 * float(deg.mean()), 2),
-            "gold_words_p50": float(np.percentile(gl, 50)), "gold_words_p90": float(np.percentile(gl, 90))}
+            "gold_words_p50": float(np.percentile(gl, 50)), "gold_words_p90": float(np.percentile(gl, 90)),
+            **gold_tok}
 
 
 def main():
@@ -101,13 +117,23 @@ def main():
                          "existing calls are unchanged. Pass Qwen/Qwen2.5-14B for the second model.")
     ap.add_argument("--regime", default=None, help="cache namespace; omit for the v1 default per dataset")
     ap.add_argument("--budget", type=int, default=None, help="override the budget used for %%capped")
+    ap.add_argument("--gold-tokenizer", default=None, metavar="MODEL",
+                    help="tokeniser used to measure the GOLD reference length in TOKENS, e.g. "
+                         "Qwen/Qwen2.5-14B. Needed to evaluate the budget gate, since budget is a "
+                         "token count and gold_words is the wrong unit. Omitted: the gold_tok_* "
+                         "columns stay BLANK (not measured), never 0.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+
+    tok = None
+    if args.gold_tokenizer:
+        from transformers import AutoTokenizer     # imported lazily: the default path needs no ML stack
+        tok = AutoTokenizer.from_pretrained(args.gold_tokenizer)
 
     rows = []
     for d in args.datasets.split(","):
         try:
-            rows.append(report(d.strip(), args.regime, args.budget, model=args.model))
+            rows.append(report(d.strip(), args.regime, args.budget, tok=tok, model=args.model))
         except Exception as e:                      # a missing cache is reported, never silently skipped
             print(f"  {d}: SKIPPED ({type(e).__name__}: {e})")
     if not rows:
@@ -115,13 +141,25 @@ def main():
 
     hdr = f"{'dataset':<14} {'regime':<12} {'n':>5} {'bud':>5} {'g50':>5} {'g90':>5} " \
           f"{'%cap':>6} {'%empty':>7} {'%sev':>6} {'%deg':>6} {'%fabr':>7} {'ansfrac':>8} " \
-          f"{'gold50':>7} {'gold90':>7}"
+          f"{'gold50':>7} {'gold90':>7}" \
+          + ("  |{:>7} {:>7} {:>7}".format('gtok50', 'gtok90', 'ratio') if tok is not None else "")
     print("\n" + hdr); print("-" * len(hdr))
     for r in rows:
         print(f"{r['dataset']:<14} {r['regime']:<12} {r['n']:>5} {r['budget']:>5} {r['gen_p50']:>5.0f} "
               f"{r['gen_p90']:>5.0f} {r['pct_capped']:>6.1f} {r['pct_empty']:>7.2f} {r['pct_severe']:>6.2f} "
               f"{r['pct_degraded']:>6.2f} {r['pct_fabricated']:>7.1f} {r['mean_answer_frac']:>8.3f} "
-              f"{r['gold_words_p50']:>7.0f} {r['gold_words_p90']:>7.0f}")
+              f"{r['gold_words_p50']:>7.0f} {r['gold_words_p90']:>7.0f}"
+              # The gate columns, printed ONLY when a tokeniser was supplied, so default output is
+              # unchanged. ratio = budget / gold_tok_p90, both TOKENS.
+              + (f"  |{r['gold_tok_p50']:>7.0f} {r['gold_tok_p90']:>7.0f} "
+                 f"{r['budget'] / r['gold_tok_p90']:>6.2f}x"
+                 if r.get("gold_tok_p90") else ""))
+    if tok is not None:
+        print(f"\ngold_tok_* measured with {args.gold_tokenizer}. ratio = budget / gold_tok_p90 (TOKENS/TOKENS).")
+        print("ratio < 1.00 = DEFECT (the reference cannot fit the budget) -> gate trips, stop and report.")
+        print("ratio >= 1.00 with a high %cap = the model over-generates -> NOT a reason to change the budget.")
+        print("⚠️ the ratio is meaningless where gold is not a reference GENERATION (factscore's gold is")
+        print("   the entity NAME, ~7 tokens, so its ratio is not-applicable rather than 'lots of room').")
     print("\ngold_* are WORDS (tokeniser-free); gen_* are TOKENS -- do not compare the two columns directly.")
     print("%fabr   = generations that invent a follow-up 'Question:' -- the few-shot continuation the")
     print("         degeneracy detector CANNOT see, and the one the judge is scored over.")
