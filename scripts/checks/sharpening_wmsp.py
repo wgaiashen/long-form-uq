@@ -184,6 +184,24 @@ def main():
             model = weighted_msp.train_weighted_msp(states, records, y, tr_idx, device,
                                                     weight_mode="normalised", length_normalise=True,
                                                     seed=sd)
+
+            # ⚠️ THE EXACT NO-OP IDENTITY. `score_at_T(T0=1, gamma=0)` divides `raw` by exactly 1.0, so
+            # it MUST equal the library's own `predict_weighted_msp` to floating-point noise, on the
+            # SAME trained model. This is the real control, and it is decisive in a way that comparing
+            # a single seed against a 3-seed mean is NOT: seed noise on this cell is +/-0.076, wide
+            # enough to hide a small wiring bug. Same model, same rows, no seeds involved -> any
+            # difference is the temperature plumbing and nothing else. Checked EVERY cell and seed.
+            v_noop, _ = score_at_T(model, states, records, te_idx, device, 1.0, 0.0, len_ref)
+            v_lib = weighted_msp.predict_weighted_msp(model, states, records, te_idx, device,
+                                                      weight_mode="normalised", length_normalise=True)
+            dmax = float(np.max(np.abs(v_noop - v_lib)))
+            if dmax > 1e-6:
+                raise SystemExit(
+                    f"NO-OP IDENTITY FAILED [{rung}/{X}/seed{sd}]: max|score_at_T(1,0) - "
+                    f"predict_weighted_msp| = {dmax:.3e} > 1e-6. The temperature plumbing has changed "
+                    f"the base method. STOPPING -- every W2 number would be meaningless.")
+            print(f"    [{rung}/{X}/seed{sd}] no-op identity vs predict_weighted_msp: "
+                  f"max|diff| = {dmax:.2e}  PASS", flush=True)
             for T0 in T0S:
                 for gm in GAMMAS:
                     v, ag = score_at_T(model, states, records, te_idx, device, T0, gm, len_ref)
