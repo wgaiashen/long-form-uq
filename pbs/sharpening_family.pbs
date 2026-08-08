@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=24gb
+#PBS -l walltime=01:00:00
+#PBS -N luq_w1_sharpen
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+# W1 -- the training-free sharpening family between perplexity and msp_min.
+# Pre-registration: prereg/W1_sharpening_axis.md (committed BEFORE this ran).
+#
+# CPU ONLY, NO GPU. Reads cached record["token_logprobs"] and nothing else -- no per-token hidden
+# states, no model load, no training. Deliberately requests no ngpus so it cannot queue behind the
+# Qwen G1 GPU job or the Gate-2 jobs.
+#
+# LUQ_CARVE is left at its default `legacy`, which reproduces the pre-2026-08-08 carve exactly, so
+# this is on the same population as the master table. The realised value is stamped into every
+# output row -- the new `all-rows` carve moves expertqa and factscore.
+export LUQ_CARVE=legacy
+python -u scripts/checks/sharpening_family.py --out results/sharpening_family__meta-llama_Meta-Llama-3.1-8B.csv
+echo "[w1-sharpen] DONE"
