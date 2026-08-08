@@ -36,6 +36,15 @@ if [ "$LUQ_CLUSTER" = doc ]; then
   : "${HF_HOME:=/vol/gpudata/gs925-msc_project/hf_cache}"
   : "${LUQ_CONDA_SH:=/vol/gpudata/gs925-msc_project/miniconda/etc/profile.d/conda.sh}"
   : "${LUQ_CONDA_ENV:=luq}"
+  # ⚠️ BIG CACHES MUST NOT LAND ON THE CEPH ALLOCATION. /vol/gpudata is CephFS with a HARD 50GB
+  # quota (~4GB free as of 2026-08-08); /vol/bitbucket/gs925 is NFS, no quota, 7.5TB free. The Qwen
+  # caches are ~90GB (16GB pooled features + ~74GB per-token states), so they go to bitbucket.
+  # Verified 2026-08-08: writable, no scheduled purge, NOT backed up -- which is fine, because
+  # everything under cache/ is regenerable by design. Records and results are NOT stored here.
+  # Read speed is ~20-24 MB/s cold (a 74GB cold read is ~50 min) but page-cached repeat reads are
+  # fast, so co-locate the jobs that consume a cache with the cache rather than re-reading it cold.
+  : "${LUQ_CACHE_ROOT:=/vol/bitbucket/gs925/luq_cache}"
+  export LUQ_CACHE_ROOT
 else
   # ---- RCS (CX3 Phase 2) ----
   # On RCS the home directory has a large allocation (~930GB), so the repo, the HF

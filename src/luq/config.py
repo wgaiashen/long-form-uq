@@ -4,12 +4,39 @@ A dataclass gives you sensible defaults plus editor autocomplete, and any field 
 be overridden from a script or the command line. Paths point at the gitignored
 cache/ and results/ folders.
 """
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 # .../msc-project-gs925  (this file is src/luq/config.py, so go up three parents)
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CACHE_DIR = REPO_ROOT / "cache"
+
+# ---- where the (large, regenerable) cache lives -----------------------------------------------
+# Default: `cache/` beside the code, which is right on RCS (~900GB home).
+#
+# `LUQ_CACHE_ROOT` overrides it, because on DoC the repo sits on a CephFS allocation with a HARD
+# 50GB quota (~4GB free), while `/vol/bitbucket/gs925` is NFS with no quota and 7.5TB free. The Qwen
+# caches are ~90GB (16GB pooled features + ~74GB of per-token states), so they cannot live beside the
+# code there. Set it in `pbs/_env.sh` per cluster, not per script.
+#
+# ⚠️ A MIS-SET CACHE ROOT MUST NOT BE SILENT. Pointing at a path that does not exist would otherwise
+# look like "no cache found", and every driver would cheerfully regenerate from scratch into a new
+# location -- or worse, split one dataset's cache across two roots. So the override must name a
+# directory that already exists, and we crash if it does not.
+_cache_env = os.environ.get("LUQ_CACHE_ROOT", "").strip()
+if _cache_env:
+    CACHE_DIR = Path(_cache_env)
+    if not CACHE_DIR.is_dir():
+        raise SystemExit(
+            f"LUQ_CACHE_ROOT={_cache_env!r} is not an existing directory.\n"
+            "Refusing to run: a wrong cache root does not fail, it silently regenerates everything "
+            "into the wrong place (or splits one dataset across two roots). Create the directory "
+            "deliberately, or unset the variable to use the default cache/ beside the code.")
+else:
+    CACHE_DIR = REPO_ROOT / "cache"
+
+# Results stay WITH THE CODE on every machine: they are small, they are the precious artifact, and
+# they are what gets committed and compared. Only the big regenerable caches move.
 RESULTS_DIR = REPO_ROOT / "results"
 
 
