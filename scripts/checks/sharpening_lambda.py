@@ -128,7 +128,13 @@ def score_tilted(model, states, records, te_idx, device, kind, param):
             kmask = torch.from_numpy(keep_np).to(device)
             lg = tilt_logits(raw, nll_np, kind, param, device, keep_np=keep_np)
             out[k] = float(weighted_msp._seq_q(lg, nll, "normalised", True, keep=kmask).item())
-            agree.append(int(int(torch.argmax(lg).item()) == int(np.argmax(nll_np))))
+            # ⚠️ Compare against the argmax over KEPT tokens. The weighter cannot place mass on a
+            # special token, so scoring it against the all-token argmax caps this diagnostic at
+            # ~89% by construction (10.9% of pubmed_qa examples have their largest NLL on a special)
+            # and would look like a failure when nothing is wrong. Same token set, per CLAUDE.md.
+            kb = keep_np.astype(bool)
+            a_ref = int(np.flatnonzero(kb)[np.argmax(nll_np[kb])]) if kb.any() else int(np.argmax(nll_np))
+            agree.append(int(int(torch.argmax(lg).item()) == a_ref))
     return out, (float(np.mean(agree)) if agree else float("nan"))
 
 
