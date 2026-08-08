@@ -41,8 +41,11 @@ if [ "$LUQ_CLUSTER" = doc ]; then
   # caches are ~90GB (16GB pooled features + ~74GB per-token states), so they go to bitbucket.
   # Verified 2026-08-08: writable, no scheduled purge, NOT backed up -- which is fine, because
   # everything under cache/ is regenerable by design. Records and results are NOT stored here.
-  # Read speed is ~20-24 MB/s cold (a 74GB cold read is ~50 min) but page-cached repeat reads are
-  # fast, so co-locate the jobs that consume a cache with the cache rather than re-reading it cold.
+  # Read speed, CORRECTED 2026-08-08: ~137-232 MB/s sustained ON A COMPUTE NODE (measured migrating
+  # 16.4 GB / 296 files in ~2 min, byte-identical, npz all load). An earlier ~20-24 MB/s figure was
+  # the JUMP BOX's link, and a second one conflated shard read with bf16->fp32 conversion and the
+  # host-to-device copy. So a 74 GB cold read is ~6-9 min, not ~50 -- which makes DoC-hosted
+  # extraction MORE attractive, not less. Still prefer co-locating a job with the cache it consumes.
   : "${LUQ_CACHE_ROOT:=/vol/bitbucket/gs925/luq_cache}"
   export LUQ_CACHE_ROOT
 else
