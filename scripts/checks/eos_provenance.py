@@ -65,10 +65,10 @@ def main():
     print("=" * 100)
     print("EOS PROVENANCE -- decision or truncation artefact?  Llama-3.1-8B, test rows.")
     print("=" * 100)
-    print(f"\n{'eval':15s}{'ends in':>10s}{'at token':>10s}{'EOS & at':>10s}{'med':>7s}{'max':>7s}"
-          f"{'PRR of':>9s}{'PRR of':>9s}")
-    print(f"{'':15s}{'special':>10s}{'budget':>10s}{'budget':>10s}{'len':>7s}{'len':>7s}"
-          f"{'has-EOS':>9s}{'nll_EOS':>9s}")
+    print(f"\n{'eval':15s}{'natural':>10s}{'budget':>10s}{'span':>10s}{'med':>7s}"
+          f"{'mean y':>7s}{'mean y':>7s}{'mean y':>7s}{'PRR of':>9s}{'PRR nll':>9s}{'n':>7s}")
+    print(f"{'':15s}{'EOS':>10s}{'cap':>10s}{'cut':>10s}{'len':>7s}"
+          f"{'nat':>7s}{'cap':>7s}{'cut':>7s}{'has-EOS':>9s}{'nat only':>9s}{'nat':>7s}")
     rows = []
     for d in LONG:
         cfg = Config(model_name=MODEL, dataset=d, ood_setting="ID",
@@ -87,28 +87,39 @@ def main():
             k = content_keep(recs[i]).astype(bool)
             nl = per_token_nll(recs[i])
             lens.append(len(nl))
-            # "ends in a special token" = the LAST generated token is special
             e = (not k[-1]) if len(k) else False
             has_eos.append(1.0 if e else 0.0)
-            # the EOS surprisal if there is one; NaN otherwise (never 0 -- that would invent a value)
             nll_eos.append(float(nl[-1]) if e else np.nan)
         lens = np.array(lens, float)
         has_eos = np.array(has_eos)
         nll_eos = np.array(nll_eos)
         mx = float(lens.max())
-        at_cap = (lens >= mx).astype(float)          # the realised budget is the max observed length
-        both = float(np.mean((has_eos > 0) & (at_cap > 0)))
 
-        # one-bit floor: does EOS-PRESENCE alone rank correctness? (uncertainty = 1 - has_eos)
+        # ⚠️ THREE PROVENANCES, NOT TWO. An earlier version of this script treated termination as
+        # binary (EOS vs budget), which mis-assigns 67% of pubmed_qa: 25.9% end in a special token,
+        # 7.0% hit the budget, and the remaining two thirds were cut by the answer-span / D1 rule --
+        # neither the model's decision nor the cap. A binary indicator would push all of those into
+        # one bucket and any coefficient fitted on it would inherit the error, which is exactly the
+        # failure this check exists to prevent, one level down.
+        natural = has_eos > 0
+        budget = (~natural) & (lens >= mx)
+        span = (~natural) & (~budget)
+        prov = np.where(natural, 0, np.where(budget, 1, 2))     # 0=natural, 1=budget-cap, 2=span-cut
+
         prr_has = results.prr(yte, 1.0 - has_eos) if 0 < has_eos.mean() < 1 else np.nan
-        # and does the EOS surprisal rank it, on the subset that HAS one?
-        m = ~np.isnan(nll_eos)
+        # PRIMARY ARM: the EOS surprisal WITHIN the natural-EOS subset, where provenance is constant
+        # by construction, so gamma is identified without needing the provenance covariate at all.
+        m = natural & ~np.isnan(nll_eos)
         prr_nll = results.prr(yte[m], nll_eos[m]) if m.sum() > 30 and np.std(nll_eos[m]) > 0 else np.nan
+        # mean correctness per provenance -- the direct read on whether termination tracks the label
+        mc = [float(np.mean(yte[s])) if s.sum() else np.nan for s in (natural, budget, span)]
 
-        print(f"{d:15s}{has_eos.mean():>9.1%}{at_cap.mean():>10.1%}{both:>10.1%}"
-              f"{np.median(lens):>7.0f}{mx:>7.0f}{prr_has:>9.3f}{prr_nll:>9.3f}")
-        rows.append((d, f"{has_eos.mean():.4f}", f"{at_cap.mean():.4f}", f"{both:.4f}",
+        print(f"{d:15s}{natural.mean():>9.1%}{budget.mean():>10.1%}{span.mean():>10.1%}"
+              f"{np.median(lens):>7.0f}{mc[0]:>7.3f}{mc[1]:>7.3f}{mc[2]:>7.3f}"
+              f"{prr_has:>9.3f}{prr_nll:>9.3f}{int(m.sum()):>7d}")
+        rows.append((d, f"{natural.mean():.4f}", f"{budget.mean():.4f}", f"{span.mean():.4f}",
                      f"{np.median(lens):.0f}", f"{mx:.0f}",
+                     f"{mc[0]:.4f}", f"{mc[1]:.4f}", f"{mc[2]:.4f}",
                      f"{prr_has:.4f}", f"{prr_nll:.4f}", f"{int(m.sum())}"))
 
     print("\n" + "=" * 100)
@@ -129,8 +140,9 @@ def main():
     outp.parent.mkdir(parents=True, exist_ok=True)
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)
-        w.writerow(["eval", "frac_ends_special", "frac_at_budget", "frac_both", "median_len",
-                    "max_len", "prr_has_eos", "prr_nll_eos", "n_with_eos"])
+        w.writerow(["eval", "frac_natural_eos", "frac_budget_cap", "frac_span_cut", "median_len",
+                    "max_len", "meany_natural", "meany_budget", "meany_span",
+                    "prr_has_eos", "prr_nll_eos_natural_only", "n_natural"])
         for r in rows:
             w.writerow(r)
     print(f"\nwrote {outp}")
