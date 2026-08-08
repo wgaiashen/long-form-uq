@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=36gb
+#PBS -l walltime=20:00:00
+#PBS -N luq_mask
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# W5 -- (B) the lambda sweep and (C) NLL in the weight logits, ONE eval per job (all 5 rungs, 3 seeds).
+# Pre-registration: prereg/W5_lambda_and_nll_prior.md (committed BEFORE this ran).
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/mask_ablation.pbs
+#
+# ⭐ lambda = 1.5 is PRE-COMMITTED, justified only by the 2026-07-12 prediction in
+# reports/OVERNIGHT_12jul.md:79,90. If it misses the bar that is a failure of the pre-committed value
+# even if another lambda clears it -- promoting a different one afterwards is banned by the prereg.
+#
+# THREE CONTROLS ABORT THE RUN IF THEY FAIL, so a broken cell can never become a quiet number:
+#   1. tilt = 0 must reproduce plain wMSP to < 1e-6 on the same trained model.
+#   2. tilt -> inf must reproduce msp_min's PRR exactly. THIS IS THE CLAIM.
+#   3. argmax(w) == argmax(nll) must reach 100% in the limit (Track 2 measured 6-13%).
+# Plus the outside check: the `norm` rows must match pdl_master to 4 dp.
+#
+# SIZING: 3 trainings per (cell, seed) against Track 2's 1, and Track 2 took 35-42 min per eval on
+# the small sets. 120 GB is sized from Track 2's 23 GB peak plus headroom for expertqa (6.6 GB cache,
+# median length 200). CPU only, no GPU.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+: "${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/mask_ablation.pbs}"
+echo "HOST $(hostname)  EVAL=$LUQ_EVAL"
+OUT="results/mask_ablation_${LUQ_EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+python -u scripts/checks/mask_ablation.py --evals "$LUQ_EVAL" --seeds 1,2,3 --out "$OUT"
+echo "[mask-abl] DONE $LUQ_EVAL -> $OUT"
