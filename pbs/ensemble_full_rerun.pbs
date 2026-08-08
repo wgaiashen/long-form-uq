@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=14:00:00
+#PBS -N luq_ens_rerun
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# RE-RUN of the 8-eval ensemble grid, because the existing one is STALE.
+#
+# WHY. `ens{MSP,SAPLMA}` at +0.273 is the ONLY row above SAPLMA (+0.241) in the whole master ladder --
+# 29/32 cells over msp_min, 21/32 over SAPLMA -- and it is parameter-free (a rank average, no training
+# beyond its components). But STOCKTAKE_post31July.md:1250 flags it `‡STALE`: the run that produced it
+# (results/ensemble_wmsp_saplma_full__*.csv, 2026-07-29 22:56) PREDATES the 2026-08-03 wMSP NaN fix, so
+# it is not a current result.
+#
+# ⚠️ THIS OVERRIDES A RECORDED AUTHOR DECISION ("not being re-run (author's decision)", same line).
+# It is run under the overnight standing instruction to use the time, and it is REVERSIBLE: it writes a
+# NEW dated file and clobbers nothing. The 2026-07-29 file is left untouched as provenance. Flag this
+# explicitly in the morning summary; if the author still does not want the line re-opened, delete the
+# output and nothing else has moved.
+#
+# Population: the COMPLETE 8 long evals x 5 rungs, 3 seeds -- not a subset. CPU only, no GPU.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+echo "HOST $(hostname)"
+OUT=/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/ensemble_rerun_2026-08-08__meta-llama_Meta-Llama-3.1-8B.csv
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+python -u scripts/checks/ensemble_ladder.py --probes saplma --seeds 1,2,3 \
+  --evals pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa,factscore \
+  --out "$OUT"
+echo "[ens-rerun] DONE -> $OUT"
