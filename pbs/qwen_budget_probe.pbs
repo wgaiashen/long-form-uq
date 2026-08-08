@@ -23,6 +23,12 @@
 #     independently of the fp32 sharding that G1 is validating, so the two de-risk in parallel.
 #   ⚠️ THE REAL RUN IS fp32 + eager. Nothing from this namespace may enter a results table.
 #
+# ⚠️ --sample-n, NOT --limit (corrected 2026-08-08). `--limit` takes the FIRST n rows, which is a
+# HEAD SLICE and not a sample -- on expertqa the first 200 rows have gold p90 450 against 349 for the
+# full set, outside the [316,376] range of random 200-row draws. Since this probe exists to measure
+# LENGTH, reading it off a head slice would bias the exact quantity it is measuring. `--sample-n`
+# draws randomly and stores the chosen indices in each record's `idx`, so the sample is auditable.
+#
 # Isolated under --prompt-regime qwen14b_probe, so it writes to cache/qwen14b_probe/ and CANNOT
 # pollute the real Qwen cache.
 #
@@ -45,7 +51,7 @@ run () {   # dataset  cap  extra...
   local DS="$1" CAP="$2"; shift 2
   echo "---- $DS (cap $CAP) ----" >&2
   python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \
-      --prompt-regime "$REGIME" --limit "$N" \
+      --prompt-regime "$REGIME" --sample-n "$N" --sample-seed 1 \
       --dtype bf16 --attn eager \
       --max-new-tokens "$CAP" --max-new-tokens-cap "$CAP" "$@" \
     || echo "!!! $DS FAILED (continuing so one bad set does not lose the rest)" >&2
