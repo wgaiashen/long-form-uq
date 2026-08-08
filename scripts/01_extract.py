@@ -6,6 +6,7 @@ first, because compute nodes have no internet.
     python scripts/01_extract.py --dataset sciq --ood ID
 """
 import argparse
+import random
 import sys
 from pathlib import Path
 
@@ -49,6 +50,15 @@ def main():
                          "Matches Joe's generate_until=['\\n'] for every dataset; off by "
                          "default since our convention leaves long-form untruncated. Use for "
                          "the pubmed_qa keystone reproduction.")
+    ap.add_argument("--sample-n", type=int, default=None,
+                    help="generate a RANDOM subsample of N examples per split, instead of --limit's "
+                         "first N. ⚠️ --limit is a HEAD SLICE, not a sample: on expertqa the first 200 "
+                         "rows have gold p90 450 against 349 for the full set, outside the [316,376] "
+                         "range of random 200-row draws. Any statistic read off a --limit run (length, "
+                         "degeneracy, capping) is therefore biased. Use this for anything measured.")
+    ap.add_argument("--sample-seed", type=int, default=1,
+                    help="seed for --sample-n. The chosen indices are stored in each record's `idx`, "
+                         "so the sample is auditable and reproducible after the fact.")
     ap.add_argument("--limit", type=int, default=None,
                     help="optional cap on #examples for a quick run")
     ap.add_argument("--max-new-tokens-cap", type=int, default=None,
@@ -82,6 +92,12 @@ def main():
                     help="OPT-IN: forbid repeating any n-gram of this size (HF default 0 = off). "
                          "Use with --repetition-penalty to kill loops; leave unset for frozen runs.")
     args = ap.parse_args()
+
+    # Validate the argument combination BEFORE anything expensive: loading fp32 Qwen-14B is ~59GB and
+    # several minutes, and a config error should not cost that.
+    if args.sample_n is not None and args.limit is not None:
+        raise SystemExit("--sample-n and --limit are both subsetting rules; pass one, not both. "
+                         "--limit takes the FIRST n (a head slice); --sample-n takes a random n.")
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
                  prompt_regime=args.prompt_regime)
@@ -191,7 +207,18 @@ def main():
         print(f"BUDGET OVERRIDE: {cfg.dataset} table={_table} -> effective={budget} "
               f"(ceiling={cfg.max_new_tokens_cap}, regime={cfg.prompt_regime!r})", flush=True)
     for split, ds in [("train", train_ds), ("test", eval_ds)]:
+        # Random subsample. Selected up front over the whole split so the draw does not depend on how
+        # far a resumed run got, which keeps a killed-and-restarted job on the SAME sample.
+        keep = None
+        if args.sample_n is not None:
+            n_total = len(ds)
+            k = min(args.sample_n, n_total)
+            keep = set(random.Random(args.sample_seed).sample(range(n_total), k))
+            print(f"SAMPLE: {split} drawing {k}/{n_total} at random (seed={args.sample_seed}); "
+                  f"selected idx are recorded per row", flush=True)
         for idx, batch in enumerate(ds):
+            if keep is not None and idx not in keep:
+                continue
             # The updated ProbeDrift yields (x, y); the old one yielded (x, y, mnt). Take
             # the first two either way, and use our own per-dataset budget (data.MAX_NEW_TOKENS).
             xb, yb = batch[0], batch[1]
