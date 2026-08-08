@@ -200,6 +200,41 @@ FAMILIES = {
     "lehmer_beta": (BETAS, score_lehmer),
 }
 
+# ----------------------------------------------------------------------------------------------
+# W1b -- LENGTH-CONDITIONED tau (--length-tau). A FOLLOW-UP, run after W1's Q1 came back NO.
+#
+# WHY. W1's own diagnostics showed that at a FIXED tau the family already behaves substantially as a
+# LENGTH rule: ESS correlates with answer length at rho >= 0.85 on three of eight datasets. That is the
+# `max z <= sqrt(n-1)` bound biting, and it was registered as a confound in advance. So the family is
+# an ACCIDENTAL length rule. This asks the mechanism question that follows: if length is going in
+# anyway, does putting it in DELIBERATELY do better than the accident?
+#
+#     tau(len) = tau0 * (len / LEN_REF) ** gamma
+#
+#     gamma = 0   the plain fixed-tau family (the required no-op control; MUST reproduce W1 exactly)
+#     gamma > 0   sharpen MORE on long answers
+#     gamma < 0   sharpen LESS on long answers, i.e. cancel the sqrt(n-1) drift
+#
+# ⚠️⚠️ THIS IS EXPLORATORY, NOT A SECOND PRE-REGISTERED TEST, AND THE REASON IS MULTIPLICITY.
+# W1 already read this same test data at 24 grid points. Adding a 2-D grid on top compounds that. So:
+#   * NO pass/fail bar is attached to it, and no p-value from it may be quoted as a result.
+#   * It is reported as a DESIGN INPUT for W2 (which puts length into the LEARNED weighter) and as a
+#     mechanism diagnostic -- "is the length dependence helping or hurting?" -- not as a horse race.
+#   * Any positive here has to be confirmed on a population this workstream has never touched before
+#     it becomes a claim. Qwen2.5-14B is the obvious venue and it is already being built next door.
+# LEN_REF is fixed a priori at 100 tokens (a round number near the grid's median-of-medians, 68), NOT
+# fitted, so it cannot absorb a per-dataset effect.
+# ----------------------------------------------------------------------------------------------
+LEN_REF = 100.0
+LTAUS = [0.5, 1.0, 2.0, 4.0]
+LGAMMAS = [-1.0, -0.5, 0.0, 0.5, 1.0]
+
+
+def score_softmax_len(nll, tau0, gamma):
+    """softmax-tau with tau set by THIS answer's own length. gamma=0 is exactly score_softmax."""
+    tau = float(tau0) * (max(len(nll), 1) / LEN_REF) ** float(gamma)
+    return score_softmax(nll, tau)
+
 
 # ----------------------------------------------------------------------------------------------
 # Selection arms. A1/A2 must report what the PROCEDURE scores, never what the best value scores.
@@ -248,6 +283,9 @@ def wilcoxon(diffs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--gate-only", action="store_true", help="run V1-V6 and stop, no sweep")
+    ap.add_argument("--length-tau", action="store_true",
+                    help="W1b follow-up: length-conditioned tau. EXPLORATORY, no bar attached, "
+                         "writes its own CSV. See the LEN_REF block for why it carries no p-value.")
     ap.add_argument("--out", default=str(OUT))
     args = ap.parse_args()
 
@@ -501,8 +539,50 @@ def main():
     else:
         print("  (consistent with R1's direction)" if d_cnn_ppl <= 0 else "  (Q1 did not pass; no conflict)")
 
+    # ---- W1b: the length-conditioned follow-up (EXPLORATORY, no bar, separate CSV) ----
+    if args.length_tau:
+        print("\n" + "=" * 100)
+        print("W1b -- LENGTH-CONDITIONED tau:  tau(len) = tau0 * (len/%.0f)**gamma" % LEN_REF)
+        print("⚠️ EXPLORATORY. W1 already read this test data at 24 grid points, so this carries NO bar")
+        print("   and NO quotable p-value. It is a MECHANISM diagnostic and a design input for W2.")
+        print("   Any positive needs confirming on a population this workstream has never touched.")
+        print("=" * 100)
+        lrows, lcurve = [], {}
+        for d in LONG:
+            nl, y = data[d]["nll"], data[d]["y"]
+            lcurve[d] = {}
+            for t0 in LTAUS:
+                for gm in LGAMMAS:
+                    v = np.array([score_softmax_len(a, t0, gm) for a in nl])
+                    p = results.prr(y, v)
+                    lcurve[d][(t0, gm)] = p
+                    lrows.append(("length_tau", d, f"t{t0}_g{gm}", p,
+                                  data[d]["n"], data[d]["med_len"], carve))
+        # NO-OP CONTROL: gamma = 0 must reproduce the plain fixed-tau family EXACTLY.
+        worst = max(abs(lcurve[d][(t0, 0.0)] - curves["softmax_tau"][d][TAUS.index(t0)])
+                    for d in LONG for t0 in LTAUS if t0 in TAUS)
+        print(f"\n  NO-OP CONTROL (gamma=0 must equal the fixed-tau family): max |diff| = {worst:.2e}"
+              f"  {'PASS' if worst < 1e-9 else 'FAIL <== the length wiring changed the base method'}")
+        print(f"\n  {'':10s}" + "".join(f"{('gamma=%+.1f' % g):>12s}" for g in LGAMMAS))
+        for t0 in LTAUS:
+            means = [float(np.mean([lcurve[d][(t0, g)] for d in LONG])) for g in LGAMMAS]
+            print(f"  tau0={t0:<6}" + "".join(f"{m:>12.4f}" for m in means))
+        flat = {(t0, g): float(np.mean([lcurve[d][(t0, g)] for d in LONG]))
+                for t0 in LTAUS for g in LGAMMAS}
+        b = max(flat, key=flat.get)
+        base = float(np.mean([data[d]["prr_min"] for d in LONG]))
+        print(f"\n  grid best (ORACLE over {len(flat)} points, NOT a result): tau0={b[0]} gamma={b[1]}"
+              f" -> {flat[b]:+.4f}   vs msp_min {flat[b] - base:+.4f}")
+        print(f"  best at gamma=0 (the W1 fixed-tau family, for reference): "
+              f"{max(flat[k] for k in flat if k[1] == 0.0):+.4f}")
+        print("\n  READ THIS AS: does DELIBERATE length-conditioning beat the ACCIDENTAL length")
+        print("  dependence the fixed-tau family already has? NOT as: is this a better method.")
+        rows += lrows
+
     # ---------------- write the CSV ----------------
     outp = Path(args.out)
+    if args.length_tau:
+        outp = outp.with_name(outp.stem + "__lengthtau" + outp.suffix)
     outp.parent.mkdir(parents=True, exist_ok=True)
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)
