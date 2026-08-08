@@ -69,13 +69,25 @@ TASKS=(
   "expertqa:384:--prompt-regime expertqa_rp12 --repetition-penalty 1.2"       # 2016 rows, longest budget
   "pubmed_qa:128:--truncate-long"                                             # 3800 rows, newline-stopped
   "xsum:56:"                                                                  # 3800 rows, ~5.6k-token sources
-  # ⚠️ med_quad NEEDS --no-repeat-ngram-size 3, and NOT --repetition-penalty. Llama's canonical
-  # med_quad (default namespace, pbs/extract_neighbour.pbs) was generated that way, and the records
-  # prove it: 0/400 of its generations contain a repeated 3-gram, against 17-55% on every other
-  # dataset. Generating Qwen's med_quad with plain decoding would put the two models on different
-  # decoding populations for the one dataset whose known failure mode is looping.
-  # rep_pen is specifically excluded: on med_quad it penalises the long few-shot context and forces
-  # immediate EOS, which produced ~35% EMPTY generations. no_repeat_ngram has no such side effect.
+  # ⚠️ med_quad has TWO independent settings that are easy to confuse. Both are pinned to v1 here.
+  #
+  # (1) BUDGET 128, i.e. v1. med_quad was regenerated at cap 768 (v2), and v2 was ARCHIVED with v1
+  #     re-emerging as canonical (author's decision 2026-08-04, STOCKTAKE_post31July.md:38). v1 is
+  #     hash-pinned in prereg/CANONICAL_v1_MANIFEST.sha256 and the file on disk verifies against it.
+  #     So this is deliberately the CAPPED version, 97.7% capped and all, not the long one.
+  #
+  # (2) --no-repeat-ngram-size 3, and NOT --repetition-penalty. Measured on the records rather than
+  #     read off a script: 0/1800 canonical med_quad generations contain a repeated 3-gram, against
+  #     17-55% on every other dataset (pubmed 17.6% is the working control for the detector). The
+  #     archived v2 and v2_span arms are also 0/1800, so the anti-loop flag is CONSTANT across the
+  #     whole med_quad lineage -- it is NOT what distinguishes v1 from v2. Mean generation length is
+  #     what does: 127 for v1 (cap 128) against 612 for v2 (cap 768).
+  #     Do not confuse this with the v1..v4 numbering in pbs/extract_neighbour.pbs, which is a
+  #     separate decoding lineage for the OOD neighbour extraction and uses the same words.
+  #     rep_pen is specifically excluded: on med_quad it penalises the long few-shot context and
+  #     forces immediate EOS, which produced ~35% EMPTY generations. no_repeat_ngram has no such
+  #     side effect. Generating Qwen with plain decoding would put the two models on different
+  #     decoding populations for the one dataset whose known failure mode is looping.
   "med_quad:128:--no-repeat-ngram-size 3"                                     # 1800 rows
   "asqa:256:--prompt-regime asqa_rp12 --repetition-penalty 1.2"               # 948 rows
   "samsum:56:"                                                                # 1800 rows
