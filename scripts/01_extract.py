@@ -28,9 +28,19 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--dtype", default="auto", choices=["auto", "fp32", "fp16", "bf16"],
-                    help="model load dtype. auto = load_model's per-model default "
-                         "(bf16 for Gemma, fp16 otherwise). Use fp32 to match Joe's "
-                         "Hidden Failures Llama runs (he passes no torch_dtype).")
+                    help="model load dtype. ⚠️ auto = load_model's per-model default, which is bf16 for "
+                         "Gemma and **fp16 for everything else** — including Qwen. Every canonical "
+                         "Llama long-eval cache was extracted fp32, and token logprobs ARE the msp_min "
+                         "signal, so omitting this silently produces a cache in a different precision "
+                         "from the one it will be compared against. PASS IT EXPLICITLY: fp32 matches "
+                         "the keystone runs. See --require-explicit-dtype.")
+    ap.add_argument("--require-explicit-dtype", action="store_true", default=None,
+                    help="refuse to run if --dtype was left at auto. On by default for any model that "
+                         "is NOT the Llama keystone, because 'auto' is only harmless where its result "
+                         "happens to match what the existing caches used. Pass --no-require-explicit-dtype "
+                         "to override deliberately.")
+    ap.add_argument("--no-require-explicit-dtype", dest="require_explicit_dtype",
+                    action="store_false", help=argparse.SUPPRESS)
     ap.add_argument("--attn", default="auto", choices=["auto", "eager", "sdpa"],
                     help="attention backend. auto = load_model's default (eager for "
                          "Gemma, HF default otherwise). Use eager to match Joe's runs.")
@@ -98,6 +108,22 @@ def main():
                              "clipped. Raise the ceiling explicitly rather than generating at a budget "
                              "you did not ask for.")
     train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting)
+
+    # ⚠️ THE fp16 TRAP (guard added 2026-08-08). `--dtype auto` resolves in generate.load_model to
+    # bf16 for Gemma and **fp16 for every other model**. Every canonical Llama long-eval cache was
+    # extracted with an explicit `--dtype fp32`, so `auto` was never exercised there -- but for a NEW
+    # model it silently produces a cache in a different precision from the one it will be compared
+    # against, and token logprobs are the msp_min signal. Crash instead of guessing.
+    _KEYSTONE = "meta-llama/Meta-Llama-3.1-8B"
+    require_explicit = (args.require_explicit_dtype if args.require_explicit_dtype is not None
+                        else cfg.model_name != _KEYSTONE)
+    if require_explicit and args.dtype == "auto":
+        raise SystemExit(
+            f"--dtype was left at 'auto' for {cfg.model_name}, which resolves to fp16.\n"
+            f"The Llama keystone caches are fp32 + eager, so an auto-dtype cache is NOT comparable "
+            f"to them. Pass --dtype fp32 --attn eager (what every canonical run used), or pass\n"
+            f"--no-require-explicit-dtype if you genuinely intend a different precision.")
+
     # auto -> None so load_model keeps its per-model defaults; otherwise override.
     dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]
     attn = None if args.attn == "auto" else args.attn

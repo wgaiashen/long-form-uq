@@ -182,12 +182,51 @@ def _spearman_loss(soft_r, target_rank):
 # MSP floor) is left untouched so the constant==MSP grounding test and the floor stay invariant.
 _SPECIAL_ID_MIN = 128000
 
+# ⚠️ THE >=128000 RULE IS LLAMA-3 ONLY, AND IT IS A SILENT BUG ON ANY OTHER MODEL (2026-08-08).
+# Qwen2.5's vocabulary is 152,064 with its specials at 151,643+, so `id >= 128000` would classify a
+# large band of ORDINARY CONTENT TOKENS as special and zero their weight -- no crash, no warning,
+# just a quietly different method. This feeds `content_keep`, which feeds weighted MSP, which is a
+# reported result, so it has to be model-aware.
+#
+# The mechanism is a module-level set that DEFAULTS TO EXACTLY THE OLD BEHAVIOUR, so no existing
+# caller changes and no committed number moves. A driver running a non-Llama model calls
+# `set_special_ids(...)` once at startup.
+#
+# ⭐ VERIFIED byte-identical on Llama before this landed: scanning all 11 cached record files, the
+# ONLY id >= 128000 that ever occurs in a generation is 128001 (<|end_of_text|>, 10,384 occurrences),
+# and it IS in `all_special_ids`. So set-membership and the >= test agree on every row we have.
+_SPECIAL_IDS = None          # None => fall back to the Llama-3 reserved-range test below
 
-def content_keep(record):
-    """1.0 for content tokens, 0.0 for special/reserved tokens (Llama-3 ids >= 128000), over the G
-    generated tokens -- used to drop the trailing <|end_of_text|> from the learned weighting."""
-    return np.array([0.0 if int(t) >= _SPECIAL_ID_MIN else 1.0 for t in record["gen_token_ids"]],
-                    dtype=np.float32)
+
+def set_special_ids(ids):
+    """Register the tokenizer's special ids for the model being run. Pass `tok.all_special_ids`.
+
+    Call this ONCE at driver startup for any non-Llama model. Passing None restores the Llama-3
+    reserved-range default. Kept as module state rather than a new argument because `content_keep`
+    is called from several places (including another workstream's `sharpening_wmsp.py`), and
+    changing its signature would break them.
+    """
+    global _SPECIAL_IDS
+    _SPECIAL_IDS = None if ids is None else {int(i) for i in ids}
+
+
+def content_keep(record, special_ids=None):
+    """1.0 for content tokens, 0.0 for special tokens, over the G generated tokens.
+
+    Used to drop the trailing end-of-text from the learned weighting: ~70% of xsum/cnn generations
+    end in EOS, and the weighter otherwise concentrates its softmax mass on that content-free "I'm
+    done" token. Only the LEARNED modes exclude them; `constant` (= the plain MSP floor) is left
+    untouched so the constant==MSP grounding test and the floor stay invariant.
+
+    Resolution order: the explicit `special_ids` argument, then whatever `set_special_ids` registered,
+    then the Llama-3 `id >= 128000` reserved-range test.
+    """
+    ids = special_ids if special_ids is not None else _SPECIAL_IDS
+    toks = record["gen_token_ids"]
+    if ids is None:
+        return np.array([0.0 if int(t) >= _SPECIAL_ID_MIN else 1.0 for t in toks], dtype=np.float32)
+    ids = {int(i) for i in ids}
+    return np.array([0.0 if int(t) in ids else 1.0 for t in toks], dtype=np.float32)
 
 
 def _weights_from_raw(raw, weight_mode: str, keep=None):

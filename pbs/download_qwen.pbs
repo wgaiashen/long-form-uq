@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_dl_qwen
+#PBS -j oe
+
+# Download Qwen/Qwen2.5-14B into HF_HOME. A hard prerequisite for the second model, and completely
+# independent of G1 -- so it runs in parallel rather than after it.
+#
+# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. This pulls ~28GB. CLAUDE.md is explicit that login nodes are
+# for editing and qsub only, and lists "a large pip install" as exactly the kind of thing that got
+# processes killed by RCS IT on 2026-07-06. A 28GB download is the same shape, so it goes through the
+# scheduler.
+#
+# ⚠️ COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out, the script says so
+# LOUDLY and exits non-zero rather than half-downloading and leaving a cache that looks present but
+# is incomplete -- a partial snapshot is worse than none, because `from_pretrained` fails deep in a
+# later job instead of here.
+#
+#   qsub pbs/download_qwen.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+unset HF_HUB_OFFLINE                 # this is the one job that MUST reach the network
+
+MODEL="Qwen/Qwen2.5-14B"
+echo "=== download $MODEL -> $HF_HOME on $(hostname) at $(date) ===" >&2
+
+echo "--- connectivity probe ---" >&2
+if ! timeout 60 curl -sSf -o /dev/null https://huggingface.co 2>&1; then
+  echo "!!! NO INTERNET on $(hostname). Cannot download here." >&2
+  echo "!!! Fall back: run the same snapshot_download from the LOGIN NODE with max_workers=2." >&2
+  exit 2
+fi
+echo "  network OK" >&2
+
+python -u - <<'PY'
+import os, sys
+from huggingface_hub import snapshot_download
+MODEL = "Qwen/Qwen2.5-14B"
+# max_workers=4: enough to saturate a cluster link, low enough not to spike RAM the way the default
+# parallel download did on the 8GB DoC jump box (implementation_notes.md §8).
+path = snapshot_download(
+    MODEL,
+    max_workers=4,
+    allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],   # weights + tokenizer, no extras
+)
+print("snapshot at:", path, flush=True)
+
+# VERIFY rather than trust: the config must match what the plan assumed, and the weights must load.
+import json, glob
+cfg = json.load(open(os.path.join(path, "config.json")))
+print(f"  layers={cfg['num_hidden_layers']} hidden={cfg['hidden_size']} "
+      f"vocab={cfg['vocab_size']} dtype={cfg.get('torch_dtype')}", flush=True)
+assert cfg["num_hidden_layers"] == 48, f"expected 48 blocks, got {cfg['num_hidden_layers']}"
+assert cfg["hidden_size"] == 5120, f"expected hidden 5120, got {cfg['hidden_size']}"
+shards = sorted(glob.glob(os.path.join(path, "*.safetensors")))
+total = sum(os.path.getsize(f) for f in shards)
+print(f"  {len(shards)} safetensors shards, {total/2**30:.1f} GiB", flush=True)
+assert total > 25 * 2**30, f"only {total/2**30:.1f} GiB downloaded — incomplete"
+
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained(MODEL)
+print(f"  tokenizer OK: vocab={len(tok)} bos={tok.bos_token!r} eos={tok.eos_token!r}", flush=True)
+print("DOWNLOAD VERIFIED", flush=True)
+PY
+STATUS=$?
+echo "=== done status=$STATUS at $(date) ===" >&2
+exit $STATUS

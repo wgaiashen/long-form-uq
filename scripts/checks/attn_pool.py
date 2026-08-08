@@ -49,6 +49,17 @@ from luq import cache, probe, results  # noqa: E402
 from luq.config import Config  # noqa: E402
 
 MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
+
+# Expected residual-stream width per model. The per-token cache guard below checks against THIS,
+# not against a bare 128000-style constant, so a wrong-model cache still fails loudly while a
+# legitimately different model is simply a new entry here.
+# ⚠️ The guard exists because a model-agnostic glob once loaded the dropped Qwen-1.5B cache into
+# PART A's headline rows (CLAUDE.md:70). Keeping it FAIL-LOUD is the point; only its constant was
+# ever wrong.
+EXPECTED_HIDDEN_DIM = {
+    "meta-llama/Meta-Llama-3.1-8B": 4096,
+    "Qwen/Qwen2.5-14B": 5120,
+}
 SEED = 1
 TEMP_GRID = [0.25, 0.5, 1.0, 2.0, 4.0]
 WEIGHT_DECAY = 1e-2          # regularises the query + head against p >> n overfitting
@@ -123,12 +134,20 @@ def load_per_token(model, dataset, layer, label_field="correctness"):
     if len(st) != len(records):
         raise SystemExit(f"{dataset}: per-token cache {len(st)} != records {len(records)}")
     states = [np.asarray(st[k], dtype=np.float32) for k in range(len(records))]
-    # RUNTIME MODEL GUARD (2026-07-27): the ONLY model is Llama-3.1-8B (hidden dim 4096). Fail loud if a
-    # cache from another model slipped in (Qwen=1536, Gemma=3584) — protects the CURRENT numbers, not just
-    # future sessions (the doc rule in CLAUDE.md does the latter).
-    d = states[0].shape[-1] if len(states) else 4096
-    if d != 4096:
-        raise SystemExit(f"{dataset}: per-token cache hidden dim {d} != 4096 (Llama). Wrong-model cache?")
+    # RUNTIME MODEL GUARD (2026-07-27; made model-aware 2026-08-08). Fail loud if the cache on disk is
+    # not the width THIS model should produce — that is how the dropped Qwen-1.5B cache once got loaded
+    # into PART A's headline rows via a model-agnostic glob (CLAUDE.md:70).
+    # ⚠️ The guard is still FAIL-LOUD and still per-model; only the hard-coded 4096 was wrong. A model
+    # absent from EXPECTED_HIDDEN_DIM is itself an error, NOT a pass — an unknown model must not skip
+    # the check, or the guard quietly stops guarding exactly when a new model is introduced.
+    if model not in EXPECTED_HIDDEN_DIM:
+        raise SystemExit(f"{dataset}: no expected hidden dim registered for {model!r}. Add it to "
+                         f"EXPECTED_HIDDEN_DIM — an unregistered model must not bypass the cache guard.")
+    want = EXPECTED_HIDDEN_DIM[model]
+    d = states[0].shape[-1] if len(states) else want
+    if d != want:
+        raise SystemExit(f"{dataset}: per-token cache hidden dim {d} != {want} expected for {model}. "
+                         "Wrong-model cache?")
     split = np.array([r["split"] for r in records])
     y = np.array([r.get(label_field, np.nan) for r in records], dtype=float)
     return states, split, y, int(z["layer"]), records
