@@ -105,8 +105,12 @@ _LABEL_OF = {"expertqa": _EXPERTQA_LABEL, "factscore": "factuality"}   # factsco
 #              ROW SET, so two models are compared on the same rows. Changes expertqa + factscore
 #              ONLY (verified: med_quad/samsum/asqa are byte-identical either way).
 # Default stays LEGACY on purpose: flipping it would silently re-point every existing driver at a
-# different population. The switch is deliberate and per-run, and the driver STAMPS it into the
-# results CSV so a file can never be ambiguous about which rule produced it.
+# different population. The switch is deliberate and per-run.
+# ⚠️ `probedriftlong` stamps this value into a `carve` column on every results row (via
+# `_provenance()`), so a CSV it wrote is never ambiguous about which population produced it. That is
+# true of THAT driver only -- any other consumer of this module writes no such column, so do not
+# assume a stamp you have not looked for. Rows predating 2026-08-08 have no column and are `legacy`
+# by definition.
 #     LUQ_CARVE=all-rows python scripts/checks/<driver>.py ...
 CARVE = os.environ.get("LUQ_CARVE", "legacy")
 if CARVE not in ("legacy", "all-rows"):

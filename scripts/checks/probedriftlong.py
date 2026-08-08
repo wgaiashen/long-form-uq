@@ -86,7 +86,15 @@ METHODS = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in WMSP]
 
 CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds",
               "different_label_projection", "eval_med_len", "train_med_len", "train_max_len",
-              "ci_lo", "ci_hi", "boot_p", "significant", "git_sha", "cluster", "env_hash"]
+              "ci_lo", "ci_hi", "boot_p", "significant", "git_sha", "cluster", "env_hash",
+              # WHICH TEST POPULATION produced this row (added 2026-08-08). "legacy" = drop
+              # unlabelled rows then carve 30%; "all-rows" = carve 30% of ALL rows then score
+              # whichever carry labels. They differ on expertqa + factscore ONLY, but a CSV that
+              # does not say which rule it used is indistinguishable from one that used the other
+              # -- and two agents are now writing results into this repo. Rows written before this
+              # column existed are `legacy` by definition; they are NOT back-filled, because an
+              # inferred stamp and a recorded one must not look the same.
+              "carve"]
 
 
 def _flush_rows(out, rows, prov):
@@ -139,7 +147,10 @@ def _provenance():
         env_hash = hashlib.sha256("\n".join(pkgs).encode()).hexdigest()[:12]
     except Exception as e:                              # never let env-hashing crash the run
         env_hash = f"unknown:{type(e).__name__}"
-    return {"git_sha": sha, "cluster": cluster, "env_hash": env_hash}
+    # `carve` is read from xl_rungs (which resolves LUQ_CARVE) rather than re-read from the
+    # environment here, so the CSV records what the run ACTUALLY used and cannot disagree with it.
+    from xl_rungs import CARVE
+    return {"git_sha": sha, "cluster": cluster, "env_hash": env_hash, "carve": CARVE}
 
 
 def _save_pooler(pooler, best_T, rung, X, sd, layer, states, te_idx, test_rows, PT, device):
