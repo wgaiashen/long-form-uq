@@ -1,8 +1,16 @@
-"""GATE 2 — diff the post-library PRR against the frozen master table.
+"""GATE 2 — diff the post-library PRR against the frozen per-eval ladder output.
 
 Pairs with `pbs/g2_library_prr.pbs`. That job re-runs the ladder under LUQ_CARVE=legacy on a
 couple of evals, writing to `results/g2_relib_<eval>__<slug>.csv`; this reads those and compares
-every (rung, eval, method) cell against `results/pdl_master__<slug>.csv`.
+every (rung, eval, method) cell against `results/pdl_fam_<eval>__<slug>.csv`.
+
+⚠️ THE BASELINE IS `pdl_fam_*`, NOT `pdl_master__*`. Both describe the same runs, but the master is
+an ASSEMBLED view whose `method` column has been RENAMED to display names -- `saplma` -> `SAPLMA`,
+`floor_min` -> `msp_min`, `attention` -> `armA(attention)`, `wmsp_shrink2` -> `wMSP-shrink@2`. The
+driver emits the raw names. Diffing raw against display makes every row look "absent from the
+master" and the gate reports a spurious FAIL, which is exactly what happened on the first attempt.
+`pdl_fam_*` is the SAME driver's own frozen output, in the same namespace, and is the file the
+master is assembled FROM -- so it is the true like-for-like comparison.
 
 WHAT COUNTS AS PASSING
 ----------------------
@@ -36,24 +44,29 @@ def main():
                     help="CSVs carry 4 dp; anything above half a unit in the last place is real movement")
     args = ap.parse_args()
 
-    master_path = ROOT / f"results/pdl_master__{SLUG}.csv"
-    if not master_path.exists():
-        raise SystemExit(f"missing frozen master: {master_path}")
-    master = pd.read_csv(master_path)[KEY + ["prr"]].rename(columns={"prr": "prr_master"})
-
-    frames = []
-    for ev in args.evals.split(","):
-        p = ROOT / f"results/g2_relib_{ev}__{SLUG}.csv"
-        if not p.exists():
-            print(f"⚠️  {ev}: {p.name} not found — job not finished? SKIPPING (not a pass)")
-            continue
-        df = pd.read_csv(p)
-        df = df[df["method"] != "VERDICT"] if "method" in df else df
+    def load(path, col_out):
+        df = pd.read_csv(path)
+        # VERDICT rows are paired-bootstrap summaries, not method PRRs — excluded from both sides.
+        df = df[~df["method"].astype(str).str.startswith("VERDICT")]
         col = "prr_mean" if "prr_mean" in df.columns else "prr"
-        frames.append(df[KEY + [col]].rename(columns={col: "prr_new"}))
-    if not frames:
+        return df[KEY + [col]].rename(columns={col: col_out}).dropna(subset=[col_out])
+
+    new_frames, base_frames = [], []
+    for ev in args.evals.split(","):
+        p_new = ROOT / f"results/g2_relib_{ev}__{SLUG}.csv"
+        p_base = ROOT / f"results/pdl_fam_{ev}__{SLUG}.csv"
+        if not p_new.exists():
+            print(f"⚠️  {ev}: {p_new.name} not found — job not finished? SKIPPING (not a pass)")
+            continue
+        if not p_base.exists():
+            raise SystemExit(f"missing frozen baseline {p_base.name} — nothing to diff {ev} against")
+        new_frames.append(load(p_new, "prr_new"))
+        base_frames.append(load(p_base, "prr_base"))
+    if not new_frames:
         raise SystemExit("no gate-2 outputs found — nothing to diff")
-    new = pd.concat(frames, ignore_index=True).dropna(subset=["prr_new"])
+    new = pd.concat(new_frames, ignore_index=True)
+    master = pd.concat(base_frames, ignore_index=True).rename(columns={"prr_base": "prr_master"})
+    master_path = Path("results/pdl_fam_<eval>__<slug>.csv")
 
     m = new.merge(master, on=KEY, how="left")
     matched = m.dropna(subset=["prr_master"]).copy()
@@ -65,10 +78,10 @@ def main():
     print(f"  cells re-run and present in the master : {len(matched)}")
     print(f"  cells IDENTICAL (<= {args.tol:g})        : {len(matched) - len(moved)}")
     print(f"  cells MOVED                            : {len(moved)}")
-    print(f"  cells not in the master (not a pass)   : {len(missing)}")
+    print(f"  cells not in the baseline (not a pass)   : {len(missing)}")
 
     if len(missing):
-        print("\n  --- present in the re-run, absent from the master (reported, not passed) ---")
+        print("\n  --- present in the re-run, absent from the frozen baseline (reported, not passed) ---")
         for _, r in missing.head(20).iterrows():
             print(f"    {r['rung']:16} {r['eval']:14} {r['method']}")
 
