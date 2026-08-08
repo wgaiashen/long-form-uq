@@ -19,6 +19,29 @@ SPACE_MARKERS = ("Ġ", "▁")          # HF byte-level / sentencepiece leading-s
 NEWLINE_GLYPHS = ("Ċ", "ċ", "ĉ")    # byte-level newline / tab glyphs
 SENT_END = {".", "!", "?"}
 _SPECIAL_ID_MIN = 128000            # Llama-3 reserved/special token range
+# ⚠️ LLAMA-3 ONLY, AND A SILENT BUG ON ANY OTHER MODEL (2026-08-08). Qwen2.5's vocabulary is 152,064
+# with its specials at 151,643+, so `id >= 128000` would classify a large band of ORDINARY CONTENT
+# TOKENS as special and drop them from the keep-mask -- no crash, just a quietly different method.
+# Mirrors the fix already made in `weighted_msp.py`; `set_special_ids(tok.all_special_ids)` below
+# registers the real ids, and the default preserves the Llama behaviour exactly so no committed
+# number moves. Verified on Llama: the only id >= 128000 ever occurring in a cached generation is
+# 128001 (<|end_of_text|>), which IS in all_special_ids, so set-membership and the >= test agree.
+_SPECIAL_IDS = None                 # None => fall back to the reserved-range test above
+
+
+def set_special_ids(ids):
+    """Register the tokenizer's special ids for the model being run. Pass `tok.all_special_ids`.
+
+    Call once at driver startup for any non-Llama model; None restores the Llama-3 default. Module
+    state rather than a new argument, because `keep_mask` is called from several places and changing
+    its signature would break them.
+    """
+    global _SPECIAL_IDS
+    _SPECIAL_IDS = None if ids is None else {int(i) for i in ids}
+
+
+def _is_special(t):
+    return int(t) >= _SPECIAL_ID_MIN if _SPECIAL_IDS is None else int(t) in _SPECIAL_IDS
 
 # Negation words: in STOPWORDS but meaning-bearing -- keep them in the "content" set.
 NEGATION = {"not", "no", "nor", "never", "none", "cannot", "n't", "without", "neither"}
@@ -73,7 +96,7 @@ def keep_mask(gen_token_ids, pieces, mode="content"):
     g = len(gen_token_ids)
     keep = np.ones(g, dtype=np.float32)
     for i, t in enumerate(gen_token_ids):                  # always drop special/reserved tokens
-        if int(t) >= _SPECIAL_ID_MIN:
+        if _is_special(t):
             keep[i] = 0.0
     if mode == "special":
         return _guard(keep)

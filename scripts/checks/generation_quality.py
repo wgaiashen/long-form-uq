@@ -31,7 +31,11 @@ sys.path.insert(0, str(ROOT / "src"))
 from luq import cache, data, degeneracy  # noqa: E402
 from luq.config import Config  # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+# DEFAULT only. Kept as the previous hard-coded value so every existing invocation stays
+# byte-identical; a second model is passed with --model. (Was a bare constant until 2026-08-08,
+# which made the script silently SKIP every dataset when pointed at a non-Llama cache namespace --
+# it reported "no datasets" rather than "wrong model", which reads like missing data.)
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 DEFAULT_REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
 
 
@@ -61,10 +65,10 @@ def fabrication(text):
     return True, m.start() / max(len(text), 1)
 
 
-def report(dataset, regime, budget_override, tok=None):
-    cfg = Config(model_name=MODEL, dataset=dataset, ood_setting="ID",
+def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
+    cfg = Config(model_name=model, dataset=dataset, ood_setting="ID",
                  prompt_regime=regime if regime is not None else DEFAULT_REGIME.get(dataset, ""))
-    recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, dataset, "ID"))
+    recs = cache.load_records(cfg.cache_dir, cache.run_key(model, dataset, "ID"))
     budget = budget_override if budget_override else data.MAX_NEW_TOKENS[dataset]
     glen = np.array([len(r["gen_token_ids"]) for r in recs])
     texts = [(r.get("gen_text") or "") for r in recs]
@@ -92,6 +96,9 @@ def report(dataset, regime, budget_override, tok=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--datasets", default="med_quad,samsum,xsum,cnn_dailymail")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="model slug whose record cache to read. Defaults to the Llama keystone, so "
+                         "existing calls are unchanged. Pass Qwen/Qwen2.5-14B for the second model.")
     ap.add_argument("--regime", default=None, help="cache namespace; omit for the v1 default per dataset")
     ap.add_argument("--budget", type=int, default=None, help="override the budget used for %%capped")
     ap.add_argument("--out", default=None)
@@ -100,7 +107,7 @@ def main():
     rows = []
     for d in args.datasets.split(","):
         try:
-            rows.append(report(d.strip(), args.regime, args.budget))
+            rows.append(report(d.strip(), args.regime, args.budget, model=args.model))
         except Exception as e:                      # a missing cache is reported, never silently skipped
             print(f"  {d}: SKIPPED ({type(e).__name__}: {e})")
     if not rows:
