@@ -69,12 +69,25 @@ IFS=':' read -r DS BUD EXTRA <<< "${TASKS[$SLURM_ARRAY_TASK_ID]}"
 echo "=== $DS (budget $BUD, FULL dataset) on $(hostname) at $(date) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
+# ⚠️ --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime, and that guard is right.
+# 01_extract:116 refuses the flag without a regime, to stop non-default-budget records being written
+# into the default namespace beside the frozen v1 records. It cannot tell that the value we pass
+# equals the table value, and it should not have to trust that. An earlier version of this script
+# passed it for all eight datasets to force the resolved-budget line to be logged; the five datasets
+# with no regime died on the guard two minutes in. The budget is EVIDENCED AFTER THE FACT instead --
+# max(len(gen_token_ids)) per dataset must equal the intended budget, which is a stronger check than
+# a printed intention anyway, since it reads what was actually generated.
+# So: pass it only where a regime exists. The five default-budget datasets take the table value, and
+# --max-new-tokens-cap alone (a pure ceiling, no guard) lifts the 128 default where it is too low.
+MNT=""
+case "$EXTRA" in *--prompt-regime*) MNT="--max-new-tokens $BUD" ;; esac
+
 # ⚠️ --dtype fp32 --attn eager passed EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model;
 # 01_extract refuses `auto` for a non-Llama model rather than producing a quietly incomparable cache.
 # No --limit and no --sample-n: this is the whole dataset, not a subset.
 # shellcheck disable=SC2086
 python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \
     --dtype fp32 --attn eager \
-    --max-new-tokens "$BUD" --max-new-tokens-cap "$BUD" $EXTRA
+    $MNT --max-new-tokens-cap "$BUD" $EXTRA
 
 echo "=== $DS done at $(date) ==="
