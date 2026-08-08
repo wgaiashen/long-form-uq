@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=120gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_w2_grid
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+# W2 FULL GRID, ONE eval per job (all 5 of its rungs, 3 seeds), so the 8 evals run in parallel.
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/sharpening_wmsp_one_eval.pbs
+#
+# ⚠️ DO NOT SUBMIT UNTIL THE NO-OP IDENTITY HAS PASSED. `score_at_T(T0=1, gamma=0)` must equal the
+# library's own `predict_weighted_msp` to <1e-6 on the same trained model. The driver raises and stops
+# if it does not, on every cell and seed -- but check the smoke log first rather than burning 8 jobs.
+#
+# SIZING, measured from the smoke (pubmed_qa / ID / seed 1): 6m50s wall, 22.9 GB peak, for ONE cell at
+# median length 22. The heavy evals are much bigger -- expertqa's per-token cache is 6.6 GB on disk at
+# median length 200, cnn_dailymail has 3800 rows -- hence 120 GB and the full 24 h. Splitting per eval
+# is what makes the grid finish at all; the same lesson as pbs/pdl_one_eval.pbs.
+#
+# CPU only, no GPU: one weighter is trained per (cell, seed) and the whole (T0, gamma) grid is then a
+# re-score off that one model, so the cost is one training pass, not one per grid point.
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+: "${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/sharpening_wmsp_one_eval.pbs}"
+echo "HOST $(hostname)  EVAL=$LUQ_EVAL"
+OUT="results/sharpening_wmsp_${LUQ_EVAL}__meta-llama_Meta-Llama-3.1-8B.csv"
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+python -u scripts/checks/sharpening_wmsp.py --evals "$LUQ_EVAL" --seeds 1,2,3 --out "$OUT"
+echo "[w2-grid] DONE $LUQ_EVAL -> $OUT"
