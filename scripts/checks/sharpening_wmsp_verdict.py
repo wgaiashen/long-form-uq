@@ -140,15 +140,33 @@ def main():
 
     # ---- ORACLE (ceiling) and LODO (the result) ----
     oracle = {ev: max(per[ev].values()) for ev in present}
-    lodo, lodo_pick = {}, {}
-    for ev in present:
-        others = [o for o in present if o != ev]
-        if not others:
-            continue
-        shared = [k for k in keys if all(k in per[o] for o in others) and k in per[ev]]
-        best = max(shared, key=lambda k: float(np.mean([per[o][k] for o in others])))
-        lodo_pick[ev] = best
-        lodo[ev] = per[ev][best]
+
+    def lodo_over(pool):
+        """LODO restricted to a subset of grid points. `pool` is a list of (T0, gamma) keys.
+
+        Reports what the PROCEDURE achieves on the held-out eval, never the best point's score.
+        """
+        sel, pick = {}, {}
+        for ev in present:
+            others = [o for o in present if o != ev]
+            if not others:
+                continue
+            shared = [k for k in pool if all(k in per[o] for o in others) and k in per[ev]]
+            if not shared:
+                continue
+            b = max(shared, key=lambda k: float(np.mean([per[o][k] for o in others])))
+            pick[ev] = b
+            sel[ev] = per[ev][b]
+        return sel, pick
+
+    # THE FACTOR DECOMPOSITION. Selecting (T0, gamma) jointly confounds two questions. Split them:
+    #   T0-only  : gamma pinned to 0 -> "does SHARPENING help at all?"
+    #   full 2-D : both free         -> "does LENGTH-CONDITIONING add anything on top?"
+    # The free-side result (§3.8) said sharpening yes, length no. This tests the same split on the
+    # LEARNED weighter, which is the only way to attribute a joint win to the right factor.
+    t0_only = [k for k in keys if float(k[1]) == 0.0]
+    lodo, lodo_pick = lodo_over(keys)
+    lodo_t0, lodo_t0_pick = lodo_over(t0_only)
 
     print("\n" + "-" * 100)
     print(f"PER-DATASET OOD MEANS  (population: {len(present)}/8 evals"
@@ -165,11 +183,32 @@ def main():
     mean_fl = float(np.mean([floor_min[e] for e in present]))
     print(f"{'MEAN':16s}{mean_noop:>+10.4f}{mean_lodo:>+10.4f}{'':>16s}{mean_orc:>+10.4f}{mean_fl:>+10.4f}")
 
+    def wilc(x):
+        return _st.wilcoxon(x).pvalue if not np.allclose(x, 0) else 1.0
+
     d = np.array([lodo[e] - noop[e] for e in present])
-    print(f"\n  LODO vs no-op:   {d.mean():+.4f}   wins {int((d > 0).sum())}/{len(present)}   "
-          f"Wilcoxon p={_st.wilcoxon(d).pvalue if not np.allclose(d, 0) else 1.0:.4f}")
-    print(f"  ORACLE vs no-op: {mean_orc - mean_noop:+.4f}   <-- CEILING, chosen on test, NOT a result")
-    print(f"  the gap between them is what honest selection costs.")
+    print(f"\n  LODO (T0 and gamma) vs no-op: {d.mean():+.4f}   wins {int((d > 0).sum())}/"
+          f"{len(present)}   Wilcoxon p={wilc(d):.4f}")
+    print(f"  ORACLE vs no-op:              {mean_orc - mean_noop:+.4f}   <-- CEILING, chosen on "
+          f"test, NOT a result")
+    if mean_orc - mean_noop > 1e-9:
+        kept = (d.mean()) / (mean_orc - mean_noop)
+        print(f"  honest selection keeps {kept:.0%} of the oracle gain and loses {1 - kept:.0%}.")
+
+    # ---- the factor decomposition: is any win SHARPENING or LENGTH-CONDITIONING? ----
+    if lodo_t0:
+        dt = np.array([lodo_t0[e] - noop[e] for e in present if e in lodo_t0])
+        dl = np.array([lodo[e] - lodo_t0[e] for e in present if e in lodo_t0])
+        print("\n" + "-" * 100)
+        print("FACTOR DECOMPOSITION -- selecting (T0, gamma) jointly confounds two questions")
+        print("-" * 100)
+        print(f"  T0 only (gamma pinned 0) vs no-op : {dt.mean():+.4f}  wins {int((dt > 0).sum())}/"
+              f"{len(dt)}  p={wilc(dt):.4f}   <- does SHARPENING help?")
+        print(f"  adding gamma on top of T0         : {dl.mean():+.4f}  wins {int((dl > 0).sum())}/"
+              f"{len(dl)}  p={wilc(dl):.4f}   <- does LENGTH-CONDITIONING add anything?")
+        print(f"  T0 picked per fold: " + "  ".join(f"{e}={lodo_t0_pick[e][0]}" for e in lodo_t0))
+        print("  ⚠️ If the second line is <= 0, length-conditioning is dead on the LEARNED side too,")
+        print("     which would be the SECOND independent null on it (the free side was §3.8).")
 
     # ---- the gamma sign pattern: the registered failure mode ----
     print("\n" + "-" * 100)
