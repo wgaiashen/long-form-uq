@@ -31,3 +31,15 @@ logs/
 # pattern (which matches directories) never matched it and it sat untracked forever. A permanently
 # dirty 'git status' is not cosmetic here: the untracked-file sweep in CLAUDE.md relies on it.
 cache
+
+# ---- INTERNAL GUIDANCE DOCS DO NOT BELONG IN THE SUBMITTED REPO (rule added 2026-08-08) ----
+# This repo is the submitted artifact and should read as a record of what was actually RUN.
+# Agent briefs, session hand-overs and "how to find your bearings" explainers are INTERNAL: they
+# belong in the PRIVATE parent (private_luq) beside CLAUDE.md and the plans. Anything mentioning
+# Claude/an assistant especially so. Pre-registrations and analysis scripts are NOT in this class --
+# they are part of the record and stay tracked here.
+*_BRIEF_*.md
+DOC_BRIEF*.md
+DOC_INSTRUCTIONS.md
+AGENT_*.md
+*_HANDOVER*.md
