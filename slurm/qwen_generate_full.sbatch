@@ -2,7 +2,7 @@
 #SBATCH --partition=a100
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=96G
+#SBATCH --mem=48G
 #SBATCH --time=12:00:00
 #SBATCH --job-name=qwen_gen
 #SBATCH --array=0-7%3
@@ -30,6 +30,12 @@
 # min(want, cap) either way), but it forces 01_extract to print the resolved BUDGET line, which is the
 # only way the log can EVIDENCE that the budget was not silently clipped to the 128 default. Trap 4.2
 # is invisible precisely when you do not ask for it to be printed.
+#
+# Memory: 48G. Measured peak is ~11GB -- one 3.4GB safetensors shard at a time (device_map="cuda"
+# streams them to the GPU) plus the pooled-feature list, which is the part that grows with the
+# dataset: 49 layers x 5120 x fp32 = 0.96MB per example, so 3.6GB at cnn/xsum/pubmed's 3800 rows.
+# This was 96G, which is not free: 4 concurrent jobs at 96G exceed vm-he-a100's 451GB, so an
+# oversized ask can leave a job pending on memory while a GPU sits idle.
 #
 # Resume is safe: 01_extract checkpoints every 200 examples and skips what is already cached, so a
 # walltime kill costs queue time, not work. 12h is chosen over a longer request on purpose -- the a100
