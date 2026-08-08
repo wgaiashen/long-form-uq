@@ -201,6 +201,60 @@ FAMILIES = {
 }
 
 # ----------------------------------------------------------------------------------------------
+# W4 Q-D (--round2) -- THE RANK-WEIGHTED FAMILY, length-invariant BY CONSTRUCTION.
+# Pre-registration: prereg/W4_lodo_families_and_rank.md §2.
+#
+# WHY. Round 1 measured that the softmax-tau family behaves substantially as a LENGTH rule: ESS
+# correlates with answer length at rho >= 0.85 on three of eight datasets. The cause is structural --
+# the largest attainable standardised value in an answer of n tokens is bounded by about sqrt(n-1),
+# so at a fixed tau a long answer concentrates far more than a short one. Weighting by the within-
+# answer RANK removes that by construction: r is always exactly [0, 1] whatever n is.
+#
+#     r_t = (rank of nll_t - 1) / (n - 1)      in [0,1], largest NLL -> 1
+#     w   = softmax(tau * r)
+#
+#     tau = 0    -> uniform            -> perplexity exactly
+#     tau -> inf -> one-hot on max NLL -> msp_min's RANKING exactly
+#
+# ESS/n is then CONSTANT in n (-> 2/tau at large tau), so this is a soft TOP-FRACTION rule rather
+# than a soft TOP-COUNT rule.
+#
+# ⚠️ THE GRID IS DELIBERATELY MUCH LARGER THAN ROUND 1's. Because ESS/n ~ 2/tau, reaching about one
+# token in a hundred needs tau ~ 200. Reusing round 1's grid (max 32) would barely move this family
+# off uniform and would MANUFACTURE a null.
+# ⚠️ THE A-PRIORI VALUE IS tau = 2, committed in the prereg before running: the rank analogue of
+# round 1's reasoning is "the top-ranked token gets e times the weight of the median-ranked token",
+# i.e. tau * (1 - 0.5) = 1.
+# ----------------------------------------------------------------------------------------------
+RANK_TAUS = [0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, np.inf]
+RANK_A0 = 2.0
+
+
+def rank_weights(nll, tau):
+    """w = softmax(tau * r), r = within-answer NLL rank scaled to [0, 1]. Ties get averaged ranks so
+    the mapping is deterministic and does not depend on the sort's tie-breaking."""
+    n = len(nll)
+    if n == 1:
+        return np.ones(1)
+    if tau == 0.0:
+        return np.full(n, 1.0 / n)
+    if not np.isfinite(tau):
+        w = np.zeros(n)
+        w[int(np.argmax(nll))] = 1.0
+        return w
+    r = (_st.rankdata(nll, method="average") - 1.0) / (n - 1.0)
+    a = tau * r
+    a = a - a.max()
+    w = np.exp(a)
+    return w / w.sum()
+
+
+def score_softmax_rank(nll, tau):
+    """Rank-weighted score: weights from the RANK, but summed against the RAW nll (as in every
+    other family here, so the endpoints are preserved exactly)."""
+    return float((rank_weights(nll, tau) * nll).sum())
+
+# ----------------------------------------------------------------------------------------------
 # W1b -- LENGTH-CONDITIONED tau (--length-tau). A FOLLOW-UP, run after W1's Q1 came back NO.
 #
 # WHY. W1's own diagnostics showed that at a FIXED tau the family already behaves substantially as a
@@ -264,6 +318,35 @@ def one_se_pick(curves, train_ds, grid):
     return int(cands[int(np.argmax(mean[cands]))])
 
 
+def argmax_pick(curves, train_ds, grid):
+    """RAW-ARGMAX leave-one-dataset-out: the parameter with the best mean on the training datasets.
+
+    ⚠️ Reported ALONGSIDE `one_se_pick`, never instead of it (prereg W4 §1.2). Round 1's 1-SE rule
+    turned out to be near-vacuous at this sample size: between-dataset PRR variance is so large that
+    the band covered most of the grid and the registered tie-break decided the answer, returning
+    tau = inf on all 8 folds. Reporting only one of the two rules would let the CHOICE OF RULE do the
+    work, so both are always shown and a disagreement between them is itself the finding.
+    """
+    M = np.array([[curves[d][i] for i in range(len(grid))] for d in train_ds], dtype=float)
+    return int(np.argmax(M.mean(axis=0)))
+
+
+def lodo_family(curves, grid, evals, base_min, base_ppl, picker):
+    """Leave-one-dataset-out over `evals` for ONE family, under ONE selection rule.
+
+    Returns (per-dataset scores, per-dataset picked parameter). Reports what the PROCEDURE achieves
+    on the held-out dataset -- never what the best parameter would have scored there.
+    """
+    vals, picks = [], []
+    for d in evals:
+        tr = [o for o in evals if o != d]
+        j = picker(curves, tr, grid)
+        vals.append(curves[d][j])
+        picks.append(grid[j])
+    vals = np.array(vals, dtype=float)
+    return vals, picks
+
+
 def wilcoxon(diffs):
     """Two-sided Wilcoxon signed-rank on the paired per-dataset differences. n=8 -> min p = 0.0078.
 
@@ -286,8 +369,17 @@ def main():
     ap.add_argument("--length-tau", action="store_true",
                     help="W1b follow-up: length-conditioned tau. EXPLORATORY, no bar attached, "
                          "writes its own CSV. See the LEN_REF block for why it carries no p-value.")
+    ap.add_argument("--round2", action="store_true",
+                    help="W4: add the RANK-weighted family (Q-D) and run leave-one-dataset-out for "
+                         "ALL families under BOTH selection rules (Q-A). Writes its own CSV so "
+                         "round 1's output stays byte-reproducible. Prereg: "
+                         "prereg/W4_lodo_families_and_rank.md")
     ap.add_argument("--out", default=str(OUT))
     args = ap.parse_args()
+
+    # W4 Q-D: the rank family joins the sweep only under --round2, so the round-1 CSV is unchanged.
+    if args.round2:
+        FAMILIES["rank_tau"] = (RANK_TAUS, score_softmax_rank)
 
     carve = os.environ.get("LUQ_CARVE", "legacy")
     print("=" * 100)
@@ -539,6 +631,155 @@ def main():
     else:
         print("  (consistent with R1's direction)" if d_cnn_ppl <= 0 else "  (Q1 did not pass; no conflict)")
 
+    # ================================================================================================
+    # W4 -- ROUND 2.  Q-A: honest selection in ALL families.  Q-D: the rank-weighted family.
+    # Pre-registration: prereg/W4_lodo_families_and_rank.md
+    # ================================================================================================
+    if args.round2:
+        print("\n" + "=" * 100)
+        print("W4 Q-A -- LEAVE-ONE-DATASET-OUT IN EVERY FAMILY, UNDER BOTH SELECTION RULES")
+        print("prereg: prereg/W4_lodo_families_and_rank.md §1")
+        print("=" * 100)
+        print("⚠️ THIS IS A SECOND LOOK AT DATA ROUND 1 ALREADY READ. A pass is WEAKER evidence than a")
+        print("   round-1 pass would have been and is not a claim until it replicates on a population")
+        print("   this workstream has never touched (Qwen, which has not begun generating).")
+        print("⚠️ THREE families are tested, so ONE p < 0.05 among them is roughly what chance gives.")
+        print("   A pass is only interesting if BOTH selection rules agree.\n")
+
+        # --- REGRESSION CHECK (prereg §1.5): the new code path must reproduce round 1's A1 exactly.
+        v_reg, p_reg = lodo_family(curves["softmax_tau"], TAUS, LONG, base_min, base_ppl, one_se_pick)
+        reg_ok = (all(not np.isfinite(p) for p in p_reg)
+                  and abs(float(v_reg.mean()) - float(base_min.mean())) < 1e-9)
+        print(f"  REGRESSION CHECK vs round 1 A1: picks={sorted(set(str(p) for p in p_reg))} "
+              f"mean={v_reg.mean():+.4f} (round 1: inf on all 8, +0.1855)  "
+              f"{'PASS' if reg_ok else 'FAIL <== the refactor changed the procedure'}")
+        if not reg_ok:
+            raise SystemExit("W4 regression check FAILED -- round 1's A1 arm is not reproduced. "
+                             "Nothing below is interpretable. Stopping, as pre-registered.")
+
+        print(f"\n{'family':14s}{'rule':11s}{'mean PRR':>10s}{'vs msp_min':>12s}{'signs':>8s}"
+              f"{'Wilcoxon':>10s}{'beat BOTH':>11s}   picks")
+        for fam, (grid, _) in FAMILIES.items():
+            for rule, picker in [("argmax", argmax_pick), ("1-SE", one_se_pick)]:
+                v, picks = lodo_family(curves[fam], grid, LONG, base_min, base_ppl, picker)
+                dm = v - base_min
+                both = int(np.sum((v > base_min) & (v > base_ppl)))
+                uniq = sorted({("inf" if not np.isfinite(p) else f"{p:g}") for p in picks})
+                print(f"{fam:14s}{rule:11s}{v.mean():>+10.4f}{dm.mean():>+12.4f}"
+                      f"{int((dm > 0).sum()):>6d}/8{wilcoxon(dm):>10.4f}{both:>9d}/8   {uniq}")
+                rows.append(("w4_lodo", fam, rule, float(v.mean()), 8,
+                             float(dm.mean()), carve))
+        print(f"\n{'msp_min (the bar)':25s}{base_min.mean():>+10.4f}")
+        print(f"{'perplexity':25s}{base_ppl.mean():>+10.4f}")
+        print("\n  Registered readings: a family whose LODO returns the ENDPOINT on every fold is a")
+        print("  NULL ('the procedure declines to leave the endpoint'), not a small positive. If the")
+        print("  two rules DISAGREE in verdict, neither is the answer -- the disagreement is the")
+        print("  finding, and it says selection is rule-dependent at n = 8.")
+
+        # --- Q-D: the rank family, a-priori tau, plus the MECHANISM check that is half the bar ---
+        print("\n" + "=" * 100)
+        print(f"W4 Q-D -- THE RANK-WEIGHTED FAMILY, a-priori tau = {RANK_A0} (prereg §2.4)")
+        print("=" * 100)
+        i_r = RANK_TAUS.index(RANK_A0)
+        vr = np.array([curves["rank_tau"][d][i_r] for d in LONG])
+        dr = vr - base_min
+        print(f"  PART 1 (PRR): mean {vr.mean():+.4f}   vs msp_min {dr.mean():+.4f}   "
+              f"signs {int((dr > 0).sum())}/8   Wilcoxon p={wilcoxon(dr):.4f}   "
+              f"beat BOTH {int(np.sum((vr > base_min) & (vr > base_ppl)))}/8")
+        print(f"    bar: margin > +{BAR_MARGIN:.3f} AND signs >= {BAR_SIGNS}/8 AND p < {BAR_P}  -> "
+              f"{'PASS' if (dr.mean() > BAR_MARGIN and int((dr > 0).sum()) >= BAR_SIGNS and wilcoxon(dr) < BAR_P) else 'FAIL'}")
+        print(f"\n  full curve (mean over the 8): " +
+              "  ".join(f"{('inf' if not np.isfinite(t) else f'{t:g}')}:{np.mean([curves['rank_tau'][d][i] for d in LONG]):+.3f}"
+                        for i, t in enumerate(RANK_TAUS)))
+
+        # ------------------------------------------------------------------------------------
+        # PART 2 (MECHANISM).
+        #
+        # ⚠️⚠️ CORRECTION, 2026-08-09, AFTER THE FIRST RUN AND BEFORE ANY VERDICT WAS RECORDED.
+        # prereg/W4 §2.5 registered the mechanism test as "rho(ESS, length) collapses toward zero".
+        # THAT STATISTIC IS MIS-SPECIFIED AND CANNOT EVER PASS. For ANY length-invariant FRACTION
+        # rule, ESS is proportional to n by definition, so rho(ESS, length) = 1 BY CONSTRUCTION --
+        # it is the design, not a failure. Verified on synthetic answers: as n goes 20 -> 400,
+        # softmax-tau's ESS/n DRIFTS 0.346 -> 0.190 while the rank family's holds 0.744 -> 0.761.
+        #
+        # The quantity that actually measures the invariance is ESS/length. Both are printed: the
+        # mis-specified registered one (so the error is visible and not quietly swapped out) and the
+        # corrected one, which is what the verdict is read from. The registered THRESHOLD (|.| < 0.3)
+        # is carried over unchanged to the corrected statistic so it is not re-tuned to pass.
+        # ------------------------------------------------------------------------------------
+        print("\n  PART 2 (MECHANISM) -- HALF the registered bar.")
+        print("  ⚠️ THE REGISTERED STATISTIC rho(ESS, length) IS MIS-SPECIFIED: for ANY length-")
+        print("     invariant FRACTION rule ESS grows with n by definition, so rho = 1 is the DESIGN.")
+        print("     Both are shown; the verdict is read from the CORRECTED statistic, ESS/length.")
+        R1_RHO = {"asqa": 0.946, "expertqa": 0.882, "factscore": 0.847}
+        R1_ESSLEN = {"pubmed_qa": 0.268, "med_quad": 0.219, "asqa": 0.373, "xsum": 0.289,
+                     "cnn_dailymail": 0.171, "samsum": 0.362, "expertqa": 0.366, "factscore": 0.307}
+        print(f"\n  {'dataset':16s}{'ESS':>8s}{'ESS/len':>9s}{'rho(ESS/len,len)':>18s}"
+              f"{'[old rho(ESS,len)]':>20s}{'round-1 ESS/len':>17s}")
+        corr, esslen = {}, {}
+        for d in LONG:
+            nl = data[d]["nll"]
+            ess = np.array([1.0 / float((rank_weights(a, RANK_A0) ** 2).sum()) for a in nl])
+            lens = np.array([len(a) for a in nl], float)
+            frac = ess / np.maximum(lens, 1)
+            rho_old = _st.spearmanr(ess, lens).statistic if lens.std() > 0 else float("nan")
+            rho_new = _st.spearmanr(frac, lens).statistic if lens.std() > 0 else float("nan")
+            corr[d] = rho_new
+            esslen[d] = float(frac.mean())
+            print(f"  {d:16s}{ess.mean():>8.1f}{frac.mean():>9.3f}{rho_new:>18.3f}"
+                  f"{rho_old:>20.3f}{R1_ESSLEN[d]:>17.3f}")
+            rows.append(("w4_rank_mech", d, f"tau{RANK_A0:g}", float(rho_new), data[d]["n"],
+                         float(frac.mean()), carve))
+        worst3 = max(abs(corr[d]) for d in R1_RHO)
+        sp_new = max(esslen.values()) / min(esslen.values())
+        sp_r1 = max(R1_ESSLEN.values()) / min(R1_ESSLEN.values())
+        print(f"\n  REGISTERED TEST, as written: worst |rho| on the three round-1 offenders "
+              f"{worst3:.3f} vs threshold 0.3  -> **FAIL**")
+
+        # ⚠️⚠️ SECOND AND FINAL CORRECTION. ESS/len was the right VARIABLE but Spearman is the wrong
+        # STATISTIC: it detects a MONOTONE relationship regardless of its SIZE, so a 1% drift with
+        # low noise still gives rho ~ 1.0. A rank correlation cannot measure INVARIANCE at all.
+        # Invariance needs an EFFECT SIZE. Computed below and reported DESCRIPTIVELY.
+        #
+        # ⚠️ THIS IS NOT A RESCUED TEST AND IS NOT REPORTED AS ONE. The registered mechanism test
+        # failed as written. The effect size is a post-hoc statistic and carries less weight, which
+        # is exactly why it is labelled here rather than substituted silently. Nothing hinges on it:
+        # the PRR half of the bar failed independently, so Q-D is a negative either way. The effect
+        # size only decides the INTERPRETATION -- whether length was removed but turned out not to be
+        # the binding constraint, or was never removed at all.
+        print("\n  ⚠️ DESCRIPTIVE ONLY (post-hoc, NOT a passed test): the registered statistic is a")
+        print("     rank correlation, which is insensitive to EFFECT SIZE -- a 1% monotone drift")
+        print("     still reads rho ~ 1.0. Invariance needs a magnitude. Shortest vs longest length")
+        print("     quartile, within each dataset:")
+        print(f"  {'dataset':16s}{'rank ESS/len Q1':>17s}{'Q4':>9s}{'ratio':>8s}"
+              f"{'| softmax ESS/len Q1':>21s}{'Q4':>9s}{'ratio':>8s}")
+        rr, sr = [], []
+        for d in LONG:
+            nl = data[d]["nll"]
+            lens = np.array([len(a) for a in nl], float)
+            q1, q4 = np.quantile(lens, 0.25), np.quantile(lens, 0.75)
+            lo_m, hi_m = lens <= q1, lens >= q4
+            def frac_of(wfn, param):
+                e = np.array([1.0 / float((wfn(a, param) ** 2).sum()) for a in nl])
+                return e / np.maximum(lens, 1)
+            fr = frac_of(rank_weights, RANK_A0)
+            fs = frac_of(softmax_weights, TAU_A0)
+            r_ratio = fr[hi_m].mean() / fr[lo_m].mean() if lo_m.any() and hi_m.any() else np.nan
+            s_ratio = fs[hi_m].mean() / fs[lo_m].mean() if lo_m.any() and hi_m.any() else np.nan
+            rr.append(r_ratio); sr.append(s_ratio)
+            print(f"  {d:16s}{fr[lo_m].mean():>17.3f}{fr[hi_m].mean():>9.3f}{r_ratio:>8.3f}"
+                  f"{fs[lo_m].mean():>21.3f}{fs[hi_m].mean():>9.3f}{s_ratio:>8.3f}")
+            rows.append(("w4_rank_effsize", d, f"tau{RANK_A0:g}", float(r_ratio), data[d]["n"],
+                         float(s_ratio), carve))
+        print(f"\n  mean |log ratio| (0 = perfectly length-invariant): rank "
+              f"{np.mean(np.abs(np.log(rr))):.4f}   round-1 softmax-tau "
+              f"{np.mean(np.abs(np.log(sr))):.4f}")
+        print(f"  cross-dataset ESS/len spread (max/min): rank {sp_new:.2f}x   "
+              f"round-1 softmax-tau {sp_r1:.2f}x")
+        print("\n  ⚠️ REGISTERED READING. If MECHANISM passes and PRR fails, that is the MORE")
+        print("  informative outcome: the length confound was real, removing it did not help, and so")
+        print("  the confound was NOT what was holding the family back.")
+
     # ---- W1b: the length-conditioned follow-up (EXPLORATORY, no bar, separate CSV) ----
     if args.length_tau:
         print("\n" + "=" * 100)
@@ -583,6 +824,8 @@ def main():
     outp = Path(args.out)
     if args.length_tau:
         outp = outp.with_name(outp.stem + "__lengthtau" + outp.suffix)
+    if args.round2:
+        outp = outp.with_name(outp.stem + "__round2" + outp.suffix)
     outp.parent.mkdir(parents=True, exist_ok=True)
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)
