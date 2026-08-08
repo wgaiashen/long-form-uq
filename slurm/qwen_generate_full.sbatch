@@ -47,6 +47,16 @@ set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 export HF_HOME HF_HUB_OFFLINE=1
+
+# Allocator only -- changes NOTHING numerically, so it cannot affect comparability with the Llama
+# caches. It matters for xsum, whose longest prompt is 5,908 tokens (the probe's head slice only
+# reached 1,704, so this was never exercised). At that length fp32 Qwen-14B needs roughly: 55GB of
+# weights + 5.5GB of all-layer hidden states + 3.3GB of prefill logits + 2.2GB of KV cache, plus a
+# 5.2GB eager-attention buffer that is allocated and freed once PER LAYER, 48 times per forward.
+# That last pattern is what fragments the heap, and ~71GB against 79.3GB usable is not much slack.
+# Llama had far more room (32GB of weights), which is why this never came up on the first model.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 echo "LUQ_CACHE_ROOT=${LUQ_CACHE_ROOT:-<unset>}"
 
 MODEL="Qwen/Qwen2.5-14B"
@@ -59,7 +69,14 @@ TASKS=(
   "expertqa:384:--prompt-regime expertqa_rp12 --repetition-penalty 1.2"       # 2016 rows, longest budget
   "pubmed_qa:128:--truncate-long"                                             # 3800 rows, newline-stopped
   "xsum:56:"                                                                  # 3800 rows, ~5.6k-token sources
-  "med_quad:128:"                                                             # 1800 rows
+  # ⚠️ med_quad NEEDS --no-repeat-ngram-size 3, and NOT --repetition-penalty. Llama's canonical
+  # med_quad (default namespace, pbs/extract_neighbour.pbs) was generated that way, and the records
+  # prove it: 0/400 of its generations contain a repeated 3-gram, against 17-55% on every other
+  # dataset. Generating Qwen's med_quad with plain decoding would put the two models on different
+  # decoding populations for the one dataset whose known failure mode is looping.
+  # rep_pen is specifically excluded: on med_quad it penalises the long few-shot context and forces
+  # immediate EOS, which produced ~35% EMPTY generations. no_repeat_ngram has no such side effect.
+  "med_quad:128:--no-repeat-ngram-size 3"                                     # 1800 rows
   "asqa:256:--prompt-regime asqa_rp12 --repetition-penalty 1.2"               # 948 rows
   "samsum:56:"                                                                # 1800 rows
   "factscore:256:--prompt-regime factscore_rp12 --repetition-penalty 1.2"     # 500 rows, eval-only
