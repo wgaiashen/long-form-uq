@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=A40
+#PBS -l walltime=08:00:00
+#PBS -N luq_qwen_probe
+#PBS -j oe
+
+# BUDGET PROBE for Qwen2.5-14B — the gate that decides each dataset's token budget.
+# 200 rows per dataset at a RAISED cap, then generation_quality.py reports gen length p50/p90,
+# % capped, % degenerate and % empty BESIDE the gold reference p90.
+#
+# ⚠️ WHY THIS IS A GATE, NOT A FORMALITY. On Llama the four budgets were two DIFFERENT problems:
+# med_quad's budget was 0.22x its gold reference p90 (a real defect -- the answer cannot fit), while
+# samsum/xsum/cnn were 1.25-1.7x their reference and still capped 28-66% of the time (the model
+# over-generates, and the cap is only where that becomes visible). Those need different fixes, so the
+# probe has to separate them. Qwen's verbosity is its own; do NOT inherit Llama's budgets.
+#
+# ⚠️ bf16 ON ONE GPU, DELIBERATELY, AND THIS IS A PILOT ONLY.
+#   * What is measured here is GENERATION LENGTH, which is insensitive to load precision at the
+#     resolution a token budget is chosen at. Probe features are NOT measured here.
+#   * fp32 Qwen-14B is ~59GB and needs two cards; the GPU queue is currently saturated (every L40S
+#     allocated, 9k+ jobs queued), so a 1-GPU bf16 job schedules in a fraction of the time.
+#   * It also shakes out the whole Qwen generation path -- tokenizer, prompts, answer_span, budgets --
+#     independently of the fp32 sharding that G1 is validating, so the two de-risk in parallel.
+#   ⚠️ THE REAL RUN IS fp32 + eager. Nothing from this namespace may enter a results table.
+#
+# Isolated under --prompt-regime qwen14b_probe, so it writes to cache/qwen14b_probe/ and CANNOT
+# pollute the real Qwen cache.
+#
+#   qsub pbs/qwen_budget_probe.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+
+MODEL="Qwen/Qwen2.5-14B"
+REGIME="qwen14b_probe"
+N=200
+
+echo "=== Qwen budget probe (bf16 PILOT, 1 GPU) on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+# Raised caps: deliberately well above the Llama budget so the model's NATURAL length is visible.
+# A probe run at the old cap can only ever re-measure the old cap.
+run () {   # dataset  cap  extra...
+  local DS="$1" CAP="$2"; shift 2
+  echo "---- $DS (cap $CAP) ----" >&2
+  python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --prompt-regime "$REGIME" --limit "$N" \
+      --dtype bf16 --attn eager \
+      --max-new-tokens "$CAP" --max-new-tokens-cap "$CAP" "$@" \
+    || echo "!!! $DS FAILED (continuing so one bad set does not lose the rest)" >&2
+}
+
+run pubmed_qa      512 --truncate-long
+run xsum           256
+run cnn_dailymail  512
+run med_quad       768
+run samsum         256
+run expertqa       768 --repetition-penalty 1.2
+run asqa           512 --repetition-penalty 1.2
+run factscore      512 --repetition-penalty 1.2
+
+echo "=== generation-quality report ===" >&2
+python -u scripts/checks/generation_quality.py \
+    --datasets pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa,factscore \
+    --regime "$REGIME" 2>&1 | tee "results/qwen_budget_probe_$(date +%Y%m%d).txt"
+
+echo "=== done at $(date) ===" >&2
