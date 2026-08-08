@@ -120,6 +120,12 @@ def main():
     print("\n--- dataset loaders (the ones the one-way sync tends to leave behind) ---", flush=True)
     from luq import data
 
+    # ⚠️ ASYMMETRY FOUND BY THIS SCRIPT'S FIRST RUN (2026-08-08): factscore's SOURCE data master
+    # lives on DoC (`/vol/gpudata/.../factscore_data`, 21 GB, the default in `luq/factscore.py:23`)
+    # and does NOT exist on RCS at all. RCS only ever had the cached RECORDS, which is why the Llama
+    # grid ran there without anyone noticing. So RCS cannot regenerate factscore prompts -- had Qwen
+    # generation stayed on RCS, that dataset would have failed. It is the one dataset that is
+    # DoC-native, which is an argument FOR the move, not against it.
     for ds in datasets:
         def f(d=ds):
             tr, ev = data.load(d, "ID")
@@ -137,9 +143,18 @@ def main():
                                      "NOT set — label on RCS, or export it here"), fatal=False)
 
     def _net():
-        import urllib.request
-        urllib.request.urlopen("https://api.openai.com", timeout=10)
-        return True, "api.openai.com reachable"
+        # ⚠️ ANY HTTP RESPONSE MEANS REACHABLE, INCLUDING AN ERROR STATUS. A bare GET to
+        # api.openai.com returns 421 Misdirected Request -- the server answered, so the network is
+        # fine. Treating that as "no internet" is a false negative that would send someone hunting a
+        # firewall that is not there (it did exactly that on the RCS smoke run).
+        import urllib.request, urllib.error
+        try:
+            r = urllib.request.urlopen("https://api.openai.com", timeout=10)
+            return True, f"api.openai.com reachable (HTTP {r.status})"
+        except urllib.error.HTTPError as e:
+            return True, f"api.openai.com reachable (HTTP {e.code} — a response, so the route works)"
+        except Exception as e:
+            return False, f"unreachable: {type(e).__name__}: {e}"
     check("outbound internet", _net, fatal=False)
 
     # ---- 6. GPU ------------------------------------------------------------------------------
