@@ -16,4 +16,5 @@ LODO-λ +0.042 over shrink@1.5), the withdrawn +0.2472 oracle (§8).
 | oracle_shuffle_audit__*.csv | oracle_shuffle_audit.py | login (post-hoc) | §8 retractions |
 | special_token_audit / eos_provenance | respective scripts | login (post-hoc) | §12 / §13 |
 | sharpening_selection_audit__*.csv | selection_audit.py | login (post-hoc) | §5 (3-arm grid; see §5.1 amendment) |
-PENDING ENTRY when they land: F5c __logws grid (jobs 3632079-86), W7b blend (msp_min↔shrink@1.5).
+| blend_msp_wmsp_<eval>__*.csv (8) | blend_msp_wmsp.py | 3632998-3633005 | §19 per-instance null |
+PENDING ENTRY when it lands: F5c __logws grid (jobs 3632079-86).
