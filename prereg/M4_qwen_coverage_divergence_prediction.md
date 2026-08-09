@@ -143,7 +143,59 @@ Any of the following is a clean negative and is reported as such:
 
 ---
 
-## Appendix A — re-measured degeneracy on a RANDOM sample
+## Appendix A — re-measured degeneracy on the FULL population (2026-08-09)
 
-*To be appended when the `--sample-n` run lands, replacing the biased head-slice column in §3. The
-formula and thresholds above are fixed and are not revised at that point.*
+The full 18,464-row generation superseded the planned `--sample-n` run: the entire population is
+better than any sample of it, so these ARE the final inputs, not an estimate. Measured with the same
+`luq.degeneracy.is_severe`, all rows, before any of the five generic-judged datasets was labelled.
+The §4 formula and the §1 thresholds are unchanged, exactly as this file said they would be.
+
+| dataset | Llama (full) | Qwen head-slice (§3) | **Qwen FULL** | change vs Llama |
+|---|---|---|---|---|
+| expertqa | 11.76% (2016) | 23.00% | **21.08% (425/2016)** | **+9.3 pp** |
+| factscore | 0.20% (500) | 17.00% | **2.20% (11/500)** | +2.0 pp |
+| asqa | 1.37% (948) | 10.00% | **3.38% (32/948)** | +2.0 pp |
+| med_quad | 12.33% (1800) | 11.50% | **7.06% (127/1800)** | −5.3 pp |
+| samsum | 0.72% (1800) | 3.50% | **2.72% (49/1800)** | +2.0 pp |
+| pubmed_qa | 1.11% (3800) | 1.50% | **2.24% (85/3800)** | +1.1 pp |
+| xsum | 0.00% (3800) | 0.00% | **0.00% (0/3800)** | 0 |
+| cnn_dailymail | 0.03% (3800) | 0.00% | **0.00% (0/3800)** | 0 |
+
+The head slice was severely biased exactly where it mattered: factscore 17.0% → 2.2% and asqa
+10.0% → 3.4% collapse once the whole population is measured, while expertqa roughly holds
+(23.0% → 21.1%). med_quad's rate *halves* relative to Llama.
+
+### §4 arithmetic re-run with the unbiased inputs
+
+| dataset | Llama coverage | predicted Qwen coverage | predicted drop | >5 pp record? | >10 pp flag? |
+|---|---|---|---|---|---|
+| **expertqa** | 85.5% | **~76.2%** | **~9.3 pp** | yes | **no — now BORDERLINE, no longer a predicted trip** |
+| factscore | 91.0% | ~89.0% | ~2.0 pp | no | no |
+| asqa | 100% | ~98.0% | ~2.0 pp | no | no |
+| all others | 100% | ~97–100% | ≤3 pp | no | no |
+
+So the §4 headline inverts on its factscore half: **factscore is no longer predicted to trip at
+all** (the "trips harder" ordering was an artifact of the head slice), and expertqa moves from a
+predicted trip to borderline-below-the-flag. Both revisions come from replacing the input §3 itself
+declared biased; the prediction that survives to be tested against measured coverage is this
+appendix's table. The actual coverage lands with the two dedicated labellers and is compared against
+BOTH tables (the §4 original and this re-run) so the effect of the input bias stays auditable.
+
+## Appendix B — ACTUAL coverage (2026-08-09, labelling complete, compared against both predictions)
+
+gpt-5-mini, dedicated labellers, all rows. Coverage = rows with a defined `factuality` / all rows.
+
+| dataset | Llama | §4 predicted (head-slice) | App-A predicted (full) | **ACTUAL** | divergence | verdict |
+|---|---|---|---|---|---|---|
+| expertqa | 85.5% | ~74.3% (trip) | ~76.2% (borderline) | **79.5% (1603/2016)** | **+6.0 pp** | **RECORD (>5 pp); the 10 pp flag does NOT fire** |
+| factscore | 91.0% | ~74.2% (trip harder) | ~89.0% (no trip) | **93.2% (466/500)** | **−2.2 pp (coverage ROSE)** | no record, no flag |
+
+- The actual lands INSIDE the registered interval on expertqa (74–81%) and just above it on
+  factscore (74–88% — coverage rising was not in the interval, a small miss in the safe direction).
+- The §4 head-slice ordering ("factscore trips harder") is refuted; the Appendix-A correction called
+  both datasets right on the flag question. The 10 pp flag fires on NEITHER dataset, so per M3 §4
+  **the eight-dataset analysis remains primary**; expertqa's 6.0 pp is recorded in every table.
+- Mechanism (M3 §5 directional expectation): dropped rows are SHORTER than kept on both datasets
+  (expertqa median 265 vs 761 chars; factscore 418 vs 665) — the registered possible reversal did
+  NOT occur; the absence mechanism looks model-stable, scalar coverage treatment stands.
+- factscore no-reference rows: 1/500 (title absent from the frozen enwiki db).
