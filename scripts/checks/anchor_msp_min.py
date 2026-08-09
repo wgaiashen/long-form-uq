@@ -121,7 +121,7 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
     # F5c WARM-START (prereg F5c §2a): push p[k] up on the PENALTY ALONE before the rank loss enters,
     # so the anchor is actually reachable (F5b: the penalty never bit on 5 of 8 evals without this).
     # Control A calls this with pretrain_epochs=0, so its library-exactness is untouched.
-    if pretrain_epochs and mode in ("anchor", "random", "combo") and lam > 0:
+    if pretrain_epochs and mode in ("anchor", "random", "combo", "wsonly") and lam > 0:
         for _ in range(pretrain_epochs):
             perm = torch.randperm(n_seq, generator=g).tolist()
             for b in range(0, n_seq, 32):
@@ -145,7 +145,10 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
             batch = perm[b:b + 32]
             if len(batch) < 2:
                 continue
-            use_reg = lam > 0
+            # 'wsonly' (F5c attribution control): warm-start toward the anchor, then train with NO
+            # sustained penalty. If wsonly ~= the lam>0 anchor arm, the "anchor effect" is really an
+            # INITIALISATION effect; if wsonly ~= lam=0, the sustained pressure is what matters.
+            use_reg = lam > 0 and mode != "wsonly"
             if use_reg:
                 qs, ps = [], []
                 for j in batch:
@@ -266,6 +269,8 @@ def main():
         acc.update({("random", l): [] for l in LAMBDAS if l > 0})
         if args.combo:
             acc.update({("combo", l): [] for l in LAMBDAS if l > 0})
+        if args.pretrain_epochs:
+            acc.update({("wsonly", l): [] for l in (1.0, 10.0) if l in LAMBDAS})
         pk = {l: [] for l in LAMBDAS}
         fl = {"msp_min": [], "msp_min_kept": [], "perplexity": []}
         for sd in seeds:
@@ -331,6 +336,12 @@ def main():
                                    pretrain_epochs=args.pretrain_epochs)
                         acc[("combo", l)].append(results.prr(
                             yte, np.asarray(predict(mc, states, records, te_idx, device), float)))
+                    if args.pretrain_epochs and l in (1.0, 10.0):
+                        mw = train(states, records, y, tr_idx, device, lam=l, mode="wsonly", seed=sd,
+                                   penalty_form=args.penalty,
+                                   pretrain_epochs=args.pretrain_epochs)
+                        acc[("wsonly", l)].append(results.prr(
+                            yte, np.asarray(predict(mw, states, records, te_idx, device), float)))
         if not acc[("anchor", 0.0)]:
             continue
         f = {k: float(np.mean(v)) for k, v in fl.items()}

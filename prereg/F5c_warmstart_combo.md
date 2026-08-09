@@ -50,3 +50,23 @@ anchored-only robustness claim on the concentrated datasets. If λ_a → 0 is wh
 anchor adds nothing once shrink is present, and F5 closes as mechanism-only.
 
 Driver: `scripts/checks/anchor_msp_min.py` (extended, still standalone). Outputs `__logws` files.
+
+## 5. AMENDMENT (2026-08-09, after the author's review; the first F5c launch was KILLED before any
+## output existed, so this precedes all F5c results)
+
+**(a) PRIMARY READING REORDERED.** The primary question is **not** the combo's mean-PRR bar (that is
+now secondary). PRIMARY: **does the rescue property replicate on the five newly-testable datasets?**
+— i.e. repair proportional to brokenness (`msp_min − wMSP-norm`), anchor-specific vs the random
+control, **at the LODO-selected λ_a, never at the grid top**. The existing rescue correlation
+(+0.671) drops to +0.262 without pubmed; replication on new datasets is what turns it from an
+anecdote into a claim.
+
+**(b) THE HEADLINE CELL RESTATED AT THE HONEST λ.** pubmed/SameTask under the LODO-selected λ = 3 is
+**+0.239** (anchor − random +0.166 there), against shrink@2's −0.052. The +0.32 figure is the λ=10
+grid top and is only ever quoted as an oracle. The repair survives honest selection: **−0.05 → +0.24.**
+
+**(c) ATTRIBUTION CONTROL ADDED (`wsonly`).** The λ_a=0 baseline carries no warm-start (the join
+check to `pdl_master` is intact), which means λ_a>0 arms differ from it by warm-start AND sustained
+penalty jointly. New arm at λ ∈ {1, 10}: warm-start toward the anchor, then train with NO sustained
+penalty. wsonly ≈ anchor arm ⇒ the effect is initialisation; wsonly ≈ λ=0 ⇒ the sustained pressure
+is what matters. Reported per cell.
