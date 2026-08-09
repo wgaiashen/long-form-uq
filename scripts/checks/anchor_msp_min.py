@@ -83,7 +83,8 @@ def anchor_index(nll_np, keep_np):
     return int(np.flatnonzero(kb)[np.argmax(nll_np[kb])])
 
 
-def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, penalty_form="linear"):
+def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, penalty_form="linear",
+          pretrain_epochs=0):
     """Copied VERBATIM from weighted_msp.train_weighted_msp; only the penalty differs.
 
     mode: 'uniform'  -> shrink_to_uniform(w)          [CONTROL A: must reproduce the library]
@@ -117,13 +118,37 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
     n_seq = len(tr_idx)
     g = torch.Generator().manual_seed(seed)
     model.train()
+    # F5c WARM-START (prereg F5c §2a): push p[k] up on the PENALTY ALONE before the rank loss enters,
+    # so the anchor is actually reachable (F5b: the penalty never bit on 5 of 8 evals without this).
+    # Control A calls this with pretrain_epochs=0, so its library-exactness is untouched.
+    if pretrain_epochs and mode in ("anchor", "random", "combo", "wsonly") and lam > 0:
+        for _ in range(pretrain_epochs):
+            perm = torch.randperm(n_seq, generator=g).tolist()
+            for b in range(0, n_seq, 32):
+                batch = perm[b:b + 32]
+                if len(batch) < 2:
+                    continue
+                ps = []
+                for j in batch:
+                    _, wj = _seq_q(model(emb[j]), nll[j], "normalised", True,
+                                   keep=kep[j], return_w=True)
+                    nk = torch.clamp(kep[j].sum(), min=1.0)
+                    pkv = wj[anc[j]] / nk
+                    ps.append(-torch.log(torch.clamp(pkv, min=1e-6)) if penalty_form == "log"
+                              else 1.0 - pkv)
+                opt.zero_grad()
+                (lam * torch.stack(ps).mean()).backward()
+                opt.step()
     for _ in range(5):
         perm = torch.randperm(n_seq, generator=g).tolist()
         for b in range(0, n_seq, 32):
             batch = perm[b:b + 32]
             if len(batch) < 2:
                 continue
-            use_reg = lam > 0
+            # 'wsonly' (F5c attribution control): warm-start toward the anchor, then train with NO
+            # sustained penalty. If wsonly ~= the lam>0 anchor arm, the "anchor effect" is really an
+            # INITIALISATION effect; if wsonly ~= lam=0, the sustained pressure is what matters.
+            use_reg = lam > 0 and mode != "wsonly"
             if use_reg:
                 qs, ps = [], []
                 for j in batch:
@@ -132,6 +157,14 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
                     qs.append(qj)
                     if mode == "uniform":
                         ps.append(shrink_to_uniform(wj))
+                    elif mode == "combo":
+                        # prereg F5c §2b: BOTH pressures, uniform coefficient FIXED at the incumbent's
+                        # 2.0 (never tuned here); lam sweeps only the anchor term.
+                        nk = torch.clamp(kep[j].sum(), min=1.0)
+                        pkv = wj[anc[j]] / nk
+                        at = (-torch.log(torch.clamp(pkv, min=1e-6)) if penalty_form == "log"
+                              else 1.0 - pkv)
+                        ps.append((2.0 / max(lam, 1e-9)) * shrink_to_uniform(wj) + at)
                     else:
                         # w = softmax(masked raw) * n_kept, so p = w / n_kept  (probability space)
                         nk = torch.clamp(kep[j].sum(), min=1.0)
@@ -183,6 +216,10 @@ def main():
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--layer", type=int, default=LAYER)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--pretrain-epochs", type=int, default=0,
+                    help="F5c warm-start: N epochs on the penalty alone before the combined loss")
+    ap.add_argument("--combo", action="store_true",
+                    help="F5c: add the shrink@2 + anchor combo arms (prereg F5c §2b)")
     ap.add_argument("--penalty", choices=["linear", "log"], default="linear",
                     help="F5b fallback: 'log' = -log p[k], gradients that cannot stall (prereg §3 C3)")
     ap.add_argument("--out", default=None)
@@ -230,6 +267,10 @@ def main():
             continue
         acc = {("anchor", l): [] for l in LAMBDAS}
         acc.update({("random", l): [] for l in LAMBDAS if l > 0})
+        if args.combo:
+            acc.update({("combo", l): [] for l in LAMBDAS if l > 0})
+        if args.pretrain_epochs:
+            acc.update({("wsonly", l): [] for l in (1.0, 10.0) if l in LAMBDAS})
         pk = {l: [] for l in LAMBDAS}
         fl = {"msp_min": [], "msp_min_kept": [], "perplexity": []}
         for sd in seeds:
@@ -279,29 +320,46 @@ def main():
             rng = np.random.RandomState(1000 + sd)
             for l in LAMBDAS:
                 m = train(states, records, y, tr_idx, device, lam=l, mode="anchor", seed=sd,
-                          penalty_form=args.penalty)
+                          penalty_form=args.penalty, pretrain_epochs=args.pretrain_epochs)
                 acc[("anchor", l)].append(results.prr(yte, np.asarray(predict(m, states, records,
                                                                              te_idx, device), float)))
                 pk[l].append(mean_p_anchor(m, states, records, te_idx, device))
                 if l > 0:
                     mr = train(states, records, y, tr_idx, device, lam=l, mode="random", seed=sd,
-                               rng=rng, penalty_form=args.penalty)
+                               rng=rng, penalty_form=args.penalty,
+                               pretrain_epochs=args.pretrain_epochs)
                     acc[("random", l)].append(results.prr(
                         yte, np.asarray(predict(mr, states, records, te_idx, device), float)))
+                    if args.combo:
+                        mc = train(states, records, y, tr_idx, device, lam=l, mode="combo", seed=sd,
+                                   penalty_form=args.penalty,
+                                   pretrain_epochs=args.pretrain_epochs)
+                        acc[("combo", l)].append(results.prr(
+                            yte, np.asarray(predict(mc, states, records, te_idx, device), float)))
+                    if args.pretrain_epochs and l in (1.0, 10.0):
+                        mw = train(states, records, y, tr_idx, device, lam=l, mode="wsonly", seed=sd,
+                                   penalty_form=args.penalty,
+                                   pretrain_epochs=args.pretrain_epochs)
+                        acc[("wsonly", l)].append(results.prr(
+                            yte, np.asarray(predict(mw, states, records, te_idx, device), float)))
         if not acc[("anchor", 0.0)]:
             continue
         f = {k: float(np.mean(v)) for k, v in fl.items()}
         print(f"\n[{rung:16s} {X:14s}]  msp_min {f['msp_min']:+.4f} (content-tok "
               f"{f['msp_min_kept']:+.4f})  ppl {f['perplexity']:+.4f}")
         print("   CONTROL A (copied loop == library) PASS   CONTROL B (anchor endpoint) PASS")
-        print(f"   {'lambda':>8s}{'anchor':>10s}{'random':>10s}{'anc-rand':>10s}{'mean p[k]':>11s}")
+        print(f"   {'lambda':>8s}{'anchor':>10s}{'random':>10s}{'combo':>10s}{'anc-rand':>10s}{'mean p[k]':>11s}")
         for l in LAMBDAS:
             a = float(np.mean(acc[("anchor", l)]))
             r = float(np.mean(acc[("random", l)])) if l > 0 and acc[("random", l)] else float("nan")
-            print(f"   {l:>8g}{a:>10.4f}{r:>10.4f}{a - r:>10.4f}{float(np.mean(pk[l])):>11.4f}")
+            c = (float(np.mean(acc[("combo", l)])) if args.combo and l > 0 and acc.get(("combo", l))
+                 else float("nan"))
+            print(f"   {l:>8g}{a:>10.4f}{r:>10.4f}{c:>10.4f}{a - r:>10.4f}{float(np.mean(pk[l])):>11.4f}")
             rows.append((rung, X, "anchor", l, f"{a:.4f}", f"{np.mean(pk[l]):.4f}", len(seeds), carve))
             if l > 0:
                 rows.append((rung, X, "random", l, f"{r:.4f}", "", len(seeds), carve))
+                if args.combo and acc.get(("combo", l)):
+                    rows.append((rung, X, "combo", l, f"{c:.4f}", "", len(seeds), carve))
         for k, v in f.items():
             rows.append((rung, X, "floor", k, f"{v:.4f}", "", len(seeds), carve))
         print("   ⚠️ CONTROL D: mean p[k] must RISE with lambda. If it does not, the bounded penalty")
@@ -311,7 +369,7 @@ def main():
             break
 
     ev = evals[0] if len(evals) == 1 else "multi"
-    suffix = "" if args.penalty == "linear" else "__logpen"
+    suffix = "" if args.penalty == "linear" else ("__logws" if args.pretrain_epochs else "__logpen")
     outp = Path(args.out) if args.out else OUT / f"anchor_msp_min_{ev}{suffix}__meta-llama_Meta-Llama-3.1-8B.csv"
     if args.smoke:
         outp = outp.with_name(outp.stem + "__SMOKE" + outp.suffix)
