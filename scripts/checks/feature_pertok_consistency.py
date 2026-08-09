@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from luq import cache  # noqa: E402
 from luq.config import Config  # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # Known regime-namespaced sets (so --datasets can list them without a per-dataset --prompt-regime).
 # Imported from attn_pool rather than re-declared: this map was duplicated here, and a duplicated
 # cache-root map is how one reader silently ends up on a different cache from every other. Importing it
@@ -35,11 +35,11 @@ from attn_pool import PROMPT_REGIME as REGIME  # noqa: E402
 TOL = 1e-4          # max abs Δ that still counts as "teacher-forced consistent" (fp32 match is ~1e-6)
 
 
-def check(dataset, regime, layer=15, sample=60, full=False):
-    cfg = Config(model_name=MODEL, dataset=dataset, ood_setting="ID",
+def check(dataset, regime, layer=15, sample=60, full=False, model=DEFAULT_MODEL):
+    cfg = Config(model_name=model, dataset=dataset, ood_setting="ID",
                  prompt_regime=regime or REGIME.get(dataset, ""))
-    key = cache.run_key(MODEL, dataset, "ID")
-    ptp = cfg.cache_dir / "pertok" / f"{cache._slug(MODEL)}__{dataset}__ID__L{layer}.npz"
+    key = cache.run_key(model, dataset, "ID")
+    ptp = cfg.cache_dir / "pertok" / f"{cache._slug(model)}__{dataset}__ID__L{layer}.npz"
     if not ptp.exists():
         return dataset, None, "no pertok cache"
     try:
@@ -63,13 +63,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--datasets", default="sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa")
     ap.add_argument("--prompt-regime", default="", help="override regime for ALL listed datasets")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="model whose caches to check (default keeps every existing invocation identical). "
+                         "NOTE: --layer must be that model's pertok layer — the file is keyed __L{layer} "
+                         "(mid = (n_hidden_layers+1)//2: Llama-3.1-8B -> 15/16 as dumped, Qwen2.5-14B -> 24).")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--full", action="store_true", help="check every example (heavier) instead of a sample")
     args = ap.parse_args()
+    print(f"model = {args.model}")
     print(f"{'dataset':16s} {'verdict':10s} detail")
     any_fail = False
     for d in args.datasets.split(","):
-        name, ok, detail = check(d, args.prompt_regime, args.layer, full=args.full)
+        name, ok, detail = check(d, args.prompt_regime, args.layer, full=args.full, model=args.model)
         v = "SKIP" if ok is None else ("PASS ✓" if ok else "FAIL ✗ (inline-only → repool)")
         if ok is False:
             any_fail = True
