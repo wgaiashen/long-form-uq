@@ -1,4 +1,13 @@
-# Canonical numbers for the report (frozen 2026-08-09, drivers at git 4410f59)
+# Canonical numbers for the report (frozen 2026-08-09)
+
+⭐ **READ THESE TWO FIRST — they are the report's data spine:**
+1. `pdl_master__*.csv` — the base ladder (all baselines, every cell).
+2. `sharpening_master__*.csv` — EVERY post-7-Aug sharpening result in one long-format table
+   (4479 rows; workstream/method/param/rung/eval/prr/mode/source). Regenerate with
+   `python scripts/checks/build_sharpening_master.py` after any new run — NEVER hand-edit; the
+   per-dataset CSVs below are its raw provenance and stay for audit only.
+
+# Detail (frozen 2026-08-09, drivers at git 4410f59)
 Nothing enters the report that is not in this directory. EXCLUDED BY DECISION: any shrink@2-as-
 incumbent framing (superseded, stocktake §18), the λ=10 oracle repair figure (§18.2: quote the
 LODO-λ +0.042 over shrink@1.5), the withdrawn +0.2472 oracle (§8).
