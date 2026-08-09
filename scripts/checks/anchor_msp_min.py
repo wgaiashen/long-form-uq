@@ -83,12 +83,19 @@ def anchor_index(nll_np, keep_np):
     return int(np.flatnonzero(kb)[np.argmax(nll_np[kb])])
 
 
-def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None):
+def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, penalty_form="linear"):
     """Copied VERBATIM from weighted_msp.train_weighted_msp; only the penalty differs.
 
     mode: 'uniform'  -> shrink_to_uniform(w)          [CONTROL A: must reproduce the library]
-          'anchor'   -> 1 - p[argmax nll among kept]  [the F5 penalty]
-          'random'   -> 1 - p[a random kept token]    [CONTROL C]
+          'anchor'   -> penalty on p[argmax nll among kept]  [the F5 penalty]
+          'random'   -> same penalty on a random kept token  [CONTROL C]
+
+    penalty_form (F5b, the fallback NAMED IN THE PREREG before any run):
+          'linear'   -> 1 - p[k]        bounded, but gradient ~ p[k] ~ 1/n at init -- Control D
+                        showed it never bites (mean p[k] flat across lambda 0..20 on the first evals)
+          'log'      -> -log(p[k])      gradient ~ 1/p[k]: LARGE exactly when the anchor mass is
+                        small, so it cannot stall at initialisation. Unbounded, so the lambda scale
+                        differs; clamp p at 1e-6 for numerical safety.
     """
     torch.manual_seed(seed)
     d = answer_states(states[tr_idx[0]]).shape[1]
@@ -128,7 +135,11 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None):
                     else:
                         # w = softmax(masked raw) * n_kept, so p = w / n_kept  (probability space)
                         nk = torch.clamp(kep[j].sum(), min=1.0)
-                        ps.append(1.0 - wj[anc[j]] / nk)
+                        pk = wj[anc[j]] / nk
+                        if penalty_form == "log":
+                            ps.append(-torch.log(torch.clamp(pk, min=1e-6)))
+                        else:
+                            ps.append(1.0 - pk)
                 q = torch.stack(qs)
                 penalty = torch.stack(ps).mean()
             else:
@@ -172,6 +183,8 @@ def main():
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--layer", type=int, default=LAYER)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--penalty", choices=["linear", "log"], default="linear",
+                    help="F5b fallback: 'log' = -log p[k], gradients that cannot stall (prereg §3 C3)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -179,10 +192,14 @@ def main():
     seeds = [int(s) for s in args.seeds.split(",")]
     if args.smoke:
         seeds = seeds[:1]
+    global LAMBDAS
+    if args.penalty == "log":
+        # -log p[k] starts at ~log(n) (3-5), an order larger than the bounded form, so the grid shifts down
+        LAMBDAS = [0.0, 0.1, 0.3, 1.0, 3.0, 10.0]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     carve = os.environ.get("LUQ_CARVE", "legacy")
     print("=" * 100)
-    print(f"F5 -- ANCHOR THE PENALTY AT msp_min, NOT perplexity  "
+    print(f"F5 -- ANCHOR THE PENALTY AT msp_min, NOT perplexity  [penalty={args.penalty}]  "
           f"[{'SMOKE, NOT A RESULT' if args.smoke else 'full grid'}]")
     print(f"device={device} seeds={seeds} evals={evals} LUQ_CARVE={carve}  lambdas={LAMBDAS}")
     print("=" * 100, flush=True)
@@ -261,13 +278,14 @@ def main():
 
             rng = np.random.RandomState(1000 + sd)
             for l in LAMBDAS:
-                m = train(states, records, y, tr_idx, device, lam=l, mode="anchor", seed=sd)
+                m = train(states, records, y, tr_idx, device, lam=l, mode="anchor", seed=sd,
+                          penalty_form=args.penalty)
                 acc[("anchor", l)].append(results.prr(yte, np.asarray(predict(m, states, records,
                                                                              te_idx, device), float)))
                 pk[l].append(mean_p_anchor(m, states, records, te_idx, device))
                 if l > 0:
                     mr = train(states, records, y, tr_idx, device, lam=l, mode="random", seed=sd,
-                               rng=rng)
+                               rng=rng, penalty_form=args.penalty)
                     acc[("random", l)].append(results.prr(
                         yte, np.asarray(predict(mr, states, records, te_idx, device), float)))
         if not acc[("anchor", 0.0)]:
@@ -293,7 +311,8 @@ def main():
             break
 
     ev = evals[0] if len(evals) == 1 else "multi"
-    outp = Path(args.out) if args.out else OUT / f"anchor_msp_min_{ev}__meta-llama_Meta-Llama-3.1-8B.csv"
+    suffix = "" if args.penalty == "linear" else "__logpen"
+    outp = Path(args.out) if args.out else OUT / f"anchor_msp_min_{ev}{suffix}__meta-llama_Meta-Llama-3.1-8B.csv"
     if args.smoke:
         outp = outp.with_name(outp.stem + "__SMOKE" + outp.suffix)
     with open(outp, "w", newline="") as fh:
