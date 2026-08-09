@@ -36,6 +36,8 @@ SLUG = "meta-llama_Meta-Llama-3.1-8B"
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 OOD = ["SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 LAMBDAS = [0.0, 0.1, 0.3, 1.0, 3.0, 10.0]
+import os as _os
+SUFFIX = _os.environ.get("F5_SUFFIX", "logpen")     # logpen = F5b; logws = F5c (warm-start+combo)
 BITE_MIN = 0.20        # if max p[k] over the grid never reaches this, the eval is UNTESTED, not null
 
 
@@ -55,9 +57,12 @@ def main():
 
     anc = defaultdict(dict)   # (rung, eval, lambda) -> prr ; and pk / random alongside
     rnd = defaultdict(dict)
+    cmb = defaultdict(dict)
+    wso = defaultdict(dict)
     pk = defaultdict(dict)
     present = set()
-    for f in sorted(glob.glob(str(RES / f"anchor_msp_min_*__logpen__{SLUG}.csv"))):
+    import argparse as _a
+    for f in sorted(glob.glob(str(RES / f"anchor_msp_min_*__{SUFFIX}__{SLUG}.csv"))):
         if "SMOKE" in f:
             continue
         for r in _csv.DictReader(open(f)):
@@ -77,11 +82,15 @@ def main():
                     pass
             elif r["mode"] == "random":
                 rnd[key] = v
+            elif r["mode"] == "combo":
+                cmb[key] = v
+            elif r["mode"] == "wsonly":
+                wso[key] = v
     present = [e for e in LONG if e in present]
     missing = [e for e in LONG if e not in present]
 
     print("=" * 100)
-    print("F5b VERDICT -- anchoring weighted MSP at msp_min (log penalty)")
+    print(f"F5 VERDICT [{SUFFIX}] -- anchoring weighted MSP at msp_min")
     print("Population: widened cells_long, Llama-3.1-8B, 3 seeds, legacy carve.")
     print("=" * 100)
     print(f"\nCOVERAGE: {len(present)}/8 evals." + (f"  ⚠️ MISSING, named: {missing}" if missing else ""))
@@ -164,6 +173,52 @@ def main():
               f"vs lambda=0 {base_m:+.4f}   vs shrink@2 {s2_m:+.4f}")
         print("   picks: " + "  ".join(f"{e}->{l}" for e, (l, _) in sel.items()))
 
+    # ---- F5c arms: combo (shrink@2-const + anchor) and wsonly (warm-start only) ----
+    if cmb:
+        print("\n" + "-" * 100)
+        print("COMBO ARM (fixed 2.0 uniform + lambda_a anchor) vs shrink@1.5, OOD means; and wsonly")
+        print("-" * 100)
+        print(f"{'eval':15s}{'l=0':>8s}{'combo-best':>11s}{'(l)':>6s}{'shr@1.5':>9s}{'wsonly@1':>10s}{'wsonly@10':>10s}")
+        l15 = defaultdict(dict)
+        import glob as _g
+        for f2 in _g.glob(str(RES / f"sharpening_lambda_*__{SLUG}.csv")):
+            if 'SMOKE' in f2 or 'verdict' in f2:
+                continue
+            for r2 in _csv.DictReader(open(f2)):
+                if r2['kind'] == 'lambda' and r2['param'] == 'lam1.5':
+                    l15[r2['eval']][r2['rung']] = float(r2['prr'])
+        combo_m, s15_m = [], []
+        for e in present:
+            base = ood_mean(anc, e, 0.0)
+            cc = [(l, ood_mean(cmb, e, l)) for l in LAMBDAS[1:]]
+            cc = [(l, v) for l, v in cc if v is not None]
+            if not cc:
+                continue
+            bl, bv = max(cc, key=lambda t: t[1])
+            s15 = float(np.mean([l15[e][rg] for rg in OOD])) if e in l15 else float('nan')
+            w1 = ood_mean(wso, e, 1.0); w10 = ood_mean(wso, e, 10.0)
+            combo_m.append(bv); s15_m.append(s15)
+            print(f"{e:15s}{(base if base is not None else float('nan')):>+8.3f}{bv:>+11.3f}{bl:>6g}"
+                  f"{s15:>+9.3f}{(w1 if w1 is not None else float('nan')):>+10.3f}"
+                  f"{(w10 if w10 is not None else float('nan')):>+10.3f}")
+        if combo_m:
+            print(f"{'MEAN':15s}{'':8s}{np.mean(combo_m):>+11.4f}{'':6s}{np.nanmean(s15_m):>+9.4f}")
+            print("  ⚠️ combo-best is a per-eval ORACLE over lambda_a; the honest read is LODO, and")
+            print("     wsonly ~= combo would mean the gain is INITIALISATION, not the anchor.")
+        # honest LODO for the combo, all evals
+        cands = LAMBDAS[1:]
+        sel = []
+        pick = {}
+        for e in present:
+            others = [o for o in present if o != e]
+            vals = {l: np.mean([ood_mean(cmb, o, l) or -9 for o in others]) for l in cands}
+            b = max(vals, key=vals.get)
+            v = ood_mean(cmb, e, b)
+            if v is not None:
+                sel.append(v); pick[e] = b
+        if sel:
+            print(f"  COMBO LODO ({len(sel)} evals): {np.mean(sel):+.4f}   picks: " +
+                  " ".join(f"{e}->{pick[e]:g}" for e in pick))
     outp = Path(args.out)
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)

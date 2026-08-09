@@ -30,4 +30,4 @@ LODO-λ +0.042 over shrink@1.5), the withdrawn +0.2472 oracle (§8).
 | special_token_audit / eos_provenance | respective scripts | login (post-hoc) | §12 / §13 |
 | sharpening_selection_audit__*.csv | selection_audit.py | login (post-hoc) | §5 (3-arm grid; see §5.1 amendment) |
 | blend_msp_wmsp_<eval>__*.csv (8) | blend_msp_wmsp.py | 3632998-3633005 | §19 per-instance null |
-PENDING ENTRY when it lands: F5c __logws grid (jobs 3632079-86).
+| anchor_msp_min_<eval>__logws__*.csv (8) + anchor_verdict__logws | anchor_msp_min.py --penalty log --pretrain-epochs 2 --combo | 3632079-86 | F5c: testability FAIL (3/8 tested), combo null vs shrink@1.5 → F5 mechanism-only (§21). ⚠️ wsonly arm trained but not written (driver bug fixed post-hoc) |

@@ -360,6 +360,14 @@ def main():
                 rows.append((rung, X, "random", l, f"{r:.4f}", "", len(seeds), carve))
                 if args.combo and acc.get(("combo", l)):
                     rows.append((rung, X, "combo", l, f"{c:.4f}", "", len(seeds), carve))
+                # ⚠️ BUG FIXED 2026-08-09 (after the F5c grid ran): the wsonly arm was TRAINED above
+                # but never appended here, so the attribution control's PRRs were computed and then
+                # silently discarded — every __logws CSV from jobs 3632079-86 has zero wsonly rows.
+                # The verdict was unaffected (no positive combo effect survived to attribute), but a
+                # control that costs compute must land in the CSV, so persist it for any future run.
+                if acc.get(("wsonly", l)):
+                    wsv = float(np.mean(acc[("wsonly", l)]))
+                    rows.append((rung, X, "wsonly", l, f"{wsv:.4f}", "", len(seeds), carve))
         for k, v in f.items():
             rows.append((rung, X, "floor", k, f"{v:.4f}", "", len(seeds), carve))
         print("   ⚠️ CONTROL D: mean p[k] must RISE with lambda. If it does not, the bounded penalty")
