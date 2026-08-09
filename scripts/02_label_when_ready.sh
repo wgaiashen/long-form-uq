@@ -34,16 +34,26 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
   exit 1
 fi
 
-# dataset : expected rows : prompt-regime ("" = default namespace)
+# ⚠️ NOT EVERY DATASET IS LABELLED BY 02_label.py. expertqa and factscore have their own labellers,
+# and using the generic one on them is silently wrong rather than an error: it writes the shared
+# `correctness` field, which is last-labeller-wins, while those two datasets are scored on EXPLICIT
+# fields the ladder selects by name (--label-field factuality). 02_label_expertqa.py says so in as
+# many words: it writes `factuality` "never the shared `correctness` field".
+# It also produces `uncovered` and `coherent`, which are what the M3 coverage rule and the M4
+# prediction are computed from -- so the generic labeller does not merely mislabel, it fails to
+# produce the numbers the replication is being judged on. Llama's expertqa records have no
+# `correctness` key at all, which is the check that catches this.
+#
+# dataset : expected rows : prompt-regime ("" = default namespace) : labeller script
 TARGETS=(
-  "pubmed_qa:3800:"
-  "xsum:3800:"
-  "cnn_dailymail:3800:"
-  "med_quad:1800:"
-  "samsum:1800:"
-  "expertqa:2016:expertqa_rp12"
-  "asqa:948:asqa_rp12"
-  "factscore:500:factscore_rp12"
+  "pubmed_qa:3800::02_label.py"
+  "xsum:3800::02_label.py"
+  "cnn_dailymail:3800::02_label.py"
+  "med_quad:1800::02_label.py"
+  "samsum:1800::02_label.py"
+  "asqa:948:asqa_rp12:02_label.py"
+  "expertqa:2016:expertqa_rp12:02_label_expertqa.py"
+  "factscore:500:factscore_rp12:02_label_factscore.py"
 )
 
 done_marker () { echo "logs/.labelled_${1}"; }
@@ -51,7 +61,7 @@ done_marker () { echo "logs/.labelled_${1}"; }
 while true; do
   remaining=0
   for t in "${TARGETS[@]}"; do
-    IFS=':' read -r DS EXPECT REG <<< "$t"
+    IFS=':' read -r DS EXPECT REG LABELLER <<< "$t"
     [ -f "$(done_marker "$DS")" ] && continue
     remaining=$((remaining + 1))
 
@@ -72,9 +82,16 @@ while true; do
       continue
     fi
 
-    echo "[$(date +%H:%M)] $DS: $N/$EXPECT rows complete -> labelling with $JUDGE"
-    python -u scripts/02_label.py --model "$MODEL" --dataset "$DS" --ood ID \
-        --judge "$JUDGE" ${REG:+--prompt-regime "$REG"} 2>&1 | tee -a "logs/label_${DS}.log"
+    echo "[$(date +%H:%M)] $DS: $N/$EXPECT rows complete -> $LABELLER with $JUDGE"
+    # The two dedicated labellers take no --dataset (each handles exactly one) and default to the
+    # right regime, but the regime is passed anyway so the call is self-describing in the log.
+    if [ "$LABELLER" = "02_label.py" ]; then
+      python -u "scripts/$LABELLER" --model "$MODEL" --dataset "$DS" --ood ID \
+          --judge "$JUDGE" ${REG:+--prompt-regime "$REG"} 2>&1 | tee -a "logs/label_${DS}.log"
+    else
+      python -u "scripts/$LABELLER" --model "$MODEL" --ood ID \
+          --judge "$JUDGE" --prompt-regime "$REG" 2>&1 | tee -a "logs/label_${DS}.log"
+    fi
     if [ "${PIPESTATUS[0]}" -eq 0 ]; then
       touch "$(done_marker "$DS")"
       echo "[$(date +%H:%M)] $DS: LABELLED"
