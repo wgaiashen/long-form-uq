@@ -1,4 +1,8 @@
-# Canonical numbers for the report (frozen 2026-08-09)
+# CANONICAL-NUMBERS INDEX for the report — a POINTER LIST, not a copy
+(Re-designed 2026-08-09: while work is live, files stay in `results/` ONLY — a second copy here
+would need double maintenance and would drift. At SUBMISSION this manifest gains sha256 checksums
+and the listed files are frozen in place. Until then: this file is the index of what the report may
+quote; everything lives at `results/<name>`.)
 
 ⭐ **READ THESE TWO FIRST — they are the report's data spine:**
 1. `pdl_master__*.csv` — the base ladder (all baselines, every cell).
