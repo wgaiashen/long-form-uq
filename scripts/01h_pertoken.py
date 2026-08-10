@@ -110,8 +110,26 @@ def main():
     # reloaded per-token states must reproduce the cached SAPLMA feature's PRR. Reloading is what
     # catches a corrupt write (e.g. a dangling numpy view) that an in-memory check would miss.
     split = np.array([r["split"] for r in records])
-    y = np.array([r[args.label_field] for r in records], dtype=float)
-    tr, te = split == "train", split == "test"
+    # ⚠️ LABEL-AWARE (fix, 2026-08-10). When this runs before the judge labels land (the Qwen
+    # extraction array overlapped labelling), the old code either crashed on the missing field
+    # (KeyError: 'correctness') or trained on NaN and printed "PRR nan vs nan MISMATCH -- cache is
+    # wrong", which reads as a corrupt cache when the cache is fine and only the LABELS are absent.
+    # Say what is actually true and skip. The check that validates the hidden states themselves is
+    # scripts/checks/feature_pertok_consistency.py, which needs no labels.
+    y_raw = [r.get(args.label_field) for r in records]
+    y = np.array([v if v is not None else np.nan for v in y_raw], dtype=float)
+    if not np.isfinite(y).any():
+        print(f"SANITY skipped: no finite '{args.label_field}' label on any record (labels not "
+              "landed yet?). The per-token cache itself is NOT suspect -- run "
+              "scripts/checks/feature_pertok_consistency.py for the label-free hidden-state guard, "
+              "and re-run this sanity after labelling.")
+        return
+    fin = np.isfinite(y)
+    if not fin.all():
+        print(f"SANITY note: {int((~fin).sum())}/{len(y)} records lack a finite "
+              f"'{args.label_field}' -- scoring the sanity on the labelled subset only "
+              "(on expertqa/factscore a null label is the judge declining, which is permanent).")
+    tr, te = (split == "train") & fin, (split == "test") & fin
     z = np.load(ppath, allow_pickle=True)
     # Align POSITIONALLY: the cache is written in record order and the record "idx" field is NOT
     # unique (train and test share idx 0..N), so a {idx: states} map would drop half the rows.

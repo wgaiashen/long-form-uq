@@ -87,6 +87,11 @@ FLOORS = ["floor_sum", "floor_ppl", "floor_min"]
 # than re-derivations:  name -> (cached pooled feature, layer, standardize)
 # uhead is deliberately ABSENT: implemented and verified against the authors, but never carried to the
 # long-form grid, and dropped by decision on 2026-07-31 for time. Say so in the write-up.
+# ⚠️ ptrue's layer is THE PROBED MIDDLE LAYER, not a constant: 15 is Llama's ceil(32/2)-1, and the
+# feature cache stores only that plane (the rest are NaN), so pointing the Llama 15 at a Qwen cache
+# aborts on the NaN plane. It is resolved from --layer in main() (same ceil(N/2)-1 rule -> 23 on
+# Qwen); the default is 15, so every existing Llama invocation is untouched. lookback stays 0 by
+# design (a single combined layer).
 BASE_FEATS = {"ptrue": ("ptrue_accurate", 15, True), "lookback": ("lookback", 0, False)}
 METHODS = FLOORS + ["fair_floor", "saplma"] + POOLERS + [w[0] for w in WMSP]
 
@@ -322,6 +327,9 @@ def main():
     # Default leaves it untouched, so a no-arg invocation is exactly the pre-port driver.
     global MODEL
     MODEL = args.model
+    # ptrue's feature plane follows the probed layer (see BASE_FEATS note). --layer's default is 15,
+    # so a no-arg Llama run resolves to the identical (15) and stays byte-identical.
+    BASE_FEATS["ptrue"] = ("ptrue_accurate", args.layer, True)
     prov = _provenance()   # aborts here (before the pool load) if the tracked tree is dirty
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} env_hash={prov['env_hash']}"
           + ("  [+save-pooler seed-1]" if args.save_pooler else ""), flush=True)
