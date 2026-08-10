@@ -40,7 +40,14 @@ from aggregation_table import load_per_token, attn_unc, paired_bootstrap, conf_m
 from attn_pool import train_attn, select_temperature, pad_batch, regime_tag, PROMPT_REGIME  # noqa: E402
 from xl_rungs import build_rows, eval_split, label_of, different_label_projection  # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
+# MODEL is a module global (not a main() local) because the save helpers (_save_pooler, _save_perex)
+# read it for cache keys and filenames. --model reassigns it at the top of main(), so every use site
+# — run_key, probe/viz/perex filenames, the tokenizer, load_per_token, Config, the output CSV —
+# follows the flag with no signature changes, and a no-arg run must stay byte-identical to before
+# the port (the no-op control: re-run one Llama cell with no --model and diff against the published
+# CSV). ⚠️ Every use is path/config construction; no logic branches on the model.
+MODEL = DEFAULT_MODEL
 
 # ⚠️ SHIM AS OF 2026-08-08 — the long-form GRID now lives in the installed `probe_drift_long`
 # library and is re-exported here under its historical names, so the ~19 modules doing
@@ -256,6 +263,12 @@ def main():
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--evals", default=",".join(EVALS))
     ap.add_argument("--layer", type=int, default=15)
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="HF model id whose caches to score (default: the Llama keystone, unchanged). "
+                         "Every use is path/config construction (cache keys, probe/viz/perex filenames, "
+                         "tokenizer, output CSV slug) — no logic branches on it. The per-token cache for "
+                         "this model at --layer must already exist (01h_pertoken); pair Qwen/Qwen2.5-14B "
+                         "with --layer 23 (the fixed ceil(N/2)-1 rule; do NOT rely on the layer default).")
     ap.add_argument("--include-expertqa", action="store_true",
                     help="DEPRECATED / no-op as of 2026-07-22: ExpertQA is now an ordinary training source by "
                          "default, so the mixed-label 'universal' pool IS the default. Kept so existing job "
@@ -305,6 +318,10 @@ def main():
                          "from the stored vectors must reproduce the in-memory prr_mean to <1e-6 or the run "
                          "ABORTS (a sidecar that disagrees with its own CSV is worse than no sidecar).")
     args = ap.parse_args()
+    # Reassign the module global so the save helpers (and every path/key below) follow the flag.
+    # Default leaves it untouched, so a no-arg invocation is exactly the pre-port driver.
+    global MODEL
+    MODEL = args.model
     prov = _provenance()   # aborts here (before the pool load) if the tracked tree is dirty
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} env_hash={prov['env_hash']}"
           + ("  [+save-pooler seed-1]" if args.save_pooler else ""), flush=True)
@@ -357,6 +374,19 @@ def main():
     print(f"device {device} | seeds {seeds} | evals {evals}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)
+    # ⚠️ NON-NEGOTIABLE FOR A NON-LLAMA MODEL: register the real special-token ids, or
+    # weighted_msp.content_keep silently falls back to the Llama-3 `id >= 128000` range test — on
+    # Qwen2.5 (specials at 151,643+) that would zero the weight of a large band of ORDINARY content
+    # tokens: no crash, just a quietly different method. Guarded to non-default models only so a
+    # no-arg Llama run keeps the byte-identical legacy path (where the two tests provably agree on
+    # every cached row). token_subsets gets the same registration for any keep-mode that routes
+    # through it.
+    if MODEL != DEFAULT_MODEL:
+        from luq import token_subsets  # noqa: E402
+        weighted_msp.set_special_ids(tok.all_special_ids)
+        token_subsets.set_special_ids(tok.all_special_ids)
+        print(f"special-token ids registered from the {MODEL} tokenizer "
+              f"({len(tok.all_special_ids)} ids; Llama range-test fallback OFF)", flush=True)
     PT, SEG, POOLED = {}, {}, {}
     for d in sorted(set(LONG_SRC) | set(evals)):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))

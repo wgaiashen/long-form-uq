@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_pdl_noop
+#PBS -j oe
+# NO-OP CONTROL for the --model port of probedriftlong.py (the Qwen ladder port, 2026-08-10).
+#
+# The port turned the hardcoded MODEL constant into a --model flag (default unchanged) and wired
+# special-token-id registration for non-default models. This file is on BOTH workstreams' collision
+# lists, so the change ships with this control: re-run ONE Llama eval with NO --model and diff the
+# shared (rung, method) PRRs against the published per-eval CSV. A port that moves a Llama number is
+# a port in the wrong place.
+#
+# factscore: smallest eval (455 labelled rows), and its per-token cache exists on RCS
+# (cache/factscore_rp12/pertok/...__L15.npz). wmsp_norm is kept (one MLP per cell) because the port
+# touched the special-ids path next to weighted_msp; baselines are skipped (not needed for the diff).
+#
+#   qsub pbs/pdl_noop_control.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+OUT="results/pdl_noop_control_factscore__meta-llama_Meta-Llama-3.1-8B.csv"
+REF="results/pdl_fam_factscore__meta-llama_Meta-Llama-3.1-8B.csv"
+
+echo "=== PDL no-op control (post --model port) on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals factscore \
+    --wmsp-only wmsp_norm --out "$OUT" || exit 1
+
+# Diff every (rung, method) the control produced against the published CSV, on prr_mean to 4 dp
+# (the published precision). Any mismatch is a hard failure.
+python - "$OUT" "$REF" <<'PY'
+import csv, sys
+new = {(r["rung"], r["method"]): float(r["prr_mean"]) for r in csv.DictReader(open(sys.argv[1]))
+       if r.get("prr_mean") not in (None, "", "nan")}
+ref = {(r["rung"], r["method"]): float(r["prr_mean"]) for r in csv.DictReader(open(sys.argv[2]))
+       if r.get("prr_mean") not in (None, "", "nan")}
+shared = sorted(set(new) & set(ref))
+if not shared:
+    sys.exit("NO SHARED (rung, method) ROWS -- the diff is vacuous, refusing to pass")
+bad = [(k, new[k], ref[k]) for k in shared if abs(new[k] - ref[k]) > 5e-5]
+print(f"no-op control: {len(shared)} shared (rung, method) rows compared")
+for k, a, b in bad:
+    print(f"  MISMATCH {k}: control {a:+.4f} vs published {b:+.4f}")
+missing = sorted(set(ref) - set(new) - {k for k in ref if k[1] in ("ptrue", "lookback")})
+print(f"rows in published-but-not-control (expected: skipped wMSP variants/baselines): {len(missing)}")
+sys.exit(1 if bad else 0)
+PY
+rc=$?
+if [ $rc -eq 0 ]; then echo "=== NO-OP CONTROL PASS: the --model port left the Llama path byte-identical ===" >&2
+else echo "=== NO-OP CONTROL FAIL (rc=$rc) -- DO NOT run the Qwen ladder until resolved ===" >&2; fi
+echo "=== done $(date) ===" >&2
+exit $rc
