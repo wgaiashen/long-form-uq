@@ -81,9 +81,14 @@ export HF_HOME HF_HUB_OFFLINE=1
 MODEL="Qwen/Qwen2.5-14B"
 SLUG="Qwen_Qwen2.5-14B"
 
+# Default = all six, CHEAPEST FIRST, so a walltime kill lands on the most expensive dataset with
+# the others already banked. This default has to exist for the ordering argument above to mean
+# anything: the script previously demanded explicit arguments, so `sbatch <this>` with no args
+# printed usage and exited (job 272325), and the only way to run it was to type an order by hand --
+# which is exactly how 272316 got submitted most-expensive-first in the first place.
 DATASETS=("$@")
 if [ ${#DATASETS[@]} -eq 0 ]; then
-  echo "usage: sbatch $0 <dataset> [dataset ...]   (short-source sets only)"; exit 2
+  DATASETS=(factscore asqa samsum expertqa pubmed_qa med_quad)
 fi
 
 regime_for() {
