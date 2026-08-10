@@ -59,10 +59,9 @@ from luq.adaptive_lehmer import (AdaptiveLehmerGate, BETA_MAX, NLL_FLOOR, ShapeS
                                  nll_shape_vector)         # noqa: E402
 from luq.config import Config                              # noqa: E402
 from luq.weighted_msp import _soft_rank, _true_rank        # noqa: E402  (THE canonical loss)
-from xl_rungs import eval_split, label_of                  # noqa: E402
+from xl_rungs import build_rows, label_of                  # noqa: E402  (shim: PT form + LUQ_CARVE)
 from attn_pool import PROMPT_REGIME                        # noqa: E402
 from probe_drift_long import cells_long, sampled_train_idx  # noqa: E402
-from probe_drift_long.splits import build_rows             # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAYER = 15
