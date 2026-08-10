@@ -32,10 +32,18 @@ python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals factscore \
 # (the published precision). Any mismatch is a hard failure.
 python - "$OUT" "$REF" <<'PY'
 import csv, sys
+# ⚠️ VERDICT:bestw_* rows are EXCLUDED from the hard gate (fix, 2026-08-10). They are derived
+# "best wMSP variant vs X" comparisons: the published run trained all 10 wMSP variants while this
+# control runs --wmsp-only wmsp_norm, so "best wMSP" ranges over different variant sets and those
+# rows differ BY CONSTRUCTION, not because a number moved. The first run of this control "failed"
+# on exactly those 6 rows while all 24 real method rows matched to 4 dp. Real method rows and
+# VERDICT rows whose inputs are variant-independent (attention_vs_fairfloor) stay in the gate.
+def keep(m):
+    return not m.startswith("VERDICT:bestw")
 new = {(r["rung"], r["method"]): float(r["prr_mean"]) for r in csv.DictReader(open(sys.argv[1]))
-       if r.get("prr_mean") not in (None, "", "nan")}
+       if r.get("prr_mean") not in (None, "", "nan") and keep(r["method"])}
 ref = {(r["rung"], r["method"]): float(r["prr_mean"]) for r in csv.DictReader(open(sys.argv[2]))
-       if r.get("prr_mean") not in (None, "", "nan")}
+       if r.get("prr_mean") not in (None, "", "nan") and keep(r["method"])}
 shared = sorted(set(new) & set(ref))
 if not shared:
     sys.exit("NO SHARED (rung, method) ROWS -- the diff is vacuous, refusing to pass")
