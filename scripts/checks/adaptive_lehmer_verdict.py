@@ -42,9 +42,10 @@ def load_new():
     for m in METHODS:
         for e in EVALS:
             for r in RUNGS:
-                g = df[(df.method == m) & (df.eval == e) & (df.rung == r)]
-                if set(g.seed) != SEEDS:
-                    missing.append((m, e, r, sorted(g.seed)))
+                # NB df["eval"], never df.eval — .eval is a pandas METHOD and shadows the column
+                g = df[(df["method"] == m) & (df["eval"] == e) & (df["rung"] == r)]
+                if set(g["seed"]) != SEEDS:
+                    missing.append((m, e, r, sorted(g["seed"])))
     if missing:
         raise SystemExit(f"GRID INCOMPLETE — refusing a partial verdict. First gaps: {missing[:6]} "
                          f"({len(missing)} total)")
