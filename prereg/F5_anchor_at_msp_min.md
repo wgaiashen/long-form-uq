@@ -1,5 +1,7 @@
 # PRE-REGISTRATION — F5: regularise weighted MSP toward `msp_min`, not toward `perplexity`
 
+> **Status (2026-08-10):** the linear penalty stalled grid-wide (an optimisation failure, §16.1); the registered −log p[k] fallback ran 8/8 (F5b): mechanism confirmed both directions with the random-anchor control, method short of the floor, penalty bites on 3/8 evals only. Continued in `F5c_warmstart_combo.md`; F5 closed as mechanism-only. Record: `STOCKTAKE_sharpening_axis.md` §16, §21.
+
 **Written 2026-08-09, BEFORE the driver was implemented and before any cell was run.**
 Population: the complete ProbeDriftLong grid, 8 long evals × 5 rungs, `meta-llama/Llama-3.1-8B`,
 legacy carve, 3 seeds. **Headline numbers are the mean over the 4 OOD rungs, n = 8 datasets.**

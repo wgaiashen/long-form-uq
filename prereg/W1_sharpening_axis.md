@@ -1,5 +1,7 @@
 # PRE-REGISTRATION — W1: the training-free sharpening family
 
+> **Status (2026-08-09):** run. The primary claim FAILED its registered bar (margin +0.0209 PASS, signs 6/8 PASS, Wilcoxon p = 0.148 FAIL — NOT ESTABLISHED); both honest selection arms collapsed to msp_min on every fold. What survives is the regime map (descriptive). Record: `STOCKTAKE_sharpening_axis.md` §3.
+
 **Written 2026-08-08, BEFORE the driver was implemented and before any cell was run.**
 Population: `meta-llama/Llama-3.1-8B`, the 8 long ProbeDriftLong evals, legacy carve.
 Plan: `../../PLAN_sharpening_axis.md`. Results doc: `../../STOCKTAKE_sharpening_axis.md`.

@@ -1,5 +1,7 @@
 # PRE-REGISTRATION — W4: honest selection across the sharpening families, and a rank-weighted arm
 
+> **Status (2026-08-09):** run. Lehmer under raw-argmax LODO is a consistent small positive (+0.027, 6/8) that misses its registered bar (p = 0.250); the rank arm removes the length confound and still fails on PRR. Per-dataset record and the corrected mechanism statistic: `STOCKTAKE_sharpening_axis.md` §7.1b–c, §7.2–7.3.
+
 **Written 2026-08-09, BEFORE either analysis was implemented or run.**
 Population: `meta-llama/Llama-3.1-8B`, the 8 long ProbeDriftLong evals, legacy carve, judge label.
 Free methods are rung-invariant, so **the unit is the DATASET, n = 8**, and every number is

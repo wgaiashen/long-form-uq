@@ -20,7 +20,7 @@ re-derived, no threshold is changed.
   artifact (`9731fea`), and nothing in them was adjusted after W6.
 
 **Population caption for every table** (corrected from §3's original, which said "layer selected
-on dev" — superseded by the author's decision of 2026-08-09; **no dev split exists**):
+on dev" — superseded on 2026-08-09 (decision recorded in `STOCKTAKE_qwen.md` §5); **no dev split exists**):
 
 > *ProbeDriftLong, 8 long evals × `cells_long`, 3 seeds, `Qwen/Qwen2.5-14B` (base), fp32 + eager,
 > judge label gpt-5-mini, layer 23 by the fixed rule `ceil(N/2) − 1` (Joe's convention; Llama ran
@@ -59,12 +59,12 @@ on dev" — superseded by the author's decision of 2026-08-09; **no dev split ex
 - **SENSITIVITY (B):** any re-selection happens on held-out data only and is reported separately,
   never pooled. (The dev-split machinery was never built; the layer is fixed by rule, so no
   selection of any kind has occurred.)
-- **FORBIDDEN (C):** looking at Qwen test PRR, adjusting, looking again. If the urge arises, stop
-  and ask the author.
+- **FORBIDDEN (C):** looking at Qwen test PRR, adjusting, looking again. Banned outright; any
+  deviation is recorded, not improvised.
 - The layer does not transfer numerically and is fixed by the rule above, not by selection.
 - The capped-draw divergence (Qwen probes drawing a different random subset of the same OOD pools)
-  is a closed, documented noise source — see `RCS_PROMPT_draw_fix_and_template_finding.md`; it is
-  not to be "fixed" mid-replication.
+  is a closed, documented noise source (an extra seed's worth of noise on 28 capped OOD cells; eval
+  rows, floors and ID pools are identical) and is not to be "fixed" mid-replication.
 
 ## 4. What is scored
 

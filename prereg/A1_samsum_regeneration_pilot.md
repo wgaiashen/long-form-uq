@@ -6,7 +6,7 @@
 
 ## The finding that reframed this pilot
 
-Measured this session from `cache/records/*` with `o200k_base` tokenisation, comparing each dataset's
+Measured at the time of writing from `cache/records/*` with `o200k_base` tokenisation, comparing each dataset's
 token budget against the p90 length of its **gold reference answer**:
 
 | dataset | budget | gold p90 | budget ÷ gold p90 | % capped | what truncation IS |

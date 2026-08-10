@@ -1,5 +1,7 @@
 # PRE-REGISTRATION — W7: the per-instance length blend (Joe's §6 ask, run as asked)
 
+> **Status (2026-08-09):** run. The registered null: the per-instance length blend does not beat the better endpoint. Record: `STOCKTAKE_sharpening_axis.md` §17.
+
 **Written 2026-08-09, before the script was implemented.** Joe, 7 Aug §6: apply the HBO pattern
 **per test example**, with length in the slot where OOD-ness sat. §8's oracle retractions are at
 dataset/cell granularity and do NOT close this; it has never been run in this form on the canonical

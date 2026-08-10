@@ -1,5 +1,7 @@
 # PRE-REGISTRATION — W5: λ = 1.5 from a July prediction, and NLL inside the weight logits
 
+> **Status (2026-08-09):** run 8/8. The registered λ = 1.5 claim FAILS (tie with shrink@2); the anchor-quality mechanism holds (Spearman +0.835, LOO-stable). Record: `STOCKTAKE_sharpening_axis.md` §15.
+
 **Written 2026-08-09, BEFORE the driver was implemented and before any cell was run.**
 Population: the COMPLETE ProbeDriftLong grid, 8 long evals × 5 rungs, `meta-llama/Llama-3.1-8B`,
 legacy carve, 3 seeds. **Headline numbers are the mean over the 4 OOD rungs, n = 8 datasets.**

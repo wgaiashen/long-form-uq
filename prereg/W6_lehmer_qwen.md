@@ -1,11 +1,13 @@
 # PRE-REGISTRATION — W6: Lehmer β = 1 on the Qwen2.5-14B grid (out-of-sample)
 
+> **Status (2026-08-10):** run. Q1 fails (margin +0.0137 and 7/8 pass, Wilcoxon p = 0.195, dragged by expertqa, which carries a severe length confound on this population); Q2 replicates on 1 of 3 (cnn_dailymail, boot p = 0.0020); Q3 (secondary) p = 0.0443. Record: `STOCKTAKE_qwen.md` §11. *(Wording edited 2026-08-10, cosmetic only — registered claims, thresholds and bars are unchanged; git history is the proof.)*
+
 **Written 2026-08-09, BEFORE any Qwen record, label or ladder number exists.** Qwen generation has
 started on DoC; no per-token logprobs have been scored against any label. Every choice below is
 derived from **Llama-3.1-8B data only**.
 
-Origin: W-Sharpen (`../../PLAN_sharpening_axis.md`; Llama results in
-`../../STOCKTAKE_sharpening_axis.md` §7.1b–c). Runs on the **W-Qwen population** as defined by
+Origin: the sharpening-axis line on Llama (project log: `PLAN_sharpening_axis.md`; Llama results
+in `STOCKTAKE_sharpening_axis.md` §7.1b–c). Runs on the **Qwen population** as defined by
 `PLAN_execution_post7Aug.md` — its splits, its carve, its judge labels — with **nothing re-selected
 on Qwen data**.
 
@@ -58,13 +60,13 @@ reported alongside, never instead of Q1.
 ## 5. MECHANICS (why this can run early, and the trap it avoids)
 
 Lehmer is training-free ⇒ **rung-invariant** ⇒ it needs only Qwen **records + judge labels** — no
-probes, no per-token hidden states, no ladder. It can be computed the day W-Qwen's labelling lands,
+probes, no per-token hidden states, no ladder. It can be computed the day the Qwen labelling lands,
 before any probe trains. Convention identical to Llama: **all generated tokens** (Lehmer uses no
 content mask, so the Llama-only `id ≥ 128000` special-token rule — the known Qwen port trap in
 `weighted_msp.py:185-193` — is **not touched by this method**). NLLs from `token_logprobs` as cached.
-Test rows: W-Qwen's own `eval_split`/carve, unmodified. Driver: `sharpening_family.py`'s
+Test rows: the Qwen replication's own `eval_split`/carve, unmodified. Driver: `sharpening_family.py`'s
 `score_lehmer` with a `--model` pin — **fail loud on any model-agnostic glob.**
 
-⚠️ **This pre-registration must be visible to the W-Qwen agent before its ladders run.** It changes
-nothing in the W-Qwen plan (no new jobs, no new selection) — it only fixes, in advance, how one free
+⚠️ **This pre-registration is committed and pushed before any Qwen ladder runs.** It changes
+nothing in the Qwen replication plan (no new jobs, no new selection) — it only fixes, in advance, how one free
 method will be read on data that does not exist yet.
