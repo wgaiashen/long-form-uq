@@ -53,6 +53,24 @@
 #
 # Host RAM: the attentions are moved to CPU and then torch.stack-ed, which COPIES, so the peak is
 # about 2x the attention term. 2 * 14.3 = ~29 GB for the worst of the six, hence 96G.
+#
+# ---- MEASURED, NOT JUST PREDICTED (job 272316, med_quad, vm-he-a100) --------------------------
+# GPU peak came in at 74,179 MiB of 81,920 -- 72.4 GiB against the 73 GB predicted above. The
+# arithmetic holds, which also means the 91 GB figure for xsum/cnn_dailymail is real and those two
+# genuinely cannot run here.
+#
+# Throughput: 11.2 s/row steady-state on med_quad (the first ~20 rows are slower; measure off a
+# later interval, not the start). That is 5.6 h for its 1800 rows, and roughly 11 h for all six,
+# which is why the default order below is CHEAPEST FIRST and why this wants --time=48:00:00 on the
+# command line rather than the 12 h in the header:
+#
+#     sbatch --time=48:00:00 slurm/qwen_lookback.sbatch
+#
+# 01c has no resume WITHIN a dataset, but it writes one file per dataset and the guard below skips
+# a dataset whose output already exists -- so a walltime kill costs the dataset in flight and
+# nothing else, and a plain resubmission picks up where it left off. Cheapest-first means the kill
+# lands on the most expensive one, with the other five already banked. Job 272316 was submitted
+# with the order reversed on the command line and cancelled 9 minutes in for exactly this reason.
 
 set -uo pipefail
 export PYTHONUNBUFFERED=1
