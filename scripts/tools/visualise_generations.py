@@ -43,10 +43,13 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "checks"))
 
 from luq import answer_span as A  # noqa: E402
 from luq import cache, data, msp  # noqa: E402
 from luq.config import Config  # noqa: E402
+from attn_pool import PROMPT_REGIME  # noqa: E402  (regime-namespaced sets: expertqa/asqa/factscore)
+from xl_rungs import label_of  # noqa: E402  (the dataset's ACTUAL label field, not bare correctness)
 
 # Prompt markers whose reappearance in the generation means it ran past its answer into junk.
 JUNK_MARKERS = ("Question:", "Answer:", "Abstract:", "Text:", "Summary:", "Story:", "Context:")
@@ -122,8 +125,8 @@ def corr_class(c):
     return "good" if c >= 0.7 else ("bad" if c < 0.3 else "mid")
 
 
-def card_html(rec, flags, glen, ratio, maxc, mspu, cut, reason):
-    c = float(rec["correctness"]) if rec.get("correctness") is not None else None
+def card_html(rec, flags, glen, ratio, maxc, mspu, cut, reason, label_field="correctness"):
+    c = float(rec[label_field]) if rec.get(label_field) is not None else None
     corr_txt = f"{c:.2f}" if c is not None else "&mdash;"  # em-dash = not labelled yet
     q = rec.get("prompt", "")
     # trim the few-shot prompt down to the last question/context block for readability
@@ -161,7 +164,8 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood)
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
+                 prompt_regime=PROMPT_REGIME.get(args.dataset, ""))
     recs = cache.load_records(cfg.cache_dir, cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting))
     # A train-only neighbour (e.g. med_quad, an ID OOD source) has no 'test' split, so the default
     # --split test would select 0 records. Fall back to all records and note it in the header.
@@ -179,7 +183,8 @@ def main():
     for r in recs:
         f, glen, ratio, maxc = flags_for(r, mnt)
         mspu = msp.msp_uncertainty(r["token_logprobs"], "sum")
-        corr = float(r["correctness"]) if r.get("correctness") is not None else None
+        lf = label_of(cfg.dataset)
+        corr = float(r[lf]) if r.get(lf) is not None else None
         _, cut, reason = A.answer_span(r["gen_text"], cfg.dataset, context=r.get("prompt"))
         rows.append({"rec": r, "flags": f, "glen": glen, "ratio": ratio, "maxc": maxc,
                      "msp": mspu, "corr": corr, "cut": cut, "reason": reason})
@@ -191,8 +196,13 @@ def main():
         return 100 * sum(1 for x in rows if pred(x)) / n
     label_txt = (f"judge({data.TASK_OF[cfg.dataset]})" if labelled
                  else "UNLABELLED (pre-judge sense-check)")
-    corr_txt = (f"mean_corr={np.mean([x['corr'] for x in rows]):.3f}" if labelled
-                else "mean_corr=&mdash; (not labelled yet)")
+    # expertqa/factscore: the judge can DECLINE a row (distrust rule) -> corr None on a labelled
+    # dataset. Mean over the labelled subset only, and say how many rows have no label.
+    lab_vals = [x["corr"] for x in rows if x["corr"] is not None]
+    n_unlab = n - len(lab_vals)
+    corr_txt = (f"mean_corr={np.mean(lab_vals):.3f}"
+                + (f" ({n_unlab} rows unlabelled/declined)" if n_unlab else "")
+                if labelled else "mean_corr=&mdash; (not labelled yet)")
     agg = (f"n={n}{split_note} &nbsp; label={label_txt} &nbsp; max_new_tokens={mnt} &nbsp; "
            f"{corr_txt}<br>"
            f"median gen_len={int(np.median([x['glen'] for x in rows]))} &nbsp; "
@@ -224,10 +234,12 @@ def main():
         # correctness-driven diagnostic sections (need judge labels)
         sections += [
             ("Confident but WRONG (low MSP uncertainty, low correctness)",
-             [x for x in rows if x["mrank"] < 0.33 and x["corr"] < 0.3 and not degen(x)],
+             [x for x in rows if x["mrank"] < 0.33 and x["corr"] is not None
+              and x["corr"] < 0.3 and not degen(x)],
              lambda x: x["mrank"]),
             ("Uncertain but RIGHT (high MSP uncertainty, high correctness)",
-             [x for x in rows if x["mrank"] > 0.67 and x["corr"] > 0.7 and not degen(x)],
+             [x for x in rows if x["mrank"] > 0.67 and x["corr"] is not None
+              and x["corr"] > 0.7 and not degen(x)],
              lambda x: -x["mrank"]),
         ]
     else:
@@ -249,7 +261,8 @@ def main():
             parts.append("<div class='meta'>none</div>")
         for x in items:
             parts.append(card_html(x["rec"], x["flags"], x["glen"], x["ratio"], x["maxc"],
-                                   x["msp"], x["cut"], x["reason"]))
+                                   x["msp"], x["cut"], x["reason"],
+                                   label_field=label_of(cfg.dataset)))
     parts.append("</div>")
 
     out = Path(args.out) if args.out else (cfg.results_dir / "viz" /
