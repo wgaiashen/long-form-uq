@@ -8,17 +8,18 @@ this population would produce a table that is blank by construction — which re
 rather than "does not exist". Qwen has exactly ONE source: the eight per-eval CSVs written by
 `probedriftlong.py --model Qwen/Qwen2.5-14B`. Concatenating those is the whole job.
 
-WHAT IT DOES **NOT** DO — deliberately. It computes no M2 replication verdict (R1a/R1b/R2/R2-desc/
-R3/R4′). Those tests were computed for Llama in an RCS working session and exist in no committed
-script, so their exact definitions — which rungs are averaged, the DiD's sign convention, whether
-the regression is on OOD means — cannot be read off the code here. Re-deriving them from the
-prereg's prose would risk running a subtly different test on the two models and calling the
-difference a replication result. Definitions come from RCS first; only then does the scorecard run.
+WHAT IT DOES **NOT** DO — deliberately. It computes no M2 replication verdict. That is
+`scripts/checks/replication_claims.py` (committed 2026-08-10), which is the test definition for
+R1a/R1b/R2/R2-desc/R3/R4′ and scores BOTH populations from one code path. Keeping assembly separate
+from scoring is the point: this file's output is the input that scorer refuses to run on unless the
+grid is complete. Until it existed the tests lived only as prose in the prereg, and re-deriving them
+per model would have risked running a subtly different test on each and calling the difference a
+replication result.
 
 Coverage is reported UP FRONT and every genuinely-absent cell stays BLANK, never zero.
 
-    python scripts/checks/qwen_pdl_master.py
     python scripts/checks/qwen_pdl_master.py --strict     # exit 1 unless all 40 cells are present
+    python scripts/checks/replication_claims.py --population qwen
 """
 import argparse
 import csv
@@ -188,11 +189,10 @@ def main():
     out_md.write_text("\n".join(lines))
     print(f"wrote {out_md}")
 
-    print("\n⚠️ NO REPLICATION VERDICT IS COMPUTED HERE. R1a/R1b/R2/R2-desc/R3/R4' need the exact")
-    print("   test definitions used for Llama (rung averaging, the DiD sign convention, the")
-    print("   regression's population). Those live in an RCS working session, not in any committed")
-    print("   script, and re-deriving them from prose risks running a different test on the two")
-    print("   models and calling the difference a result.")
+    print("\nNo replication verdict is computed here -- that is scripts/checks/replication_claims.py")
+    print("   (committed 2026-08-10), the test definition for R1a/R1b/R2/R2-desc/R3/R4', which runs")
+    print("   over BOTH populations from one code path and refuses a partial grid. Next:")
+    print("     python scripts/checks/replication_claims.py --population qwen")
 
     if args.strict and (gaps or missing_evals):
         print("\nSTRICT: coverage incomplete -> exit 1")
