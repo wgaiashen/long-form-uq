@@ -1,0 +1,28 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_mqclean
+#PBS -j oe
+# med_quad CLEAN-SPAN shadow ladder, ONE eval per job (2026-08-11 sensitivity; plan in the
+# private parent). Same shape as pdl_one_eval.pbs with three deliberate differences:
+#   1. LUQ_REGIME points med_quad at the shadow root cache/med_quad_clean/ (built by
+#      scripts/checks/make_med_quad_clean_regime.py) — every med_quad read (records, logprobs,
+#      per-token states, train AND eval side) resolves there; all other datasets stay canonical.
+#   2. --out goes to results/analysis/ under a sensitivity name — the canonical pdl_fam_* CSVs
+#      and pdl_master are NEVER touched by this job.
+#   3. no --baselines (ptrue/lookback are not report-relevant to the sensitivity and their
+#      pooled features are deliberately absent from the shadow root).
+# All 8 evals are submitted (not just the 19 affected cells): the 21 untouched cells MUST
+# reproduce the canonical master to 4 dp — that invariance is the correctness control.
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_medquad_clean.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+export LUQ_REGIME="med_quad=med_quad_clean"
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+echo "=== PDL med_quad-clean SENSITIVITY eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$EV" \
+    --out "results/analysis/pdl_mqclean_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2
