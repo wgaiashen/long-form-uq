@@ -72,17 +72,27 @@ def master_medquad_floors():
 
 
 def main():
+    import time
+    t0 = time.time()
+
+    def tick(msg):
+        print(f"[{time.time() - t0:7.1f}s] {msg}", flush=True)
+
     key = cache.run_key(MODEL, DATASET, "ID")
     slug = cache._slug(MODEL)
     records = cache.load_records(CACHE_DIR, key)
+    tick(f"records loaded ({len(records)})")
     z = np.load(CACHE_DIR / "pertok" / f"{key}__L{LAYER}.npz", allow_pickle=True)
     states = [np.asarray(z["states"][k], dtype=np.float32) for k in range(len(records))]
+    tick("pertok states loaded")
     if len(states) != len(records):
         raise SystemExit(f"G-window FAIL: {len(states)} states vs {len(records)} records")
-    feats = cache.load_features(CACHE_DIR, key, "saplma")[:, LAYER, :]
+    feats = np.ascontiguousarray(cache.load_features(CACHE_DIR, key, "saplma")[:, LAYER, :])
+    tick("saplma feature plane loaded")
     if len(feats) != len(records):
         raise SystemExit(f"G-pool FAIL: feature cache {len(feats)} rows vs {len(records)} records")
     tok = V.load_tokenizer(MODEL)
+    tick("tokenizer loaded")
 
     # ---------------- gates on the RAW cache ----------------
     pool_diffs = []
@@ -99,10 +109,14 @@ def main():
     print(f"G-window/G-logprob PASS on {len(records)} rows; G-pool max|Δ| = {mx:.4g} "
           f"({'within the documented med_quad tolerance' if mx > POOL_WARN else 'tight'})")
 
+    tick(f"raw gates done (G-pool max|Δ| {mx:.4g})")
+
     # ---------------- the cut ----------------
     n_cut = n_empty = 0
     clean_records, clean_states, cut_toks = [], [], []
-    for r, st in zip(records, states):
+    for _i, (r, st) in enumerate(zip(records, states)):
+        if _i and _i % 300 == 0:
+            tick(f"cut loop {_i}/{len(records)}")
         clean, cut_char, reason = A.answer_span(r["gen_text"], DATASET, context=r.get("prompt"))
         ct = repool.char_to_tok(tok, r["gen_token_ids"], cut_char)
         if ct == 0:                                      # predeclared edge policy: keep 1 token
@@ -131,8 +145,12 @@ def main():
     cache.save_records(clean_records, OUT_ROOT, key)
     ptdir = OUT_ROOT / "pertok"
     ptdir.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(ptdir / f"{key}__L{LAYER}.npz",
-                        states=np.array(clean_states, dtype=object), layer=LAYER)
+    tick("cut loop done; writing shadow root (UNCOMPRESSED npz — compression measured too slow)")
+    st_obj = np.empty(len(clean_states), dtype=object)
+    for k, s in enumerate(clean_states):
+        st_obj[k] = s
+    np.savez(ptdir / f"{key}__L{LAYER}.npz", states=st_obj, layer=LAYER)
+    tick("pertok written")
     (OUT_ROOT / "meta").mkdir(parents=True, exist_ok=True)
     src_hash = CACHE_DIR / "meta" / f"{key}.prompthash"
     if src_hash.exists():
