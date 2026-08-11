@@ -23,5 +23,7 @@ case "$MODEL" in
   *) echo "REFUSING '$MODEL': no fixed layer"; exit 2 ;;
 esac
 echo "=== trunc-hidden $MODEL (L$LAYER) on $(hostname) at $(date) ==="
-python -u scripts/checks/truncation_sensitivity_hidden.py --model "$MODEL" --layer "$LAYER" --seeds 1,2,3
+# --skip-poolers: select_temperature dominates the runtime (40 min without emitting a cell) and
+# uniform/attention are secondary to the SAPLMA-vs-wMSP question this sensitivity exists to answer.
+python -u scripts/checks/truncation_sensitivity_hidden.py --model "$MODEL" --layer "$LAYER" --seeds 1,2,3 --skip-poolers
 echo "=== done at $(date) ==="
