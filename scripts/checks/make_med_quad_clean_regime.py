@@ -83,7 +83,12 @@ def main():
     records = cache.load_records(CACHE_DIR, key)
     tick(f"records loaded ({len(records)})")
     z = np.load(CACHE_DIR / "pertok" / f"{key}__L{LAYER}.npz", allow_pickle=True)
-    states = [np.asarray(z["states"][k], dtype=np.float32) for k in range(len(records))]
+    # ⚠️ HOIST z["states"] OUT OF THE COMPREHENSION. Indexing an NpzFile re-reads and re-materialises
+    # the WHOLE member every time, so `z["states"][k]` inside the loop read the 3.5GB array 1800 times.
+    # That killed the job at the 3h wall having produced nothing (3659804, 99% CPU, 2h57m of it here).
+    # attn_pool.load_per_token:133 already does it correctly — this is the same read, done once.
+    st = z["states"]
+    states = [np.asarray(st[k], dtype=np.float32) for k in range(len(records))]
     tick("pertok states loaded")
     if len(states) != len(records):
         raise SystemExit(f"G-window FAIL: {len(states)} states vs {len(records)} records")
