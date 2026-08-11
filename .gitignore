@@ -43,3 +43,8 @@ DOC_BRIEF*.md
 DOC_INSTRUCTIONS.md
 AGENT_*.md
 *_HANDOVER*.md
+
+# Agent scratch / worktrees. INTERNAL by definition (see CLAUDE.md: internal guidance never goes
+# in the submitted repo). A 42MB unlabelled records duplicate was found here on 2026-08-11, untracked
+# but NOT ignored, so a `git add -A` would have swept it into the submitted artifact.
+.claude/
