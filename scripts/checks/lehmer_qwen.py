@@ -194,10 +194,15 @@ def main():
     ap.add_argument("--model", default=MODEL_DEFAULT,
                     help="EXPLICIT model pin. There is no glob fallback and there must never be one.")
     ap.add_argument("--boot", type=int, default=BOOT_B, help="paired-bootstrap resamples (registered: 2000)")
+    ap.add_argument("--out", default=None,
+                    help="EXPLICIT output override. Default None reproduces the original fixed path "
+                         "(results/lehmer_qwen__<slug>.csv), so the W6 pre-registered run stays "
+                         "byte-identical. Pass a different path (e.g. under LUQ_REGIME=...) so a "
+                         "clean-span recompute can never land on top of the frozen W6 result.")
     args = ap.parse_args()
 
     slug = cache._slug(args.model)
-    out = ROOT / "results" / f"lehmer_qwen__{slug}.csv"
+    out = Path(args.out) if args.out else (ROOT / "results" / f"lehmer_qwen__{slug}.csv")
 
     print("=" * 100)
     print("W6 -- LEHMER beta = 1, OUT-OF-SAMPLE   (prereg: prereg/W6_lehmer_qwen.md)")
