@@ -29,8 +29,18 @@ from luq import answer_span as A, cache  # noqa: E402
 from luq.config import Config  # noqa: E402
 from luq.labels import llm_judge  # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 GPT5 = "gpt-5-2025-08-07"
+
+# ⚠️ PORTED TO --model 2026-08-11 (Qwen2.5-14B). The default is the exact original string and the
+# default --cut-source is still `answer_span`, so every pre-existing invocation is byte-identical.
+#
+# WHY A SECOND CUT SOURCE. `answer_span` has rules only for {med_quad, xsum, pubmed_qa} | SHORT_FORM.
+# On samsum / cnn_dailymail / expertqa / factscore it returns "no-cut" for every row, so this script
+# would sample ZERO rows there and silently report nothing — which reads as "no problem found".
+# `luq.template_restart` supplies the frozen boundaries for those four, derived from the datasets'
+# own prompt templates and committed BEFORE any of their PRR effects were computed. It is opt-in via
+# --cut-source so nothing about the Llama path changes by accident.
 
 
 def spearman(a, b):
@@ -56,16 +66,35 @@ def main():
     ap.add_argument("--judge", default="gpt-5-mini")
     ap.add_argument("--also-gpt5", action="store_true", help="also run GPT-5 (med_quad cross-check)")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="EXPLICIT model pin. Default is the original string, so existing "
+                         "invocations are byte-identical.")
+    ap.add_argument("--cut-source", choices=["answer_span", "template_restart"],
+                    default="answer_span",
+                    help="where the clean span comes from. answer_span (default) is the promoted "
+                         "Llama rule set; template_restart carries the frozen boundaries for the "
+                         "four datasets answer_span has no rule for.")
     args = ap.parse_args()
 
-    cfg = Config(model_name=MODEL, dataset=args.dataset, ood_setting="ID")
+    from attn_pool import PROMPT_REGIME  # noqa: E402  (the dataset -> cache-namespace map)
+    from luq import template_restart as TR  # noqa: E402
+    MODEL = args.model
+    cfg = Config(model_name=MODEL, dataset=args.dataset, ood_setting="ID",
+                 prompt_regime=PROMPT_REGIME.get(args.dataset, ""))
     recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, args.dataset, "ID"))
+    print(f"[{args.dataset}] model={MODEL} cut-source={args.cut_source} "
+          f"namespace={PROMPT_REGIME.get(args.dataset, '') or '<base>'} rows={len(recs)}", flush=True)
 
     # only CUT rows can move the label; sample from those
     cut = []
     for r in recs:
-        clean, _, rsn = A.answer_span(r["gen_text"], args.dataset, context=r.get("prompt"))
-        if not rsn.startswith("no-cut") and clean.strip() and clean.strip() != r["gen_text"].strip():
+        if args.cut_source == "answer_span":
+            clean, _, rsn = A.answer_span(r["gen_text"], args.dataset, context=r.get("prompt"))
+            fired = not rsn.startswith("no-cut")
+        else:
+            clean, ch, rsn, _st = TR.restart_cut(r["gen_text"], args.dataset)
+            fired = ch is not None
+        if fired and clean.strip() and clean.strip() != r["gen_text"].strip():
             cut.append((r, clean))
     rng = np.random.RandomState(args.seed)
     if len(cut) > args.n:
