@@ -104,18 +104,41 @@ def main():
 
         dp = Path(dst.cache_dir) / "pertok"
         dp.mkdir(parents=True, exist_ok=True)
+        target = dp / f"{key}__L{layer}.npz"
+        if n_sliced == 0:
+            # ⭐ NOTHING WAS CUT -> the truncated cache IS the canonical one. Symlink instead of
+            # writing a multi-GB byte-for-byte duplicate (pubmed_qa alone is 4.5 GB). A symlink is
+            # also self-documenting: it says "identical to v1", where a copy would merely look like
+            # a separate artifact that happens to match.
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            target.symlink_to(src_pt.resolve())
+            print(f"{d:15s}{len(out):>7d}{0:>8d}{100.0:>8.1f}%{'symlink':>10s}   identical to v1")
+            fp = Path(dst.cache_dir) / "features"
+            fp.mkdir(parents=True, exist_ok=True)
+            src_f = Path(src.cache_dir) / "features" / f"{key}__saplma.npz"
+            tgt_f = fp / f"{key}__saplma.npz"
+            if src_f.exists():
+                if tgt_f.exists() or tgt_f.is_symlink():
+                    tgt_f.unlink()
+                tgt_f.symlink_to(src_f.resolve())
+            continue
         arr = np.empty(len(out), dtype=object)
         for i, s in enumerate(out):
             arr[i] = s
-        np.savez_compressed(dp / f"{key}__L{layer}.npz", states=arr, layer=layer)
+        # savez, NOT savez_compressed. These arrays are multi-GB and compression is the single
+        # slowest step -- the first attempt was killed mid-write on pubmed_qa after 6 minutes and
+        # 3.5 GB. The cache is regenerable scratch on a 15 TB volume, so disk is the cheap resource
+        # here and wall-clock is the expensive one.
+        np.savez(target, states=arr, layer=layer)
 
         # SAPLMA = mean-pool over the retained window, by the same definition 01e_repool uses.
         feats = np.stack([s.mean(axis=0) for s in out]).astype(np.float32)
         fp = Path(dst.cache_dir) / "features"
         fp.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(fp / f"{key}__saplma.npz", feats=feats[:, None, :], layer=layer)
+        np.savez(fp / f"{key}__saplma.npz", feats=feats[:, None, :], layer=layer)
 
-        mb = (dp / f"{key}__L{layer}.npz").stat().st_size / 1e6
+        mb = target.stat().st_size / 1e6
         med = 100 * float(np.median(kept)) if kept else 100.0
         print(f"{d:15s}{len(out):>7d}{n_sliced:>8d}{med:>8.1f}%{mb:>10.1f}M  ok")
 

@@ -145,11 +145,27 @@ def main():
             yte = np.array([y[i] for i in te_idx], float)
             states = [PT[d][0][i] for d, i in allrows]
             records = [PT[d][3][i] for d, i in allrows]
-            # the TRUNCATED view: train rows untouched, test rows sliced
+            # ⚠️ THE TRUNCATED VIEW MUST SLICE THE RECORD TOO, NOT ONLY THE STATES.
+            # `weighted_msp` derives BOTH the per-token NLL and the content-keep mask from the
+            # RECORD, and multiplies them against the weights it computes from the STATES. Slicing
+            # only the states leaves a 24-row state tensor being masked by a 56-token keep vector,
+            # which is exactly the crash this hit:
+            #     RuntimeError: size of tensor a (56) must match size of tensor b (24)
+            # Failing loudly there was the right behaviour -- a silent broadcast would have scored a
+            # method against a mask for different tokens. So the record is sliced to the same n.
             keeps = [KEEP[d][i] for d, i in allrows]
-            st_tr = list(states)
+            st_tr, rec_tr = list(states), list(records)
             for j in te_idx:
-                st_tr[j] = states[j][:keeps[j]]
+                n_state = keeps[j]
+                if n_state >= len(states[j]):
+                    continue                                   # untouched row
+                st_tr[j] = states[j][:n_state]
+                n_tok = n_state - 1                            # states are G+1, tokens are G
+                r = dict(records[j])
+                r["gen_token_ids"] = r["gen_token_ids"][:n_tok]
+                r["token_logprobs"] = r["token_logprobs"][:n_tok]
+                rec_tr[j] = r
+                assert len(st_tr[j]) == len(r["token_logprobs"]) + 1
             n_test = len(yte)
             pct_cut = 100 * float(np.mean([keeps[j] < len(states[j]) for j in te_idx]))
 
@@ -171,7 +187,7 @@ def main():
                                                       length_normalise=True, seed=sd, **kw)
                 a = weighted_msp.predict_weighted_msp(mdl, states, records, te_idx, device,
                                                       weight_mode="normalised", length_normalise=True)
-                b = weighted_msp.predict_weighted_msp(mdl, st_tr, records, te_idx, device,
+                b = weighted_msp.predict_weighted_msp(mdl, st_tr, rec_tr, te_idx, device,
                                                       weight_mode="normalised", length_normalise=True)
                 add(nm, results.prr(yte, np.asarray(a, float)), results.prr(yte, np.asarray(b, float)))
             if not args.skip_poolers:

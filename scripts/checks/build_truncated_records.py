@@ -156,7 +156,15 @@ def main():
             if already_clean:
                 kept_label += 1
             else:
-                for f in (lf, f"{lf}_model"):
+                # ⚠️ DROP THE JUDGE'S SIBLING OUTPUTS TOO, NOT JUST THE SCORE.
+                # expertqa/factscore rows carry `uncovered` / `coherent` /
+                # `factuality_quarantined` alongside `factuality`. Those describe the OLD text just
+                # as much as the score does. Leaving them behind made a truncated row look like a
+                # row the judge had SEEN AND DECLINED, when in fact it is a row awaiting re-judging
+                # -- the two are indistinguishable downstream, and "declined" is data while
+                # "awaiting" is an absence. That is precisely the confusion this project's rules
+                # exist to prevent, so every field the judge wrote goes together.
+                for f in (lf, f"{lf}_model", "uncovered", "coherent", f"{lf}_quarantined"):
                     nr.pop(f, None)
                 dropped += 1
             assert len(nr["gen_token_ids"]) == len(nr["token_logprobs"])
