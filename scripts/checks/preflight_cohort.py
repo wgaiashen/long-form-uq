@@ -81,7 +81,26 @@ def check_families():
     return fails
 
 
-def check_caches(datasets):
+# Which POOLED feature files each driver actually opens. ⚠️ CORRECTED 2026-08-11 after this check
+# false-positived and killed all 8 clean-span ladder jobs three minutes in. It demanded
+# saplma/ptrue_accurate/lookback for EVERY driver, but:
+#   * probedriftlong computes SAPLMA by mean-pooling the PERTOK states (`Xmean = np.stack([s.mean(0)
+#     ...])`, :494) and only touches load_features inside `for bm in active_base` — i.e. solely when
+#     --baselines is passed, and even then it degrades to a loud blank cell rather than failing.
+#   * contribution_ladder never calls load_features at all (pertok + record logprobs only).
+#   * ood_onegrid genuinely does read them: it is the driver that scores linear/ptrue/lookback.
+# The shadow regime cache/med_quad_clean/ deliberately ships pertok+records WITHOUT pooled features,
+# which is correct for this ladder — so demanding them blocked a valid run.
+# ⚠️ A guard that fails a CORRECT run teaches people to bypass guards. Being accurate about what each
+# driver reads matters as much as failing loud.
+FEATURES_READ = {
+    "probedriftlong": [],            # pertok only, for the no --baselines invocation
+    "contribution_ladder": [],       # pertok + record logprobs only
+    "ood_onegrid": ["saplma", "ptrue_accurate", "lookback"],
+}
+
+
+def check_caches(datasets, needed=None):
     """Every cache file the run will open must EXIST, checked per dataset under its own prompt regime.
 
     ADDED 2026-08-04, after the widened `ood_onegrid` crashed all six rerun jobs four hours in. It
@@ -92,22 +111,22 @@ def check_caches(datasets):
 
     This only STATS the files (no loading), so it is safe on a login node and costs seconds.
     """
+    needed = [] if needed is None else needed
     from luq import cache as _cache
     from luq.config import Config
     from attn_pool import PROMPT_REGIME
     MODEL = "meta-llama/Meta-Llama-3.1-8B"
-    NEEDED = ["saplma", "ptrue_accurate", "lookback"]
     fails = []
     for d in datasets:
         cd = Config(model_name=MODEL, dataset=d, ood_setting="ID",
                     prompt_regime=PROMPT_REGIME.get(d, "")).cache_dir
         want = [cd / "pertok" / f"{_cache._slug(MODEL)}__{d}__ID__L15.npz"]
-        want += [cd / "features" / f"{_cache._slug(MODEL)}__{d}__ID__{fm}.npz" for fm in NEEDED]
+        want += [cd / "features" / f"{_cache._slug(MODEL)}__{d}__ID__{fm}.npz" for fm in needed]
         miss = [p.name for p in want if not p.exists()]
         if miss:
             fails.append(f"{d}: {len(miss)} cache file(s) absent under {cd} -> {miss}")
     if not fails:
-        print(f"  ✅ caches resolve for all {len(datasets)} datasets (pertok L15 + {len(NEEDED)} pooled)")
+        print(f"  ✅ caches resolve for all {len(datasets)} datasets (pertok L15 + {len(needed)} pooled)")
     return fails
 
 
@@ -133,7 +152,8 @@ def main():
         for n in names:
             for attr, want, _ in EXPECT[n]:
                 need |= want
-        fails += check_caches(sorted(need))
+        feats = sorted({f for n in names for f in FEATURES_READ.get(n, [])})
+        fails += check_caches(sorted(need), feats)
     if fails:
         print("\n❌ PREFLIGHT FAILED — refusing to start the job:")
         for f in fails:
