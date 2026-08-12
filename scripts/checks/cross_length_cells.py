@@ -28,6 +28,20 @@ def spec_str(pairs):
     return "+".join(f"{d}:{n}" for d, n in pairs)
 
 
+def long_plus_short_trivia_only(X):
+    """The TRIVIA-ONLY variant of LONG+SHORT, for the matched Qwen replication.
+
+    Qwen will only ever have TriviaQA (SciQ is Tier 3, unfunded), so a Qwen arm built from
+    trivia alone is NOT the same pool as the primary Llama arm, which uses sciq+trivia. Comparing
+    them directly would be a cross-population comparison wearing a replication's clothes. These
+    trivia-only Llama arms exist purely to give Qwen something matched to compare against; the
+    sciq+trivia arms remain the primary Llama result.
+    """
+    srcs = rung_sources_long(X)["LOO-long"]
+    half = (XL_TOTAL // len(srcs)) // 2
+    return [(d, half) for d in srcs] + [("trivia_qa", XL_TOTAL - half * len(srcs))]
+
+
 def long_plus_short(X):
     """Half the canonical LOO-long mixture for X, plus an equal split of the two short sets.
 
@@ -43,6 +57,16 @@ def long_plus_short(X):
     per_short = remaining // 2                               # 452 each
     short_part = [("sciq", per_short), ("trivia_qa", remaining - per_short)]
     return long_part + short_part
+
+
+def cells_trivia_only():
+    """The matched-to-Qwen arms. ID-short for trivia_qa is already `trivia_qa:1800` in the primary
+    set, so it is matched already and is NOT repeated here."""
+    out = []
+    for X in LONG_TARGETS:
+        out.append(("short2long_tvo", X, "LONG+SHORT-tv", long_plus_short_trivia_only(X)))
+        out.append(("short2long_tvo", X, "SHORT-tv", [("trivia_qa", XL_TOTAL)]))
+    return out
 
 
 def cells():
@@ -66,9 +90,12 @@ def cells():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--qsub", action="store_true", help="emit qsub lines instead of a table")
+    ap.add_argument("--trivia-only", action="store_true",
+                    help="the TRIVIA-ONLY arms that match what Qwen can run (see "
+                         "DOC_BRIEF_qwen_crosslength.md §2). Secondary to the primary sciq+trivia set.")
     args = ap.parse_args()
 
-    rows = cells()
+    rows = cells_trivia_only() if args.trivia_only else cells()
     if args.qsub:
         print("# no-op control FIRST -- do not submit the cells until it passes")
         print("qsub pbs/cross_length_noop.pbs")
