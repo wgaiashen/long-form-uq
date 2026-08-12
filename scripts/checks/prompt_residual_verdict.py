@@ -264,6 +264,52 @@ def main():
                  "are entered once per dataset (from `LOO-long`), not once per rung. `SAPLMA` is "
                  "the standing OOD bar and is read from the canonical master, not refitted here.")
 
+    # ---- EXPLORATORY: is the effect just a short-generation artifact? ---------------------------
+    # ⚠️ NOT PRE-REGISTERED. Added 2026-08-12 after seeing pubmed_qa, and labelled exploratory.
+    # Motivation: h0 is ONE row of a (G+1)-row window, so it contributes 1/(G+1) of the
+    # anchor-inclusive mean. On pubmed_qa (Llama median 22 tokens) that is a large share; on
+    # expertqa (median 200) it is small. If the residual gain tracks generation length, the
+    # mechanism is the mundane "h0 contaminates the pooled mean when G is small" rather than the
+    # claimed "task-relative representation" -- and it would predict the effect DISAPPEARS on
+    # genuinely long outputs, which is the regime this project is about.
+    # Median generated-token counts, Llama-3.1-8B, from results/analysis/CROSS_LENGTH_TARGET_SELECTION.md §1.
+    MED_LEN = {"pubmed_qa": 22, "xsum": 33, "cnn_dailymail": 39, "samsum": 56,
+               "factscore": 80, "asqa": 86, "med_quad": 128, "expertqa": 200}
+    lines.append("\n## 6. EXPLORATORY (not pre-registered) — does the gain track generation length?")
+    lines.append("")
+    lines.append("`h0` is one row of a `G+1` window, so it is `1/(G+1)` of the anchor-inclusive mean. "
+                 "If the residual gain concentrates on short-generation datasets, the mechanism is "
+                 "**anchor contamination of a short mean**, not task-relative representation — and it "
+                 "would fade on genuinely long outputs.")
+    lines.append("")
+    lines.append("| dataset | median gen tokens | `R2 − R1` (OOD) | `R2 − R3` (OOD) |")
+    lines.append("|---|---:|---|---|")
+    xs, ys = [], []
+    for e in sorted(EVALS, key=lambda k: MED_LEN.get(k, 0)):
+        a, b = d_primary.get(e), d_mech.get(e)
+        lines.append(f"| `{e}` | {MED_LEN.get(e, '—')} | "
+                     + (f"{a:+.4f}" if a is not None else "—") + " | "
+                     + (f"{b:+.4f}" if b is not None else "—") + " |")
+        if a is not None and e in MED_LEN:
+            xs.append(MED_LEN[e]); ys.append(a)
+    if len(xs) >= 4:
+        r = float(np.corrcoef(np.log(xs), ys)[0, 1])
+        lines.append("")
+        lines.append(f"Pearson correlation of `R2 − R1` with **log** median generation length: "
+                     f"**r = {r:+.3f}** (n = {len(xs)} datasets).")
+        lines.append("")
+        if r < -0.5:
+            lines.append("⚠️ **Strongly negative: the gain concentrates on SHORT generations.** That "
+                         "is the anchor-contamination story, not the task-relative one. Any claim "
+                         "must be stated as length-dependent, and the method should not be presented "
+                         "as improving long-form transfer in general.")
+        elif r > 0.5:
+            lines.append("The gain is larger on LONGER generations, which the contamination story "
+                         "does not predict.")
+        else:
+            lines.append("No strong length relationship, so anchor contamination does not obviously "
+                         "explain the pattern. n = 8 makes this weak evidence either way.")
+
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
     OUT_MD.write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
