@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -N luq_mqc1
+#PBS -j oe
+# ONE clean-span med_quad feature extraction per job, right-sized.
+#
+# ⚠️ WHY SPLIT AND WHY NOT L40S. The combined job sat unschedulable on "Insufficient amount of
+# resource" with 66/180 GPUs free — because it pinned gpu_type=L40S, which 178 running jobs are using
+# against A40's 44. Everyone pins the same card. Splitting also right-sizes: only LOOKBACK needs fp32
+# + eager (~32GB weights + 7.6GB attention ≈ 40GB, so a 48GB card); ptrue and ptrue_unsup run at the
+# fp16 default (~16GB) and fit a far smaller, far less contended GPU.
+# Shorter walls also backfill more readily than one 6h block.
+#   qsub -l select=1:ncpus=4:mem=24gb:ngpus=1:gpu_type=RTX6000 -l walltime=02:00:00 -v STEP=ptrue ...
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+M="meta-llama/Meta-Llama-3.1-8B"; REG="med_quad_clean"; S="${STEP:?set STEP}"
+echo "=== clean-span med_quad: $S on $(hostname) at $(date) ==="
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU)"
+case "$S" in
+  ptrue)       python -u scripts/01b_ptrue.py --dataset med_quad --ood ID --model "$M" \
+                   --prompt-regime "$REG" --name ptrue_accurate --store-layers 15 ;;
+  lookback)    python -u scripts/01c_lookback.py --dataset med_quad --ood ID --model "$M" \
+                   --prompt-regime "$REG" ;;
+  ptrue_unsup) python -u scripts/01g_ptrue_unsup.py --dataset med_quad --ood ID --model "$M" \
+                   --prompt-regime "$REG" ;;
+  *) echo "unknown STEP=$S"; exit 2 ;;
+esac
+STATUS=$?
+echo "=== $S done $(date), exit=$STATUS ==="
+exit $STATUS

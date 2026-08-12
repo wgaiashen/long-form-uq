@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_xlnoop
+#PBS -j oe
+# NO-OP CONTROL for the --train-spec driver change. RUN THIS BEFORE ANY CROSS-LENGTH CELL.
+#
+# The change adds an explicit training pool to probedriftlong.py. The control asks the only
+# question that matters: does the new code path reproduce a cell the OLD path already produced?
+#
+# The chosen cell is xsum / 1ds-Diff-long, whose canonical spec is a SINGLE source at the full
+# budget -- `pubmed_qa:1800` -- so it can be expressed exactly as a --train-spec and compared
+# against a committed CSV. Its canonical values live in
+#   results/pdl_fam_xsum_1ds-Diff__meta-llama_Meta-Llama-3.1-8B.csv
+# (that rung was lost to walltime in the main xsum job and recovered separately on 2026-08-05).
+#
+# PASS = every method reproduces to <= 1e-4. A "fix" that moves an untouched cell is a bug, and
+# that invariance is the whole point of running this first.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+OUT="results/xlen_NOOP_xsum__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== NO-OP CONTROL: xsum / 1ds-Diff-long via --train-spec pubmed_qa:1800 at $(date) ===" >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --seeds 1,2,3 \
+    --evals xsum \
+    --train-spec pubmed_qa:1800 \
+    --rung-name "1ds-Diff-long" \
+    --wmsp-only wmsp_norm,wmsp_shrink2,wmsp_shrink10 \
+    --out "$OUT" || exit 1
+
+echo "=== comparing against the canonical cell ===" >&2
+python -u - <<'PY'
+import sys
+import pandas as pd
+
+NEW = "results/xlen_NOOP_xsum__meta-llama_Meta-Llama-3.1-8B.csv"
+CANON = "results/pdl_fam_xsum_1ds-Diff__meta-llama_Meta-Llama-3.1-8B.csv"
+TOL = 1e-4
+
+new = pd.read_csv(NEW)
+canon = pd.read_csv(CANON)
+canon = canon[canon["rung"] == "1ds-Diff-long"]
+
+n = new.set_index("method")["prr_mean"]
+c = canon.set_index("method")["prr_mean"]
+shared = [m for m in n.index if m in c.index and not str(m).startswith("VERDICT:")]
+if not shared:
+    sys.exit("[FAIL] no shared methods to compare -- the control proved nothing")
+
+bad = []
+print(f"{'method':<20} {'new':>10} {'canonical':>10} {'delta':>10}")
+for m in sorted(shared):
+    d = abs(float(n[m]) - float(c[m]))
+    print(f"{m:<20} {float(n[m]):>+10.4f} {float(c[m]):>+10.4f} {d:>10.2e}")
+    if d > TOL:
+        bad.append((m, d))
+
+# The realised pool label must also match: same sources, same counts.
+print(f"\nnew   train label: {new['train'].iloc[0]}")
+print(f"canon train label: {canon['train'].iloc[0]}")
+if new["train"].iloc[0] != canon["train"].iloc[0]:
+    bad.append(("train-pool-label", float("nan")))
+
+if bad:
+    sys.exit(f"\n[FAIL] {len(bad)} method(s) moved beyond {TOL}: {bad}")
+print(f"\n[PASS] all {len(shared)} methods reproduce the canonical cell to <= {TOL}")
+PY
+echo "=== done $(date) ===" >&2

@@ -1,0 +1,59 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_xlen
+#PBS -j oe
+# BIDIRECTIONAL CROSS-LENGTH TRANSFER — one cell per job.
+#
+# The auxiliary experiment that replaces the full ProbeDrift-XL rerun. It asks two questions:
+#   long -> short : does a probe trained only on long-form responses still rank uncertainty on
+#                   short-form QA, and how far short of the short-form ID ceiling does it fall?
+#   short -> long : at a MATCHED 1,800-example budget, does substituting half the long-form
+#                   supervision with short-form supervision help or hurt long-form OOD?
+#
+# ⚠️ NOT a causal claim about response length — the datasets differ in domain and task too. The
+# framing is cross-length TRANSFER / a short-form supervision ablation.
+#
+# CPU-only by design: the driver loads per-token caches + records + a tokenizer, never model
+# weights. The RCS GPU queue is heavily contended; the small CPU queues are not.
+#
+# ⚠️ LUQ_SPEC USES '+' AS ITS SEPARATOR, NOT ','. `qsub -v` splits its argument on commas, so a
+# comma inside the spec would be parsed as another variable. Translated to ',' below.
+#
+#   qsub -v LUQ_EVAL=trivia_qa,LUQ_RUNG=ID-short,LUQ_SPEC=trivia_qa:1800,LUQ_TAG=idshort \
+#        pbs/cross_length.pbs
+#   qsub -v LUQ_EVAL=asqa,LUQ_RUNG=LONG+SHORT,LUQ_SPEC=xsum:128+cnn_dailymail:128+med_quad:128+samsum:128+expertqa:128+pubmed_qa:128+factscore:128+sciq:452+trivia_qa:452,LUQ_TAG=longshort \
+#        pbs/cross_length.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+RUNG="${LUQ_RUNG:?set LUQ_RUNG}"
+SPEC_RAW="${LUQ_SPEC:?set LUQ_SPEC (use + between sources, not ,)}"
+TAG="${LUQ_TAG:?set LUQ_TAG}"
+SPEC="${SPEC_RAW//+/,}"
+
+# Cohort gate: exits in seconds if the driver disagrees with the canonical dataset cohort.
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+OUT="results/xlen_${TAG}_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+PEREX="results/perex/xlen_${TAG}"
+mkdir -p "$PEREX"
+
+echo "=== CROSS-LENGTH eval=$EV rung=$RUNG on $(hostname) at $(date) ===" >&2
+echo "    spec: $SPEC" >&2
+echo "    out : $OUT" >&2
+
+# Method set frozen to the five the experiment registers, plus wmsp_shrink10 (free on the same
+# path) and the three training-free floors as reference levels. NO ptrue/lookback/orgad/sar/
+# adaptive-Lehmer: this experiment does not reopen the method search.
+python -u scripts/checks/probedriftlong.py \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --train-spec "$SPEC" \
+    --rung-name "$RUNG" \
+    --wmsp-only wmsp_norm,wmsp_shrink2,wmsp_shrink10 \
+    --perex-dir "$PEREX" \
+    --out "$OUT"
+
+echo "=== done $(date) ===" >&2

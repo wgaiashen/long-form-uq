@@ -322,6 +322,19 @@ def main():
                          "for ANY method pair a post-hoc read instead of a re-run. Self-gated: PRR recomputed "
                          "from the stored vectors must reproduce the in-memory prr_mean to <1e-6 or the run "
                          "ABORTS (a sidecar that disagrees with its own CSV is worse than no sidecar).")
+    ap.add_argument("--train-spec", default=None,
+                    help="EXPLICIT training pool, 'ds:n,ds:n' (e.g. 'sciq:900,trivia_qa:900'). Replaces the "
+                         "rung grid from cells_long with ONE cell per --evals target built from exactly this "
+                         "spec, for the cross-length transfer experiment (the long grid otherwise has no way "
+                         "to say 'half long, half short'). The named datasets are added to the cache-load set, "
+                         "so short-form sources (sciq/trivia_qa, which live in SHORT_DATASETS not LONG_SRC) "
+                         "load correctly. A source contributing 0 rows is already a hard failure in "
+                         "build_rows, so a mis-typed name cannot silently shrink the pool. REQUIRES "
+                         "--rung-name and --out.")
+    ap.add_argument("--rung-name", default=None,
+                    help="the rung label written to the CSV when --train-spec is used. Required with it: an "
+                         "unlabelled custom cell would be indistinguishable from a canonical rung in the "
+                         "results file.")
     args = ap.parse_args()
     # Reassign the module global so the save helpers (and every path/key below) follow the flag.
     # Default leaves it untouched, so a no-arg invocation is exactly the pre-port driver.
@@ -330,10 +343,54 @@ def main():
     # ptrue's feature plane follows the probed layer (see BASE_FEATS note). --layer's default is 15,
     # so a no-arg Llama run resolves to the identical (15) and stays byte-identical.
     BASE_FEATS["ptrue"] = ("ptrue_accurate", args.layer, True)
-    prov = _provenance()   # aborts here (before the pool load) if the tracked tree is dirty
+    # ---- explicit training pool (cross-length transfer) ------------------------------------------
+    # `spec = [(source, cap)]` is the currency cells_long produces and build_rows consumes; build_rows
+    # does not care where it came from, so an explicit pool needs no library change. Parsed here so a
+    # malformed spec fails before the (slow) cache load.
+    train_spec = None
+    if args.train_spec:
+        if not args.rung_name:
+            raise SystemExit("--train-spec requires --rung-name (an unlabelled custom cell is "
+                             "indistinguishable from a canonical rung in the CSV)")
+        if not args.out:
+            raise SystemExit("--train-spec requires --out (the default filename is the canonical "
+                             "grid's, and a custom pool must never be written there)")
+        train_spec = []
+        for part in args.train_spec.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if part.count(":") != 1:
+                raise SystemExit(f"--train-spec: bad entry {part!r}; expected 'dataset:count'")
+            d, n = part.split(":")
+            d = d.strip()
+            if not n.strip().isdigit() or int(n) <= 0:
+                raise SystemExit(f"--train-spec: bad count in {part!r}; expected a positive integer")
+            train_spec.append((d, int(n)))
+        if not train_spec:
+            raise SystemExit("--train-spec is empty")
+        dups = [d for d, _ in train_spec if [x for x, _ in train_spec].count(d) > 1]
+        if dups:
+            raise SystemExit(f"--train-spec: duplicate source(s) {sorted(set(dups))}")
+        total = sum(n for _, n in train_spec)
+        print(f"TRAIN-SPEC: rung={args.rung_name!r} pool="
+              + "+".join(f"{d}:{n}" for d, n in train_spec)
+              + f" (requested total {total}; cells_long grid BYPASSED)", flush=True)
+        if total != XL_TOTAL:
+            print(f"  ⚠️ requested total {total} != the matched budget {XL_TOTAL} — intentional? "
+                  f"the realised pool is recorded per row in the `train` column either way", flush=True)
+
+    # Provenance runs AFTER the cheap argument validation above: `git status` on this tree takes a
+    # while, and a mis-typed --train-spec should fail instantly rather than behind it. It still
+    # aborts long before the ~20-min pool load, which is the guarantee that matters.
+    prov = _provenance()   # aborts here if the tracked tree is dirty
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} env_hash={prov['env_hash']}"
           + ("  [+save-pooler seed-1]" if args.save_pooler else ""), flush=True)
+
     want_rungs = set(s.strip() for s in args.rungs.split(",") if s.strip()) if args.rungs else None
+    if want_rungs is not None and train_spec is not None:
+        raise SystemExit("--rungs filters the cells_long grid, which --train-spec replaces; pass one or "
+                         "the other")
     if want_rungs is not None:
         _valid = {"ID", "SameTask", "DiffTask", "LOO", "1ds-Diff", "Long->Short"}
         _bad = want_rungs - _valid
@@ -396,7 +453,10 @@ def main():
         print(f"special-token ids registered from the {MODEL} tokenizer "
               f"({len(tok.all_special_ids)} ids; Llama range-test fallback OFF)", flush=True)
     PT, SEG, POOLED = {}, {}, {}
-    for d in sorted(set(LONG_SRC) | set(evals)):
+    # A --train-spec source must join the load set: sciq/trivia_qa live in SHORT_DATASETS, not
+    # LONG_SRC, so without this they are never loaded and build_rows hits its zero-rows guard.
+    _load = set(LONG_SRC) | set(evals) | ({d for d, _ in train_spec} if train_spec else set())
+    for d in sorted(_load):
         loaded = load_per_token(MODEL, d, args.layer, label_of(d))
         if loaded is None:
             print(f"  {d}: no pertok cache -> skip", flush=True); continue
@@ -464,8 +524,28 @@ def main():
         print(f"  {d}: {len(states)} rows (label={label_of(d)})", flush=True)
     sources = set(PT)
 
+    if train_spec is not None:
+        # Validate AFTER the load, against what actually has a cache -- a named source with no
+        # pertok cache must fail loudly here rather than quietly shrinking the pool.
+        missing = [d for d, _ in train_spec if d not in PT]
+        if missing:
+            raise SystemExit(f"--train-spec: no usable cache for {missing} (loaded: {sorted(PT)}). "
+                             f"Refusing to run a pool that is smaller than the one requested.")
+        # A source equal to the eval target is NOT leakage: build_rows routes `d == X` to X's own
+        # TRAIN split via eval_split (splits.py:171-173), which is disjoint from the test rows by
+        # construction even for the split-less sets. That is exactly how the canonical ID cell is
+        # built, and it is what the ID-short arm of the cross-length experiment needs. Announced
+        # rather than blocked, so it is visible in the log that this cell is an ID construction.
+        selfsrc = [X for X in evals if X in {d for d, _ in train_spec}]
+        if selfsrc:
+            print(f"  note: {selfsrc} appear in their own pool -> ID construction (own TRAIN split, "
+                  f"disjoint from the eval test rows)", flush=True)
+        cells = [(args.rung_name, X, list(train_spec)) for X in evals]
+    else:
+        cells = cells_long(sources, evals)
+
     out_rows = []
-    for rung, X, spec in cells_long(sources, evals):
+    for rung, X, spec in cells:
         if want_rungs is not None and rung.replace("-long", "") not in want_rungs:
             continue
         if X not in PT:
