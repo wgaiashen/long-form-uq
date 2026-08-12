@@ -54,9 +54,11 @@ over a single real position is exactly 1.0 -- giving pooled == z into the identi
 head, optimiser, schedule, weight decay and RNG draw order.
 
 ⚠️ THAT EQUIVALENCE IS NOT ASSUMED. Every cell re-derives the canonical mean-pool control the
-ORIGINAL way (full states through train_attn) and asserts it matches the pseudo-sequence R0 to
-<1e-6. If it ever disagrees the run ABORTS: R0 is not a new measurement, so a drift there means the
-harness is wrong and no arm is reportable. (Verified offline first at 1.19e-07 on synthetic data.)
+ORIGINAL way (full states through train_attn) and asserts it matches the pseudo-sequence R0 on the
+PER-EXAMPLE UNCERTAINTIES (see the GATE_VEC_TOL note below for why that, and not PRR, is the right
+instrument). If it disagrees the run ABORTS: R0 is not a new measurement, so a drift there means the
+harness is wrong and no arm is reportable. (Verified offline first at 1.19e-07 on synthetic data,
+then at exactly 0.00e+00 on real cached states.)
 
     python scripts/checks/prompt_residual.py --evals pubmed_qa --seeds 1 --smoke   # SMOKE TEST
     python scripts/checks/prompt_residual.py --evals xsum                          # one eval, full
@@ -87,7 +89,27 @@ DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # is the same quantity through the pseudo-sequence path. They must agree -- see GATE below.
 ARMS = ["meanpool_canonical", "resid_R0_anchormean", "resid_R1_genmean", "resid_R2_promptresid",
         "resid_R3_constanchor"]
-GATE_TOL = 1e-6          # pre-registered: R0 must reproduce the canonical control to this tolerance
+
+# ---- THE REPRODUCTION GATE, AND WHY IT MEASURES VECTORS RATHER THAN PRR ------------------------
+# Respecified 2026-08-12 after the first grid attempt (prereg §10). The gate's CLAIM is "the
+# pseudo-sequence path computes the same thing as the canonical path". The first version tested
+# that claim on PRR -- which was the wrong instrument, because PRR is a RANK statistic and therefore
+# a DISCONTINUOUS function of the scores: two examples whose uncertainties differ by fp32 round-off
+# can swap order, and the metric jumps.
+#
+# Measured, not assumed (200 trials at n=1140, the cnn_dailymail held-out size):
+#   * a PURE 1e-7 perturbation of the scores moves PRR by up to 1.57e-04
+#   * swapping ONE adjacent pair moves PRR by 4.58e-06
+# The observed failure was 9.66e-06, i.e. squarely inside what tie-flipping alone produces, and the
+# ID cells of the same run agreed at EXACTLY 0.00e+00 -- same computation, no tie happened to flip.
+#
+# So the gate now runs on the PER-EXAMPLE UNCERTAINTIES, which is the quantity the identity is
+# actually about, at a tolerance appropriate to fp32 accumulation over d=4096. The PRR gap is still
+# computed, logged and stored per cell -- it is informative, not ignored -- and still aborts if it
+# grows large enough to threaten a conclusion (effects of interest here are ~0.010, so 1e-3 is two
+# orders below anything that could matter).
+GATE_VEC_TOL = 1e-5      # PRIMARY: max |uncertainty_canonical - uncertainty_R0| per example
+GATE_PRR_INFO = 1e-3     # secondary backstop on the PRR gap; far above pure rank discreteness
 
 
 def build_reps(states, tr_idx):
@@ -246,19 +268,27 @@ def main():
                 v[arm] = np.asarray(attn_unc(m, seq, te_idx, device), float)
 
             # ---- GATE (blocking) -------------------------------------------------------------
-            # R0 and the canonical control are THE SAME QUANTITY by two code paths. If they
-            # disagree, the pseudo-sequence trick is not equivalent and nothing here is reportable.
+            # R0 and the canonical control are THE SAME QUANTITY by two code paths. The identity is
+            # tested on the per-example uncertainties; the PRR gap is recorded alongside because it
+            # is discretised by rank ties (see the GATE_VEC_TOL note at the top of this file).
+            vec_gap = float(np.abs(v["meanpool_canonical"] - v["resid_R0_anchormean"]).max())
             prr_can = results.prr(yte, v["meanpool_canonical"])
             prr_r0 = results.prr(yte, v["resid_R0_anchormean"])
-            gap = abs(prr_can - prr_r0)
-            if gap > GATE_TOL:
+            prr_gap = abs(prr_can - prr_r0)
+            if vec_gap > GATE_VEC_TOL:
                 raise SystemExit(
                     f"FATAL GATE FAILURE at [{rung}/{X}/seed{sd}]: the canonical mean-pool control "
-                    f"(PRR {prr_can:.9f}) and the pseudo-sequence R0 (PRR {prr_r0:.9f}) differ by "
-                    f"{gap:.3e} > {GATE_TOL:g}. These are the same quantity computed two ways, so "
-                    f"a disagreement means the length-1 pooling identity does not hold here. "
-                    f"Refusing to report ANY arm from a harness that cannot reproduce its own "
+                    f"and the pseudo-sequence R0 differ by {vec_gap:.3e} > {GATE_VEC_TOL:g} on the "
+                    f"PER-EXAMPLE uncertainties. These are the same quantity computed two ways, so "
+                    f"a disagreement of that size means the length-1 pooling identity does NOT hold "
+                    f"here. Refusing to report ANY arm from a harness that cannot reproduce its own "
                     f"control.")
+            if prr_gap > GATE_PRR_INFO:
+                raise SystemExit(
+                    f"FATAL GATE FAILURE at [{rung}/{X}/seed{sd}]: per-example vectors agree "
+                    f"({vec_gap:.3e}) but PRR differs by {prr_gap:.3e} > {GATE_PRR_INFO:g}. That is "
+                    f"far more than rank-tie discreteness can explain at this scale, so something "
+                    f"other than fp32 round-off is moving the ranking.")
             n_gate += 1
 
             for m_name, vec in v.items():
@@ -266,12 +296,13 @@ def main():
                     "model": MODEL, "layer": args.layer, "eval": X, "rung": rung, "seed": sd,
                     "method": m_name, "prr": results.prr(yte, vec),
                     "n_train": n_tr, "n_test": len(te_idx),
+                    "gate_vec_gap": vec_gap, "gate_prr_gap": prr_gap,
                     "different_label_projection": xlbl,
                     "smoke": bool(args.smoke),
                     "git_sha": prov["git_sha"], "cluster": prov["cluster"],
                     "env_hash": prov["env_hash"], "carve": prov["carve"],
                 })
-            print(f"  [{rung}/{X}/s{sd}] gate ok ({gap:.2e})  "
+            print(f"  [{rung}/{X}/s{sd}] gate ok (vec {vec_gap:.1e}, prr {prr_gap:.1e})  "
                   + "  ".join(f"{a}={results.prr(yte, v[a]):+.4f}" for a in ARMS), flush=True)
 
     if not out_rows:

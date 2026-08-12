@@ -193,7 +193,43 @@ is rejected by the verdict script, and never enters a results table.
 the **worst** arm. That is the pattern §5 pre-registered as **refuting** the mechanism. Stated here
 so that if the full grid reproduces it, the conclusion was fixed in advance and not fitted after.
 
-## 9. What this cannot show
+## 9. AMENDMENT 2026-08-12 (second) — the reproduction gate was measuring the wrong quantity
+
+**What happened.** The first full-grid attempt aborted on `cnn_dailymail/SameTask-long/seed1`: the
+canonical mean-pool control scored PRR `0.172965263` and the pseudo-sequence `R0` scored
+`0.172974924`, a gap of `9.66e-06` against a `1e-6` threshold. All three `ID` cells of the same run
+had agreed at **exactly `0.00e+00`**.
+
+**Diagnosis, measured rather than assumed.** PRR is a **rank** statistic and therefore a
+**discontinuous** function of the scores: two examples whose uncertainties differ only by fp32
+round-off can swap order, and the metric jumps. Over 200 trials at `n = 1140` (the `cnn_dailymail`
+held-out size):
+
+| perturbation | effect on PRR |
+|---|---|
+| pure `1e-7` noise on the scores | up to **1.57e-04** |
+| swapping ONE adjacent pair | **4.58e-06** |
+
+The observed `9.66e-06` sits inside what tie-flipping alone produces, and it is 16× smaller than the
+worst pure-round-off effect. The `ID` cells agreeing at exactly zero is the corroborating evidence:
+same computation, no tie happened to flip.
+
+**What changed, and the honest characterisation.** The gate's *claim* is "the two code paths compute
+the same thing". PRR was the wrong **instrument** for that claim. The gate now runs on the
+**per-example uncertainties** — the quantity the identity is actually about — at `1e-5`, a tolerance
+appropriate to fp32 accumulation over `d = 4096`. The PRR gap is still computed, logged, **persisted
+per row** (`gate_prr_gap`), and still aborts above `1e-3`, which is two orders below the smallest
+effect this experiment could care about (`+0.010`).
+
+⚠️ **This is a threshold change made after seeing a failure, which is exactly the shape of a
+convenient fix, so it is recorded in full rather than quietly applied.** Three things constrain it:
+the diagnosis was *measured* before the change, not argued; the replacement gate tests a **stricter
+and more direct** property (vector identity) rather than a looser one; and **no method, arm, scope,
+comparison or decision threshold in §§1-5 was touched.** The maximum observed `gate_vec_gap` and
+`gate_prr_gap` across the whole grid are reported in the verdict, so the reader can judge the
+substitution rather than take it on trust.
+
+## 10. What this cannot show
 
 `h0` is a single token's state. If `R2` fails, that is evidence against *this* anchor, not against
 task-relative representation in general. If `R2` succeeds, the mechanism claim ("removes

@@ -153,20 +153,26 @@ def main():
     # ---- the reproduction gate ------------------------------------------------------------------
     lines.append("\n## 1. Reproduction gate (blocking)")
     lines.append("")
-    gaps = []
-    for e in EVALS:
-        for r in ALL_RUNGS:
-            a, b = cell(g, "meanpool_canonical", e, r), cell(g, R0, e, r)
-            if a is not None and b is not None:
-                gaps.append(abs(a - b))
-    if gaps:
-        lines.append(f"`R0` is the canonical mean-pool control computed through the pseudo-sequence "
-                     f"path. Max |PRR difference| over {len(gaps)} cells = **{max(gaps):.3e}** "
-                     f"(driver aborts above 1e-6). The two code paths agree, so the length-1 "
-                     f"pooling identity holds on real data and the R1/R2 arms sit on a harness that "
-                     f"reproduces its own control.")
-    else:
-        lines.append("⚠️ no paired cells to gate on.")
+    # Read the gate quantities the driver persisted per row, so this is the evidence the run
+    # actually recorded -- not a re-derivation from the rounded cell means.
+    vg = df["gate_vec_gap"].astype(float)
+    pg = df["gate_prr_gap"].astype(float)
+    lines.append(f"`R0` is the canonical mean-pool control computed through the pseudo-sequence "
+                 f"path, so the two must agree. Over {len(df['method'].eq(R0).index)} scored rows:")
+    lines.append("")
+    lines.append("| quantity | max observed | gate | |")
+    lines.append("|---|---|---|---|")
+    lines.append(f"| per-example uncertainty gap | **{vg.max():.3e}** | abort above 1e-5 | "
+                 f"{'PASS' if vg.max() <= 1e-5 else 'FAIL'} |")
+    lines.append(f"| PRR gap (rank-discretised) | {pg.max():.3e} | abort above 1e-3 | "
+                 f"{'PASS' if pg.max() <= 1e-3 else 'FAIL'} |")
+    lines.append("")
+    lines.append("⚠️ The gate is on the **per-example uncertainties**, not PRR. PRR is a rank "
+                 "statistic and therefore discontinuous in the scores: a measured `1e-7` "
+                 "perturbation moves it by up to `1.57e-04`, and a single adjacent-pair swap by "
+                 "`4.58e-06`. Gating a rank metric at `1e-6` tests 'no tie flipped', not 'same "
+                 "computation'. Both quantities are reported so the substitution can be judged "
+                 "rather than taken on trust — see prereg §9.")
 
     # ---- primary --------------------------------------------------------------------------------
     lines.append("\n## 2. PRIMARY — `R2 − R1` over the 4 OOD rungs")
