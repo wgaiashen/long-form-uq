@@ -68,8 +68,22 @@ FIELDS = ["model", "rung", "eval", "method", "reg_lambda", "prr_mean", "prr_std"
           "carve", "git_sha", "cluster", "env_hash", "provenance"]
 
 
+OUT_TAG = ""   # set from --tag in main(); "" reproduces the original fixed path exactly
+
+
 def out_path(slug, ev):
-    return ROOT / "results" / f"wmsp_lambda_qwen__{slug}__{ev}.csv"
+    tag = f"_{OUT_TAG}" if OUT_TAG else ""
+    return ROOT / "results" / f"wmsp_lambda_qwen{tag}__{slug}__{ev}.csv"
+
+
+def master_path(slug):
+    """The reference master for the outside control. Defaults to the canonical raw-span master;
+    --master-csv overrides it so a clean-population run can gate against the clean-population
+    master instead of one built on a different population it was never meant to match."""
+    return Path(MASTER_CSV) if MASTER_CSV else (ROOT / "results" / f"pdl_master__{slug}.csv")
+
+
+MASTER_CSV = ""   # set from --master-csv in main(); "" reproduces the original path exactly
 
 
 def _flush(path, rows):
@@ -86,7 +100,7 @@ def _flush(path, rows):
 
 def master_shrink2(slug):
     """(rung, eval) -> the published wmsp_shrink2 PRR, for the outside control."""
-    p = ROOT / "results" / f"pdl_master__{slug}.csv"
+    p = master_path(slug)
     if not p.exists():
         raise SystemExit(f"no master at {p} -- the outside control cannot run, so nothing here is "
                          f"interpretable. Build it with qwen_pdl_master.py --strict first.")
@@ -170,7 +184,21 @@ def main():
     ap.add_argument("--layer", type=int, default=LAYER_DEFAULT)
     ap.add_argument("--gate-only", action="store_true",
                     help="skip training; re-read the produced CSVs and deliver the 40-cell verdict")
+    ap.add_argument("--tag", default="",
+                    help="EXPLICIT output-path tag. Default '' reproduces the original fixed path "
+                         "(results/wmsp_lambda_qwen__<slug>__<eval>.csv) exactly, so the existing "
+                         "raw-span run is never at risk of being overwritten by a later one.")
+    ap.add_argument("--master-csv", default="",
+                    help="EXPLICIT reference master for the outside control. Default '' reproduces "
+                         "the original path (results/pdl_master__<slug>.csv). Pass a different "
+                         "master (e.g. the clean-population one) so the control checks against the "
+                         "population this run actually used, not a population it was never meant "
+                         "to match.")
     args = ap.parse_args()
+
+    global OUT_TAG, MASTER_CSV
+    OUT_TAG = args.tag
+    MASTER_CSV = args.master_csv
 
     from luq import cache
     slug = cache._slug(args.model)
