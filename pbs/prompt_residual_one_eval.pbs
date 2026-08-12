@@ -1,0 +1,60 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_presid
+#PBS -j oe
+# PR1 -- PROMPT-RESIDUAL PROBING, ONE eval per job (all 5 of its rungs, 3 seeds).
+# Pre-registration: prereg/PR1_prompt_residual.md.
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/prompt_residual_one_eval.pbs
+#
+# ⚠️ RUNS FROM A WORKTREE, NOT THE MAIN CHECKOUT. This workstream lives on the branch
+# `method-dev-residual` so it cannot collide with the cross-length work in the main checkout --
+# probedriftlong._provenance() ABORTS on a dirty tracked tree, so two agents editing one checkout
+# cannot both run. The worktree has no cache/ of its own (cache/ is gitignored), hence
+# LUQ_CACHE_ROOT below; luq.config RAISES if it points at a path that does not exist, so a typo
+# here fails loudly rather than silently finding zero caches.
+#
+# SIZING. Same cache load as pbs/pdl_one_eval.pbs (the driver loads the union of LONG_SRC and the
+# eval target, which the OOD rungs REQUIRE), which plateaued at 25.8GB on 40gb. This job then does
+# strictly LESS work per cell than that one: no weighted-MSP training, no sentence-segment pass, no
+# pooled baselines, and a frozen-query linear head instead of the temperature-selected pooler. So
+# the load dominates and 12h is generous; 48gb is the proven 40gb plus headroom.
+#
+# NO COHORT-GATE CALL. pbs/pdl_one_eval.pbs runs preflight_cohort.py because its driver could carry
+# a hand-typed dataset list that drifts from the canonical cohort. This driver has no such list --
+# it reads pdl.LONG_SRC directly -- so the defect that gate exists to catch cannot occur here, and
+# registering a new driver would mean editing a shared file for no protection gained.
+set -uo pipefail
+
+# The worktree is the code root; the caches stay in the main checkout (13GB, not duplicated).
+MAIN=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925
+export LUQ_REPO="$PBS_O_WORKDIR"
+export LUQ_CACHE_ROOT="$MAIN/cache"
+
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy          # the population every committed Llama number sits on
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=xsum pbs/prompt_residual_one_eval.pbs}"
+
+# LUQ_SMOKE=1 -> harness check only: one seed, two rungs (ID exercises the single-source path and
+# DiffTask the multi-source one), pools hard-subsampled. Its output filename carries __SMOKE and the
+# driver stamps a smoke=True column, so it can never be mistaken for a result.
+if [ "${LUQ_SMOKE:-0}" = "1" ]; then
+    ARGS="--smoke --seeds 1 --rungs ID,DiffTask"
+    SUF="__SMOKE"
+else
+    ARGS="--seeds 1,2,3"
+    SUF=""
+fi
+OUT="$MAIN/results/method_dev/prompt_residual/prompt_residual_${EV}__meta-llama_Meta-Llama-3.1-8B${SUF}.csv"
+
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+
+echo "=== PR1 prompt-residual eval=$EV smoke=${LUQ_SMOKE:-0} on $(hostname) at $(date) ===" >&2
+echo "    repo=$LUQ_REPO  cache=$LUQ_CACHE_ROOT" >&2
+python -u scripts/checks/prompt_residual.py $ARGS --evals "$EV" --out "$OUT"
+rc=$?
+echo "=== done rc=$rc $(date) ===" >&2
+exit $rc
