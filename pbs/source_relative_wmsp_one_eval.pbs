@@ -1,0 +1,71 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=120gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_srcrel
+#PBS -j oe
+# PR2 -- SOURCE-RELATIVE weighted MSP, ONE eval per job.
+# Pre-registration: prereg/PR2_source_relative_wmsp.md.  CONDITIONAL on PR1 being neutral/negative.
+#
+#   qsub -v LUQ_EVAL=asqa pbs/source_relative_wmsp_one_eval.pbs
+#   qsub -v LUQ_EVAL=asqa,LUQ_SMOKE=1 pbs/source_relative_wmsp_one_eval.pbs   # harness check
+#
+# ⚠️ RUNS FROM THE `method-dev-residual` WORKTREE (see pbs/prompt_residual_one_eval.pbs for why).
+#
+# SIZING follows pbs/sharpening_wmsp_one_eval.pbs, not the prompt-residual job: this trains FOUR
+# weighters per (cell, seed) -- the library canonical, our no-op copy, masked and pure -- so it is
+# roughly 4x the cost of one canonical wMSP cell, which was measured at 6m50s / 22.9GB for a SHORT
+# eval. Hence the full 120gb and 24h rather than the pooler job's 48gb/12h.
+#
+# SCOPE: the MULTI-SOURCE rungs only. ID and 1ds-Diff-long are single-source, where within-source
+# ranking is mathematically identical to global ranking -- they are run at seed 1 ONLY, as an
+# exact-invariance control (the driver ABORTS if they are not identical to canonical).
+set -uo pipefail
+
+MAIN=/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925
+export LUQ_REPO="$PBS_O_WORKDIR"
+export LUQ_CACHE_ROOT="$MAIN/cache"
+
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=asqa pbs/source_relative_wmsp_one_eval.pbs}"
+
+if [ "${LUQ_SMOKE:-0}" = "1" ]; then
+    ARGS="--smoke --seeds 1 --rungs DiffTask"      # a genuinely multi-source rung
+    SUF="__SMOKE"
+else
+    ARGS="--seeds 1,2,3 --rungs SameTask,DiffTask,LOO"
+    SUF=""
+fi
+OUT="$MAIN/results/method_dev/source_relative/source_relative_${EV}__meta-llama_Meta-Llama-3.1-8B${SUF}.csv"
+
+if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+
+echo "=== PR2 source-relative eval=$EV smoke=${LUQ_SMOKE:-0} on $(hostname) at $(date) ===" >&2
+echo "    repo=$LUQ_REPO  cache=$LUQ_CACHE_ROOT" >&2
+python -u scripts/checks/source_relative_wmsp.py $ARGS --evals "$EV" --out "$OUT"
+rc=$?
+
+# THE EXACT-INVARIANCE CONTROL (prereg §1), seed 1 only. ID and 1ds-Diff-long are SINGLE-SOURCE
+# pools, where within-source ranking is mathematically identical to global ranking -- so both arms
+# MUST reproduce canonical bit-for-bit there. The driver raises if they do not. This is a separate
+# invocation because --seeds is global: the scored rungs want 3 seeds, this control only needs 1,
+# and running it at 3 would triple the cost of a check that cannot vary by seed.
+# It runs even when the main scored run failed, because the control is diagnostic about WHY.
+if [ "${LUQ_SMOKE:-0}" != "1" ]; then
+    CTRL="$MAIN/results/method_dev/source_relative/invariance_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+    if [ -e "$CTRL" ]; then
+        echo "note: $CTRL exists, skipping the invariance control" >&2
+    else
+        echo "--- invariance control (ID + 1ds-Diff, seed 1) ---" >&2
+        python -u scripts/checks/source_relative_wmsp.py --seeds 1 --rungs ID,1ds-Diff \
+            --evals "$EV" --out "$CTRL"
+        crc=$?
+        echo "--- invariance control rc=$crc ---" >&2
+        [ "$rc" -eq 0 ] && rc=$crc      # a failed control must not be hidden by a passing main run
+    fi
+fi
+
+echo "=== done rc=$rc $(date) ===" >&2
+exit $rc
