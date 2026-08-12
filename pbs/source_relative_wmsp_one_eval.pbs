@@ -31,13 +31,16 @@ export LUQ_CARVE=legacy
 
 EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=asqa pbs/source_relative_wmsp_one_eval.pbs}"
 
+ARMS="${LUQ_ARMS:-masked,pure}"
+TAG="${LUQ_TAG:-}"                 # distinguishes re-runs (e.g. the rescaled masked arm)
 if [ "${LUQ_SMOKE:-0}" = "1" ]; then
-    ARGS="--smoke --seeds 1 --rungs DiffTask"      # a genuinely multi-source rung
+    ARGS="--smoke --seeds 1 --rungs DiffTask --arms $ARMS"   # a genuinely multi-source rung
     SUF="__SMOKE"
 else
-    ARGS="--seeds 1,2,3 --rungs SameTask,DiffTask,LOO"
+    ARGS="--seeds 1,2,3 --rungs SameTask,DiffTask,LOO --arms $ARMS"
     SUF=""
 fi
+SUF="${TAG}${SUF}"
 OUT="$MAIN/results/method_dev/source_relative/source_relative_${EV}__meta-llama_Meta-Llama-3.1-8B${SUF}.csv"
 
 if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi

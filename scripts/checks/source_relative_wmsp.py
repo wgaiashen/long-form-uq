@@ -134,8 +134,27 @@ def train_srcrel(states, records, y, tr_idx, sources, device, *, mode="canonical
             q = torch.stack(qs)
             penalty = torch.stack([shrink_to_uniform(w) for w in ws]).mean()   # FULL batch, as canonical
 
-            if mode == "masked":
+            if mode in ("masked", "masked_scaled"):
                 # Rank only within each source subgroup, then average over the valid subgroups.
+                #
+                # ⚠️ WHY `masked_scaled` EXISTS (added 2026-08-13, prereg §7 amendment).
+                # The rank loss is an MSE between soft and hard ranks, so its SCALE grows with the
+                # number of items ranked: ranks run 1..m, and the MSE is O(m^2). Ranking inside
+                # subgroups of ~5 instead of a batch of 32 therefore shrinks the rank term by
+                # roughly an order of magnitude -- while lambda stays fixed at 2. The shrink penalty
+                # then dominates and drives the weights UNIFORM, at which point weighted MSP IS
+                # perplexity. That is not a null result about source-relative supervision; it is the
+                # method quietly becoming a different method.
+                # Measured on pubmed_qa, and it is unambiguous -- Omega(w) = mean((w-1)^2) falls
+                # monotonically as the subgroups get smaller:
+                #     2 sources -> Omega 0.97 | 5 sources -> 0.11 | 7 sources -> 0.05
+                # against ~3.3-4.5 for the full-batch arms, with PRR landing on pubmed's perplexity
+                # (-0.174) rather than anywhere near canonical (+0.19).
+                # `masked_scaled` rescales each subgroup's ranks to span the range the FULL batch
+                # would have spanned, so the rank term keeps its canonical magnitude and lambda's
+                # effective strength is unchanged -- which is what the pre-registration promised.
+                # This is a SCALE correction, not a hyperparameter tune: lambda, lr, batch size,
+                # epochs, seeds, batch membership and permutation are all untouched.
                 sub_losses = []
                 by_src = defaultdict(list)
                 for k, j in enumerate(batch):
@@ -146,7 +165,13 @@ def train_srcrel(states, records, y, tr_idx, sources, device, *, mode="canonical
                         continue                       # prereg §2: subgroups of <2 are skipped
                     kt = torch.tensor(ks, dtype=torch.long, device=device)
                     tgt = _true_rank(incorrect[[batch[k] for k in ks]])
-                    sub_losses.append(((_soft_rank(q[kt]) - tgt) ** 2).mean())
+                    sq = (_soft_rank(q[kt]) - tgt) ** 2
+                    if mode == "masked_scaled":
+                        # ranks span 1..m; stretch to 1..len(batch) so the MSE matches the
+                        # full-batch scale. Squared because the deviation itself is scaled.
+                        scale = (len(batch) - 1.0) / max(len(ks) - 1.0, 1.0)
+                        sq = sq * (scale ** 2)
+                    sub_losses.append(sq.mean())
                 if not sub_losses:
                     continue                           # no valid subgroup -> no rank signal this step
                 rank_loss = torch.stack(sub_losses).mean()
@@ -184,6 +209,10 @@ def main():
     ap.add_argument("--rungs", default="", help="base rung names; default = the multi-source scope")
     ap.add_argument("--out", default="")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--arms", default="masked,pure",
+                    help="comma-separated source-relative modes to run: masked | masked_scaled | pure. "
+                         "The canonical comparator and the no-op fidelity gate ALWAYS run, so every "
+                         "output file is self-contained and can be cross-checked against any other.")
     args = ap.parse_args()
 
     MODEL = args.model
@@ -196,8 +225,12 @@ def main():
     if args.smoke:
         print("⚠️  SMOKE TEST -- results are NOT reportable", flush=True)
 
+    arms = [a.strip() for a in args.arms.split(",") if a.strip()]
+    _valid = {"masked", "masked_scaled", "pure"}
+    if set(arms) - _valid:
+        raise SystemExit(f"--arms: unknown {sorted(set(arms) - _valid)}; valid are {sorted(_valid)}")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device={device} model={MODEL} layer={args.layer} lambda={LAMBDA}", flush=True)
+    print(f"device={device} model={MODEL} layer={args.layer} lambda={LAMBDA} arms={arms}", flush=True)
     evals = [e.strip() for e in args.evals.split(",") if e.strip()] or list(pdl.LONG_SRC)
 
     PT = {}
@@ -272,7 +305,7 @@ def main():
                     f"source-relative delta measured against it would be confounded with that drift.")
             n_gate += 1
 
-            for mode in ("masked", "pure"):
+            for mode in arms:
                 dg = {}
                 v[f"wmsp_srcrel_{mode}_shrink2"] = srcrel_unc(
                     states, records, y, tr_idx, te_idx, sources, device, mode, sd, diag=dg)
@@ -307,8 +340,8 @@ def main():
             tag = " [INERT: must equal canonical]" if inert else f" [{n_src} sources]"
             print(f"  [{rung}/{X}/s{sd}] noop {gap:.1e}{tag}  "
                   f"canon={results.prr(yte, v['wmsp_shrink2']):+.4f}  "
-                  f"masked={results.prr(yte, v['wmsp_srcrel_masked_shrink2']):+.4f}  "
-                  f"pure={results.prr(yte, v['wmsp_srcrel_pure_shrink2']):+.4f}", flush=True)
+                  + "  ".join(f"{m}={results.prr(yte, v[f'wmsp_srcrel_{m}_shrink2']):+.4f}"
+                              for m in arms), flush=True)
 
     if not out_rows:
         raise SystemExit("no cells produced -- refusing to write an empty CSV")
