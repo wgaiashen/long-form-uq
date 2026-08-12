@@ -288,6 +288,25 @@ def main():
       "poolers are level (§2.3), so most of the shortfall is the ordinary price of leaving the "
       "training distribution.")
     w("")
+    w("### Two alternative explanations, tested and rejected")
+    w("")
+    w("The SHORT-only result on `asqa` is favourable and surprising, so it was treated as a suspected "
+      "artefact and checked against the questions that would have been asked had it gone the other "
+      "way. Both alternatives make a prediction about `xsum`, and both fail there:")
+    w("")
+    w("1. **\"A homogeneous pool beats a heterogeneous one, regardless of task.\"** The SHORT pool is "
+      "two similar QA sets; `LOO-long` is seven heterogeneous sources. If homogeneity itself were the "
+      "cause, SHORT-only should also beat LONG on `xsum`. It does not — it collapses there "
+      "(+0.039 mean-pool, +0.019 attention, against +0.255 / +0.323 from LONG).")
+    w("2. **\"The short-form labels are simply cleaner or more learnable\"** (they come from `gpt-5`, "
+      "the long-form ones from `gpt-5-mini`). A label-quality advantage would travel with the "
+      "training data to *every* target. It does not — same `xsum` collapse.")
+    w("")
+    w("What survives both is the task-match reading: SciQ and TriviaQA are QA, ASQA is QA, XSum is "
+      "summarisation. The eval population is provably unchanged across arms (floor invariance, and "
+      "`eval_med_len` 85.5 on both the `asqa` LONG and SHORT arms), so the training pool is the only "
+      "thing that differs.")
+    w("")
     w("### Caveats, stated up front")
     w("")
     w("- **Three long targets and two short targets.** No cross-dataset significance test is claimed "
