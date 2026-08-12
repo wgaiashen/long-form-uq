@@ -10,6 +10,10 @@ set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 export LUQ_REGIME="med_quad=med_quad_clean"
 echo "=== clean-span Lehmer on $(hostname) at $(date) ===" >&2
+# ⚠️ PROPAGATE THE EXIT CODE. Without this the script's own trailing echo becomes the job's status,
+# so a FAILED gate reported PBS Exit_status=0 — a failure that looks like a success in qstat.
 python -u scripts/checks/sharpening_family.py \
     --out results/analysis/sharpening_family_mqclean__meta-llama_Meta-Llama-3.1-8B.csv
-echo "=== done $(date) ===" >&2
+STATUS=$?
+echo "=== done $(date), python exit=$STATUS ===" >&2
+exit $STATUS
