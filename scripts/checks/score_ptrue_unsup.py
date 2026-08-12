@@ -17,6 +17,7 @@ the rows merge into both master tables with no assembler change beyond the ALIAS
 
     python scripts/checks/score_ptrue_unsup.py
 """
+import argparse
 import csv as _csv
 import sys
 from pathlib import Path
@@ -31,10 +32,17 @@ from luq.config import Config  # noqa: E402
 from luq import cache, results  # noqa: E402
 from xl_rungs import eval_split, label_of  # noqa: E402
 from provenance import provenance  # noqa: E402  stamp, so these rows are traceable like every other
+from attn_pool import PROMPT_REGIME  # noqa: E402  merges LUQ_REGIME, same mechanism every other
+                                      # driver uses -- so a clean-population run reads the clean
+                                      # records here too, instead of this script's own frozen dict.
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
+# EXPLICIT model pin. Default is the original string, so `python score_ptrue_unsup.py` with no args
+# stays byte-identical to before. REGIME is gone -- PROMPT_REGIME (imported above) already carries
+# the same three base entries plus whatever LUQ_REGIME overrides, so a second, unsynced copy of that
+# mapping is not needed and cannot drift from it.
+MODEL = MODEL_DEFAULT
 SLUG = cache._slug(MODEL)
-REGIME = {"expertqa": "expertqa_rp12", "asqa": "asqa_rp12", "factscore": "factscore_rp12"}
 
 LONG = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
 SHORT = ["sciq", "trivia_qa"]
@@ -85,8 +93,13 @@ def _from_sidecar(ds, n_rows, recs):
 
 
 def score_one(ds):
-    cfg = Config(model_name=MODEL, dataset=ds, ood_setting="ID", prompt_regime=REGIME.get(ds, ""))
-    recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, ds, "ID"))
+    cfg = Config(model_name=MODEL, dataset=ds, ood_setting="ID", prompt_regime=PROMPT_REGIME.get(ds, ""))
+    try:
+        recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, ds, "ID"))
+    except FileNotFoundError:
+        # A genuinely absent population (e.g. Qwen has no sciq/trivia_qa records at all -- the
+        # Long->Short rung was never generated for it) is a known, out-of-scope gap, not a crash.
+        return None, "no records for this (model, dataset) at all -- population was never generated"
     field = label_of(ds)
     unc = np.array([r.get("ptrue_unsup", np.nan) for r in recs], dtype=float)
     if not np.isfinite(unc).any():
@@ -110,7 +123,17 @@ def score_one(ds):
 
 
 def main():
+    global MODEL, SLUG
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=MODEL_DEFAULT,
+                    help="EXPLICIT model pin. Default is the original string, so a no-args "
+                         "invocation stays byte-identical to before.")
+    args = ap.parse_args()
+    MODEL = args.model
+    SLUG = cache._slug(MODEL)
+
     print(f"Unsupervised P(True) — floor scoring (no training, no ladder re-run)\n")
+    print(f"model={MODEL}")
     PROV = provenance(strict=False)
     rows_long, rows_xl = [], []
     for ds in LONG + SHORT:
