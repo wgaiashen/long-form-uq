@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_mqcb
+#PBS -j oe
+# TOP-UP: add P(True) + Lookback rows to the clean-span ladder, WITHOUT redoing the 9 methods already
+# scored. --skip-wmsp and --skip-poolers drop the two training bottlenecks (8 wMSP fits and the
+# 5-temperature pooler selection), so this pass computes floors + saplma + the two baselines only.
+# Output goes to a SEPARATE file so the completed pdl_mqclean_* CSVs are never rewritten.
+#   qsub -v LUQ_EVAL=med_quad pbs/mqclean_ptrue_lookback_ladder.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+export LUQ_REGIME="med_quad=med_quad_clean"
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+echo "=== clean-span ptrue/lookback top-up eval=$EV on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals "$EV" \
+    --baselines ptrue,lookback --skip-wmsp --skip-poolers \
+    --out "results/analysis/pdl_mqclean_base_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== done $(date) ===" >&2

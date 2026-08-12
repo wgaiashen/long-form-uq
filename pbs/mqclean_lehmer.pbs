@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=24gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_mqclehmer
+#PBS -j oe
+# Fixed Lehmer beta on the CLEAN span. Training-free: reads record["token_logprobs"] only, no GPU,
+# no hidden states, no training -- so it is the cheapest of the four missing final-table methods.
+# beta=1 is the final-table row; the full curve stays available for the appendix figure.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export LUQ_REGIME="med_quad=med_quad_clean"
+echo "=== clean-span Lehmer on $(hostname) at $(date) ===" >&2
+python -u scripts/checks/sharpening_family.py \
+    --out results/analysis/sharpening_family_mqclean__meta-llama_Meta-Llama-3.1-8B.csv
+echo "=== done $(date) ===" >&2

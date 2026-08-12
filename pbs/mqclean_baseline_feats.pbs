@@ -1,0 +1,34 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=06:00:00
+#PBS -N luq_mqcf
+#PBS -j oe
+# Extract P(True) + Lookback + unsupervised-P(True) features for the CLEAN-SPAN med_quad ONLY.
+#
+# WHY ONLY med_quad: the span fix changed med_quad's records and nothing else, so the canonical
+# ptrue/lookback features for the other 7 evals remain valid. 1800 rows, max seq 1358 -> lookback's
+# attention tensor is 32x32x1358^2x4B = 7.6GB on top of ~32GB fp32 weights = ~40GB, which fits the
+# 48GB L40S. (The earlier a100 requirement was driven by cnn's 2048-token sequences; not the case here.)
+#
+# ⚠️ These MUST be re-extracted rather than spliced: the verification question is appended AFTER the
+# generation, so a shorter span puts the verdict at a different position; and lookback's attention is a
+# softmax over the token set, which changes when the set changes. A prefix of the raw features would be
+# wrong, not merely truncated.
+#
+# ⚠️ --store-layers 15 for ptrue, matching every other dataset's cache (the other seven are
+# (n,33,4096) with only L15 finite). Without it these would be non-comparable AND ~2GB.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+M="meta-llama/Meta-Llama-3.1-8B"; REG="med_quad_clean"
+echo "=== clean-span med_quad baseline features on $(hostname) at $(date) ==="
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "(no GPU)"
+python -u scripts/01b_ptrue.py --dataset med_quad --ood ID --model "$M" \
+    --prompt-regime "$REG" --name ptrue_accurate --store-layers 15 || echo "!!! ptrue FAILED"
+python -u scripts/01c_lookback.py --dataset med_quad --ood ID --model "$M" \
+    --prompt-regime "$REG" || echo "!!! lookback FAILED"
+python -u scripts/01g_ptrue_unsup.py --dataset med_quad --ood ID --model "$M" \
+    --prompt-regime "$REG" || echo "!!! ptrue_unsup FAILED"
+echo "=== sizes (expect ~21MB ptrue / ~7MB lookback, NOT GB) ==="
+ls -la cache/med_quad_clean/features/ 2>/dev/null | awk '{print "  "$5" "$9}'
+echo "=== DONE $(date) ==="
