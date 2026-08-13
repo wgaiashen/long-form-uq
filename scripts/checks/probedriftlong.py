@@ -292,6 +292,15 @@ def main():
                          "Any WMSP variant not listed is EXCLUDED and its column is left ABSENT (never zero). "
                          "Each variant is a SEPARATE MLP fit, so this genuinely saves compute. Default None = all "
                          "committed variants (RCS default behaviour unchanged). Fails loud on an unknown name.")
+    ap.add_argument("--wmsp-extra-lambdas", default=None,
+                    help="comma-separated EXTRA shrink lambdas to APPEND as wmsp_lam<L> variants "
+                         "(e.g. '1,1.5'). Additive and opt-in: the default None leaves the committed "
+                         "WMSP list byte-identical, so no existing invocation changes. Combine with "
+                         "--skip-wmsp to run ONLY the extra lambdas (the cheapest way to fill a "
+                         "missing lambda cell). Added 2026-08-13 for PR4's short-form dev selection, "
+                         "which needs lambda 1 and 1.5 on a --train-spec cell; every other lambda in "
+                         "the registry already exists. It does NOT create a new registry variant -- "
+                         "output lands in the --out file, never in a canonical master.")
     ap.add_argument("--rungs", default=None,
                     help="comma-separated BASE rung names to KEEP: ID,SameTask,DiffTask,LOO,1ds-Diff (they map "
                          "to the -long ladder names). Default None = every rung cells_long emits (RCS default "
@@ -410,6 +419,29 @@ def main():
         active_wmsp = [w for w in WMSP if w[0] in keep_names]
         print(f"WMSP-ONLY: keeping {[w[0] for w in active_wmsp]} ; EXCLUDED {excluded} "
               "(their columns are left ABSENT, not zero)", flush=True)
+    # EXTRA lambdas (opt-in, additive). Appended AFTER --wmsp-only so the two flags compose, and
+    # allowed even under --skip-wmsp so "only the missing lambda" is expressible. Default None means
+    # this block never runs and the committed variant list is untouched.
+    if args.wmsp_extra_lambdas:
+        have = {w[0] for w in active_wmsp}
+        for tok_ in args.wmsp_extra_lambdas.split(","):
+            tok_ = tok_.strip()
+            if not tok_:
+                continue
+            try:
+                lam_ = float(tok_)
+            except ValueError:
+                raise SystemExit(f"--wmsp-extra-lambdas: {tok_!r} is not a number")
+            if lam_ <= 0:
+                raise SystemExit(f"--wmsp-extra-lambdas: lambda must be > 0, got {lam_}")
+            name_ = f"wmsp_lam{tok_}"
+            if name_ in have:
+                raise SystemExit(f"--wmsp-extra-lambdas: {name_} is already active; refusing to fit it twice")
+            active_wmsp = active_wmsp + [(name_, {"weight_mode": "normalised",
+                                                  "reg": shrink_to_uniform, "reg_lambda": lam_})]
+            have.add(name_)
+        print(f"WMSP-EXTRA-LAMBDAS: appended {[w[0] for w in active_wmsp if w[0].startswith('wmsp_lam')]}",
+              flush=True)
     active_poolers = [] if args.skip_poolers else POOLERS
     active_base = []
     if args.baselines:

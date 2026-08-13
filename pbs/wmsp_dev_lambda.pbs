@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_devlam
+#PBS -j oe
+# PR4 — the TWO MISSING shrink lambdas on the short-form development cells.
+#
+# Protocol: prereg/PR4_wmsp_dev_selection_protocol.md (written and frozen BEFORE these cells ran).
+# Fills lambda = 1 and lambda = 1.5 only. lambda = 0 / 2 / 10 already exist on both cells at 3 seeds
+# from the cross-length run (results/xlen_long2short_othershort_*.csv) and are NOT recomputed.
+#
+#   PRIMARY   train sciq:1800      -> evaluate trivia_qa
+#   secondary train trivia_qa:1800 -> evaluate sciq        (SciQ has ~94% correct labels, so it is a
+#                                                           stability check only, never the selector)
+#
+# ⚠️ NOTHING CANONICAL IS TOUCHED. --out points into results/analysis/, and --train-spec requires
+# --rung-name + --out, so the canonical pdl_* filenames cannot be written by this job.
+#
+# Floors + SAPLMA are deliberately NOT skipped: they must reproduce the existing xlen cell exactly,
+# which is a free no-op control that the cell definition here matches the one already run.
+#
+#   qsub -v LUQ_DIR=sciq2trivia pbs/wmsp_dev_lambda.pbs
+#   qsub -v LUQ_DIR=trivia2sciq pbs/wmsp_dev_lambda.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+DIR="${LUQ_DIR:?set LUQ_DIR to sciq2trivia or trivia2sciq}"
+case "$DIR" in
+  sciq2trivia) EV="trivia_qa"; SPEC="sciq:1800";      RUNG="DEV-sciq2trivia" ;;
+  trivia2sciq) EV="sciq";      SPEC="trivia_qa:1800"; RUNG="DEV-trivia2sciq" ;;
+  *) echo "LUQ_DIR must be sciq2trivia or trivia2sciq, got '$DIR'" >&2; exit 2 ;;
+esac
+
+OUT="results/analysis/wmsp_dev_lambda_${DIR}__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "=== PR4 dev lambdas: $DIR  (eval=$EV  train=$SPEC)  on $(hostname) at $(date) ==="
+echo "    filling lambda 1 and 1.5 only; 0/2/10 already exist and are not recomputed"
+
+python -u scripts/checks/probedriftlong.py \
+    --evals "$EV" \
+    --train-spec "$SPEC" \
+    --rung-name "$RUNG" \
+    --seeds 1,2,3 \
+    --layer 15 \
+    --skip-wmsp \
+    --wmsp-extra-lambdas 1,1.5 \
+    --skip-poolers \
+    --out "$OUT"
+rc=$?
+echo "=== done rc=$rc at $(date) ==="
+exit $rc
