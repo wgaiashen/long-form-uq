@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=40gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_xljs
+#PBS -j oe
+# JUDGE-CONSISTENCY SENSITIVITY for the cross-length experiment.
+#
+# The short-form sets carry `gpt-5` judge labels; every long-form set carries `gpt-5-mini`. The
+# cross-length arms are therefore built on two judge models, against the standing "never mix judges
+# within one comparison" rule. `scripts/checks/rejudge_short_mini.py` re-labelled TriviaQA with
+# gpt-5-mini into the shadow regime `cache/trivia_mini/` (pertok symlinked -- the representation is
+# byte-identical, only the label moves). This re-scores the TriviaQA-EVAL arms against it.
+#
+# ⚠️ SCOPE. Only the arms where trivia_qa is the EVAL are re-scored, because that is where the label
+# change moves the PRR yardstick. In the short->long arms trivia is only a TRAINING source and the
+# eval label (asqa/xsum/factscore) is untouched; with 98.6% binarised agreement, re-labelling 1.4% of
+# training rows cannot plausibly move those. Stated rather than assumed.
+#
+#   qsub -v LUQ_CELL=longshort  pbs/cross_length_judgesens.pbs   # the canonical Long->Short rung
+#   qsub -v LUQ_CELL=idshort    pbs/cross_length_judgesens.pbs
+#   qsub -v LUQ_CELL=othershort pbs/cross_length_judgesens.pbs
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
+
+CELL="${LUQ_CELL:?set LUQ_CELL to longshort|idshort|othershort}"
+
+# Redirect ONLY trivia_qa to the re-judged shadow. Every other dataset resolves to its canonical
+# root, so the long training sources keep the gpt-5-mini labels they always had.
+export LUQ_REGIME="trivia_qa=trivia_mini"
+
+python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1
+
+COMMON="--seeds 1,2,3 --evals trivia_qa --wmsp-only wmsp_norm,wmsp_shrink2,wmsp_shrink10"
+OUT="results/xlen_judgesens_${CELL}_trivia_qa__meta-llama_Meta-Llama-3.1-8B.csv"
+
+echo "=== JUDGE SENSITIVITY cell=$CELL regime=$LUQ_REGIME on $(hostname) at $(date) ===" >&2
+
+case "$CELL" in
+  longshort)
+    # The canonical Long->Short rung: cells_long builds it, no --train-spec needed.
+    python -u scripts/checks/probedriftlong.py $COMMON --rungs "Long->Short" --out "$OUT" ;;
+  idshort)
+    python -u scripts/checks/probedriftlong.py $COMMON \
+        --train-spec trivia_qa:1800 --rung-name "ID-short" --out "$OUT" ;;
+  othershort)
+    python -u scripts/checks/probedriftlong.py $COMMON \
+        --train-spec sciq:1800 --rung-name "OTHER-SHORT" --out "$OUT" ;;
+  *) echo "unknown LUQ_CELL=$CELL" >&2; exit 1 ;;
+esac
+
+echo "=== done $(date) ===" >&2
