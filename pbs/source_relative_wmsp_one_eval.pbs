@@ -43,12 +43,16 @@ fi
 SUF="${TAG}${SUF}"
 OUT="$MAIN/results/method_dev/source_relative/source_relative_${EV}__meta-llama_Meta-Llama-3.1-8B${SUF}.csv"
 
-if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
-
-echo "=== PR2 source-relative eval=$EV smoke=${LUQ_SMOKE:-0} on $(hostname) at $(date) ===" >&2
+echo "=== PR2 source-relative eval=$EV smoke=${LUQ_SMOKE:-0} invonly=${LUQ_INVONLY:-0} on $(hostname) at $(date) ===" >&2
 echo "    repo=$LUQ_REPO  cache=$LUQ_CACHE_ROOT" >&2
-python -u scripts/checks/source_relative_wmsp.py $ARGS --evals "$EV" --out "$OUT"
-rc=$?
+rc=0
+if [ "${LUQ_INVONLY:-0}" = "1" ]; then
+    echo "INVONLY: skipping the scored run; only the invariance control below will run" >&2
+else
+    if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber"; exit 3; fi
+    python -u scripts/checks/source_relative_wmsp.py $ARGS --evals "$EV" --out "$OUT"
+    rc=$?
+fi
 
 # THE EXACT-INVARIANCE CONTROL (prereg §1), seed 1 only. ID and 1ds-Diff-long are SINGLE-SOURCE
 # pools, where within-source ranking is mathematically identical to global ranking -- so both arms

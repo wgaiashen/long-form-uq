@@ -167,10 +167,12 @@ def train_srcrel(states, records, y, tr_idx, sources, device, *, mode="canonical
                     tgt = _true_rank(incorrect[[batch[k] for k in ks]])
                     sq = (_soft_rank(q[kt]) - tgt) ** 2
                     if mode == "masked_scaled":
-                        # ranks span 1..m; stretch to 1..len(batch) so the MSE matches the
-                        # full-batch scale. Squared because the deviation itself is scaled.
-                        scale = (len(batch) - 1.0) / max(len(ks) - 1.0, 1.0)
-                        sq = sq * (scale ** 2)
+                        # Match the EXPECTED rank-MSE of a batch of size B: Var(uniform 1..m) is
+                        # (m^2-1)/12, so scaling by (B^2-1)/(m^2-1) makes a subgroup of size m carry
+                        # the same magnitude as the full batch, leaving lambda's effective strength
+                        # unchanged. (The cruder ((B-1)/(m-1))^2 overshoots by 1.3-1.5x here.)
+                        B, m_ = float(len(batch)), float(len(ks))
+                        sq = sq * ((B * B - 1.0) / max(m_ * m_ - 1.0, 1.0))
                     sub_losses.append(sq.mean())
                 if not sub_losses:
                     continue                           # no valid subgroup -> no rank signal this step
@@ -309,7 +311,7 @@ def main():
                 dg = {}
                 v[f"wmsp_srcrel_{mode}_shrink2"] = srcrel_unc(
                     states, records, y, tr_idx, te_idx, sources, device, mode, sd, diag=dg)
-                diags[mode] = dg
+                diags[f"wmsp_srcrel_{mode}_shrink2"] = dg
                 if inert:
                     # prereg §1: single-source pools MUST be identical to canonical.
                     g2 = float(np.abs(v[f"wmsp_srcrel_{mode}_shrink2"] - v["wmsp_shrink2"]).max())
@@ -324,7 +326,7 @@ def main():
                                        for i in te_idx])
 
             for m_name, vec in v.items():
-                dg = diags.get(m_name.split("_")[2] if m_name.startswith("wmsp_srcrel") else "", {})
+                dg = diags.get(m_name, {})
                 out_rows.append({
                     "model": MODEL, "layer": args.layer, "eval": X, "rung": rung, "seed": sd,
                     "method": m_name, "prr": results.prr(yte, vec),
