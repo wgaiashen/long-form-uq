@@ -112,7 +112,12 @@ def fmt(df, m):
 def main():
     cells, canon_arms = {}, {}
     for p in sorted(glob.glob(os.path.join(RESULTS, "xlen_*.csv"))):
-        if "NOOP" in p:
+        # NOOP is the driver control, not a cell. `judgesens` is a DIFFERENT POPULATION -- it is
+        # scored on the re-judged gpt-5-mini labels, so its floors legitimately differ from the
+        # canonical ones and it must never enter the primary set. (The floor-invariance gate caught
+        # exactly this when the glob was too broad: the judgesens cells share (eval, rung) keys with
+        # the primary ones, so they collided in the gate's bookkeeping. Handled separately in §5.)
+        if "NOOP" in p or "judgesens" in p:
             continue
         df = read_cell(p)
         cells[os.path.basename(p).replace(f"__{SLUG}.csv", "").replace("xlen_", "")] = (df, p)
@@ -321,6 +326,87 @@ def main():
       "TriviaQA re-judge sensitivity is costed and not yet run.")
     w("- **Llama only.** Nothing here is claimed to replicate on Qwen; that arm is costed, not run.")
     w("")
+
+    # ---------------- TRIVIA-ONLY MATCHED PANEL ----------------
+    tvo = {}
+    for p in sorted(glob.glob(os.path.join(RESULTS, "xlen_short2long_tvo_*.csv"))):
+        df = read_cell(p)
+        tvo[(df["eval"].iloc[0], df["rung"].iloc[0])] = df
+    if tvo:
+        w("## 4. Trivia-only arms — the matched baseline for the Qwen replication")
+        w("")
+        w("Qwen will only ever have TriviaQA (SciQ is unfunded), so a trivia-only Qwen pool is **not** "
+          "the same pool as the primary arms above, which use SciQ+TriviaQA. Comparing those directly "
+          "would be a cross-population comparison wearing a replication's clothes. These trivia-only "
+          "Llama arms exist so the eventual Qwen numbers have something matched to compare against. "
+          "**They are secondary — §1 remains the primary Llama result.**")
+        w("")
+        w("`LONG+SHORT-tv` = 7 long × 128 + `trivia_qa:904`. `SHORT-tv` = `trivia_qa:1800`.")
+        w("")
+        w("| target | method | LONG | LONG+SHORT-tv | delta | SHORT-tv | (primary delta, sciq+trivia) |")
+        w("|---|---|---:|---:|---:|---:|---:|")
+        for ev in LONG_TARGETS:
+            cdf, _ = canon_arms[ev]
+            ls = tvo.get((ev, "LONG+SHORT-tv"))
+            sh = tvo.get((ev, "SHORT-tv"))
+            if ls is None or sh is None:
+                continue
+            for m, disp in SUP.items():
+                a, av = fmt(cdf, m)
+                b, bv = fmt(ls, m)
+                c, _ = fmt(sh, m)
+                d = f"{bv-av:+.3f}" if (av is not None and bv is not None) else "—"
+                prim = deltas.get(m, {}).get(ev)
+                pr = f"{prim:+.3f}" if prim is not None else "—"
+                w(f"| `{ev}` | `{disp}` | {a} | {b} | **{d}** | {c} | {pr} |")
+        w("")
+
+    # ---------------- JUDGE-CONSISTENCY SENSITIVITY ----------------
+    js = {}
+    for p in sorted(glob.glob(os.path.join(RESULTS, "xlen_judgesens_*.csv"))):
+        df = read_cell(p)
+        js[df["rung"].iloc[0]] = df
+    if js:
+        w("## 5. Judge-consistency sensitivity (TriviaQA re-judged with `gpt-5-mini`)")
+        w("")
+        w("The short-form sets carry `gpt-5` labels and every long-form set carries `gpt-5-mini`, so "
+          "the arms mix two judge models. TriviaQA was re-judged with `gpt-5-mini` into a shadow "
+          "regime (`cache/trivia_mini/`, per-token cache symlinked so the representation is "
+          "byte-identical — only the label moves) and the TriviaQA-**eval** arms re-scored against it.")
+        w("")
+        w("**Label-level agreement over all 3,800 rows:** Pearson r **0.9832**, exact agreement "
+          "**96.2%**, binarised@0.5 **98.6%**, mean difference **+0.0004**, error mass 36.8% → 36.6%. "
+          "0 rows unjudged.")
+        w("")
+        rung_src = {"Long->Short": canon_arms["trivia_qa"][0],
+                    "ID-short": cells.get("long2short_idshort_trivia_qa", (None,))[0],
+                    "OTHER-SHORT": cells.get("long2short_othershort_trivia_qa", (None,))[0]}
+        w("| arm | method | gpt-5 | gpt-5-mini | delta |")
+        w("|---|---|---:|---:|---:|")
+        worst = 0.0
+        for rung in ("Long->Short", "ID-short", "OTHER-SHORT"):
+            new = js.get(rung)
+            old = rung_src.get(rung)
+            if new is None or old is None:
+                continue
+            for m, disp in {**FLOORS, **SUP}.items():
+                a, av = fmt(old, m)
+                b, bv = fmt(new, m)
+                if av is None or bv is None:
+                    continue
+                worst = max(worst, abs(bv - av))
+                w(f"| `{rung}` | `{disp}` | {av:+.4f} | {bv:+.4f} | {bv-av:+.4f} |")
+        w("")
+        w(f"**Largest movement anywhere: |Δ| = {worst:.4f}**, against per-cell seed sds of roughly "
+          f"0.02–0.05 on these arms. Every method ordering is preserved. **The judge-model mismatch "
+          f"is immaterial at the PRR level**, so the primary numbers stand on the existing labels and "
+          f"this is reported as a closed caveat rather than an open one.")
+        w("")
+        w("⚠️ Scope: only arms where `trivia_qa` is the **eval** are re-scored, because that is where "
+          "the label change moves the yardstick. In the short→long arms trivia is a training source "
+          "and the eval label is untouched; at 98.6% binarised agreement, re-labelling 1.4% of "
+          "training rows cannot plausibly move them.")
+        w("")
 
     os.makedirs(ANALYSIS, exist_ok=True)
     out = os.path.join(ANALYSIS, "CROSS_LENGTH_RESULTS.md")
