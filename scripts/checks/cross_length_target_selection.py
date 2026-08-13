@@ -9,8 +9,9 @@ The question it answers, per family (correctness_qa / summ / factuality):
     and carries no measurement caveat that would undermine a small auxiliary experiment?
 
 ⚠️ THE TWO MODELS ARE NEVER POOLED. Every quantity is computed inside one model's own population and
-compared across models only as an agreement/stability statement. That is the standing rule in
-CLAUDE.md and it is what `--model` isolation below enforces.
+compared across models only as an agreement/stability statement. Llama-3.1-8B and Qwen2.5-14B are
+separate populations with separate labels, layers and generations; a joint table would be a
+cross-population comparison rather than a result. The per-model loading below is what enforces it.
 
 Inputs (all already on disk):
   * results/pdl_fam_<eval>__meta-llama_Meta-Llama-3.1-8B.csv   — Llama ladder, 9 core methods x 5 rungs
