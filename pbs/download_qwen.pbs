@@ -7,7 +7,7 @@
 # Download Qwen/Qwen2.5-14B into HF_HOME. A hard prerequisite for the second model, and completely
 # independent of G1 -- so it runs in parallel rather than after it.
 #
-# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. This pulls ~28GB. CLAUDE.md is explicit that login nodes are
+# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. This pulls ~28GB. The project conventions are explicit that login nodes are
 # for editing and qsub only, and lists "a large pip install" as exactly the kind of thing that got
 # processes killed by RCS IT on 2026-07-06. A 28GB download is the same shape, so it goes through the
 # scheduler.

@@ -93,7 +93,7 @@ def driver_population(dataset):
     if not path.exists():
         raise SystemExit(f"{dataset}: missing records cache {path}")
     recs = [json.loads(line) for line in open(path)]
-    # Fail loud on a wrong-model cache rather than silently scoring it (CLAUDE.md: no model-agnostic globs).
+    # Fail loud on a wrong-model cache rather than silently scoring it (project convention: no model-agnostic globs).
     if "Meta-Llama-3.1-8B" not in path.name:
         raise SystemExit(f"{dataset}: {path.name} is not the Llama cache — refusing to run")
     lab = label_of(dataset)

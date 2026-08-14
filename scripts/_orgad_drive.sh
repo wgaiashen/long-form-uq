@@ -3,7 +3,7 @@
 # Extracts (resumable, concurrent) the model's own important tokens for every dataset -- QA exact answer
 # for sciq/trivia/pubmed/med_quad, key fact-bearing terms for xsum/samsum -- then auto-submits the
 # ID + OOD ladder eval and the token-weight visualiser to the scheduler. Runs under setsid+nohup so it
-# survives the Claude session ending. Fully resumable (each dataset's extraction skips cached rows).
+# survives the interactive session ending. Fully resumable (each dataset's extraction skips cached rows).
 set -uo pipefail
 cd /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925
 source pbs/_env.sh

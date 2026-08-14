@@ -2,7 +2,7 @@
 
 ## 0. Provenance — read this first
 
-The thresholds below were fixed in `PLAN_execution_post7Aug.md` §3 (the private parent repo),
+The thresholds below were fixed in `PLAN_execution_post7Aug.md` §3 (a planning document kept outside this repo),
 committed in `9731fea` on 2026-08-08 02:42 +0100, **before a single Qwen record existed** (Qwen
 generation began 2026-08-09). This file **transcribes them verbatim** on 2026-08-10; nothing is
 re-derived, no threshold is changed.

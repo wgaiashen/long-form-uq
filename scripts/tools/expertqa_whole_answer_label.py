@@ -7,7 +7,7 @@ FRAMING (Gaia's, kept honest): this is FAITHFULNESS to an expert reference, NOT 
 not turn ExpertQA into a factuality task; it makes the existing factuality label whole-answer
 instead of 36%-visible. Reuse the mini judge (r=0.86 vs gpt-5). No regeneration.
 
-Claude's reservation (see worklog 2026-07-07): the blind spot is a real property (Llama answers
+A reservation recorded on 2026-07-07: the blind spot is a real property (Llama answers
 open expert Qs more broadly than one expert's ~200-word answer), so a MATCH-based whole-answer judge
 may penalise correct-but-different answers — the reference-coverage trap the three-state design (and
 the AlignScore r=0.19 result) flagged. So STEP 3 adds a BREADTH-BIAS diagnostic, not just Spearman.

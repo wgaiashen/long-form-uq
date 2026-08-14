@@ -52,7 +52,7 @@ def nll_window(record, state_len):
     w = np.empty(len(nll) + 1, dtype=np.float32)
     w[0] = float(nll.mean()) if len(nll) else 0.0        # anchor: neutral (no logprob for the prompt token)
     w[1:] = nll
-    if len(w) != state_len:                              # alignment gate (CLAUDE.md: assert, do not pad silently)
+    if len(w) != state_len:                              # alignment gate (project convention: assert, do not pad silently)
         raise SystemExit(f"C2 NLL window {len(w)} != state window {state_len} — alignment bug, HALT")
     return w
 

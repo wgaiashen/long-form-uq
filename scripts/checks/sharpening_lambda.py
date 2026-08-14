@@ -131,7 +131,7 @@ def score_tilted(model, states, records, te_idx, device, kind, param):
             # ⚠️ Compare against the argmax over KEPT tokens. The weighter cannot place mass on a
             # special token, so scoring it against the all-token argmax caps this diagnostic at
             # ~89% by construction (10.9% of pubmed_qa examples have their largest NLL on a special)
-            # and would look like a failure when nothing is wrong. Same token set, per CLAUDE.md.
+            # and would look like a failure when nothing is wrong. Same token set, per the project conventions.
             kb = keep_np.astype(bool)
             a_ref = int(np.flatnonzero(kb)[np.argmax(nll_np[kb])]) if kb.any() else int(np.argmax(nll_np))
             agree.append(int(int(torch.argmax(lg).item()) == a_ref))
@@ -207,7 +207,7 @@ def main():
             floors["msp_min"].append(results.prr(yte, v_min))
             # ⚠️ SAME TOKEN SET. The learned weighter is forbidden special tokens, so the endpoint
             # this family can reach is msp_min restricted to CONTENT tokens. Checking against the
-            # all-token msp_min is a TOKEN-SET CONFOUND (CLAUDE.md's standing rule), not a failure of
+            # all-token msp_min is a TOKEN-SET CONFOUND (the standing project rule), not a failure of
             # the method. Measured difference on pubmed_qa: 0.3478 (kept) vs 0.3710 (all), because
             # 10.9% of its examples have their largest NLL on a special token. Both are reported.
             v_mk = []

@@ -9,7 +9,7 @@
 #SBATCH --output=logs/qwen_repool_%A_%a.out
 
 # Teacher-forced RE-POOL of the Qwen2.5-14B feature cache + the per-token cache, one dataset per
-# array task. This is the MANDATORY step after 01_extract (CLAUDE.md: the SAPLMA feature cache must
+# array task. This is the MANDATORY step after 01_extract (project convention: the SAPLMA feature cache must
 # be teacher-forced, matching the pertok cache), ported from the Llama invocation verbatim:
 # slurm/overnight_gpu.sbatch ran `01e_repool --dtype fp32 --attn eager --cache-per-token`, and
 # scripts/checks/make_pubmed_d1.py records that pubmed takes NO --truncate-long here (its cached

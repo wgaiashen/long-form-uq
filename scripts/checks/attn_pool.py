@@ -54,7 +54,7 @@ MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
 # not against a bare 128000-style constant, so a wrong-model cache still fails loudly while a
 # legitimately different model is simply a new entry here.
 # ⚠️ The guard exists because a model-agnostic glob once loaded the dropped Qwen-1.5B cache into
-# PART A's headline rows (CLAUDE.md:70). Keeping it FAIL-LOUD is the point; only its constant was
+# PART A's headline rows (the project conventions). Keeping it FAIL-LOUD is the point; only its constant was
 # ever wrong.
 EXPECTED_HIDDEN_DIM = {
     "meta-llama/Meta-Llama-3.1-8B": 4096,
@@ -136,7 +136,7 @@ def load_per_token(model, dataset, layer, label_field="correctness"):
     states = [np.asarray(st[k], dtype=np.float32) for k in range(len(records))]
     # RUNTIME MODEL GUARD (2026-07-27; made model-aware 2026-08-08). Fail loud if the cache on disk is
     # not the width THIS model should produce — that is how the dropped Qwen-1.5B cache once got loaded
-    # into PART A's headline rows via a model-agnostic glob (CLAUDE.md:70).
+    # into PART A's headline rows via a model-agnostic glob (the project conventions).
     # ⚠️ The guard is still FAIL-LOUD and still per-model; only the hard-coded 4096 was wrong. A model
     # absent from EXPECTED_HIDDEN_DIM is itself an error, NOT a pass — an unknown model must not skip
     # the check, or the guard quietly stops guarding exactly when a new model is introduced.

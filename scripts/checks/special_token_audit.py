@@ -5,7 +5,7 @@ Results: ../STOCKTAKE_sharpening_axis.md §12.
 
 WHY THIS EXISTS
 ---------------
-CLAUDE.md's standing rule: "when aligning, keep every compared method on the SAME token set or the
+The standing project rule: "when aligning, keep every compared method on the SAME token set or the
 difference is a confound rather than a result." This audit checks whether that holds across the
 master ladder. It was prompted by W5's CONTROL 2 abort, which turned out to be a token-set mismatch.
 

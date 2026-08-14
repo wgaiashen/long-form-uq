@@ -33,33 +33,32 @@ logs/
 # PBS job logs (persistent by design -- see pbs/topk_prior_one_eval.pbs -- but not artifacts to track)
 logs/
 
-# The worktree's cache is a SYMLINK to the main checkout's cache, so the existing 'cache/'
+# A worktree's cache is a SYMLINK to the main checkout's cache, so the existing 'cache/'
 # pattern (which matches directories) never matched it and it sat untracked forever. A permanently
-# dirty 'git status' is not cosmetic here: the untracked-file sweep in CLAUDE.md relies on it.
+# dirty 'git status' is not cosmetic here: the untracked-file sweep relies on it.
 cache
 
-# `results` is now a SYMLINK to ../results, i.e. into the PRIVATE PARENT repo, which is where the
-# result files are version-controlled from 2026-08-14 (they previously sat in no repository at all).
+# `results` is a SYMLINK to ../results, i.e. to a directory outside this repository, where the
+# result files are version-controlled separately (they are not part of the published artifact).
 # The code keeps reading and writing `results/...` exactly as before, because this path still
 # resolves -- that is the entire point of the symlink, and it is why no driver, PBS script or glob
 # needed changing. Same trailing-slash trap as `cache` above: the 'results/' pattern on line 12
 # matches a DIRECTORY and does NOT match this symlink, so the bare form is required or the tree
-# reads permanently dirty and the CLAUDE.md untracked sweep stops working.
+# reads permanently dirty and the untracked-file sweep stops working.
 results
 
-# ---- INTERNAL GUIDANCE DOCS DO NOT BELONG IN THE SUBMITTED REPO (rule added 2026-08-08) ----
+# ---- WORKING NOTES DO NOT BELONG IN THE SUBMITTED REPO ----
 # This repo is the submitted artifact and should read as a record of what was actually RUN.
-# Agent briefs, session hand-overs and "how to find your bearings" explainers are INTERNAL: they
-# belong in the PRIVATE parent (private_luq) beside CLAUDE.md and the plans. Anything mentioning
-# Claude/an assistant especially so. Pre-registrations and analysis scripts are NOT in this class --
-# they are part of the record and stay tracked here.
+# Cluster hand-overs, session notes and "how to find your bearings" explainers are working notes:
+# they are kept outside this repository, alongside the planning documents. Pre-registrations and
+# analysis scripts are NOT in this class -- they are part of the record and stay tracked here.
 *_BRIEF_*.md
 DOC_BRIEF*.md
 DOC_INSTRUCTIONS.md
 AGENT_*.md
 *_HANDOVER*.md
 
-# Agent scratch / worktrees. INTERNAL by definition (see CLAUDE.md: internal guidance never goes
-# in the submitted repo). A 42MB unlabelled records duplicate was found here on 2026-08-11, untracked
-# but NOT ignored, so a `git add -A` would have swept it into the submitted artifact.
+# Editor / tooling scratch directories and worktrees. A 42MB unlabelled records duplicate was found
+# in one of these on 2026-08-11, untracked but NOT ignored, so a `git add -A` would have swept it
+# into the submitted artifact.
 .claude/
