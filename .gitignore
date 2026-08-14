@@ -32,6 +32,15 @@ logs/
 # dirty 'git status' is not cosmetic here: the untracked-file sweep in CLAUDE.md relies on it.
 cache
 
+# `results` is now a SYMLINK to ../results, i.e. into the PRIVATE PARENT repo, which is where the
+# result files are version-controlled from 2026-08-14 (they previously sat in no repository at all).
+# The code keeps reading and writing `results/...` exactly as before, because this path still
+# resolves -- that is the entire point of the symlink, and it is why no driver, PBS script or glob
+# needed changing. Same trailing-slash trap as `cache` above: the 'results/' pattern on line 12
+# matches a DIRECTORY and does NOT match this symlink, so the bare form is required or the tree
+# reads permanently dirty and the CLAUDE.md untracked sweep stops working.
+results
+
 # ---- INTERNAL GUIDANCE DOCS DO NOT BELONG IN THE SUBMITTED REPO (rule added 2026-08-08) ----
 # This repo is the submitted artifact and should read as a record of what was actually RUN.
 # Agent briefs, session hand-overs and "how to find your bearings" explainers are INTERNAL: they
