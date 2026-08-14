@@ -61,4 +61,6 @@ AGENT_*.md
 # Editor / tooling scratch directories and worktrees. A 42MB unlabelled records duplicate was found
 # in one of these on 2026-08-11, untracked but NOT ignored, so a `git add -A` would have swept it
 # into the submitted artifact.
+.vscode/
+.idea/
 .claude/
