@@ -18,6 +18,12 @@ logs/
 *.o[0-9]*
 *.e[0-9]*
 
+# Transient scheduler bookkeeping written by the job-watcher shell loops: bare lists of PBS job
+# IDs, and a zero-byte "fleet launched" sentinel. Five of these were committed by accident and
+# untracked on 2026-08-14. The job IDs are long dead and document nothing reproducible.
+.luq_*
+.seg_fleet_launched
+
 # Secrets
 .env
 
