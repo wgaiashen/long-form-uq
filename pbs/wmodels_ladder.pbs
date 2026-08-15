@@ -40,8 +40,10 @@ RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds Same
 # than an accident of which pertok caches happen to exist on this cluster.
 PANEL="pubmed_qa,xsum,cnn_dailymail,samsum,asqa,factscore"
 SLUG="$(printf '%s' "$MODEL" | tr '/' '_')"
-OUT="results/wmodels_stageA__${SLUG}__${EVAL}.csv"
-PEREX="results/perex_wmodels/${SLUG}"
+# LUQ_OUT / LUQ_PEREX exist so a CODE-VALIDATION run can be pointed at scratch. A smoke must never
+# be able to write into results/, where it would be indistinguishable from a real cell.
+OUT="${LUQ_OUT:-results/wmodels_stageA__${SLUG}__${EVAL}.csv}"
+PEREX="${LUQ_PEREX:-results/perex_wmodels/${SLUG}}"
 
 case "$EVAL" in
   pubmed_qa|xsum|cnn_dailymail|samsum|asqa|factscore) ;;
