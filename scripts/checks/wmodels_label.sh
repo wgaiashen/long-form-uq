@@ -29,7 +29,18 @@ MODE="${2:-}"
 SCRATCH="${LUQ_SCRATCH:-${TMPDIR:-/tmp}}/wmodels_label"
 mkdir -p "$SCRATCH"
 
-: "${OPENAI_API_KEY:?OPENAI_API_KEY is not set -- the judge cannot run}"
+# The key lives in the PRIVATE PARENT as a sourceable `export OPENAI_API_KEY=...` file, gitignored
+# and mode 600. Sourcing it here means an unattended overnight run does not die on a missing key.
+# ⚠️ Never echo the value, and never move this file into the public repo.
+if [ -z "${OPENAI_API_KEY:-}" ]; then
+  KEYFILE="${LUQ_OPENAI_KEYFILE:-$(cd "$(dirname "$0")/../.." && pwd)/../.openai_key}"
+  if [ -f "$KEYFILE" ]; then
+    # shellcheck disable=SC1090
+    . "$KEYFILE"
+    echo "OPENAI_API_KEY loaded from the private parent (value not shown)" >&2
+  fi
+fi
+: "${OPENAI_API_KEY:?OPENAI_API_KEY is not set and no key file was found -- the judge cannot run}"
 
 echo "=== cost estimate BEFORE spending (model=$MODEL) ===" >&2
 python -u scripts/checks/judge_cost_estimate.py \
