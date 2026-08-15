@@ -59,6 +59,14 @@ else
   : "${LUQ_REPO:=${PBS_O_WORKDIR:-$PWD}}"
   : "${HF_HOME:=$HOME/hf_cache}"   # large home allocation; do NOT use $EPHEMERAL
   : "${LUQ_VENV:=$HOME/venv}"      # python venv created per pbs/SETUP_RCS.md
+  # FActScore assets. src/luq/factscore.py defaults to the DoC master
+  # (/vol/gpudata/gs925-msc_project/factscore_data), which does not exist on RCS -- so a factscore
+  # extraction here died with FileNotFoundError on prompt_entities.txt (2026-08-15).
+  # ⚠️ ENTITIES ONLY. This directory holds the 500-line prompt_entities.txt and NOT the ~4GB
+  # enwiki-20230401.db, so GENERATION works on RCS but factscore LABELLING does not -- the judge
+  # reads the enwiki sqlite. Label factscore on DoC, or rsync the db here first.
+  : "${FACTSCORE_DIR:=$(dirname "${LUQ_REPO}")/factscore_data}"
+  export FACTSCORE_DIR
 fi
 export LUQ_CLUSTER LUQ_REPO HF_HOME
 
