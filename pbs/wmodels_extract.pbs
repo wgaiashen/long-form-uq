@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=12:00:00
+#PBS -N luq_wm_ext
+#PBS -j oe
+
+# W-Models generation + all-layer SAPLMA feature cache, ONE dataset per job (they fill queue slots
+# independently; queue wait, not compute, is the dominant cost here).
+#
+# The six-dataset reduced replication panel (prereg/M5_multimodel_far_ood.md §2):
+#   pubmed_qa, xsum, cnn_dailymail, samsum, asqa, factscore.   med_quad and expertqa are DROPPED.
+#
+# ⚠️ THE PER-DATASET SPEC IS BAKED IN HERE, NOT PASSED AT SUBMIT TIME. It is transcribed verbatim
+# from slurm/qwen_generate_full.sbatch, which is the canonical second-model spec. Budgets are
+# LLAMA's, unchanged -- changing a budget on one model only would manufacture exactly the confound
+# the replication exists to avoid. Passing these by hand at qsub time is how a population silently
+# ends up on different decoding settings.
+#
+# ⚠️ --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime (01_extract:116 refuses it otherwise,
+# to stop non-default-budget records landing in the default namespace beside the frozen v1 records).
+# So it is passed only where a regime exists; --max-new-tokens-cap (a pure ceiling, no guard) carries
+# the budget elsewhere. The budget is evidenced after the fact by max(len(gen_token_ids)) per
+# dataset, which is a stronger check than a printed intention.
+#
+# ⚠️ --dtype AND --attn ARE PASSED EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model, and
+# token logprobs ARE the msp_min and wMSP signal. 01_extract's --require-explicit-dtype is on by
+# default for non-keystone models and would refuse `auto` anyway; this is the belt to that braces.
+#
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum pbs/wmodels_extract.pbs
+#   qsub -v LUQ_MODEL=google/gemma-2-9b-it,LUQ_DTYPE=bf16,LUQ_DATASET=xsum pbs/wmodels_extract.pbs
+#
+# SMOKE MODE (the prompt-regime validity gate, prereg §6): set LUQ_LIMIT and LUQ_PROBE.
+# --limit N takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
+#   qsub -v LUQ_MODEL=...,LUQ_DTYPE=fp32,LUQ_DATASET=xsum,LUQ_LIMIT=40,LUQ_PROBE=llama31i_probe pbs/wmodels_extract.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE (fp32 | bf16) -- never leave this to auto}"
+DS="${LUQ_DATASET:?set LUQ_DATASET}"
+ATTN="${LUQ_ATTN:-eager}"
+LIMIT="${LUQ_LIMIT:-}"
+PROBE="${LUQ_PROBE:-}"
+
+# dataset : budget (LLAMA's, unchanged) : extra flags   -- verbatim from qwen_generate_full.sbatch
+case "$DS" in
+  cnn_dailymail) BUD=128; EXTRA="" ;;                                                      # 3800 rows
+  pubmed_qa)     BUD=128; EXTRA="--truncate-long" ;;                                       # 3800, newline-stopped
+  xsum)          BUD=56;  EXTRA="" ;;                                                      # 3800
+  asqa)          BUD=256; EXTRA="--prompt-regime asqa_rp12 --repetition-penalty 1.2" ;;    # 948
+  samsum)        BUD=56;  EXTRA="" ;;                                                      # 1800
+  factscore)     BUD=256; EXTRA="--prompt-regime factscore_rp12 --repetition-penalty 1.2" ;;  # 500, eval-only
+  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2). med_quad and expertqa are"; \
+     echo "!!! deliberately dropped; anything else is a typo." >&2; exit 3 ;;
+esac
+
+# Smoke mode: force an isolated namespace so probe caches can never touch real ones. Because every
+# smoke run then HAS a regime, --max-new-tokens becomes legal for all six datasets.
+if [ -n "$PROBE" ]; then
+  EXTRA="$(printf '%s' "$EXTRA" | sed -E 's#--prompt-regime [^ ]+##')"
+  EXTRA="--prompt-regime ${PROBE} ${EXTRA}"
+fi
+
+MNT=""
+case "$EXTRA" in *--prompt-regime*) MNT="--max-new-tokens $BUD" ;; esac
+LIM=""; [ -n "$LIMIT" ] && LIM="--limit $LIMIT"
+
+echo "=== W-Models extract ===" >&2
+echo "  model=$MODEL dtype=$DTYPE attn=$ATTN dataset=$DS budget=$BUD" >&2
+echo "  extra='$EXTRA' ${LIM:+(SMOKE $LIM)}" >&2
+echo "  host=$(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+# shellcheck disable=SC2086
+python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \
+    --dtype "$DTYPE" --attn "$ATTN" \
+    $MNT --max-new-tokens-cap "$BUD" $EXTRA $LIM
+STATUS=$?
+echo "=== $DS done status=$STATUS at $(date) ===" >&2
+exit $STATUS
