@@ -82,10 +82,19 @@ def main():
             print(f"  [{rank}/{args.top}] {ntok} tokens -> ❌ CUDA OOM at {peak:.1f} GiB peak",
                   flush=True)
             print(f"CANARY FAILED: {e}", flush=True)
-            print("Options, in order: switch --attn sdpa (eager materialises an n^2 buffer per "
-                  "layer); reduce the pooled-feature layer set; or move this dataset to a larger "
-                  "card. Do NOT silently drop the dataset -- that leaves a hole in the panel.",
-                  flush=True)
+            if "gemma" in args.model.lower():
+                # ⛔ Do NOT suggest sdpa for Gemma-2. It soft-caps its attention logits and ONLY the
+                # eager path applies that cap; SDPA silently skips it. Since the probe reads hidden
+                # states, and those are computed FROM the attention, sdpa would give subtly wrong
+                # internal features -- a quietly different method, not a memory optimisation.
+                print("Gemma-2 REQUIRES eager (soft-capping), so switching to sdpa is NOT an option "
+                      "here. Move this dataset to a larger card.", flush=True)
+            else:
+                print("Options, in order: switch --attn sdpa (eager materialises an n^2 buffer per "
+                      "layer, and this panel does not use the attention-extraction path that needs "
+                      "eager); or move this dataset to a larger card.", flush=True)
+            print("⛔ Do NOT silently drop the dataset -- that leaves a hole in the panel and puts "
+                  "this population on a different dataset set from every other one.", flush=True)
             sys.exit(1)
         peak = torch.cuda.max_memory_allocated() / 2**30
         worst = max(worst, peak)
