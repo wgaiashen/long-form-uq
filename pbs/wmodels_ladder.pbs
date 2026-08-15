@@ -1,0 +1,80 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_wm_lad
+#PBS -j oe
+
+# W-Models Stage-A ladder, ONE eval per job: ID + DiffTask-long + 1ds-Diff-long, 3 seeds.
+#
+# ⚠️ CPU ON PURPOSE. The driver falls back to device=cpu, and running here keeps the ladder off the
+# GPU queue that the extraction jobs are competing for. With only two wMSP arms the per-cell cost is
+# a fraction of the full eight-arm ladder that took ~97 CPU-hours across eight evals.
+#
+# ⚠️ --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
+# prereg/M5_multimodel_far_ood.md §4: lambda=0 is the unregularised control and lambda=2 the
+# pre-specified regularised configuration, both transferred unchanged from the development
+# populations. NO lambda grid and NO model-specific selection runs on a replication population --
+# that is the entire reason these populations are informative.
+#
+# ⚠️ --perex-dir IS REQUIRED, not optional. The verification gate compares per-example score vectors,
+# not PRR: PRR moves ~1e-4 on 1e-7 round-off, so an equivalence check on PRR alone would pass runs
+# that are not actually equivalent.
+#
+# ⚠️ THE CELL COUNT IS ASSERTED AFTERWARDS. probedriftlong prints "<d>: no pertok cache -> skip" and
+# carries on, so a missing dataset silently yields a smaller grid instead of an error. A blank cell
+# reads as "not measured" and a number reads as "measured"; those must never be confusable.
+#
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_EVAL=xsum pbs/wmodels_ladder.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
+SEEDS="${LUQ_SEEDS:-1,2,3}"
+RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds SameTask,LOO.
+SLUG="$(printf '%s' "$MODEL" | tr '/' '_')"
+OUT="results/wmodels_stageA__${SLUG}__${EVAL}.csv"
+PEREX="results/perex_wmodels/${SLUG}"
+
+case "$EVAL" in
+  pubmed_qa|xsum|cnn_dailymail|samsum|asqa|factscore) ;;
+  *) echo "!!! '$EVAL' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
+esac
+
+LAYER=$(MODEL="$MODEL" python - <<'PY'
+import math, os
+from transformers import AutoConfig
+print(math.ceil(AutoConfig.from_pretrained(os.environ["MODEL"]).num_hidden_layers / 2) - 1)
+PY
+)
+[ -z "$LAYER" ] && { echo "!!! could not resolve layer for $MODEL" >&2; exit 4; }
+
+mkdir -p "$PEREX"
+echo "=== W-Models Stage-A ladder ===" >&2
+echo "  model=$MODEL layer=$LAYER eval=$EVAL rungs=$RUNGS seeds=$SEEDS" >&2
+echo "  out=$OUT perex=$PEREX" >&2
+echo "  host=$(hostname) at $(date)" >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --model "$MODEL" --layer "$LAYER" \
+    --evals "$EVAL" \
+    --rungs "$RUNGS" \
+    --seeds "$SEEDS" \
+    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --perex-dir "$PEREX" \
+    --out "$OUT"
+STATUS=$?
+
+# The special-token registration must have fired for a non-default model. If it silently fell back to
+# the Llama `id >= 128000` range test, a band of ordinary content tokens would have been zero-weighted
+# -- no crash, just a quietly different method.
+if [ "$MODEL" != "meta-llama/Meta-Llama-3.1-8B" ]; then
+  echo "--- verifying special-token registration fired ---" >&2
+  grep -q "special-token ids registered" "$PBS_O_WORKDIR"/luq_wm_lad.o* 2>/dev/null \
+    || echo "  (log not yet flushed; assert this from the .o file before recording any number)" >&2
+fi
+
+echo "=== $EVAL ladder done status=$STATUS at $(date) ===" >&2
+exit $STATUS
