@@ -44,7 +44,16 @@ from attn_pool import PROMPT_REGIME                            # noqa: E402
 
 QWEN = "Qwen/Qwen2.5-14B"
 DATASETS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
-LAYER = {"Qwen/Qwen2.5-14B": 23, "meta-llama/Meta-Llama-3.1-8B": 15}
+# Middle layer per model, from the fixed rule ceil(n_layers/2) - 1. Never re-selected from results.
+# ⚠️ gemma-2-9b-it has 42 layers -> 20. The discarded 2026-06 Gemma run used 21, which is the OTHER
+# convention in this repo (03_probe.py's n_layers//2); it is not a precedent.
+LAYER = {
+    "Qwen/Qwen2.5-14B": 23,                  # 48 layers
+    "meta-llama/Meta-Llama-3.1-8B": 15,      # 32
+    "meta-llama/Llama-3.1-8B-Instruct": 15,  # 32
+    "google/gemma-2-9b-it": 20,              # 42
+    "Qwen/Qwen2.5-32B": 31,                  # 64
+}
 
 
 def main():

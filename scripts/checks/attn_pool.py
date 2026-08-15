@@ -40,7 +40,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-os.environ.setdefault("HF_HOME", "/vol/gpudata/gs925-msc_project/hf_cache")
+# HF_HOME fallback for callers that did not source an env script. On RCS, pbs/_env.sh already
+# exports HF_HOME, so this whole block is a no-op there.
+# ⚠️ It must NOT hard-code DoC's /vol/gpudata: that path is inside the hard 50 GB quota and already
+# holds Qwen-14B (27.5 GB), so a 32B checkpoint (~65 GB in bf16) cannot fit. Prefer the un-quota'd
+# /vol/bitbucket root and only fall back to gpudata when bitbucket is absent.
+if "HF_HOME" not in os.environ:
+    for _cand in ("/vol/bitbucket/gs925/hf_cache", "/vol/gpudata/gs925-msc_project/hf_cache"):
+        if Path(_cand).parent.is_dir():
+            os.environ["HF_HOME"] = _cand
+            break
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
@@ -56,9 +65,16 @@ MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
 # ⚠️ The guard exists because a model-agnostic glob once loaded the dropped Qwen-1.5B cache into
 # PART A's headline rows (the project conventions). Keeping it FAIL-LOUD is the point; only its constant was
 # ever wrong.
+# ⚠️ Values are read from each checkpoint's own config.json (`hidden_size`), never assumed from the
+# family: gemma-2-9b-it is 3584, NOT the 4096 an 8-9B model invites you to guess.
 EXPECTED_HIDDEN_DIM = {
+    # development populations (the two the hypothesis was formed on)
     "meta-llama/Meta-Llama-3.1-8B": 4096,
     "Qwen/Qwen2.5-14B": 5120,
+    # replication populations, W-Models (2026-08-15)
+    "meta-llama/Llama-3.1-8B-Instruct": 4096,
+    "google/gemma-2-9b-it": 3584,
+    "Qwen/Qwen2.5-32B": 5120,
 }
 SEED = 1
 TEMP_GRID = [0.25, 0.5, 1.0, 2.0, 4.0]

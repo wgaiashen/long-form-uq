@@ -53,6 +53,12 @@ def load_model(name: str, attn_implementation: str | None = None,
     is_gemma = "gemma" in name.lower()
     if dtype is None:
         dtype = torch.bfloat16 if is_gemma else torch.float16
+        # Make the implicit choice LOUD. fp16 here is not cosmetic: token logprobs ARE the msp_min
+        # and wMSP signal, so a run that meant fp32 and silently got fp16 produces a plausible but
+        # different number rather than a crash. The pipeline drivers (01_extract / 01e_repool /
+        # 01h_pertoken) all take --dtype; this warning exists for every other caller.
+        print(f"⚠️  load_model({name}): no explicit dtype -> defaulting to {dtype}. "
+              f"Pass dtype= explicitly if this run must match a cached population.", flush=True)
     if attn_implementation is None and is_gemma:
         attn_implementation = "eager"
     tok = AutoTokenizer.from_pretrained(name)

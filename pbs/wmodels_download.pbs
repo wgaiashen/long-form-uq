@@ -1,0 +1,85 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_wm_dl
+#PBS -j oe
+
+# W-Models: download a replication-population checkpoint into HF_HOME, then VERIFY it.
+# Generalised from pbs/download_qwen.pbs, which was hardcoded to Qwen2.5-14B.
+#
+# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. These pull 16-65GB. Login nodes are for editing and qsub
+# only; a large download is exactly the shape of work that got processes killed by RCS IT on
+# 2026-07-06.
+#
+# ⚠️ COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out the script says so
+# LOUDLY and exits non-zero rather than half-downloading. A partial snapshot is worse than none:
+# `from_pretrained` would then fail deep inside a later job instead of here.
+#
+# ⚠️ THE ASSERTIONS ARE THE POINT. Layer count and hidden size are what the fixed layer rule
+# ceil(N/2)-1 and the fail-loud EXPECTED_HIDDEN_DIM registry depend on. A checkpoint that quietly
+# differs from the registered shape must stop here, not surface as a wrong-shaped cache later.
+#
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_LAYERS=32,LUQ_HIDDEN=4096,LUQ_MIN_GIB=14 pbs/wmodels_download.pbs
+#   qsub -v LUQ_MODEL=google/gemma-2-9b-it,LUQ_LAYERS=42,LUQ_HIDDEN=3584,LUQ_MIN_GIB=16 pbs/wmodels_download.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+unset HF_HUB_OFFLINE                 # this is the one job that MUST reach the network
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+LAYERS="${LUQ_LAYERS:?set LUQ_LAYERS (num_hidden_layers to assert)}"
+HIDDEN="${LUQ_HIDDEN:?set LUQ_HIDDEN (hidden_size to assert)}"
+MIN_GIB="${LUQ_MIN_GIB:-10}"
+
+echo "=== download $MODEL -> $HF_HOME on $(hostname) at $(date) ===" >&2
+echo "    asserting layers=$LAYERS hidden=$HIDDEN min_size=${MIN_GIB}GiB" >&2
+
+echo "--- connectivity probe ---" >&2
+if ! timeout 60 curl -sSf -o /dev/null https://huggingface.co 2>&1; then
+  echo "!!! NO INTERNET on $(hostname). Cannot download here." >&2
+  echo "!!! Fall back: run the same snapshot_download from the LOGIN NODE with max_workers=2." >&2
+  exit 2
+fi
+echo "  network OK" >&2
+
+MODEL="$MODEL" LAYERS="$LAYERS" HIDDEN="$HIDDEN" MIN_GIB="$MIN_GIB" python -u - <<'PY'
+import os, sys, json, glob
+from huggingface_hub import snapshot_download
+
+MODEL = os.environ["MODEL"]
+LAYERS = int(os.environ["LAYERS"]); HIDDEN = int(os.environ["HIDDEN"])
+MIN_GIB = float(os.environ["MIN_GIB"])
+
+# max_workers=4: enough to saturate a cluster link, low enough not to spike RAM the way the default
+# parallel download did on the 8GB DoC jump box (implementation_notes.md §8).
+path = snapshot_download(
+    MODEL, max_workers=4,
+    allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],   # weights + tokenizer, no extras
+)
+print("snapshot at:", path, flush=True)
+
+cfg = json.load(open(os.path.join(path, "config.json")))
+n, h = cfg["num_hidden_layers"], cfg["hidden_size"]
+print(f"  layers={n} hidden={h} vocab={cfg.get('vocab_size')} dtype={cfg.get('torch_dtype')}", flush=True)
+assert n == LAYERS, f"expected {LAYERS} blocks, got {n}"
+assert h == HIDDEN, f"expected hidden {HIDDEN}, got {h}"
+
+# The fixed layer rule, echoed here so the job log records which layer this checkpoint implies.
+import math
+print(f"  fixed rule ceil(N/2)-1 -> layer {math.ceil(n / 2) - 1}", flush=True)
+
+shards = sorted(glob.glob(os.path.join(path, "*.safetensors")))
+total = sum(os.path.getsize(f) for f in shards)
+print(f"  {len(shards)} safetensors shards, {total / 2**30:.1f} GiB", flush=True)
+assert total > MIN_GIB * 2**30, f"only {total / 2**30:.1f} GiB downloaded — incomplete"
+
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained(MODEL)
+print(f"  tokenizer OK: vocab={len(tok)} bos={tok.bos_token!r} eos={tok.eos_token!r} "
+      f"n_special={len(tok.all_special_ids)}", flush=True)
+print("DOWNLOAD VERIFIED", flush=True)
+PY
+STATUS=$?
+echo "=== done status=$STATUS at $(date) ===" >&2
+exit $STATUS
