@@ -295,12 +295,24 @@ prompt-regime choice.
    it were the summary — the same measurement-validity defect that removed `med_quad` from this panel
    (§2.1).
 
-**Why base rather than a chat template.** §6's fallback has no working code path: `probe_drift`'s
-`instruct=True` covers only 3 of the 6 panel datasets, and an instruct *variant* is not
-`apply_chat_template`. Post-hoc truncation is also unavailable — `luq.template_restart` covers
-template restarts and base-model pretraining artefacts, not assistant persona, and it is by design
-"strictly MODEL-AGNOSTIC", so adding a rule that fires on one checkpoint would be retuning on a
-finding.
+**Why base rather than a chat template.** Post-hoc truncation is unavailable — `luq.template_restart`
+covers template restarts and base-model pretraining artefacts, not assistant persona, and it is by
+design "strictly MODEL-AGNOSTIC", so adding a rule that fires on one checkpoint would be retuning on
+a finding. The native chat template was **not built** at the time of the decision.
+
+> **⚠️ AMENDMENT, same day, before any PRR.** This deviation as first written claimed §6's
+> chat-template fallback "has no working code path", reasoning from `probe_drift`'s `instruct=True`
+> covering only 3 of the 6 panel datasets. **That inference was wrong.** §6 specifies the model's
+> *native* chat template, and `tok.apply_chat_template(...)` acts on the **final prompt string**, so
+> it is dataset-agnostic across all six, custom loaders included. Both instruct checkpoints ship a
+> `chat_template` (verified). It is ~5 lines in `01_extract`.
+> **What this does and does not change.** The chat template was genuinely *not implemented*, so it
+> was not an available option on the day — but "not built" is not "cannot be built", and the original
+> wording overstated the constraint. The decision itself was the author's, taken on the
+> generation-validity evidence in the table above, which is unaffected. The swap's remaining
+> justifications also stand independently: `gemma-2-9b` is regime-matched to both development
+> populations, and Gemma's role in the panel is the third FAMILY, not the instruct axis.
+> Recorded here rather than silently edited, because this file is the audit trail.
 
 **What the swap costs and does not cost.** `gemma-2-9b` is the same family, size, hidden width (3584)
 and probe layer (20). Gemma's role in the panel is the **third model family**; the instruct axis is
