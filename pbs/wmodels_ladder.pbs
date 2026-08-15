@@ -34,6 +34,11 @@ MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
 RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds SameTask,LOO.
+# ⚠️ --evals restricts TARGETS ONLY. Without --sources the rungs are still built from the full
+# 8-dataset LONG_SRC, so a "six-dataset panel" run would quietly train on med_quad and expertqa --
+# the two datasets this panel exists to drop. Passing it also makes the restriction explicit rather
+# than an accident of which pertok caches happen to exist on this cluster.
+PANEL="pubmed_qa,xsum,cnn_dailymail,samsum,asqa,factscore"
 SLUG="$(printf '%s' "$MODEL" | tr '/' '_')"
 OUT="results/wmodels_stageA__${SLUG}__${EVAL}.csv"
 PEREX="results/perex_wmodels/${SLUG}"
@@ -60,6 +65,7 @@ echo "  host=$(hostname) at $(date)" >&2
 python -u scripts/checks/probedriftlong.py \
     --model "$MODEL" --layer "$LAYER" \
     --evals "$EVAL" \
+    --sources "$PANEL" \
     --rungs "$RUNGS" \
     --seeds "$SEEDS" \
     --wmsp-only wmsp_norm,wmsp_shrink2 \

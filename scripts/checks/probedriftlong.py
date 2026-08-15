@@ -301,6 +301,15 @@ def main():
                          "which needs lambda 1 and 1.5 on a --train-spec cell; every other lambda in "
                          "the registry already exists. It does NOT create a new registry variant -- "
                          "output lands in the --out file, never in a canonical master.")
+    ap.add_argument("--sources", default=None,
+                    help="comma-separated subset of LONG_SRC to use as the TRAINING-SOURCE POOL. Default "
+                         "None = all 8. ⚠️ --evals restricts TARGETS ONLY; without this flag the rungs are "
+                         "still built from the full 8-dataset pool, so a 'reduced panel' run would quietly "
+                         "train on datasets it claims to have dropped. It also makes the restriction "
+                         "EXPLICIT rather than an accident of which pertok caches happen to exist -- the "
+                         "loader otherwise prints 'no pertok cache -> skip' and shrinks the pool silently. "
+                         "Order is taken from LONG_SRC and never re-sorted, because 1ds-Diff-long reads "
+                         "diff[:1]. Added 2026-08-15 for the W-Models six-dataset panel (prereg M5).")
     ap.add_argument("--rungs", default=None,
                     help="comma-separated BASE rung names to KEEP: ID,SameTask,DiffTask,LOO,1ds-Diff (they map "
                          "to the -long ladder names). Default None = every rung cells_long emits (RCS default "
@@ -460,11 +469,23 @@ def main():
         Path(args.perex_dir).mkdir(parents=True, exist_ok=True)
         print(f"PER-EXAMPLE SIDECARS -> {args.perex_dir} (gated: recomputed PRR must match to <1e-6)", flush=True)
     global LONG_SRC
+    if args.sources:
+        want = [s.strip() for s in args.sources.split(",") if s.strip()]
+        unknown = [s for s in want if s not in LONG_SRC]
+        if unknown:
+            raise SystemExit(f"--sources names {unknown}, which are not in LONG_SRC {LONG_SRC}")
+        # Preserve LONG_SRC ORDER: `1ds-Diff-long` takes diff[:1], so re-ordering the pool silently
+        # changes that rung's composition on every eval (dataset_configs.py:8-10).
+        LONG_SRC = [d for d in LONG_SRC if d in want]
+        print(f"RESTRICTED SOURCE POOL ({len(LONG_SRC)}): {LONG_SRC}", flush=True)
+        print("  ⚠️ rung composition is defined by THIS pool, not the 8-dataset one. SameTask/DiffTask/"
+              "LOO differ from the full grid; ID and 1ds-Diff may not. Caption tables accordingly.",
+              flush=True)
     if args.label_homogeneous:
         LONG_SRC = [d for d in LONG_SRC if d != "expertqa"]
         print("LABEL-HOMOGENEOUS mode: ExpertQA removed from training sources (correctness labels only)",
               flush=True)
-    else:
+    elif not args.sources:
         print("default MIXED-LABEL pool: ExpertQA (faithfulness) is an ordinary training source", flush=True)
     evals = args.evals.split(","); seeds = [int(s) for s in args.seeds.split(",")]
     device = "cuda" if torch.cuda.is_available() else "cpu"
