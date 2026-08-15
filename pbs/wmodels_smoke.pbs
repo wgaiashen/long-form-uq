@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=04:00:00
+#PBS -N luq_wm_smoke
+#PBS -j oe
+
+# W-Models prompt-regime validity gate (prereg/M5_multimodel_far_ood.md §6).
+# 40 DETERMINISTIC rows per dataset x 6 datasets = 240 rows, one GPU slot, then the report.
+#
+# ⚠️ THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,
+# invented continuations, cap behaviour and generation length. It never computes or looks at PRR.
+# Choosing a prompt regime by looking at PRR would be selecting the population on the outcome.
+#
+# ⚠️ --limit takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
+# ⚠️ --prompt-regime <slug>_probe isolates every write, so a probe cache can never contaminate a
+# real one. That namespacing is also why --max-new-tokens becomes legal for all six datasets.
+# ⚠️ generation_quality.py MUST be given --out: its default path writes a TRACKED results file.
+#
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_PROBE=llama31i_probe pbs/wmodels_smoke.pbs
+#   qsub -v LUQ_MODEL=google/gemma-2-9b-it,LUQ_DTYPE=bf16,LUQ_PROBE=gemma29it_probe pbs/wmodels_smoke.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE}"
+PROBE="${LUQ_PROBE:?set LUQ_PROBE (isolated cache namespace)}"
+ATTN="${LUQ_ATTN:-eager}"
+N="${LUQ_LIMIT:-40}"
+OUTDIR="${LUQ_OUTDIR:-results/wmodels_smoke}"
+mkdir -p "$OUTDIR"
+
+echo "=== W-Models validity smoke ===" >&2
+echo "  model=$MODEL dtype=$DTYPE attn=$ATTN probe_regime=$PROBE rows_per_dataset=$N" >&2
+echo "  host=$(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+FAILED=""
+for DS in cnn_dailymail pubmed_qa xsum asqa samsum factscore; do
+  case "$DS" in
+    cnn_dailymail) BUD=128; EXTRA="" ;;
+    pubmed_qa)     BUD=128; EXTRA="--truncate-long" ;;
+    xsum)          BUD=56;  EXTRA="" ;;
+    asqa)          BUD=256; EXTRA="--repetition-penalty 1.2" ;;
+    samsum)        BUD=56;  EXTRA="" ;;
+    factscore)     BUD=256; EXTRA="--repetition-penalty 1.2" ;;
+  esac
+  echo "--- smoke $DS (budget $BUD, $N rows) ---" >&2
+  # shellcheck disable=SC2086
+  python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --dtype "$DTYPE" --attn "$ATTN" \
+      --prompt-regime "$PROBE" --max-new-tokens "$BUD" --max-new-tokens-cap "$BUD" \
+      --limit "$N" $EXTRA || FAILED="$FAILED $DS"
+done
+
+[ -n "$FAILED" ] && echo "!!! extraction failed for:$FAILED" >&2
+
+echo "=== validity report (UQ-independent signals only) ===" >&2
+python -u scripts/checks/generation_quality.py \
+    --model "$MODEL" \
+    --datasets cnn_dailymail,pubmed_qa,xsum,asqa,samsum,factscore \
+    --regime "$PROBE" \
+    --out "$OUTDIR/smoke__$(printf '%s' "$MODEL" | tr '/' '_').csv"
+
+echo "=== smoke done at $(date). Gate: severe<=5.0 degraded<=10.0 empty<=1.0 fabricated<=10.0 ansfrac>=0.90 ===" >&2
+[ -n "$FAILED" ] && exit 9
+exit 0
