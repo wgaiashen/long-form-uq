@@ -1,0 +1,92 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=12:00:00
+#PBS -N luq_wm_post
+#PBS -j oe
+
+# W-Models post-extraction, ONE dataset per job:
+#   01e_repool  ->  feature/pertok consistency GUARD  ->  01h_pertoken
+#
+# ⚠️ 01e_repool IS MANDATORY, NOT OPTIONAL. There are two ways to produce the pooled SAPLMA feature:
+# the INLINE autoregressive capture during 01_extract, and the TEACHER-FORCED re-pool here. They
+# differ by ~8e-3 absolute on the residual stream -- not precision -- and the pertok cache is
+# teacher-forced. Skipping this is exactly the med_quad/cnn/ASQA/ExpertQA gap that had to be fixed
+# once already. The guard turns that silent 8e-3 into a hard failure, so it runs before pertok and
+# a non-zero exit stops the job.
+#
+# ⚠️ --dtype MUST MATCH THE EXTRACTION DTYPE or the re-pooled states are not the ones that were
+# generated from. It is passed through explicitly, never defaulted.
+#
+# ⚠️ THE LAYER IS COMPUTED, NOT TRANSCRIBED. ceil(num_hidden_layers/2) - 1 is read off the
+# checkpoint's own config, so a mistyped layer cannot silently produce a valid-looking cache at the
+# wrong depth. It is cross-checked against the registry in scripts/checks/slice_caches_truncated.py.
+#
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum pbs/wmodels_postextract.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE (must match extraction)}"
+DS="${LUQ_DATASET:?set LUQ_DATASET}"
+ATTN="${LUQ_ATTN:-eager}"
+
+case "$DS" in
+  cnn_dailymail|xsum|samsum) REGIME="" ;;
+  pubmed_qa)                 REGIME="" ;;
+  asqa)                      REGIME="asqa_rp12" ;;
+  factscore)                 REGIME="factscore_rp12" ;;
+  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
+esac
+RG=""; [ -n "$REGIME" ] && RG="--prompt-regime $REGIME"
+
+# pubmed_qa was generated newline-stopped; the re-pool must reproduce the same token window.
+TL=""; [ "$DS" = "pubmed_qa" ] && TL="--truncate-long"
+
+LAYER=$(MODEL="$MODEL" python - <<'PY'
+import math, os
+from transformers import AutoConfig
+n = AutoConfig.from_pretrained(os.environ["MODEL"]).num_hidden_layers
+print(math.ceil(n / 2) - 1)
+PY
+)
+[ -z "$LAYER" ] && { echo "!!! could not resolve layer for $MODEL" >&2; exit 4; }
+
+# Cross-check against the committed registry: the rule and the table must agree.
+MODEL="$MODEL" LAYER="$LAYER" python - <<'PY' || exit 5
+import ast, os, sys
+src = open("scripts/checks/slice_caches_truncated.py").read()
+for n in ast.walk(ast.parse(src)):
+    if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "LAYER":
+        reg = {ast.literal_eval(k): ast.literal_eval(v) for k, v in zip(n.value.keys, n.value.values)}
+        break
+m, got = os.environ["MODEL"], int(os.environ["LAYER"])
+if m not in reg:
+    sys.exit(f"!!! {m} is not in the LAYER registry -- add it before running")
+if reg[m] != got:
+    sys.exit(f"!!! layer disagreement for {m}: rule says {got}, registry says {reg[m]}")
+print(f"  layer {got} agrees with the registry", flush=True)
+PY
+
+echo "=== W-Models post-extract ===" >&2
+echo "  model=$MODEL dtype=$DTYPE attn=$ATTN dataset=$DS layer=$LAYER regime='${REGIME:-<default>}'" >&2
+echo "  host=$(hostname) at $(date)" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+echo "--- 1/3 re-pool (teacher-forced) ---" >&2
+# shellcheck disable=SC2086
+python -u scripts/01e_repool.py --model "$MODEL" --dataset "$DS" --ood ID \
+    --dtype "$DTYPE" --attn "$ATTN" $RG $TL || { echo "!!! repool failed" >&2; exit 6; }
+
+echo "--- 2/3 feature/pertok consistency guard ---" >&2
+# shellcheck disable=SC2086
+python -u scripts/checks/feature_pertok_consistency.py --model "$MODEL" --datasets "$DS" \
+    --layer "$LAYER" $RG --full || { echo "!!! CONSISTENCY GUARD FAILED -- not writing pertok" >&2; exit 7; }
+
+echo "--- 3/3 per-token cache at layer $LAYER ---" >&2
+# shellcheck disable=SC2086
+python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DS" --ood ID \
+    --layer "$LAYER" --dtype "$DTYPE" --attn "$ATTN" $RG || { echo "!!! pertoken failed" >&2; exit 8; }
+
+echo "=== $DS post-extract done at $(date) ===" >&2
