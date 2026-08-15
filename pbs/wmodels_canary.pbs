@@ -1,0 +1,44 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb:ngpus=1:gpu_type=RTX6000
+#PBS -l walltime=01:00:00
+#PBS -N luq_wm_canary
+#PBS -j oe
+
+# W-Models memory canary (G5). Runs the LONGEST real inputs through the actual extraction path and
+# reports peak GPU memory, before a full six-dataset array is submitted.
+#
+# ⚠️ THE SMOKE DOES NOT COVER THIS. `01_extract --limit 40` takes the FIRST 40 rows by index, and the
+# rows that OOM are the LONGEST ones, which sit in the tail. A 40-row smoke can pass comfortably on a
+# card that the full run then dies on, hours in.
+#
+# ⚠️ "Longest" is TOKENISER-dependent, so the canary ranks with the target model's own tokeniser
+# rather than reusing a Llama-derived ranking.
+#
+# gpu_type is overridable because the point is to test the card the real run will actually get:
+#   qsub -v LUQ_MODEL=google/gemma-2-9b-it,LUQ_DTYPE=bf16,LUQ_DATASET=xsum pbs/wmodels_canary.pbs
+#   qsub -l select=1:ncpus=2:mem=64gb:ngpus=1:gpu_type=L40S -v LUQ_MODEL=...,LUQ_DTYPE=fp32 pbs/wmodels_canary.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+mkdir -p logs
+LIVE="logs/wmodels_canary__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-xsum}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE}"
+DS="${LUQ_DATASET:-xsum}"
+ATTN="${LUQ_ATTN:-eager}"
+TOP="${LUQ_TOP:-3}"
+
+echo "=== canary: $MODEL | $DS | $DTYPE + $ATTN | top $TOP longest ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+python -u scripts/checks/wmodels_memory_canary.py \
+    --model "$MODEL" --dataset "$DS" --dtype "$DTYPE" --attn "$ATTN" --top "$TOP"
+STATUS=$?
+echo "=== canary done status=$STATUS at $(date) ===" >&2
+exit $STATUS
