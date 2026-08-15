@@ -1,0 +1,46 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb:ngpus=1:gpu_type=RTX6000
+#PBS -l walltime=00:40:00
+#PBS -N luq_wm_iprobe
+#PBS -j oe
+
+# DIAGNOSTIC ONLY -- predicts whether an instruct checkpoint will hit the two failures that
+# withdrew gemma-2-9b-it (prereg M5 D1), BEFORE it consumes a scarce 48GB card for 12 hours:
+#   1. whitespace-fronting  -> a leading newline, which --truncate-long then cuts to EMPTY
+#   2. assistant persona    -> trailing chatter the judge grades as the answer
+#
+# ⛔ THIS IS NOT A POPULATION. It writes NOTHING to any cache, runs in bf16 on an abundant card
+# purely because the question ("is the first emitted token a newline?") is not dtype-sensitive, and
+# its output may never enter a results table. The real fp32 run remains the population.
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+mkdir -p logs; LIVE="logs/wmodels_instruct_probe__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+
+python -u - <<'PY'
+import sys, torch
+sys.path.insert(0, "src")
+from luq import data, generate
+M = "meta-llama/Llama-3.1-8B-Instruct"
+model, tok = generate.load_model(M, attn_implementation="eager", dtype=torch.bfloat16)
+for ds in ["pubmed_qa", "samsum"]:
+    tr, ev = data.load(ds, "ID")
+    prompts = list(tr.x)[:8]
+    print(f"\n=== {ds} (budget {data.MAX_NEW_TOKENS[ds]}) ===", flush=True)
+    lead = 0
+    for i, p in enumerate(prompts):
+        out = generate.generate(model, tok, p, max_new_tokens=data.MAX_NEW_TOKENS[ds])
+        ids = out["gen_token_ids"] if isinstance(out, dict) else out[0]
+        txt = tok.decode(ids)
+        first = tok.decode(ids[:1])
+        if first.strip() == "":
+            lead += 1
+        print(f"  [{i}] first_token={first!r} len={len(ids)} text={txt[:110]!r}", flush=True)
+    print(f"  --> leading-whitespace rate: {lead}/{len(prompts)}", flush=True)
+    if ds == "pubmed_qa" and lead:
+        print("  ⚠️ pubmed_qa uses --truncate-long; a leading newline truncates the answer to EMPTY.",
+              flush=True)
+PY
+echo "=== instruct probe done at $(date) ===" >&2
