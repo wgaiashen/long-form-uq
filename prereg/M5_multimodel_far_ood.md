@@ -49,8 +49,13 @@ evidence and are **not** counted as confirmatory replications.
 | model | layers → layer | hidden | dtype | cluster |
 |---|---|---|---|---|
 | `meta-llama/Llama-3.1-8B-Instruct` | 32 → **15** | 4096 | fp32 | RCS |
-| `google/gemma-2-9b-it` | 42 → **20** | **3584** | bf16 + eager | RCS |
+| `google/gemma-2-9b-it` ⛔ **superseded — see D1** | 42 → **20** | **3584** | bf16 + eager | RCS |
 | `Qwen/Qwen2.5-32B` | 64 → **31** | 5120 | bf16 | DoC |
+
+⛔ **This table records what was REGISTERED, and is deliberately not rewritten.** `gemma-2-9b-it` was
+withdrawn on 2026-08-15 and replaced by `google/gemma-2-9b` (base) — see **deviation D1 in §8** for
+the evidence and reasoning. A pre-registration is an audit trail: changes are recorded as deviations,
+never edited into the original text.
 
 Layer indices follow the fixed rule `ceil(N/2) − 1` and are **never re-selected from results**.
 ⚠️ Gemma is **20**; the discarded 2026-06 Gemma-2-9B-It run used 21 under the repo's other
