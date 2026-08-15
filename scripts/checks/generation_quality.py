@@ -49,6 +49,27 @@ def gold_text(r):
 # documents the per-dataset shapes; this is the cheap population-level rate of the med_quad/QA one.
 _FABRICATED = re.compile(r"\bQuestion\s*:")
 
+# ⚠️ ADDED 2026-08-15. `_FABRICATED` only sees an invented "Question:" restart -- the BASE-model
+# few-shot failure. It is structurally blind to the INSTRUCT-model failure: the model answers
+# correctly and then continues in its assistant persona ("Let me know if you'd like me to analyze
+# anything else!"). Measured on gemma-2-9b-it samsum: 80% of generations, with the real answer only
+# ~63% of the saved text, while pct_fabricated read 0.0%.
+# This matters because the judge scores the WHOLE saved output, so the filler is graded as if it
+# were the summary -- the same harm pct_fabricated exists to measure, arriving by a different route.
+# Kept as a SEPARATE column: pct_fabricated's semantics are load-bearing for the existing Llama and
+# Qwen numbers and must not shift under them.
+_CHATTER = re.compile(
+    r"(let me know|i hope (this|that) helps|hope this helps|would you like|feel free to|"
+    r"anything else|if you'd like|shall i|do you want me to|is there anything)", re.I)
+
+
+def chatter(text):
+    """(has_assistant_chatter, fraction of the text that precedes it)."""
+    m = _CHATTER.search(text or "")
+    if not m:
+        return False, 1.0
+    return True, m.start() / max(len(text), 1)
+
 
 def fabrication(text):
     """(has_fabricated_continuation, fraction of the text that is the REAL answer).
@@ -96,9 +117,14 @@ def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
     fab = [fabrication(t) for t in texts]
     has_fab = np.array([f[0] for f in fab])
     answer_frac = np.array([f[1] for f in fab])
+    cht = [chatter(t) for t in texts]
+    has_cht = np.array([c[0] for c in cht])
+    cht_frac = np.array([c[1] for c in cht])
     return {"dataset": dataset, "regime": cfg.prompt_regime or "(v1 default)", "n": len(recs),
             "pct_fabricated": round(100 * float(has_fab.mean()), 1),
             "mean_answer_frac": round(float(answer_frac.mean()), 3),
+            "pct_chatter": round(100 * float(has_cht.mean()), 1),
+            "mean_prechatter_frac": round(float(cht_frac.mean()), 3),
             "budget": int(budget),
             "gen_p50": float(np.percentile(glen, 50)), "gen_p90": float(np.percentile(glen, 90)),
             "pct_capped": round(100 * float(capped.mean()), 1),

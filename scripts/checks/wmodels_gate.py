@@ -33,6 +33,12 @@ MAX_DEGRADED = 10.0
 MAX_EMPTY = 1.0
 MAX_FABRICATED = 10.0
 MIN_ANSWER_FRAC = 0.90
+# ⚠️ ADDED 2026-08-15. The instruct failure mode pct_fabricated cannot see: the model answers
+# correctly then continues in its assistant persona. gemma-2-9b-it samsum scored 80% chatter with
+# pct_fabricated at 0.0%, i.e. the gate would have PASSED a population where ~30% of the saved text
+# is filler that the judge then grades as if it were the answer.
+MAX_CHATTER = 10.0
+MIN_PRECHATTER_FRAC = 0.90
 MAX_CAPPED_OVER_BASE = 20.0     # percentage POINTS above the base model on the same dataset
 
 
@@ -82,7 +88,8 @@ def main():
         print("  Not a pass and not a fail. Let generation add rows, then re-run this gate.")
         sys.exit(3)
 
-    hdr = f"  {'dataset':15s} {'severe':>7s} {'degrad':>7s} {'empty':>6s} {'fabric':>7s} {'ansfrc':>7s} {'capped':>7s}  verdict"
+    hdr = (f"  {'dataset':15s} {'severe':>7s} {'degrad':>7s} {'empty':>6s} {'fabric':>7s} "
+           f"{'ansfrc':>7s} {'capped':>7s} {'chatr':>6s}  verdict")
     print(hdr)
     failures = []
     uncompared = []
@@ -102,6 +109,14 @@ def main():
             why.append(f"fabricated {fab}>{MAX_FABRICATED}")
         if afr is None or afr < MIN_ANSWER_FRAC:
             why.append(f"answer_frac {afr}<{MIN_ANSWER_FRAC}")
+        cht, pcf = f(r, "pct_chatter"), f(r, "mean_prechatter_frac")
+        if cht is None or pcf is None:
+            why.append("chatter NOT MEASURED (re-run generation_quality.py; older CSV)")
+        else:
+            if cht > MAX_CHATTER:
+                why.append(f"chatter {cht}>{MAX_CHATTER}")
+            if pcf < MIN_PRECHATTER_FRAC:
+                why.append(f"prechatter_frac {pcf}<{MIN_PRECHATTER_FRAC}")
         # ⚠️ A cap check with no baseline value must READ as unevaluated, not pass silently. The `~`
         # marks exactly that: the number is the smoke's own %capped, with nothing to compare it to.
         bcap = f(base.get(d), "pct_capped") if base else None
@@ -117,7 +132,9 @@ def main():
         verdict = "pass" if not why else "FAIL: " + "; ".join(why)
         if why:
             failures.append(d)
-        print(f"  {d:15s} {sev:7.2f} {deg:7.2f} {emp:6.2f} {fab:7.1f} {afr:7.3f} {capstr}  {verdict}")
+        chtstr = "     ?" if cht is None else f"{cht:6.1f}"
+        print(f"  {d:15s} {sev:7.2f} {deg:7.2f} {emp:6.2f} {fab:7.1f} {afr:7.3f} "
+              f"{capstr} {chtstr}  {verdict}")
 
     if uncompared:
         print(f"  ⚠️ %capped marked `~` = NOT COMPARED (no baseline row): {uncompared}. "
