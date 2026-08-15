@@ -57,6 +57,11 @@ def main():
     ap.add_argument("--baseline-csv", default=None,
                     help="base-model generation_quality.csv, for the %%capped comparison. Without it "
                          "the cap check is reported as NOT EVALUATED rather than silently passed.")
+    ap.add_argument("--min-rows", type=int, default=40,
+                    help="refuse to decide on fewer than this many rows per dataset. Matters for the "
+                         "INLINE gate, which reads a partial cache while generation is still running: "
+                         "a percentage over 5 rows is noise, and a regime decision made on noise is "
+                         "worse than no gate at all. 40 = the pre-registered smoke size.")
     args = ap.parse_args()
 
     smoke = rows_by_dataset(args.smoke_csv)
@@ -69,6 +74,13 @@ def main():
         print(f"  ❌ FAIL — smoke is incomplete, missing {missing}")
         print("  A partial smoke is not a pass. Re-run the missing datasets.")
         sys.exit(1)
+
+    thin = [(d, int(float(smoke[d].get("n", 0) or 0))) for d in PANEL
+            if float(smoke[d].get("n", 0) or 0) < args.min_rows]
+    if thin:
+        print(f"  ⏳ UNDECIDED — too few rows to judge: {thin} (need >= {args.min_rows} each)")
+        print("  Not a pass and not a fail. Let generation add rows, then re-run this gate.")
+        sys.exit(3)
 
     hdr = f"  {'dataset':15s} {'severe':>7s} {'degrad':>7s} {'empty':>6s} {'fabric':>7s} {'ansfrc':>7s} {'capped':>7s}  verdict"
     print(hdr)
