@@ -86,14 +86,20 @@ echo "--- 1/3 re-pool (teacher-forced) ---" >&2
 python -u scripts/01e_repool.py --model "$MODEL" --dataset "$DS" --ood ID \
     --dtype "$DTYPE" --attn "$ATTN" $RG $TL || { echo "!!! repool failed" >&2; exit 6; }
 
-echo "--- 2/3 feature/pertok consistency guard ---" >&2
-# shellcheck disable=SC2086
-python -u scripts/checks/feature_pertok_consistency.py --model "$MODEL" --datasets "$DS" \
-    --layer "$LAYER" $RG --full || { echo "!!! CONSISTENCY GUARD FAILED -- not writing pertok" >&2; exit 7; }
-
-echo "--- 3/3 per-token cache at layer $LAYER ---" >&2
+echo "--- 2/3 per-token cache at layer $LAYER ---" >&2
 # shellcheck disable=SC2086
 python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DS" --ood ID \
     --layer "$LAYER" --dtype "$DTYPE" --attn "$ATTN" $RG || { echo "!!! pertoken failed" >&2; exit 8; }
+
+# ⚠️ ORDER FIXED 2026-08-15. The guard compares the pooled feature cache against the TEACHER-FORCED
+# pertok cache, so it needs BOTH. It was previously run between repool and 01h_pertoken, where the
+# pertok cache does not exist yet -- so it skipped every dataset, printed "ALL consistent" and exited
+# 0. A guard that runs before the thing it checks is not a guard; it is a rubber stamp.
+# --require-checked makes a SKIP fail the job, so this can never silently regress.
+echo "--- 3/3 feature/pertok consistency guard (AFTER pertok, which it compares against) ---" >&2
+# shellcheck disable=SC2086
+python -u scripts/checks/feature_pertok_consistency.py --model "$MODEL" --datasets "$DS" \
+    --layer "$LAYER" $RG --full --require-checked \
+    || { echo "!!! CONSISTENCY GUARD FAILED OR SKIPPED -- the caches are not verified" >&2; exit 7; }
 
 echo "=== $DS post-extract done at $(date) ===" >&2

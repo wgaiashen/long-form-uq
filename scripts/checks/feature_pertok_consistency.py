@@ -69,20 +69,39 @@ def main():
                          "(mid = (n_hidden_layers+1)//2: Llama-3.1-8B -> 15/16 as dumped, Qwen2.5-14B -> 24).")
     ap.add_argument("--layer", type=int, default=15)
     ap.add_argument("--full", action="store_true", help="check every example (heavier) instead of a sample")
+    ap.add_argument("--require-checked", action="store_true",
+                    help="exit non-zero if ANY dataset was skipped. Default off so existing callers "
+                         "are unaffected, but every NEW caller should pass it: a guard that skipped "
+                         "has verified nothing, and must not be mistaken for one that passed.")
     args = ap.parse_args()
     print(f"model = {args.model}")
     print(f"{'dataset':16s} {'verdict':10s} detail")
     any_fail = False
+    skipped = []
     for d in args.datasets.split(","):
         name, ok, detail = check(d, args.prompt_regime, args.layer, full=args.full, model=args.model)
         v = "SKIP" if ok is None else ("PASS ✓" if ok else "FAIL ✗ (inline-only → repool)")
         if ok is False:
             any_fail = True
+        if ok is None:
+            skipped.append(name)
         print(f"{name:16s} {v:10s} {detail}")
     if any_fail:
         print("\nFAIL: one or more feature caches are inline-only (not teacher-forced). Re-pool with 01e_repool.")
         sys.exit(1)
-    print("\nALL consistent (feature cache == teacher-forced pertok).")
+    # ⚠️ A SKIP IS NOT A PASS. Until 2026-08-15 a run where every dataset skipped (typically because
+    # the pertok cache did not exist yet) still printed "ALL consistent" and exited 0 -- a guard
+    # reporting success for having checked nothing, which is the exact failure mode this guard exists
+    # to prevent elsewhere. Found when a W-Models post-extract job ran the guard BEFORE 01h_pertoken:
+    # it skipped every dataset and passed, so it could never have caught anything.
+    if skipped:
+        print(f"\n⚠️ SKIPPED (nothing compared): {skipped}. A skip is NOT a pass — the pertok cache "
+              f"must exist, so run this AFTER 01h_pertoken.")
+        if args.require_checked:
+            print("--require-checked: exiting non-zero because at least one dataset was not checked.")
+            sys.exit(2)
+    if not skipped:
+        print("\nALL consistent (feature cache == teacher-forced pertok).")
 
 
 if __name__ == "__main__":
