@@ -37,6 +37,14 @@ set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 export HF_HOME
 
+# PBS only copies its .o file back when the job ENDS, so a multi-hour generation job is invisible
+# while it matters most. Mirror everything to a live log as well, so progress (and a stall) can be
+# seen from the login node with `tail -f`.
+mkdir -p logs
+LIVE="logs/wmodels_extract__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-unknown}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
 MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE (fp32 | bf16) -- never leave this to auto}"
 DS="${LUQ_DATASET:?set LUQ_DATASET}"

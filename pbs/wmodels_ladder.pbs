@@ -30,6 +30,13 @@ set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 export HF_HOME
 
+# PBS copies its .o file back only at job END, and a ladder cell can run for hours. Mirror to a live
+# log so progress is visible from the login node with `tail -f`.
+mkdir -p logs
+LIVE="logs/wmodels_ladder__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_EVAL:-unknown}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
 MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
