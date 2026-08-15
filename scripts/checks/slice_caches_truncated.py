@@ -51,7 +51,8 @@ LAYER = {
     "Qwen/Qwen2.5-14B": 23,                  # 48 layers
     "meta-llama/Meta-Llama-3.1-8B": 15,      # 32
     "meta-llama/Llama-3.1-8B-Instruct": 15,  # 32
-    "google/gemma-2-9b-it": 20,              # 42
+    "google/gemma-2-9b": 20,                 # 42 -- base, the population actually run
+    "google/gemma-2-9b-it": 20,              # 42 -- instruct, WITHDRAWN 2026-08-15
     "Qwen/Qwen2.5-32B": 31,                  # 64
 }
 

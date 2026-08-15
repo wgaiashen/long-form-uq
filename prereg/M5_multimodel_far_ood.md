@@ -267,3 +267,47 @@ Any deviation from this file is recorded here with its date and reason, before t
 reported. Adding a method, changing λ, changing the dataset panel, changing a rung, or changing a
 threshold after any replication-population PRR has been observed invalidates the primary claim, which
 must then be reported as exploratory.
+
+---
+
+### D1 — `google/gemma-2-9b-it` → `google/gemma-2-9b` (base). 2026-08-15.
+
+**Recorded before any PRR was computed on any replication population.** No supervised number, no
+floor, and no ladder cell existed for either Gemma checkpoint at the time of this decision. The
+change was made on **generation-validity evidence only**, which is the same standard §6 sets for the
+prompt-regime choice.
+
+**What was measured.** `gemma-2-9b-it` under raw few-shot, on real generations (not the smoke):
+
+| dataset | n | finding |
+|---|---|---|
+| `pubmed_qa` | 200 | **100% EMPTY** — every record is a bare `"\n"`, 1 token |
+| `samsum` | 400 | **82.2% assistant chatter**; real answer only 69% of saved text |
+| `cnn_dailymail` | 200 | clean (0.5% chatter) |
+| `asqa` | 200 | clean (0.0% chatter) |
+
+**Mechanisms, both specific to instruction tuning:**
+1. *Whitespace-fronting.* An instruct model under raw prompting emits a leading newline. `pubmed_qa`
+   generates with `--truncate-long` (Joe's `generate_until=['\n']`), so the newline truncates the
+   entire answer away. The failure is total and silent — the job exits 0.
+2. *Assistant persona.* The model answers correctly, then continues ("Let me know if you'd like me to
+   analyze any other text!"). The judge scores the whole saved output, so the filler is graded as if
+   it were the summary — the same measurement-validity defect that removed `med_quad` from this panel
+   (§2.1).
+
+**Why base rather than a chat template.** §6's fallback has no working code path: `probe_drift`'s
+`instruct=True` covers only 3 of the 6 panel datasets, and an instruct *variant* is not
+`apply_chat_template`. Post-hoc truncation is also unavailable — `luq.template_restart` covers
+template restarts and base-model pretraining artefacts, not assistant persona, and it is by design
+"strictly MODEL-AGNOSTIC", so adding a rule that fires on one checkpoint would be retuning on a
+finding.
+
+**What the swap costs and does not cost.** `gemma-2-9b` is the same family, size, hidden width (3584)
+and probe layer (20). Gemma's role in the panel is the **third model family**; the instruct axis is
+carried by `meta-llama/Llama-3.1-8B-Instruct`, which is unaffected. The base checkpoint is also
+**regime-matched to both development populations**, which are base models — so this deviation makes
+the panel more internally consistent, not less.
+
+⛔ **`gemma-2-9b-it` is WITHDRAWN.** Its partial caches are not to be scored, promoted, or reported.
+It stays in the hidden-dim and layer registries only so that a stale cache fails loudly rather than
+being silently mistaken for the base population.
