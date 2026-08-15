@@ -41,7 +41,7 @@ export HF_HOME
 # while it matters most. Mirror everything to a live log as well, so progress (and a stall) can be
 # seen from the login node with `tail -f`.
 mkdir -p logs
-LIVE="logs/wmodels_extract__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-unknown}.log"
+LIVE="logs/wmodels_extract__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-unknown}__${PBS_JOBID%%.*}.log"
 exec > >(tee -a "$LIVE") 2>&1
 echo "live log: $LIVE"
 

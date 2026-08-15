@@ -24,7 +24,7 @@ export HF_HOME
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 mkdir -p logs
-LIVE="logs/wmodels_canary__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-xsum}.log"
+LIVE="logs/wmodels_canary__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-xsum}__${PBS_JOBID%%.*}.log"
 exec > >(tee -a "$LIVE") 2>&1
 echo "live log: $LIVE"
 

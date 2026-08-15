@@ -30,7 +30,7 @@ export HF_HOME
 # PBS copies its .o file back only at job END. Mirror to a live log so a long re-pool/pertok run can
 # be watched (and a stall spotted) from the login node with `tail -f`.
 mkdir -p logs
-LIVE="logs/wmodels_post__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-unknown}.log"
+LIVE="logs/wmodels_post__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_DATASET:-unknown}__${PBS_JOBID%%.*}.log"
 exec > >(tee -a "$LIVE") 2>&1
 echo "live log: $LIVE"
 
