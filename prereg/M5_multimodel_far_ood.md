@@ -328,3 +328,43 @@ the panel more internally consistent, not less.
 ⛔ **`gemma-2-9b-it` is WITHDRAWN.** Its partial caches are not to be scored, promoted, or reported.
 It stays in the hidden-dim and layer registries only so that a stale cache fails loudly rather than
 being silently mistaken for the base population.
+
+---
+
+### D2 — `gemma-2-9b` exceeds the `pct_severe` gate on two datasets; ACCEPTED by the author. 2026-08-15.
+
+**Recorded before any PRR was computed on any replication population.**
+
+`gemma-2-9b` (base) clears the two failures that withdrew the instruct checkpoint — `pubmed_qa` 0.0%
+empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct_severe` ceiling of
+**5.0** on two datasets, measured on the first 200-400 records of the real run:
+
+| dataset | `pct_severe` | what the detector is actually flagging |
+|---|---|---|
+| `pubmed_qa` | **6.0%** | HTML markup: `'<strong>Yes</strong>.'`, `'<b>Yes</b>.'` — the **answer is correct**, the formatting is web-scraped. Fires the detector's code-density branch (`{}<>`), by design |
+| `asqa` | **7.0%** | genuine web / pretraining artefacts, e.g. *"The answer to this puzzle was submitted by `<b>David</b>` and it can be found on page #2354"* |
+
+For calibration: Llama base is ~1.1% on `pubmed_qa`, and the 5.0 ceiling was anchored to it with
+headroom, fixed before any Gemma number existed.
+
+**§6 HAS NO REMEDY FOR A BASE MODEL, and that is a gap in the registration.** Its decision rule is
+"if raw few-shot fails, use that model's native chat template" — which presupposes an instruct
+checkpoint. A base model has no alternative regime, so "fail" is undefined for it. Registering the
+gap rather than quietly reinterpreting the rule.
+
+**Author's decision: ACCEPT `gemma-2-9b` and report the numbers prominently.** Reasons: the flagged
+content is largely correct with anomalous formatting rather than degenerate; 6-7% is far from the
+catastrophic failures that withdrew the instruct checkpoint (100% / 82%); and the ceiling was
+calibrated on Llama's unusually clean output, so it is a strict bar for a different family. Gemma's
+role in the panel is the third FAMILY, and this markup behaviour is a real property of it.
+
+**Binding conditions on this acceptance:**
+1. ⛔ **The threshold is NOT moved.** `wmodels_gate.py` continues to report `FAIL` for these
+   datasets. This is an explicit, recorded override, not a re-tuned gate — so the gate never
+   misreports what it measured.
+2. `pct_severe` for `gemma-2-9b` **must be reported in the results table**, not relegated to a
+   footnote, wherever this population appears.
+3. The distinction between `pubmed_qa` (cosmetic markup) and `asqa` (genuine artefacts) is stated,
+   not averaged away.
+4. If a Gemma-specific result later depends on `asqa`, this acceptance is revisited before that
+   result is claimed.
