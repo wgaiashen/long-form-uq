@@ -331,6 +331,49 @@ being silently mistaken for the base population.
 
 ---
 
+### D3 — `pubmed_qa` prompt provenance: Llama base is on probe_drift **v1**, every other population on **v2**. 2026-08-16.
+
+**Not a deviation from the protocol — a pre-existing property of the development cache, found while
+verifying the new populations.** Recorded here because it is a population difference on one dataset,
+and this file is where such things belong.
+
+**How it surfaced.** Comparing Gemma's `pubmed_qa` prompts against Llama base's gave **0 of 3800
+identical** — which initially read as a different sample. It is not. Comparing the *questions*
+instead:
+
+| split | v1 vs v2 question SET | ORDER | positions coinciding |
+|---|---|---|---|
+| train | **identical**, 1800/1800 | different | 1/1800 |
+| test | **identical**, 2000/2000 | different | 3/2000 |
+
+So the two library generations hold **the same examples in a different order**, plus a slightly
+reworded few-shot preamble (*"The following are abstract and question about them … question and
+answer to a gi…"* vs *"…abstract**s** and question**s** about them … question and **its** answer."*;
+1309 vs 1296 chars on a shared question).
+
+**Cause.** `probe_drift` is an editable install and three checkouts exist on the filesystem, in two
+generations: v1 (`{x,y}`, pre-formatted, `dataset_configs` sha `f38d54cb`) at `~/ProbeDrift` and
+`temp_idea_1_msp_probe/ProbeDrift`, and v2 (raw fields, sha `6c22ef9c`) at
+`gs925-msc_project/ProbeDrift`, which is what pip resolves. Llama base's `pubmed_qa` was generated
+before the author received v2; everything since — Llama base's other datasets, Qwen2.5-14B, and all
+three replication populations — is v2. Verified by exact match: v1's `train__pubmed_qa__ID` `x[0]` is
+byte-identical to Llama base's `train[0]` prompt, 1800/1800 across the split.
+This is exactly the hazard `cache.source_provenance()` exists for; Llama base's stamp is **missing**
+because that cache predates the stamping.
+
+**Why it is benign, and why no regeneration is done.**
+- `pubmed_qa` has explicit `train`/`validation` splits, so **no positional carve applies** — order
+  cannot move an example between train and test.
+- Probe training consumes the train **set**; PRR aggregates over the test **set**. Neither depends on
+  row order.
+- Each model's records and pertok cache are aligned **to each other**, which is all `load_per_token`
+  requires. Cross-model ordering differences do not touch that alignment.
+
+**The caveat that IS carried:** Llama base's `pubmed_qa` prompts use a marginally different few-shot
+preamble from every other population. Same examples, different wording. Llama base is a
+**development** population whose role here is descriptive, not confirmatory, so this cannot affect
+the primary test — but it is stated in the limitations rather than left silent.
+
 ### D2 — `gemma-2-9b` exceeds the `pct_severe` gate on two datasets; ACCEPTED by the author. 2026-08-15.
 
 **Recorded before any PRR was computed on any replication population.**
