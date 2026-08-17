@@ -1,0 +1,62 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=14:00:00
+#PBS -N luq_ens_perex
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+
+# W-Ensemble component pass -- prereg/M6_hapes_saplma_ensemble.md
+#
+# WHAT THIS PRODUCES, AND WHY IT IS ONE PASS
+# ------------------------------------------
+# The M6 question is whether HAPES (wmsp_shrink2) supplies a signal complementary to SAPLMA. Every
+# ensemble, correlation and rung-profile number in M6 is a function of the PER-EXAMPLE uncertainty
+# vectors, not of the per-cell PRRs. probedriftlong.py already computes all the components we need in
+# one pass (floors, SAPLMA, mean-pool `uniform`, attention pooler, and the wMSP variants) and already
+# has --perex-dir, whose _save_perex() writes unc__<method> at (n_seeds, n_te) in float64 and REFUSES
+# to write if PRR recomputed from the stored vectors misses the in-memory value by >=1e-6.
+#
+# So one compute pass makes every downstream ensemble a free post-hoc read. No driver is edited.
+#
+# --wmsp-only wmsp_norm,wmsp_shrink2 is what keeps this affordable: the default WMSP list would also
+# train the segmented and Blondel variants per cell, which M6 does not use. HAPE (wmsp_norm) is kept
+# because M6 needs it as a reference/ablation and as a continuity check against the canonical master.
+#
+# LAMBDA IS FIXED AT 2. This is not a lambda sweep -- see prereg M6 sections 3 and 10.
+#
+# OUTPUT DIRECTORY -- READ THIS
+# -----------------------------
+# --perex-dir is results/pdl_perex_ens, NEVER results/pdl_perex. The filename pattern is identical
+# ({eval}__{rung}__{slug}.npz) and results/pdl_perex is version-controlled and read by
+# orthogonality_map.py, pdl_significance.py and length_blend_perinstance.py. Writing there would
+# silently change the population behind already-quoted numbers.
+#
+# CPU ONLY. No GPU is requested; the ladder falls back to device=cpu. This is deliberate: the
+# W-Models extraction work owns the GPUs on both clusters and must not be slowed down.
+#
+# Run ONE dataset first as a correctness + wall-clock probe, then the remaining seven:
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_perex_ens.pbs
+#   for E in med_quad asqa xsum cnn_dailymail samsum expertqa factscore; do
+#     qsub -v LUQ_EVAL=$E pbs/pdl_perex_ens.pbs
+#   done
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_perex_ens.pbs}"
+
+echo "M6 component pass: eval=$EV, seeds 1,2,3, wmsp_norm+wmsp_shrink2, on $(hostname) at $(date)" >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --perex-dir results/pdl_perex_ens \
+    --out "results/pdl_ens_components_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+
+echo "M6 component pass: eval=$EV finished at $(date)" >&2
