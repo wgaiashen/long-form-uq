@@ -328,6 +328,14 @@ def main():
                          "prr": round(dmax, 8), "n_eval": n_eval, "carve": carve, **prov})
 
         # ------------------------------------------------------------- CONTROL 2: the outside gate
+        # ⚠️ STRICT ONLY AT THE FULL SEED COUNT. pdl_master stores the MEAN OVER 3 SEEDS, so a run with
+        # fewer seeds is a different estimator and cannot be held to 4 dp. Measured on the first smoke
+        # (1 seed, pubmed_qa): every rung missed by 0.019-0.085 while the RECORDED per-rung seed sd for
+        # wMSP-norm on that dataset is 0.035-0.106 -- i.e. every miss was within ~1.4 seed sd, exactly
+        # what one draw from that distribution looks like. Widening the tolerance instead would have
+        # hidden a real failure inside seed noise, so below the full seed count the check is ADVISORY
+        # and says so, rather than passing quietly.
+        gate_strict = len(seeds) >= 3
         gate_txt = []
         for method in ("HAPE", "HAPES"):
             got = float(np.mean(per[(method, "post_token")]))
@@ -337,10 +345,11 @@ def main():
                 continue
             dv = got - exp
             ok = abs(dv) <= GATE_4DP
-            if not ok:
+            if not ok and gate_strict:
                 gate2_fail.append(f"{rung}/{X}/{method}: post_token {got:+.6f} vs master "
                                   f"{CANON_METHOD[method]} {exp:+.6f} (Δ {dv:+.2e})")
-            gate_txt.append(f"{method}:post Δ{dv:+.1e}{'' if ok else ' ✗'}")
+            mark = "" if ok else (" ✗" if gate_strict else " (advisory)")
+            gate_txt.append(f"{method}:post Δ{dv:+.1e}{mark}")
             rows.append({"model": MODEL, "method": method, "alignment": "CONTROL2_vs_master",
                          "lambda": "", "dataset": X, "rung": rung, "seed": "mean",
                          "prr": round(dv, 8), "n_eval": n_eval, "carve": carve, **prov})
@@ -377,7 +386,12 @@ def main():
     # ------------------------------------------------------------------ gate summary
     print("\n" + "=" * 104)
     print(f"CONTROL 2 -- post_token vs canonical master (bar: |Δ| <= {GATE_4DP:g}, i.e. 4 dp)")
-    if gate2_fail:
+    if len(seeds) < 3:
+        print(f"  ⚠️ ADVISORY ONLY -- ran {len(seeds)} seed(s); pdl_master stores the MEAN OVER 3 SEEDS,")
+        print("     so these are different estimators and the 4 dp bar does not apply. The deltas are")
+        print("     printed per cell above for inspection. The STRICT gate runs in the full 3-seed pass,")
+        print("     and no pre_token number may be interpreted until it passes there.")
+    elif gate2_fail:
         print("  ❌ FAIL -- the post_token arm does not reproduce current behaviour, so the pre_token")
         print("     numbers are NOT readable. Do not interpret them.")
         for f in gate2_fail[:20]:
