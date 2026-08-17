@@ -331,6 +331,47 @@ being silently mistaken for the base population.
 
 ---
 
+### D4 — `Qwen/Qwen2.5-32B` runs `--attn sdpa`, not `eager`. 2026-08-17.
+
+**Recorded before any PRR exists for this population.** No Qwen32 record, feature, per-token cache,
+label or ladder cell had been produced at the time of this decision.
+
+**What changed.** All six datasets of the Qwen2.5-32B population use `--attn sdpa`. Every other
+population in the panel uses `eager`. The setting is **constant within this population**.
+
+**Why.** bf16 Qwen32 is ~65 GB of weights in a ~79 GB card. `eager` attention materialises an n×n
+buffer **per layer** — allocated and freed 64 times per forward — and xsum's longest prompt is
+~5.9k tokens under the Qwen tokeniser. That combination is the tightest memory margin in the panel.
+The DoC `a100` partition was fully allocated with 3-day walltimes, no preemption, and Slurm could
+produce **no start-time estimate**; the memory canary written to test the margin needs *the same*
+`a100`, so gating on it costs **two** queue cycles on the one resource with no ETA. `sdpa` uses
+memory-efficient kernels that never materialise that buffer, which removes the constraint the canary
+existed to measure.
+
+**Why `eager` is not required here.** The project uses `eager` for two reasons, neither of which
+applies to this population:
+1. **Gemma-2 soft-capping** — only the eager path applies the cap. Gemma-specific; Qwen2.5 has no
+   soft-capping.
+2. **Attention-weight extraction** for Lookback Lens / uhead, which SDPA does not return. **This
+   panel runs neither method** (§4: floors, SAPLMA, attention pooler, wmsp_norm, wmsp_shrink2).
+
+The remaining reason is consistency with the canonical runs, which is an implementation argument
+rather than a correctness one. SDPA and eager compute the **same mathematics**; they differ at
+kernel-precision level, of the order of the 1e-6 tolerance this project's own equivalence gates use.
+
+**Why it does not threaten the primary test.** Δ_shrink is a **within-model** difference —
+`wmsp_shrink2` minus `wmsp_norm` on the same records, same backend, same dtype — so the attention
+backend cancels exactly, as dtype does (D1 reasoning, §1). This population **already** carries an
+implementation difference (bf16, forced by size), so this adds to an existing caveat rather than
+creating a new class of one.
+
+**What is carried forward:** wherever Qwen2.5-32B appears beside the eager populations, `sdpa` is
+stated as an additional implementation difference alongside bf16, in the same sentence. It is not
+relegated to a footnote, and no claim is made that this population is backend-matched to the others.
+
+⚠️ The memory canary was **not run**. If Qwen32 OOMs anyway, that is new information and the fallback
+is a smaller per-job scope, not a further change of precision or backend.
+
 ### D3 — `pubmed_qa` prompt provenance: Llama base is on probe_drift **v1**, every other population on **v2**. 2026-08-16.
 
 **Not a deviation from the protocol — a pre-existing property of the development cache, found while
