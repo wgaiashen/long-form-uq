@@ -372,7 +372,7 @@ relegated to a footnote, and no claim is made that this population is backend-ma
 ⚠️ The memory canary was **not run**. If Qwen32 OOMs anyway, that is new information and the fallback
 is a smaller per-job scope, not a further change of precision or backend.
 
-### D3 — `pubmed_qa` prompt provenance: Llama base is on probe_drift **v1**, every other population on **v2**. 2026-08-16.
+### D3 — `pubmed_qa` **and `xsum`** prompt provenance: Llama base is on probe_drift **v1**, every other population on **v2**. 2026-08-16, scope extended 2026-08-17.
 
 **Not a deviation from the protocol — a pre-existing property of the development cache, found while
 verifying the new populations.** Recorded here because it is a population difference on one dataset,
@@ -410,8 +410,28 @@ because that cache predates the stamping.
 - Each model's records and pertok cache are aligned **to each other**, which is all `load_per_token`
   requires. Cross-model ordering differences do not touch that alignment.
 
-**The caveat that IS carried:** Llama base's `pubmed_qa` prompts use a marginally different few-shot
-preamble from every other population. Same examples, different wording. Llama base is a
+> **⚠️ SCOPE EXTENDED 2026-08-17 — `xsum` too, not just `pubmed_qa`.** When Gemma's xsum landed it
+> showed the same signature. Verified against the v1 bundled splits directly:
+>
+> | Llama base dataset | train prompts found in v1 | generation |
+> |---|---|---|
+> | `pubmed_qa` | **1800/1800** | **v1** |
+> | `xsum` | **1800/1800** | **v1** |
+> | `cnn_dailymail` | 0/1800 | v2 |
+>
+> `xsum`: same **3799/3800 source texts**, different order (4/3800 positions coincide), and the
+> template was **reworded** between generations —
+> v1 *"Here's the text and **it's short one-sentence** summary."* →
+> v2 *"Here's the text and **its short** summary."* (typo fixed, "one-sentence" dropped).
+> This matches the author's account: pubmed and xsum were generated before Joe supplied v2;
+> everything since is v2.
+>
+> Benign for the same reasons: `xsum` also has explicit `train`/`test` splits, so no positional carve
+> is involved, and probe training consumes the train **set** while PRR aggregates over the test
+> **set** — neither depends on row order.
+
+**The caveat that IS carried:** Llama base's `pubmed_qa` **and `xsum`** prompts use marginally
+different wording from every other population. Same examples, different wording. Llama base is a
 **development** population whose role here is descriptive, not confirmatory, so this cannot affect
 the primary test — but it is stated in the limitations rather than left silent.
 
