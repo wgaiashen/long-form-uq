@@ -43,7 +43,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL="Qwen/Qwen2.5-32B"
 DTYPE=bf16
-ATTN=eager
+# ⚠️ SWITCHED TO sdpa 2026-08-17 (was eager). eager materialises an n^2 attention buffer per layer,
+# which made the a100 slot itself the scarce resource this population needed TWICE (once for the
+# memory canary, once for the real array), and the canary passed at only 96% headroom on xsum. sdpa
+# computes the same attention with memory-efficient kernels, never materialising that buffer, at a
+# ~1e-6 kernel-precision difference from eager -- the same order as other equivalence gates already
+# used in this project. Verified safe for this panel: none of its six methods (perplexity, msp_min,
+# SAPLMA, attention pooler, wmsp_norm, wmsp_shrink2) call output_attentions or need raw attention
+# weights (that requirement is Lookback Lens / uhead, neither of which is in this panel). Record as a
+# prereg deviation alongside D1/D2 -- NOT done from DoC, docs are read-only here.
+ATTN=sdpa
 LAYER=31                       # ceil(64/2)-1, the fixed rule. Cross-checked against the registry.
 
 # The six-dataset reduced panel, LONGEST-FIRST so no straggler runs alone at the end.

@@ -1,6 +1,5 @@
 #!/bin/bash
 #SBATCH --partition=a100
-#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=06:00:00
@@ -18,7 +17,13 @@
 # 88GB of luq_cache. Exporting BEFORE sourcing works because _env.sh assigns with `:=`, which
 # respects an already-set value.
 #
-# A GPU is requested only so the load test at the end is meaningful; the download itself is CPU/net.
+# ⚠️ NO --gres=gpu HERE (fixed 2026-08-16, was --gres=gpu:1). This script never touches CUDA -- it
+# is snapshot_download + a tokenizer load, both CPU/net, matching its own PBS twin
+# (pbs/wmodels_download.pbs) and the Qwen-14B precedent (pbs/download_qwen.pbs), neither of which
+# requests a GPU. The original comment claiming "a GPU is requested so the load test is meaningful"
+# did not match the code (no model is ever loaded here) and cost this job a ~5-day backfill queue
+# behind other users' long-running jobs on the 3-node a100 partition, whose GPUs were all allocated
+# while CPU/mem had ample headroom (verified via `scontrol show node`). Do not re-add it.
 #
 #   sbatch slurm/wmodels_qwen32_download.sbatch
 

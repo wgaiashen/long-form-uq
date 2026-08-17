@@ -49,7 +49,10 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL="Qwen/Qwen2.5-32B"
 DTYPE=bf16
-ATTN=eager
+# ⚠️ SWITCHED TO sdpa 2026-08-17 (was eager) -- see wmodels_qwen32_postextract.sbatch for the full
+# reasoning (the a100 canary/array double-queue cost, the 96%-headroom xsum pass, and the panel-wide
+# verification that no method here needs raw attention weights). Record as a prereg deviation.
+ATTN=sdpa
 LAYER=31                       # ceil(64/2)-1, the fixed rule. Cross-checked against the registry.
 
 # The six-dataset reduced panel, LONGEST-FIRST so no straggler runs alone at the end.
