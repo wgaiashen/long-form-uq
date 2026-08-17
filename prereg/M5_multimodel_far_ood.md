@@ -428,6 +428,32 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 | `pubmed_qa` | **6.0%** | HTML markup: `'<strong>Yes</strong>.'`, `'<b>Yes</b>.'` — the **answer is correct**, the formatting is web-scraped. Fires the detector's code-density branch (`{}<>`), by design |
 | `asqa` | **7.0%** | genuine web / pretraining artefacts, e.g. *"The answer to this puzzle was submitted by `<b>David</b>` and it can be found on page #2354"* |
 
+> **⚠️ SUPERSEDED — the figures above are from the first 200-400 rows. FINAL full-population numbers
+> (2026-08-17, `results/wmodels_genquality__google_gemma-2-9b.csv`) differ IN BOTH DIRECTIONS:**
+>
+> | dataset | n | partial | **FINAL `pct_severe`** | vs the 5.0 gate |
+> |---|---|---|---|---|
+> | `pubmed_qa` | 3800 | 6.0 | **7.29** | over |
+> | `factscore` | 500 | — | **7.20** | over — **not flagged at all in the partial data** |
+> | `samsum` | 1800 | 4.75 | **5.33** | over — was under |
+> | `asqa` | 948 | 7.0 | **4.32** | **UNDER — it does not fail after all** |
+> | `cnn_dailymail` | 3800 | 0.08 | **0.08** | fine |
+> | `xsum` | — | — | pending | — |
+>
+> So the acceptance covers **three** datasets exceeding the gate (`pubmed_qa`, `factscore`, `samsum`),
+> not the two named above, and **`asqa` — cited above as the worst case at 7.0% with "genuine
+> pretraining artefacts" — is in fact the second-cleanest at 4.32%.** The qualitative reading of
+> *what* is flagged still holds per dataset; only the rates moved.
+>
+> **This does not change the decision** (accept, report prominently, threshold not moved), and it was
+> recorded before any PRR. It is written here rather than by editing the original text, because a
+> deviation record whose evidence is silently swapped is not a record.
+>
+> ⚠️ **Lesson carried:** the original acceptance was taken on 200-400 rows, and per-dataset rates moved
+> by up to 2.7 points once the full populations landed — enough to flip two datasets across the gate
+> in opposite directions. Acceptances on partial data must be revisited on the full population, not
+> assumed stable.
+
 For calibration: Llama base is ~1.1% on `pubmed_qa`, and the 5.0 ceiling was anchored to it with
 headroom, fixed before any Gemma number existed.
 
