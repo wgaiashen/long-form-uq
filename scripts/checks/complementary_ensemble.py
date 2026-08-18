@@ -494,7 +494,7 @@ def main():
     # ---------------------------------------------------------------- zavg robustness footnote
     print("\n  ROBUSTNESS FOOTNOTE (not a headline, never an alternative to choose from):")
     for label, a, b in ENSEMBLES[:2]:
-        vals = [macro(lambda y, mt, a=a, b=b: ensemble_prr(y, mt, a, b, "z"), rg) for rg in RUNGS]
+        vals = [macro(lambda y, mt, a=a, b=b: ensemble_prr(y, mt, a, b, "z"), rg, [a, b]) for rg in RUNGS]
         print(f"    zavg {label:34s} ID {vals[0]:+.3f}  OODmacro {np.mean(vals[1:]):+.3f}")
         rows.append({"section": "zavg_footnote", "method": label,
                      "value": round(float(np.mean(vals[1:])), 4), "rung": "OODmacro"})

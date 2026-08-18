@@ -316,3 +316,19 @@ would have flattered the ensemble, since averaging rewards whichever score gets 
 seeds of the per-seed PRR*, and ensembles are combined **within** each seed before scoring, matching
 `ensemble_ladder.py`'s long-standing convention. The module carries the measurement in a comment so the
 trap is not re-entered.
+
+**D3 — a crash in the analysis driver's final step, after all substantive output (2026-08-18).** The
+first full-grid run of `complementary_ensemble.py` completed every gate, estimand, control, reference and
+complementarity table, then raised `TypeError` on the closing `zavg` robustness footnote: a call site not
+updated when `macro()` gained its `need` argument. It aborted **before** writing the output CSV. Fixed
+(one line) and re-run; every number was reproduced identically and the `zavg` footnote now prints
+(PRIMARY ID +0.592 / OOD +0.269; CONTROL ID +0.623 / OOD +0.245), agreeing with `rankavg` in direction and
+magnitude. No result changed. Recorded because the outputs were observed before the file was written, and
+the chronology should not have to be reconstructed later.
+
+**D4 — outcome recorded (2026-08-18).** Primary `rankavg{HAPES λ=2, SAPLMA}`: OOD macro **+0.0343**,
+**7/8** datasets, CI **[−0.0092, +0.0765]**, exact Wilcoxon **p = 0.1484**; ID macro **+0.0079**, CI
+**[−0.0130, +0.0304]**. Under §6 the OOD leg is **not established**, so the verdict is **NULL**. §12's
+null wording applies. The ensemble is **not** promoted to a headline method; HAPES remains the principal
+method contribution.
+
