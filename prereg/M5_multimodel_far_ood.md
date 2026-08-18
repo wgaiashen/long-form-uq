@@ -458,13 +458,35 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 > | `samsum` | 1800 | 4.75 | **5.33** | over — was under |
 > | `asqa` | 948 | 7.0 | **4.32** | **UNDER — it does not fail after all** |
 > | `cnn_dailymail` | 3800 | 0.08 | **0.08** | fine |
-> | `xsum` | — | — | pending | — |
+> | `xsum` | 3800 | — | **0.08** | fine — cleanest of the six |
 >
 > So the acceptance covers **three** datasets exceeding the gate (`pubmed_qa`, `factscore`, `samsum`),
 > not the two named above, and **`asqa` — cited above as the worst case at 7.0% with "genuine
 > pretraining artefacts" — is in fact the second-cleanest at 4.32%.** The qualitative reading of
 > *what* is flagged still holds per dataset; only the rates moved.
 >
+> **⚠️ WHAT THE FLAG MEANS IS NOT THE SAME ON ALL THREE FAILING DATASETS (added 2026-08-18, full
+> populations, `src/luq/degeneracy.py:64`).** The detector fires on three independent branches, and
+> separating them changes the reading of D2's binding condition 3:
+>
+> | dataset | `pct_severe` | branch that fires | median `max_content_run` (severe rows) | reading |
+> |---|---|---|---|---|
+> | `pubmed_qa` | 7.29 | `code_density` only | **1** (bar is 25) | cosmetic: `<strong>Yes</strong>.` around a correct answer |
+> | `samsum` | 5.33 | `code_density` only | **3** | cosmetic: a correct one-line summary, then chatter + `<strong>` scaffolding |
+> | `factscore` | 7.20 | **`max_content_run` on 28 of 36** | **32.5**, max 92 | **genuine degeneracy** — function-word-stripped word salad in the tail |
+>
+> So on `pubmed_qa` and `samsum` the prose is structurally normal and only the markup trips the
+> ceiling, which is what the original acceptance argued. **`factscore` is different in kind**: 5.6% of
+> its 500 generations collapse into text like *"waiting patiently awaiting discovery revelation truth
+> behind mystery surrounding subject under discussion currently taking place presently ongoing process
+> unfolding slowly steadily gradually progressing"*. It is also 20.4% `pct_degraded` and 20.6%
+> `pct_capped` against 0.2% / 5.0% for Llama base on the same dataset.
+>
+> ⛔ **Condition 4 named `asqa` as the dataset to revisit if a Gemma-specific result depended on it.
+> On the full populations `asqa` passes (4.32) and `factscore` is the genuine failure, so the
+> substance of condition 4 now attaches to `factscore`.** Flagged rather than silently rewritten: the
+> acceptance was the author's, and so is any change to its conditions.
+
 > **This does not change the decision** (accept, report prominently, threshold not moved), and it was
 > recorded before any PRR. It is written here rather than by editing the original text, because a
 > deviation record whose evidence is silently swapped is not a record.
