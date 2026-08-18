@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_align
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+
+# W-Align -- post_token (l_t <-> h_t, current) vs pre_token (l_t <-> h_(t-1)) alignment of token losses
+# to hidden states, on HAPE (lambda 0) and HAPES (lambda 2). Results: ../STOCKTAKE_alignment.md.
+#
+# POST-HOC SENSITIVITY ABLATION. lambda is FIXED, not swept, and no alignment will be selected on test
+# performance.
+#
+# ONE EVAL PER JOB (all 5 rungs, 3 seeds, 4 arms). Run the smoke first -- it prints CONTROL 1 (the exact
+# positional mapping, asserted for every example) and CONTROL 3 (distinctness) on one cell/one seed:
+#
+#   qsub -v LUQ_EVAL=pubmed_qa,LUQ_SMOKE=1 pbs/token_state_alignment.pbs     # controls, 1 cell
+#   qsub -v LUQ_EVAL=pubmed_qa            pbs/token_state_alignment.pbs      # probe: full eval
+#   for E in med_quad asqa xsum cnn_dailymail samsum expertqa factscore; do \
+#     qsub -v LUQ_EVAL=$E pbs/token_state_alignment.pbs; done                # remaining seven
+#
+# ⛔ CHECK CONTROL 2 IN THE PROBE LOG BEFORE READING ANY pre_token NUMBER. It requires the post_token
+# arm to reproduce pdl_master's wMSP-norm / wMSP-shrink@2 to 4 dp on every cell. If it fails, the
+# post arm is not current behaviour and the comparison means nothing.
+#
+# COST (measured, not extrapolated): job 3507628 ran 8 evals x 40 cells x 3 seeds with wmsp on and no
+# attention poolers in 2h26m; the same grid with wmsp off took 10 min, so wMSP training is ~68 s each.
+# This is 4 arms x 5 rungs x 3 seeds = 60 trainings per eval, so expect ~1-2 h. The 6 h walltime is
+# headroom for the long-generation evals (expertqa has the largest pertok cache at 6.2 GB).
+#
+# CPU ONLY, deliberately: the W-Models extraction work owns the GPUs on both clusters.
+# ⚠️ Each job loads the FULL LONG_SRC pool, because the OOD rungs train on the other datasets -> 64gb.
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/token_state_alignment.pbs}"
+SMOKE_FLAG=""
+if [ "${LUQ_SMOKE:-0}" = "1" ]; then SMOKE_FLAG="--smoke"; fi
+
+echo "W-Align: eval=$EV smoke=${LUQ_SMOKE:-0} on $(hostname) at $(date)" >&2
+
+python -u scripts/checks/token_state_alignment.py --evals "$EV" --seeds 1,2,3 $SMOKE_FLAG
+
+echo "W-Align: eval=$EV finished at $(date)" >&2
