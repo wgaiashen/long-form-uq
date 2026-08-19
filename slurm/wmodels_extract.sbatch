@@ -41,24 +41,43 @@ MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 DTYPE="${LUQ_DTYPE:?set LUQ_DTYPE (fp32 | bf16) -- never leave this to auto}"
 DS="${LUQ_DATASET:?set LUQ_DATASET}"
 ATTN="${LUQ_ATTN:-eager}"
+# --chat-template changes the generations, so it MUST get a fresh --prompt-regime, on EVERY dataset
+# including asqa/factscore -- their existing asqa_rp12/factscore_rp12 already holds raw-few-shot
+# records, and mixing the two under one namespace is exactly what the fresh-regime rule exists to
+# stop (01_extract's own prompt-hash guard would refuse it anyway). LUQ_CHAT_REGIME names the new one.
+CHAT=""; [ "${LUQ_CHAT:-0}" = "1" ] && CHAT="--chat-template"
+CHAT_REGIME="${LUQ_CHAT_REGIME:-llama31i_chat}"
 
 case "$DS" in
-  cnn_dailymail) BUD=128; EXTRA="" ;;                                                        # 3800 rows
-  pubmed_qa)     BUD=128; EXTRA="--truncate-long" ;;                                         # 3800, newline-stopped
-  xsum)          BUD=56;  EXTRA="" ;;                                                        # 3800
-  asqa)          BUD=256; EXTRA="--prompt-regime asqa_rp12 --repetition-penalty 1.2" ;;      # 948
-  samsum)        BUD=56;  EXTRA="" ;;                                                        # 1800
-  factscore)     BUD=256; EXTRA="--prompt-regime factscore_rp12 --repetition-penalty 1.2" ;; # 500
+  cnn_dailymail) BUD=128; PENALTY="" ;;                    # 3800 rows
+  pubmed_qa)     BUD=128; PENALTY=""; TRUNC="--truncate-long" ;;  # 3800, newline-stopped
+  xsum)          BUD=56;  PENALTY="" ;;                    # 3800
+  asqa)          BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 948
+  samsum)        BUD=56;  PENALTY="" ;;                    # 1800
+  factscore)     BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 500
   *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2). med_quad and expertqa are"; \
      echo "!!! deliberately dropped; anything else is a typo." >&2; exit 3 ;;
 esac
+TRUNC="${TRUNC:-}"
+
+if [ -n "$CHAT" ]; then
+  REGIME="$CHAT_REGIME"
+elif [ "$DS" = "asqa" ]; then
+  REGIME="asqa_rp12"
+elif [ "$DS" = "factscore" ]; then
+  REGIME="factscore_rp12"
+else
+  REGIME=""
+fi
+EXTRA="$PENALTY $TRUNC $CHAT"
+[ -n "$REGIME" ] && EXTRA="--prompt-regime $REGIME $EXTRA"
 
 # --max-new-tokens is only legal alongside a --prompt-regime (01_extract:116).
 MNT=""
-case "$EXTRA" in *--prompt-regime*) MNT="--max-new-tokens $BUD" ;; esac
+[ -n "$REGIME" ] && MNT="--max-new-tokens $BUD"
 
 echo "=== W-Models extract (DoC) ===" >&2
-echo "  model=$MODEL dtype=$DTYPE attn=$ATTN dataset=$DS budget=$BUD extra='$EXTRA'" >&2
+echo "  model=$MODEL dtype=$DTYPE attn=$ATTN dataset=$DS budget=$BUD regime=${REGIME:-<default>} extra='$EXTRA'" >&2
 echo "  host=$(hostname) at $(date)" >&2
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
