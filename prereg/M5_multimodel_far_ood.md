@@ -145,6 +145,12 @@ populations are informative: they have never been used to choose the shrinkage s
 λ = 1.5 may be reported later as a **supplementary sensitivity only**, after the primary fixed-λ
 result is complete, and may not alter the primary conclusion.
 
+> 🔵 **ACTIVATED 2026-08-19 — see deviation D5.** The primary is complete on three populations, so
+> this provision is now in force and the ladders run all three of λ ∈ {0, 1.5, 2}. **The primary is
+> still λ = 2 and every recorded verdict stands on it.** ⛔ Never report the better of 1.5 and 2:
+> taking the max across two λ values, per model or per rung, is the selection this panel exists to
+> avoid.
+
 ---
 
 ## 5. Hypotheses
@@ -520,3 +526,40 @@ role in the panel is the third FAMILY, and this markup behaviour is a real prope
    not averaged away.
 4. If a Gemma-specific result later depends on `asqa`, this acceptance is revisited before that
    result is claimed.
+
+---
+
+### D5 — the λ = 1.5 supplementary sensitivity is ACTIVATED. 2026-08-19.
+
+**This is the §4 provision being exercised, not a new decision.** §4 reserved λ = 1.5 as a
+"supplementary sensitivity only, after the primary fixed-λ result is complete, and may not alter the
+primary conclusion". The primary is complete on three populations (Llama base, Llama-3.1-8B-Instruct,
+gemma-2-9b), so the provision is now in force.
+
+**What changes.** `wmsp_shrink1_5` (`reg_lambda = 1.5`) is added to the `WMSP` registry in
+`scripts/checks/probedriftlong.py` and the ladders run `--wmsp-only
+wmsp_norm,wmsp_shrink1_5,wmsp_shrink2`. Every population is re-run or run with all three, so no
+population is compared against another on a different method set.
+
+**What does NOT change, and this is the binding part:**
+
+1. ⛔ **The primary remains Δ_shrink = PRR(λ = 2) − PRR(λ = 0).** The registered hypothesis in §5.1 is
+   untouched, and every verdict already recorded stands on λ = 2.
+2. ⛔ **λ is not selected on any replication population's test results.** Reporting whichever of 1.5
+   and 2 scores higher per model, per rung or per dataset would be precisely the selection this panel
+   exists to rule out, and it would silently convert three replication populations into a two-point
+   grid search. **Report the pair side by side; never take the max.**
+3. ⛔ **λ = 1.5 cannot rescue a negative.** If the λ = 2 primary is weak on a population — as it is on
+   `gemma-2-9b` — a stronger λ = 1.5 number on that population is a **sensitivity observation, not a
+   replication**. The recorded verdict does not move.
+4. The sensitivity is reported as its own table, never merged into the §5.3 panel row.
+
+**Free reproduction control.** The re-runs recompute `wmsp_norm` and `wmsp_shrink2` from the same
+caches with the same seeds, so both must reproduce the committed values **exactly**. They are
+compared on per-example vectors, not PRR. Drift means the registry edit changed something it should
+not have, and stops the sensitivity before any λ = 1.5 number is read.
+
+**Why it is worth running at all.** λ = 2 and λ = 0 are two points on a continuum, and the gap between
+them is where the whole shrinkage claim lives. A third point says whether the effect is a smooth
+function of shrinkage strength or an artefact of one setting — which is a question about the
+mechanism, and it is answerable at zero marginal cost from caches that already exist.

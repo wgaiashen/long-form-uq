@@ -72,6 +72,13 @@ WMSP = [("wmsp_norm", {"weight_mode": "normalised"}),
         ("wmsp_seg_flat", {"weight_mode": "normalised", "segment_ids": "_seg_ids"}),
         ("wmsp_seg_softmax", {"weight_mode": "normalised", "segment_ids": "_seg_ids",
                               "segment_mode": "softmax"}),
+        # λ = 1.5, added 2026-08-19. SUPPLEMENTARY SENSITIVITY ONLY -- PLAN_post14Aug.md §4 permits it
+        # "only after the primary fixed-λ experiment completes, and it must not affect the primary
+        # conclusion". ⛔ The primary remains λ = 2 (`wmsp_shrink2`) against the λ = 0 control
+        # (`wmsp_norm`). λ is NEVER selected on a replication population's test results -- reporting
+        # whichever of 1.5 and 2 happens to score higher would be exactly the selection this panel
+        # exists to avoid. Report the pair; do not pick a winner from it.
+        ("wmsp_shrink1_5", {"weight_mode": "normalised", "reg": shrink_to_uniform, "reg_lambda": 1.5}),
         ("wmsp_shrink2", {"weight_mode": "normalised", "reg": shrink_to_uniform, "reg_lambda": 2.0}),
         ("wmsp_shrink10", {"weight_mode": "normalised", "reg": shrink_to_uniform, "reg_lambda": 10.0}),
         ("wmsp_blondel", {"weight_mode": "normalised", "loss": "blondel"}),
