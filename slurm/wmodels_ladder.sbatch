@@ -36,6 +36,13 @@ MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
 RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"
+# λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
+# Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
+#   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
+# ⛔ The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
+# is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
+# that exists precisely because nothing has been selected on it.
+WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink2}"
 
 case "$EVAL" in
   pubmed_qa|xsum|cnn_dailymail|samsum|asqa|factscore) ;;
@@ -58,6 +65,7 @@ PY
 
 echo "=== W-Models Stage-A ladder (DoC) ===" >&2
 echo "  model=$MODEL layer=$LAYER eval=$EVAL rungs=$RUNGS seeds=$SEEDS" >&2
+echo "  wmsp=$WMSP" >&2
 echo "  out=$OUT perex=$PEREX host=$(hostname) at $(date)" >&2
 
 python -u scripts/checks/probedriftlong.py \
@@ -66,7 +74,7 @@ python -u scripts/checks/probedriftlong.py \
     --sources "$PANEL" \
     --rungs "$RUNGS" \
     --seeds "$SEEDS" \
-    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --wmsp-only "$WMSP" \
     --perex-dir "$PEREX" \
     --out "$OUT"
 STATUS=$?
