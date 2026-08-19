@@ -91,6 +91,13 @@ def main():
     ap.add_argument("--no-repeat-ngram-size", type=int, default=None,
                     help="OPT-IN: forbid repeating any n-gram of this size (HF default 0 = off). "
                          "Use with --repetition-penalty to kill loops; leave unset for frozen runs.")
+    ap.add_argument("--chat-template", action="store_true",
+                    help="wrap the (already-formatted, possibly few-shot) prompt as a single user turn "
+                         "via tok.apply_chat_template before tokenising, instead of feeding it raw. For "
+                         "instruct checkpoints whose raw-few-shot generations fail the validity gate on "
+                         "assistant-persona chatter (prereg M5 §6). apply_chat_template acts on the "
+                         "FINAL prompt string, so this is dataset-agnostic including custom loaders. "
+                         "MUST be paired with a fresh --prompt-regime, same reason as --max-new-tokens.")
     args = ap.parse_args()
 
     # Validate the argument combination BEFORE anything expensive: loading fp32 Qwen-14B is ~59GB and
@@ -118,6 +125,10 @@ def main():
             raise SystemExit("--max-new-tokens changes the generations, so it MUST be paired with a fresh "
                              "--prompt-regime; refusing to write non-default-budget records into the "
                              "default cache namespace alongside the frozen v1 records.")
+    if args.chat_template and not args.prompt_regime:
+        raise SystemExit("--chat-template changes the generations, so it MUST be paired with a fresh "
+                         "--prompt-regime; refusing to write chat-template records into the default "
+                         "cache namespace alongside the frozen raw-few-shot records.")
         if args.max_new_tokens > cfg.max_new_tokens_cap:
             raise SystemExit(f"--max-new-tokens {args.max_new_tokens} exceeds the safety ceiling "
                              f"--max-new-tokens-cap {cfg.max_new_tokens_cap} and would be silently "
@@ -227,6 +238,14 @@ def main():
             if (split, idx) in done:
                 continue  # already cached by a previous run
             prompt, target = xb[0], yb[0]  # batch_size=1: unwrap the lists
+            if args.chat_template:
+                # Acts on the FINAL prompt string -- the already-formatted (possibly few-shot)
+                # blob goes in as one user turn, so this is the same wrap regardless of which
+                # loader produced the prompt. tokenize=False: generate.generate() still does its
+                # own tok(prompt) below, so the record stores the true token IDs actually fed in.
+                prompt = tok.apply_chat_template(
+                    [{"role": "user", "content": prompt}],
+                    tokenize=False, add_generation_prompt=True)
 
             record, pooled = generate.generate(model, tok, prompt, budget,
                                                truncate_at_newline=truncate,
