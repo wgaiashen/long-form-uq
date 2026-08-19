@@ -10,7 +10,7 @@
 # GPU queue that the extraction jobs are competing for. With only two wMSP arms the per-cell cost is
 # a fraction of the full eight-arm ladder that took ~97 CPU-hours across eight evals.
 #
-# ⚠️ --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
+# ⚠️ --wmsp-only IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
 # prereg/M5_multimodel_far_ood.md §4: lambda=0 is the unregularised control and lambda=2 the
 # pre-specified regularised configuration, both transferred unchanged from the development
 # populations. NO lambda grid and NO model-specific selection runs on a replication population --
@@ -41,6 +41,13 @@ MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
 EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
 RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds SameTask,LOO.
+# λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
+# Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
+#   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
+# ⛔ The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
+# is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
+# that exists precisely because nothing has been selected on it.
+WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink2}"
 # ⚠️ --evals restricts TARGETS ONLY. Without --sources the rungs are still built from the full
 # 8-dataset LONG_SRC, so a "six-dataset panel" run would quietly train on med_quad and expertqa --
 # the two datasets this panel exists to drop. Passing it also makes the restriction explicit rather
@@ -68,6 +75,7 @@ PY
 mkdir -p "$PEREX"
 echo "=== W-Models Stage-A ladder ===" >&2
 echo "  model=$MODEL layer=$LAYER eval=$EVAL rungs=$RUNGS seeds=$SEEDS" >&2
+echo "  wmsp=$WMSP" >&2
 echo "  out=$OUT perex=$PEREX" >&2
 echo "  host=$(hostname) at $(date)" >&2
 
@@ -77,7 +85,7 @@ python -u scripts/checks/probedriftlong.py \
     --sources "$PANEL" \
     --rungs "$RUNGS" \
     --seeds "$SEEDS" \
-    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --wmsp-only "$WMSP" \
     --perex-dir "$PEREX" \
     --out "$OUT"
 STATUS=$?
