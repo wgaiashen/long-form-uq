@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=120gb
+#PBS -l walltime=14:00:00
+#PBS -N luq_ens_qwen
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+
+# M6b component pass on Qwen2.5-14B -- prereg/M6b_qwen14b_ensemble_replication.md
+#
+# The Qwen twin of pbs/pdl_perex_ens.pbs. Same driver, same component set, same seeds; only the
+# population changes. Persists per-example vectors so every ensemble afterwards is a free CPU read.
+#
+# ⛔ PREREQUISITE: the Qwen per-token caches must be ON RCS. They are produced on DoC and this
+# population had NONE on RCS as of 2026-08-20 (zero pertok, zero features -- records only). The
+# ladder that produced results/pdl_master__Qwen_Qwen2.5-14B.csv ran WITHOUT --perex-dir, which is
+# why no sidecars exist. Eight files must arrive first, all __ID__L23.npz, ~25 GB total:
+#     cache/pertok/Qwen_Qwen2.5-14B__{pubmed_qa,med_quad,xsum,cnn_dailymail,samsum}__ID__L23.npz
+#     cache/asqa_rp12/pertok/Qwen_Qwen2.5-14B__asqa__ID__L23.npz
+#     cache/expertqa_rp12/pertok/Qwen_Qwen2.5-14B__expertqa__ID__L23.npz
+#     cache/factscore_rp12/pertok/Qwen_Qwen2.5-14B__factscore__ID__L23.npz
+# Transfer with `rsync -avP` FROM DoC (RCS cannot reach DoC; ssh returns 255). Never cp/scp -- a
+# plain copy silently truncated a 2.3 GB file once. Verify size + that each np.load succeeds before
+# submitting: a truncated npz raises BadZipFile, and attn_pool.EXPECTED_HIDDEN_DIM already fails
+# loud if the hidden dim is not 5120 for this model.
+#
+# WHY LAYER 23. Joe's middle-layer rule ceil(N/2)-1 on 48 layers, the same rule the Llama grid used.
+# (feature_pertok_consistency.py mentions "24" -- that is the AS-DUMPED index, exactly as Llama is
+# "15/16 as dumped". Not a conflict.)
+#
+# WHY carve=legacy. Every row of the Qwen master carries carve=legacy, so the continuity gate can
+# only pass if this pass uses the same carve rule.
+#
+# WHY 120gb (Llama's twin asks 64gb). The driver holds ALL EIGHT source per-token caches in RAM at
+# once. Qwen's are 3-5 GB each against Llama's 1.2-6.2 GB (hidden 5120 vs 4096), and the Llama pass
+# peaked at 26 GB, so expect ~33 GB here. DoC's own Qwen ladder requested 128 G; 120gb is the
+# largest request already in routine use on RCS.
+#
+# CPU ONLY, deliberately. No GPU is requested; the ladder falls back to device=cpu.
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_perex_ens_qwen.pbs          # probe first, check the gates
+#   for E in med_quad asqa xsum cnn_dailymail samsum expertqa factscore; do \
+#     qsub -v LUQ_EVAL=$E pbs/pdl_perex_ens_qwen.pbs; done
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"
+source pbs/_env.sh
+luq_activate || exit 1
+cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export LUQ_CARVE="${LUQ_CARVE:-legacy}"
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/pdl_perex_ens_qwen.pbs}"
+MODEL="Qwen/Qwen2.5-14B"
+LAYER=23
+
+echo "M6b Qwen component pass: eval=$EV layer=$LAYER carve=$LUQ_CARVE on $(hostname) at $(date)" >&2
+free -g | head -2 >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --perex-dir results/pdl_perex_ens_Qwen_Qwen2.5-14B \
+    --out "results/pdl_ens_components_${EV}__Qwen_Qwen2.5-14B.csv"
+
+echo "M6b Qwen component pass: eval=$EV finished at $(date)" >&2

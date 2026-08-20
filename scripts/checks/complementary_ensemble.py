@@ -95,29 +95,38 @@ def verify_combiner():
         assert np.allclose(zavg(a, b), za_ref(a, b), atol=0, rtol=0), "zavg diverged"
     print("✅ combiners are bit-identical to ensemble_ladder.rankavg / .zavg (20 random vectors)")
 
-SLUG = "meta-llama_Meta-Llama-3.1-8B"
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # n = 8 datasets. This is the unit of analysis.
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 # ⚠️ REPORT / Hidden Failures rung order. LOO comes before SameTask. Do not silently reorder.
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
 OOD = RUNGS[1:]
-# canonical master values, for the component continuity gate (macro over the 8 datasets, per rung)
-CANON = {                       # method -> {rung: macro}
-    "saplma":       {"ID": 0.587, "LOO-long": 0.237, "SameTask-long": 0.316,
-                     "DiffTask-long": 0.203, "1ds-Diff-long": 0.209},
-    "attention":    {"ID": 0.623, "LOO-long": 0.256, "SameTask-long": 0.265,
-                     "DiffTask-long": 0.182, "1ds-Diff-long": 0.186},
-    "uniform":      {"ID": 0.576, "LOO-long": 0.216, "SameTask-long": 0.272,
-                     "DiffTask-long": 0.163, "1ds-Diff-long": 0.162},
-    "wmsp_norm":    {"ID": 0.450, "LOO-long": 0.158, "SameTask-long": 0.146,
-                     "DiffTask-long": 0.128, "1ds-Diff-long": 0.125},
-    "wmsp_shrink2": {"ID": 0.521, "LOO-long": 0.240, "SameTask-long": 0.238,
-                     "DiffTask-long": 0.205, "1ds-Diff-long": 0.232},
-    "floor_min":    {r: 0.186 for r in RUNGS},
-    "floor_ppl":    {r: 0.117 for r in RUNGS},
-}
-GATE_TOL = 0.02                 # macro tolerance for the continuity gate (seed sd is <=0.017 per rung)
-ID_SCALE = 0.0044               # measured seed-to-seed sd of SAPLMA's ID macro -- see prereg §5.1
+
+# The components whose canonical values must be reproduced before any ensemble PRR is read.
+GATE_COMPONENTS = ["floor_min", "floor_ppl", "floor_sum", "saplma", "uniform", "attention",
+                   "wmsp_norm", "wmsp_shrink2"]
+
+# ⭐ PER-CELL GATE (strengthened 2026-08-20). The earlier version compared a computed MACRO against a
+# hardcoded table of seven Llama values at 0.02 tolerance. That is far weaker than it looked: a macro
+# can match while individual cells are wrong in cancelling directions, and the hardcoded numbers are
+# model-specific so the gate simply could not run on a second population. It now reads the master CSV
+# and compares EVERY (component, eval, rung) cell -- 8 x 8 x 5 = up to 320 comparisons per model.
+GATE_CELL_TOL = 1e-3    # per-cell; the masters are stored to 4 dp so this is the resolution floor
+
+# The two masters use DIFFERENT schemas, so the reader auto-detects rather than assuming:
+#   Llama: rung,eval,method,prr,...            with DISPLAY names  ("wMSP-shrink@2", "SAPLMA")
+#   Qwen : model,eval,rung,method,prr_mean,... with RAW keys       ("wmsp_shrink2",  "saplma")
+# ALIAS is copied from scripts/checks/assemble_pdl_table.py, which is what BUILT the Llama master --
+# not from luq.method_names, whose display strings differ ("wMSP-normalised" vs the master's "wMSP-norm").
+# The ID reference scale, DERIVED FROM MEASURED VARIABILITY, not invented (prereg M6 §5.1). SAPLMA's
+# ID macro across the three Llama seed sets is +0.5889 / +0.5822 / +0.5905 -> sd 0.0044. An ID delta
+# whose bootstrap CI lies entirely below -0.0044 exceeds run-to-run noise and counts as MATERIAL.
+# An interpretive scale, NOT a pass/fail target.
+ID_SCALE = 0.0044
+
+ALIAS_TO_MASTER = {"floor_sum": "msp_sum", "floor_ppl": "perplexity", "floor_min": "msp_min",
+                   "wmsp_norm": "wMSP-norm", "wmsp_shrink2": "wMSP-shrink@2",
+                   "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "attention": "armA(attention)"}
 
 NAMES = {"wmsp_shrink2": "HAPES λ=2", "wmsp_norm": "HAPE", "saplma": "SAPLMA",
          "attention": "attention-pool", "uniform": "mean-pool", "floor_min": "msp_min",
@@ -132,12 +141,46 @@ ENSEMBLES = [
 ]
 
 
-def load_cells(perex_dir):
+def load_master(model_slug):
+    """{(component_key, eval, rung): prr} from the canonical master, schema auto-detected.
+
+    Returns raw-component-keyed entries so the caller never has to know which naming a master uses.
+    Raises if the file is missing: a gate that silently finds nothing to compare against is not a gate.
+    """
+    path = ROOT / "results" / f"pdl_master__{model_slug}.csv"
+    if not path.exists():
+        raise SystemExit(f"GATE: canonical master not found at {path}. Refusing to run without the "
+                         "reference the continuity gate exists to check against.")
+    with open(path) as f:
+        rdr = _csv.DictReader(f)
+        cols = rdr.fieldnames or []
+        prr_col = "prr" if "prr" in cols else ("prr_mean" if "prr_mean" in cols else None)
+        if prr_col is None:
+            raise SystemExit(f"GATE: {path.name} has neither a 'prr' nor a 'prr_mean' column ({cols}).")
+        rows = [r for r in rdr if r.get("rung") != "rung"]
+    # Detect naming: if any master method equals a DISPLAY name we know, it is display-keyed.
+    methods = {r["method"] for r in rows}
+    display_keyed = bool(methods & set(ALIAS_TO_MASTER.values()))
+    out = {}
+    for r in rows:
+        try:
+            v = float(r[prr_col])
+        except (ValueError, KeyError, TypeError):
+            continue
+        for raw, disp in ALIAS_TO_MASTER.items():
+            if r["method"] == (disp if display_keyed else raw):
+                out[(raw, r["eval"], r["rung"])] = v
+    print(f"  master {path.name}: {prr_col!r} column, "
+          f"{'display' if display_keyed else 'raw'}-keyed methods, {len(out)} component cells")
+    return out
+
+
+def load_cells(perex_dir, slug):
     """{(eval, rung): (methods dict of (n_seeds, n_te), y)} plus a coverage report."""
     cells, missing = {}, []
     for d in LONG:
         for rg in RUNGS:
-            p = Path(perex_dir) / f"{d}__{rg}__{SLUG}.npz"
+            p = Path(perex_dir) / f"{d}__{rg}__{slug}.npz"
             if not p.exists():
                 missing.append(f"{d}/{rg}")
                 continue
@@ -218,8 +261,16 @@ def boot_ci_mean(d, b=10000, seed=0):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--perex-dir", default=str(ROOT / "results" / "pdl_perex_ens"))
-    ap.add_argument("--out", default=str(ROOT / "results" / f"complementary_ensemble__{SLUG}.csv"))
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="population to analyse. Default is the Llama development population, so every "
+                         "existing invocation stays byte-identical.")
+    ap.add_argument("--perex-dir", default=None,
+                    help="per-example sidecar dir. Default: results/pdl_perex_ens for Llama, "
+                         "results/pdl_perex_ens_<slug> otherwise.")
+    ap.add_argument("--exclude", default="",
+                    help="comma-separated datasets to DROP, for a sensitivity arm (e.g. expertqa). "
+                         "The excluded run is a SENSITIVITY and never replaces the full-grid primary.")
+    ap.add_argument("--out", default=None)
     ap.add_argument("--verify-combiner", action="store_true",
                     help="import ensemble_ladder (slow: pulls in torch) and assert the local rankavg/"
                          "zavg are bit-identical to the shared ones. Run once, not every time.")
@@ -228,55 +279,82 @@ def main():
     if args.verify_combiner:
         verify_combiner()
 
+    # model-derived paths; nothing about the Llama invocation changes
+    from luq import cache as _cache
+    slug = _cache._slug(args.model)
+    global LONG
+    excluded = [d for d in args.exclude.split(",") if d]
+    if excluded:
+        missing = [d for d in excluded if d not in LONG]
+        if missing:
+            raise SystemExit(f"--exclude names datasets not in the grid: {missing}")
+        LONG = [d for d in LONG if d not in excluded]
+    perex_dir = args.perex_dir or str(
+        ROOT / "results" / ("pdl_perex_ens" if args.model == DEFAULT_MODEL
+                            else f"pdl_perex_ens_{slug}"))
+    suffix = ("__excl-" + "-".join(excluded)) if excluded else ""
+    out_path = args.out or str(ROOT / "results" / f"complementary_ensemble__{slug}{suffix}.csv")
+
     print("=" * 104)
     print("M6 -- HAPES + SAPLMA: is the combination better than SAPLMA far OOD without losing ID?")
-    print(f"Population: complete ProbeDriftLong long grid, 8 evals x 5 rungs, 3 seeds, {SLUG}, layer 15.")
-    print(f"Source: {args.perex_dir}   (per-example sidecars; no training, no GPU)")
+    print(f"Population: ProbeDriftLong long grid, {len(LONG)} evals x 5 rungs, 3 seeds, {args.model}.")
+    if excluded:
+        print(f"⚠️ SENSITIVITY ARM -- EXCLUDED: {excluded}. This never replaces the full-grid primary.")
+    print(f"Source: {perex_dir}   (per-example sidecars; no training, no GPU)")
     print("=" * 104)
 
-    cells, missing = load_cells(args.perex_dir)
+    cells, missing = load_cells(perex_dir, slug)
     print(f"\nCOVERAGE: {len(cells)}/40 cells")
     if missing:
         print(f"⚠️ MISSING ({len(missing)}): {', '.join(missing)}")
         print("   Reported as INCOMPLETE. A partial grid is never presented as the whole one.")
     if not cells:
-        raise SystemExit(f"no sidecars under {args.perex_dir} -- run pbs/pdl_perex_ens.pbs first")
+        raise SystemExit(f"no sidecars under {perex_dir} -- run the component pass first")
 
     rows = []
 
     # ---------------------------------------------------------------- GATE 1: component continuity
     print("\n" + "-" * 104)
-    print("GATE 1 -- COMPONENT CONTINUITY against the canonical pdl_master (macro over datasets, per rung)")
-    print("         This replaces any gate on an old ensemble number: the 2026-07-29 ensemble artefact's")
-    print("         HAPE leg predates the 2026-08-03/08-05 weighting fixes and disagrees on 13/40 cells.")
+    print("GATE 1 -- COMPONENT CONTINUITY vs the canonical pdl_master, PER CELL")
+    print(f"         Every (component, eval, rung) compared at tol {GATE_CELL_TOL:g}. A macro-only check")
+    print("         can pass while individual cells are wrong in cancelling directions.")
     print("-" * 104)
-    gate_fail = []
-    print(f"{'method':16s}" + "".join(f"{r:>17s}" for r in RUNGS))
-    for m in ["floor_min", "floor_ppl", "saplma", "uniform", "attention", "wmsp_norm", "wmsp_shrink2"]:
-        line = f"{NAMES.get(m, m):16s}"
-        for rg in RUNGS:
-            vals = [component_prr(y, meth, m)
-                    for (d, r), (meth, y) in cells.items() if r == rg and m in meth]
-            if not vals:
-                line += f"{'absent':>17s}"
+    master = load_master(slug)
+    gate_fail, n_cmp, worst, worst_at = [], 0, 0.0, None
+    print(f"{'component':16s}{'cells':>7s}{'max|d|':>11s}{'macro ID':>10s}{'macro OOD':>11s}  status")
+    for m in GATE_COMPONENTS:
+        got_cells, diffs = {}, []
+        for (d, rg), (meth, y) in cells.items():
+            if m not in meth:
                 continue
-            got = float(np.mean(vals))
-            exp = CANON.get(m, {}).get(rg)
+            got = component_prr(y, meth, m)
+            got_cells[(d, rg)] = got
+            exp = master.get((m, d, rg))
             if exp is None:
-                line += f"{got:>+13.3f}    "
                 continue
+            n_cmp += 1
             dv = got - exp
-            flag = "" if abs(dv) <= GATE_TOL else " ✗"
-            if abs(dv) > GATE_TOL:
-                gate_fail.append(f"{m}/{rg}: got {got:+.3f} vs canonical {exp:+.3f} (Δ {dv:+.3f})")
-            line += f"{got:>+9.3f}({dv:+.3f}){flag}"
-            rows.append({"section": "gate_continuity", "method": m, "rung": rg,
-                         "value": round(got, 4), "canonical": exp, "delta": round(dv, 4),
-                         "pass": abs(dv) <= GATE_TOL})
-        print(line)
-    print(f"\n  GATE 1: {'✅ PASS' if not gate_fail else '❌ FAIL'}"
-          f"  (tolerance {GATE_TOL} on the macro; per-rung seed sd is <=0.017)")
-    for f in gate_fail:
+            diffs.append(abs(dv))
+            if abs(dv) > worst:
+                worst, worst_at = abs(dv), f"{m}/{d}/{rg}"
+            if abs(dv) > GATE_CELL_TOL:
+                gate_fail.append(f"{m}/{d}/{rg}: got {got:+.6f} vs master {exp:+.6f} (d {dv:+.2e})")
+            rows.append({"section": "gate_continuity", "method": m, "eval": d, "rung": rg,
+                         "value": round(got, 6), "canonical": exp, "delta": round(dv, 8),
+                         "pass": abs(dv) <= GATE_CELL_TOL})
+        if not got_cells:
+            print(f"{NAMES.get(m, m):16s}{'absent':>7s}"); continue
+        mid = [v for (d, rg), v in got_cells.items() if rg == "ID"]
+        mood = [v for (d, rg), v in got_cells.items() if rg != "ID"]
+        mx = max(diffs) if diffs else float("nan")
+        ok = not diffs or mx <= GATE_CELL_TOL
+        print(f"{NAMES.get(m, m):16s}{len(diffs):>7d}{mx:>11.2e}"
+              f"{np.mean(mid) if mid else float('nan'):>+10.3f}"
+              f"{np.mean(mood) if mood else float('nan'):>+11.3f}  {'ok' if ok else 'FAIL'}")
+    print(f"\n  GATE 1: {'✅ PASS' if not gate_fail else '❌ FAIL'}  "
+          f"({n_cmp} per-cell comparisons, max |d| = {worst:.2e}"
+          + (f" at {worst_at}" if worst_at else "") + f", tol {GATE_CELL_TOL:g})")
+    for f in gate_fail[:15]:
         print(f"    ✗ {f}")
 
     # ---------------------------------------------------------------- GATE 2: sidecar integrity
@@ -312,7 +390,7 @@ def main():
     if gate_fail or bad or det_bad:
         print("\n⛔ A GATE FAILED. Per the project convention the primary result is NOT read or")
         print("   interpreted until the gates pass. Stopping here.")
-        _write(args.out, rows)
+        _write(out_path, rows)
         return
 
     # ---------------------------------------------------------------- the rung profile
@@ -404,7 +482,7 @@ def main():
     if ood_stat is None or id_stat is None:
         print("  ⏸ PRIMARY ensemble not computable on this population (a component is ABSENT, not zero).")
         print("     No verdict is issued. Run pbs/pdl_perex_ens.pbs to produce HAPES λ=2 + attention.")
-        _write(args.out, rows)
+        _write(out_path, rows)
         return
     om, olo, ohi, op, opos, on = ood_stat
     im, ilo, ihi = id_stat
@@ -499,7 +577,7 @@ def main():
         rows.append({"section": "zavg_footnote", "method": label,
                      "value": round(float(np.mean(vals[1:])), 4), "rung": "OODmacro"})
 
-    _write(args.out, rows)
+    _write(out_path, rows)
 
 
 def _write(out, rows):
