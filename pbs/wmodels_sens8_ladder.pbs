@@ -1,0 +1,132 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_wm_s8
+#PBS -j oe
+
+# The EIGHT-dataset ProbeDriftLong ladder for a W-Models population -- prereg M5 **D6**, the
+# COMPARABILITY SENSITIVITY. One eval per job, all five rungs, 3 seeds, lambda in {0, 1.5, 2}.
+#
+# ⛔ THIS IS NOT THE PRIMARY PANEL, AND IT MUST NEVER BE ABLE TO BECOME IT.
+# The primary result is the SIX-dataset panel (prereg M5 §2), which is complete at 29/29 cells and
+# whose files must be byte-identical after this runs. That is the entire reason this is a SEPARATE
+# SCRIPT rather than a mode on pbs/wmodels_ladder.pbs: a mis-set environment variable must not be
+# able to write eight-pool numbers into primary filenames. The output paths below are therefore
+# HARDCODED to the sens8 namespace and are deliberately NOT overridable from the environment.
+#
+# WHY --sources IS ABSENT, AND THAT IS THE POINT.
+# probedriftlong's --sources defaults to None = the full 8-dataset LONG_SRC. The six-dataset panel is
+# imposed by PASSING --sources; the eight-dataset grid is the driver's own default. So the one flag
+# that distinguishes these two experiments is a flag this script does not pass. Do not "helpfully"
+# add it.
+#
+# ⚠️ THE CELL COUNT IS 40 AND MUST BE ASSERTED AFTERWARDS.
+# probedriftlong prints "<d>: no pertok cache -> skip" and carries on, so a missing med_quad or
+# expertqa cache silently yields the old 29-cell grid under a new filename -- which would read as
+# "the sensitivity agrees with the primary" when it is actually "the sensitivity never ran". A blank
+# cell reads as not-measured and a number reads as measured; those must never be confusable.
+#
+# 15 OF THE 40 CELLS MUST REPRODUCE THE PRIMARY EXACTLY (the D6 free control):
+#   ID x6, 1ds-Diff-long x6, and SameTask-long for xsum/cnn_dailymail/samsum.
+# Widening the source pool cannot touch them. They are recomputed here ON PURPOSE so the control has
+# something to compare; checked on per-example vectors by scripts/checks/wmodels_panel8_control.py,
+# never on PRR (PRR moves ~1e-4 on 1e-7 of round-off).
+#
+#   qsub -v LUQ_MODEL=google/gemma-2-9b,LUQ_EVAL=med_quad pbs/wmodels_sens8_ladder.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+# PBS copies its .o file back only at job END, and a ladder cell can run for hours. Mirror to a live
+# log so progress is visible from the login node with `tail -f`.
+mkdir -p logs
+LIVE="logs/wmodels_sens8__$(printf '%s' "${LUQ_MODEL:-unknown}" | tr '/' '_')__${LUQ_EVAL:-unknown}__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="${LUQ_MODEL:?set LUQ_MODEL}"
+EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
+SEEDS="${LUQ_SEEDS:-1,2,3}"
+# All five rungs in one job. The six-dataset panel split these into Stage A / Stage B because Stage B
+# was registered as opportunistic and droppable; here the whole grid is the deliverable.
+RUNGS="${LUQ_RUNGS:-ID,SameTask,DiffTask,LOO,1ds-Diff}"
+# ⛔ lambda is TRANSFERRED, NOT SELECTED. {0, 1.5, 2} matches the primary lam3 run exactly so the two
+# grids are comparable method-for-method. Primary remains lambda=2 vs lambda=0 (prereg §4, D5);
+# max(1.5, 2) is NEVER reported -- that would be a two-point grid search on a replication population.
+WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink1_5,wmsp_shrink2}"
+
+SLUG="$(printf '%s' "$MODEL" | tr '/' '_')"
+# ⛔ HARDCODED, NOT $LUQ_OUT / $LUQ_PEREX. See the block at the top of this file.
+OUT="results/wmodels_sens8__${SLUG}__${EVAL}.csv"
+PEREX="results/perex_wmodels_sens8/${SLUG}"
+
+# The eight-dataset universe. Read from the library rather than transcribed: probe_drift_long's
+# dataset_configs is the ONE definition, and a hand-copied list here would be a fifth copy of the
+# taxonomy that could silently drift out of agreement with the rungs the driver actually builds.
+VALID=$(python - <<'PY'
+from probe_drift_long import LONG_DATASETS
+print(",".join(LONG_DATASETS))
+PY
+)
+[ -z "$VALID" ] && { echo "!!! could not read LONG_DATASETS from probe_drift_long" >&2; exit 5; }
+case ",$VALID," in
+  *",$EVAL,"*) ;;
+  *) echo "!!! '$EVAL' is not one of the eight long-form evals ($VALID)." >&2; exit 3 ;;
+esac
+
+# THE LAYER IS COMPUTED, NOT TRANSCRIBED. ceil(num_hidden_layers/2)-1 read off the checkpoint's own
+# config, so a mistyped layer cannot silently produce a valid-looking cache at the wrong depth.
+LAYER=$(MODEL="$MODEL" python - <<'PY'
+import math, os
+from transformers import AutoConfig
+print(math.ceil(AutoConfig.from_pretrained(os.environ["MODEL"]).num_hidden_layers / 2) - 1)
+PY
+)
+[ -z "$LAYER" ] && { echo "!!! could not resolve layer for $MODEL" >&2; exit 4; }
+
+mkdir -p "$PEREX"
+echo "=== W-Models EIGHT-dataset sensitivity ladder (prereg M5 D6) ===" >&2
+echo "  model=$MODEL layer=$LAYER eval=$EVAL rungs=$RUNGS seeds=$SEEDS" >&2
+echo "  wmsp=$WMSP" >&2
+echo "  sources=<driver default: all 8> (NOT passed -- see header)" >&2
+echo "  out=$OUT perex=$PEREX" >&2
+echo "  host=$(hostname) at $(date)" >&2
+
+python -u scripts/checks/probedriftlong.py \
+    --model "$MODEL" --layer "$LAYER" \
+    --evals "$EVAL" \
+    --rungs "$RUNGS" \
+    --seeds "$SEEDS" \
+    --wmsp-only "$WMSP" \
+    --perex-dir "$PEREX" \
+    --out "$OUT"
+STATUS=$?
+
+# The special-token registration must have fired for a non-default model. If it silently fell back to
+# the Llama `id >= 128000` range test, a band of ordinary content tokens would have been zero-weighted
+# -- no crash, just a quietly different method.
+if [ "$MODEL" != "meta-llama/Meta-Llama-3.1-8B" ]; then
+  echo "--- verifying special-token registration fired ---" >&2
+  grep -q "special-token ids registered" "$LIVE" 2>/dev/null \
+    || echo "  (not seen in the live log; assert this before recording any number)" >&2
+fi
+
+# Per-eval cell count. Five rungs are expected for every one of the eight evals at the full pool --
+# unlike the six-dataset panel, nothing is legitimately omitted here (restoring expertqa is exactly
+# what gives factscore its SameTask partner back). Anything short means a pertok cache was missing
+# and the driver skipped it silently.
+if [ "$STATUS" -eq 0 ]; then
+  N=$(EVAL="$EVAL" OUT="$OUT" python - <<'PY'
+import csv, os
+rows = list(csv.DictReader(open(os.environ["OUT"])))
+print(len({r["rung"] for r in rows}))
+PY
+)
+  echo "  rungs present for $EVAL: ${N:-?} (expect 5)" >&2
+  [ "${N:-0}" != "5" ] && { echo "!!! SHORT GRID for $EVAL -- expected 5 rungs, got ${N:-0}." >&2
+                            echo "!!! Do NOT record any number from this file." >&2; STATUS=9; }
+fi
+
+echo "=== $EVAL sens8 ladder done status=$STATUS at $(date) ===" >&2
+exit $STATUS

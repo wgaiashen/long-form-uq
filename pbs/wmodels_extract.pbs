@@ -60,8 +60,23 @@ case "$DS" in
   asqa)          BUD=256; EXTRA="--prompt-regime asqa_rp12 --repetition-penalty 1.2" ;;    # 948
   samsum)        BUD=56;  EXTRA="" ;;                                                      # 1800
   factscore)     BUD=256; EXTRA="--prompt-regime factscore_rp12 --repetition-penalty 1.2" ;;  # 500, eval-only
-  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2). med_quad and expertqa are"; \
-     echo "!!! deliberately dropped; anything else is a typo." >&2; exit 3 ;;
+  # --- outside the primary six-dataset panel; IN SCOPE ONLY for the D6 eight-dataset sensitivity ---
+  # Added 2026-08-20 under prereg M5 D6. Generating these does NOT touch the primary panel: they land
+  # in their own cache files, and the contamination risk lives at the LADDER stage, which is why the
+  # sensitivity has its own driver (pbs/wmodels_sens8_ladder.pbs) rather than a flag on the primary one.
+  # Specs transcribed VERBATIM from slurm/qwen_generate_full.sbatch, the canonical second-model spec.
+  #
+  # ⚠️ med_quad takes --no-repeat-ngram-size 3 and specifically NOT --repetition-penalty: rep-pen
+  # penalises its long few-shot context and forces immediate EOS, which produced ~35% EMPTY generations.
+  # Budget 128 is the hash-pinned v1 (prereg/CANONICAL_v1_MANIFEST.sha256), deliberately the CAPPED
+  # version, not the archived v2 at 768.
+  med_quad)      BUD=128; EXTRA="--no-repeat-ngram-size 3" ;;                                # 1800 rows
+  # ⚠️ expertqa is the longest budget in the project and ~29% of the whole eight-dataset generation
+  # token load. It is BORDERLINE against this script's 12h walltime -- submit it with -l walltime=24:00:00.
+  expertqa)      BUD=384; EXTRA="--prompt-regime expertqa_rp12 --repetition-penalty 1.2" ;;   # 2016 rows
+  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2), and is not one of the two"; \
+     echo "!!! datasets the D6 sensitivity adds (med_quad, expertqa). Anything else is a typo." >&2; \
+     exit 3 ;;
 esac
 
 # Smoke mode: force an isolated namespace so probe caches can never touch real ones. Because every

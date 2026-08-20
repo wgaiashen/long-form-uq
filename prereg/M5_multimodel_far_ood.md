@@ -98,6 +98,20 @@ Labelling: `02_label.py --judge gpt-5-mini` (passed **explicitly**) for the firs
 `02_label_factscore.py --prompt-regime factscore_rp12` for factscore. Judges are never mixed within
 a comparison.
 
+**The two dropped datasets, registered here for D6.** They sit outside the reduced panel and outside
+every primary claim in this file. Their regimes are recorded so the D6 sensitivity inherits a
+registered decoding setting rather than one transcribed from a job script at run time.
+
+- `med_quad`: default namespace, budget 128, `--no-repeat-ngram-size 3`, and specifically not
+  `--repetition-penalty`, which on this dataset penalises the long few-shot context and forces
+  immediate EOS, producing about 35% empty generations. Budget 128 is the hash-pinned v1
+  (`CANONICAL_v1_MANIFEST.sha256`), the capped version rather than the archived v2 at 768.
+- `expertqa`: `--prompt-regime expertqa_rp12 --repetition-penalty 1.2`, budget 384.
+
+Labelling: `02_label.py --judge gpt-5-mini` for med_quad; `02_label_expertqa.py --prompt-regime
+expertqa_rp12 --judge gpt-5-mini` for expertqa, which writes the explicit `factuality` field and
+never the shared `correctness`.
+
 ---
 
 ## 3. Rungs and cell counts
@@ -563,3 +577,97 @@ not have, and stops the sensitivity before any λ = 1.5 number is read.
 them is where the whole shrinkage claim lives. A third point says whether the effect is a smooth
 function of shrinkage strength or an artefact of one setting — which is a question about the
 mechanism, and it is answerable at zero marginal cost from caches that already exist.
+
+---
+
+### D6 — the eight-dataset `google/gemma-2-9b` grid, as a sensitivity. 2026-08-20.
+
+Recorded before any eight-dataset artifact for this population exists. A search over `cache/records`,
+`cache/pertok`, `cache/features`, `cache/meta` and every regime namespace returns no `gemma-2-9b`
+artifact for either `med_quad` or `expertqa`.
+
+**This is a dataset-panel change taken after replication-population PRRs were observed.** Under §8
+that would make the primary claim exploratory. It is avoided in the only honest way available: the
+panel is not changed. The six-dataset panel of §2 stays primary, its 29 cells are not recomputed, its
+files are not overwritten, and every verdict in §5 continues to stand on it. The eight-dataset grid
+is a separately-named sensitivity.
+
+**Why run it.** The two development populations the report is built on, `Meta-Llama-3.1-8B` and
+`Qwen/Qwen2.5-14B`, are on the full eight-dataset grid at 40 cells each. Gemma is the third model
+family and its numbers cannot currently be placed beside theirs cell for cell.
+
+**What it reverses.** On 2026-08-19 the author decided against the eight-dataset grid: `med_quad` and
+`expertqa` are positive on 8 of 8 development model-by-rung combinations, so adding them lifts the
+positive-dataset count from 5/6 to 7/8 and cuts FActScore's share of the hardest rung from a sixth to
+an eighth, without moving the macro. That is enlarging the population after seeing the result, in the
+direction that flatters it. **That objection stands, and is why the grid is a sensitivity rather than
+a replacement.** What has changed is the second half of that entry's argument, that the panel only
+means anything if every population sits on the same six or the same eight: as of 2026-08-20 both
+other replication populations have invalid generations, so there is one valid population, not three.
+
+**Fixed here, before any number is computed.**
+
+1. The six-dataset panel stays primary. The sensitivity writes to `wmodels_sens8__*`,
+   `perex_wmodels_sens8/` and `wmodels_master8__*`, and never to a primary filename.
+   `results/wmodels_master__google_gemma-2-9b.csv` and the twelve
+   `wmodels_stage{A,B}_lam3__google_gemma-2-9b__*.csv` must be byte-identical afterwards.
+2. The reading rule holds whichever way the numbers move. The eight-dataset macro and
+   positive-dataset count are never quoted in place of the six-dataset figures. If the sensitivity is
+   stronger than the primary, that is a sensitivity observation, not a replication, on the same
+   footing D5 gives λ = 1.5.
+3. A dataset that fails the §6 gate stays in, with the failure stated on every table carrying it.
+   Dropping one on Gemma alone would destroy the comparability the grid exists to provide, since
+   `med_quad` sits in both development masters carrying exactly the §2.1 defects. This is a real
+   risk: Gemma already exceeds the `pct_severe` ceiling on `factscore` at 7.20%, with 20.4%
+   `pct_degraded`.
+4. λ ∈ {0, 1.5, 2}, matching the primary run so the grids are comparable method for method. D5's
+   constraints carry over: the primary is λ = 2 against λ = 0, and the better of 1.5 and 2 is never
+   reported.
+
+**Validity diagnostics, required before either dataset enters a model-level claim.** Beyond the §6
+gate columns:
+
+- `med_quad`: the invented-continuation rate and the capped fraction against the budget of 128.
+  `pct_fabricated` alone is not sufficient, having already read 0.0% on a population whose real
+  answer was about 63% of the saved text, which is why `mean_answer_frac` exists. Its degeneracy rate
+  is a lower bound and must be reported as one: `A2_med_quad_degeneracy_gate.md` records that looping
+  is detected through `max_content_run`, and a generation cut at 128 tokens cannot be detected as a
+  loop that would have run to 400. med_quad is about 97.7% capped, so the cap truncates the evidence
+  the detector needs, and a low `pct_severe` is not evidence of clean generations.
+- `expertqa`: the size of the quarantine-to-zero label cluster. `02_label_expertqa.py` never sends a
+  severe generation to the judge and writes `factuality = 0.0, coherent = False,
+  factuality_quarantined = True`; a `coherent = false` verdict is likewise forced to 0.0. Those
+  labels are a function of the text, not of a measurement. Report counts for
+  `factuality_quarantined`, for `coherent = false`, and for all-uncovered (`factuality = None`, which
+  is judged with no denominator and is never zero).
+
+**Degeneration-only PRR diagnostic**, required wherever that cluster exists, so on `expertqa` and
+`factscore`. If part of the label vector is a deterministic function of malformed text, a method that
+detects malformed text earns PRR on those rows for free and the cell is partly measuring a text
+detector. Three numbers per method per cell, from the per-example sidecars at no extra cost: PRR on
+the full eval set; PRR with the quarantined rows excluded, where a collapse means the method was
+reading degeneracy; and PRR of the method against the quarantine indicator alone as the target. A gap
+between the first two does not invalidate a cell, but it is stated wherever that cell is quoted.
+
+**Free control.** Widening the pool from six to eight leaves 15 of the 40 cells
+composition-identical: `ID` and `1ds-Diff-long` on all six existing evals, and `SameTask-long` for
+xsum, cnn_dailymail and samsum. Computed from `cells_long`, not assumed. Those 15 must reproduce the
+committed six-dataset numbers exactly, compared on per-example vectors rather than PRR, which moves
+about 1e-4 on 1e-7 of round-off. The panel-6 control could only compare five methods, four of them
+pool-independent, so `saplma` alone carried it; this population's sidecars carry all ten, six of them
+pool-dependent. It keeps that control's refusal to pass any cell where no pool-dependent method was
+compared, and its negative control: pointed at `DiffTask-long` it must fail and name `med_quad` and
+`expertqa` as the difference.
+
+**Pool semantics.** Training sources and row counts for all 40 cells are read from the recorded
+`meta__train` and asserted against `cells_long`, never a transcribed table. Three expectations are
+checked individually, because each would fail as a missing row rather than an error:
+`factscore/SameTask-long` is restored at `expertqa:1800` where §3 correctly omits it at six; the
+three summarisation `SameTask-long` cells do not move; `LOO-long` caps go 360 to 257 on every eval,
+with `DiffTask-long` composition changing as computed.
+
+**Not claimable from this deviation:** that Gemma replicates §5.1 more strongly than recorded there;
+any eight-dataset macro or positive count quoted as the replication result; any med_quad-specific
+`msp_min` or `msp_sum` absolute value, which carries the standing do-not-claim from
+`STOCKTAKE_cleanspan.md`; any `expertqa` or `factscore` number quoted without its degeneration
+diagnostic alongside.
