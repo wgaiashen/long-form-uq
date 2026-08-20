@@ -20,6 +20,12 @@
 #   sbatch --export=ALL,LUQ_MODEL=google/gemma-2-9b,LUQ_DTYPE=bf16,LUQ_DATASET=xsum \
 #          slurm/wmodels_postextract.sbatch
 #   (remember the DoC --export=ALL gotcha: export the vars in-shell instead and drop --export)
+#
+# CHAT-TEMPLATE MODE: set LUQ_CHAT=1 to override the regime to the chat namespace on EVERY dataset
+# (including asqa/factscore, whose default regimes hold raw-few-shot records) -- must match whatever
+# --chat-template extraction actually wrote to, or this reads the wrong (or a missing) cache silently.
+#   sbatch --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum,LUQ_CHAT=1 \
+#          slurm/wmodels_postextract.sbatch
 
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
@@ -42,6 +48,9 @@ case "$DS" in
   factscore)                 REGIME="factscore_rp12" ;;
   *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
 esac
+if [ "${LUQ_CHAT:-0}" = "1" ]; then
+  REGIME="${LUQ_CHAT_REGIME:-llama31i_chat}"
+fi
 RG=""; [ -n "$REGIME" ] && RG="--prompt-regime $REGIME"
 
 # pubmed_qa was generated newline-stopped; the re-pool must reproduce the same token window.
