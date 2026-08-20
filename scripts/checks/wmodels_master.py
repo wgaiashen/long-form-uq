@@ -68,9 +68,15 @@ def main() -> int:
     if not a.lam3_only:
         pats += [f"{a.prefix}A__{slug}__*.csv", f"{a.prefix}B__{slug}__*.csv"]
 
-    cells, srcs, conflicts, dup_ok = {}, [], [], 0
+    cells, srcs, conflicts, dup_ok, quarantined = {}, [], [], 0, []
     for pat in pats:
         for p in sorted(RESULTS.glob(pat)):
+            # ⛔ DO_NOT_USE marks a QUARANTINED population -- generations that failed the §6 gate,
+            # kept on disk as evidence, never as results. The stage wildcards can match them, so the
+            # exclusion is explicit here rather than left to whoever writes the next glob.
+            if "DO_NOT_USE" in p.name:
+                quarantined.append(p.name)
+                continue
             srcs.append(p.name)
             for r in csv.DictReader(open(p)):
                 if r["method"].startswith("VERDICT"):
@@ -87,7 +93,10 @@ def main() -> int:
                 cells[k] = r
 
     print(f"=== W-Models master — {a.model} ===")
-    print(f"  source files ({len(srcs)}): {', '.join(srcs)}\n")
+    print(f"  source files ({len(srcs)}): {', '.join(srcs)}")
+    if quarantined:
+        print(f"  ⛔ skipped {len(quarantined)} QUARANTINED file(s) (DO_NOT_USE): {quarantined}")
+    print()
 
     if conflicts:
         print(f"!!! {len(conflicts)} CONFLICTING duplicate(s) -- the same cell with different "
