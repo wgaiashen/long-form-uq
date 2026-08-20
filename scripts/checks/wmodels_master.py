@@ -52,6 +52,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="google/gemma-2-9b")
+    ap.add_argument("--panel", choices=["six", "eight"], default="six",
+                    help="'six' (default) = the primary reduced panel of prereg M5 section 2, with "
+                         "factscore/SameTask-long expected-absent. 'eight' = the D6 comparability "
+                         "sensitivity over the full ProbeDriftLong universe, where nothing is out of "
+                         "scope: restoring expertqa is exactly what gives factscore its SameTask "
+                         "partner back, so EXPECTED_ABSENT is empty and the grid is 40 cells. "
+                         "Pair it with --prefix wmodels_sens8 and an explicit --out; the default "
+                         "output name is the PRIMARY master and must never be written from an "
+                         "eight-source run.")
     ap.add_argument("--prefix", default="wmodels_stage",
                     help="filename prefix before the A/B stage letter. Default picks up BOTH the "
                          "λ∈{0,2} and λ∈{0,1.5,2} runs; pass a more specific prefix to take one.")
@@ -64,6 +73,25 @@ def main() -> int:
     a = ap.parse_args()
 
     slug = a.model.replace("/", "_")
+
+    # The panel decides both the expected grid and what counts as legitimately absent. Read the
+    # eight from the library rather than transcribing it: probe_drift_long.dataset_configs is the one
+    # definition, and a second copy here could silently drift from the rungs the ladder built.
+    if a.panel == "eight":
+        from probe_drift_long.dataset_configs import LONG_DATASETS
+        panel, expected_absent = list(LONG_DATASETS), set()
+    else:
+        panel, expected_absent = list(PANEL), set(EXPECTED_ABSENT)
+
+    # A run over eight sources must not be able to land on the primary master's filename. The
+    # six-dataset panel is the registered primary (prereg M5 D6 item 1) and its file has to stay
+    # byte-identical; an accidental overwrite here would be indistinguishable from a re-run.
+    if a.panel == "eight" and a.out is None:
+        print("!!! --panel eight requires an explicit --out. The default filename is the PRIMARY "
+              "six-dataset master, which the D6 sensitivity must never overwrite.\n"
+              f"    Suggested: --out results/wmodels_master8__{slug}.csv", file=sys.stderr)
+        return 2
+
     pats = [f"{a.prefix}A_lam3__{slug}__*.csv", f"{a.prefix}B_lam3__{slug}__*.csv"]
     if not a.lam3_only:
         pats += [f"{a.prefix}A__{slug}__*.csv", f"{a.prefix}B__{slug}__*.csv"]
@@ -93,6 +121,9 @@ def main() -> int:
                 cells[k] = r
 
     print(f"=== W-Models master — {a.model} ===")
+    print(f"  panel  {a.panel} ({len(panel)} evals x {len(RUNGS)} rungs"
+          + (f", {len(expected_absent)} expected-absent)" if expected_absent else ")")
+          + ("   [D6 SENSITIVITY, not the primary]" if a.panel == "eight" else ""))
     print(f"  source files ({len(srcs)}): {', '.join(srcs)}")
     if quarantined:
         print(f"  ⛔ skipped {len(quarantined)} QUARANTINED file(s) (DO_NOT_USE): {quarantined}")
@@ -108,13 +139,13 @@ def main() -> int:
 
     present = {(e, r) for (e, r, m) in cells}
     missing, absent = [], []
-    for ev in PANEL:
+    for ev in panel:
         for rung in RUNGS:
             if (ev, rung) in present:
                 continue
-            (absent if (ev, rung) in EXPECTED_ABSENT else missing).append(f"{ev}/{rung}")
+            (absent if (ev, rung) in expected_absent else missing).append(f"{ev}/{rung}")
 
-    n_expected = len(PANEL) * len(RUNGS) - len(EXPECTED_ABSENT)
+    n_expected = len(panel) * len(RUNGS) - len(expected_absent)
     print(f"  cells {len(present)}/{n_expected} in scope"
           f"{'' if dup_ok == 0 else f'   ({dup_ok} identical duplicate rows collapsed)'}")
     if absent:
@@ -127,7 +158,7 @@ def main() -> int:
 
     def sort_key(item):
         (ev, rung, meth), _ = item
-        return (PANEL.index(ev) if ev in PANEL else 99,
+        return (panel.index(ev) if ev in panel else 99,
                 RUNGS.index(rung) if rung in RUNGS else 99,
                 METHOD_ORDER.index(meth) if meth in METHOD_ORDER else 99, meth)
 
