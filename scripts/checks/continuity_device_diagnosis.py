@@ -68,7 +68,7 @@ def main():
     print("=" * 100)
     print(f"{'component':14s}{'cells':>6s}{'max|d|':>10s}{'med |d|/sd':>12s}{'>2sd':>6s}"
           f"{'signs +/-':>11s}{'binom p':>9s}  verdict")
-    stop = []
+    stop, wide = [], {}
     for m in DETERMINISTIC + TRAINED:
         ds, ratios, signed = [], [], []
         for d in LONG:
@@ -92,16 +92,22 @@ def main():
         bp = binomtest(pos, n, 0.5).pvalue
         n_big = int(np.sum(np.array(ratios) > SD_MULT))
         if m in DETERMINISTIC:
+            # sd is 0 by construction, so |d|/sd and the sign of a ~1e-5 rounding difference carry no
+            # information. Judge on the absolute bar alone and blank the noise-relative columns.
             ok = max(ds) <= DET_TOL
-            verdict = "ok" if ok else "FAIL (deterministic must match)"
+            verdict = "ok (exact)" if ok else "FAIL (deterministic must match)"
             if not ok:
                 stop.append(f"{m}: deterministic component off by {max(ds):.2e}")
+            print(f"{m:14s}{n:>6d}{max(ds):>10.2e}{'-':>12s}{'-':>6s}{'-':>11s}{'-':>9s}  {verdict}")
+            continue
         else:
             ok = n_big == 0
             biased = bp < 0.01 and (pos == n or pos == 0)
             verdict = ("ok" if ok else f"{n_big} cell(s) beyond {SD_MULT:g}sd") + (" BIASED" if biased else "")
             if biased:
                 stop.append(f"{m}: signed deltas {pos}/{n} one-sided (binom p={bp:.4f})")
+            if n_big:
+                wide[m] = n_big
         print(f"{m:14s}{n:>6d}{max(ds):>10.2e}{np.median(ratios):>12.2f}{n_big:>6d}"
               f"{f'{pos}/{n-pos}':>11s}{bp:>9.4f}  {verdict}")
     print("=" * 100)
@@ -110,8 +116,16 @@ def main():
         for s in stop:
             print(f"  x {s}")
         raise SystemExit(1)
-    print("VERDICT: the re-run is consistent with the canonical grid within its own seed spread,")
-    print("         and the deterministic components reproduce exactly.")
+    print("VERDICT: no stop condition. Deterministic components reproduce exactly and no trained")
+    print("         component shows a one-sided shift, so the re-run is a RE-DRAW of the stochastic fit,")
+    print("         not a biased estimator.")
+    if wide:
+        print()
+        print("         BUT NOT A BIT-REPRODUCTION. Cells beyond 2x the master's 3-seed sd: "
+              + ", ".join(f"{k} {v}/40" for k, v in wide.items()) + ".")
+        print("         A 3-seed sd is itself a very noisy estimate, so 2x it is not a 95% interval and")
+        print("         some exceedance is expected. Report the Qwen components as reproduced WITHIN")
+        print("         SEED NOISE, never as identical to the published master rows.")
 
 
 if __name__ == "__main__":
