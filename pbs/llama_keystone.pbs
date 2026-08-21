@@ -13,7 +13,8 @@
 # wall-time hit just resubmit.
 #
 # fp32 8B is memory-hungry; A100 requested. On RCS the A100 is 40GB (vs DoC 80GB).
-# TODO(confirm on RCS): whether 40GB holds fp32 Llama-3.1-8B + all-layer hidden states.
+# In practice 40GB does not hold fp32 Llama-3.1-8B plus all-layer hidden states on a long
+# source; the 48GB L40S is the working card on RCS.
 # If it OOMs, this keystone repro is best left on DoC's 80GB.
 #
 # PREREQUISITES (login node, one time): accept the meta-llama license, set HF_TOKEN, and

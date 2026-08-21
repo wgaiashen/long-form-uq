@@ -11,7 +11,7 @@
 # article prompt OOMs RCS 48GB (same wall as xsum's per-token pass) -> DoC. Run ONLY AFTER the judge labels
 # are in the records (01h's SANITY gate needs r["correctness"] to compare mean-pool PRR vs the cached SAPLMA
 # feature). So first rsync the LABELLED records RCS->DoC:
-#   rsync -avP gs925@login.cx3.hpc.imperial.ac.uk:/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/cache/records/meta-llama_Meta-Llama-3.1-8B__cnn_dailymail__ID.jsonl \
+#   rsync -avP <user>@login.cx3.hpc.imperial.ac.uk:/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/cache/records/meta-llama_Meta-Llama-3.1-8B__cnn_dailymail__ID.jsonl \
 #     /vol/gpudata/gs925-msc_project/msc-project-gs925/cache/records/
 # then:  sbatch slurm/cnn_dailymail_pertoken_doc.sbatch
 # after it finishes, rsync the pertok cache DoC->RCS (the ladder runs on RCS where the other caches live):

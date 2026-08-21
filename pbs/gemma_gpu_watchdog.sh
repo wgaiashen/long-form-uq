@@ -32,7 +32,7 @@ while true; do
     break
   fi
   # If no luq_gemma job is queued or running, the previous one ended with work left.
-  # TODO(confirm on RCS): `qstat -u $USER` truncates the job name column; if matching is
+  # Note: `qstat -u $USER` truncates the job name column; if matching is
   # flaky, switch to `qstat -fw` and grep `Job_Name = luq_gemma`.
   if ! qstat -u "$USER" 2>/dev/null | grep -q "$JOBNAME"; then
     if [ "$resubs" -ge "$MAX_RESUBS" ]; then

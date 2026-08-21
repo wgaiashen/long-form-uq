@@ -14,7 +14,7 @@
 #
 # PREREQ on DoC: the RECORDS for each dataset must be present (01s reads only cache/records/..., not
 # per-token). cnn records are already on DoC (generated here); rsync the other 4 from RCS if missing:
-#   rsync -avP gs925@login.cx3.hpc.imperial.ac.uk:'/rds/.../cache/records/*__{pubmed_qa,xsum,samsum,med_quad}__ID.jsonl' cache/records/
+#   rsync -avP <user>@login.cx3.hpc.imperial.ac.uk:'/rds/.../cache/records/*__{pubmed_qa,xsum,samsum,med_quad}__ID.jsonl' cache/records/
 #
 # Faithful (question prepended, matches lm-polygraph):  sbatch slurm/sar_token_doc.sbatch
 # No-prepend ablation (answer-only relevance):          NO_PREPEND=1 sbatch slurm/sar_token_doc.sbatch

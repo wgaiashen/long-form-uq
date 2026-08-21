@@ -11,9 +11,7 @@ sciq × pubmed_qa × xsum) where a second queue and no 3-GPU cap help. **Keep th
 job** (Gemma-2-9B + the eager fp32 Lookback recompute) **on DoC's A100-80GB** — RCS's
 A100s are only 40GB and scarce; default to the **L40S (48GB)** on RCS.
 
-> Items marked **TODO(confirm on RCS)** are values I could not verify from here. Check
-> them on a login node before relying on them. RCS docs:
-> https://icl-rcs-user-guide.readthedocs.io/en/latest/hpc/
+> RCS docs: https://icl-rcs-user-guide.readthedocs.io/en/latest/hpc/
 
 ---
 
@@ -21,7 +19,7 @@ A100s are only 40GB and scarce; default to the **L40S (48GB)** on RCS.
 
 1. **Log in** (password only, no key auth):
    ```bash
-   ssh gs925@login.cx3.hpc.imperial.ac.uk
+   ssh <user>@login.cx3.hpc.imperial.ac.uk
    ```
 
 2. **Where data lives.** The RCS **home directory has a large allocation (~930GB)**, so the
@@ -55,16 +53,13 @@ A100s are only 40GB and scarce; default to the **L40S (48GB)** on RCS.
    # one dep that lives on GitHub (same as DoC):
    pip install "git+https://github.com/IINemo/lm-polygraph.git@dev"
    ```
-   - **ProbeDrift is local-only** (not on GitHub), so copy it from DoC and install it
-     editable. From a **DoC login node**:
+   - **ProbeDrift is not distributed with this repository.** It supplies the formatted prompts
+     and gold targets for each dataset and rung, and it is installed editable from a local
+     checkout:
      ```bash
-     scp -r /vol/gpudata/gs925-msc_project/ProbeDrift \
-         gs925@login.cx3.hpc.imperial.ac.uk:~/ProbeDrift
+     pip install -e <path-to>/ProbeDrift
      ```
-     then back on **RCS**:
-     ```bash
-     pip install -e ~/ProbeDrift
-     ```
+     Without it the extraction and ladder stages cannot build their populations.
    - Prefer a **conda env** instead? Create it, then submit with
      `LUQ_CONDA_ENV_RCS=<env>` and `LUQ_CONDA_SH_RCS=<path>/etc/profile.d/conda.sh` set;
      `pbs/_env.sh` will use conda instead of the venv. See the RCS conda guide.

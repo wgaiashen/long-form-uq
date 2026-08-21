@@ -15,7 +15,7 @@
 #
 # PREREQ on DoC: cache/expertqa_rp12/ must be present (records + the SAPLMA feature npz the reload gate
 # checks). If not on DoC, rsync it from RCS first:
-#   rsync -avP gs925@login.cx3.hpc.imperial.ac.uk:/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/cache/expertqa_rp12/ \
+#   rsync -avP <user>@login.cx3.hpc.imperial.ac.uk:/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/cache/expertqa_rp12/ \
 #     /vol/gpudata/gs925-msc_project/msc-project-gs925/cache/expertqa_rp12/
 # AFTER it finishes: rsync the pertok back DoC->RCS (the ladder runs on RCS):
 #   cache/expertqa_rp12/pertok/...__L15.npz   (verify size + that it np.load()s)

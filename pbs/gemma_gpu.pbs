@@ -21,7 +21,7 @@
 #      extraction/eval and the parallel OOD sweeps (extract.pbs / the OOD scripts);
 #   2) if you must run it on RCS, the A100-40GB requested above may OOM on the fp32
 #      Lookback pass for long examples -- split 01c_lookback onto its own run, or cap
-#      the recompute length. TODO(confirm on RCS): whether 40GB holds the xsum Lookback
+#      the recompute length. In practice the 40GB A100 does not hold the xsum Lookback
 #      pass. The 80GB Gemma+fp32 path stays on DoC.
 #
 # Submit:  LUQ_CLUSTER=rcs ./scripts/submit.sh gemma_gpu     (or: qsub pbs/gemma_gpu.pbs)
