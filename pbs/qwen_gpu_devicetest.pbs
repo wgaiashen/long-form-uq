@@ -1,0 +1,44 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=04:00:00
+#PBS -N luq_devtest
+#PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
+#PBS -j oe
+
+# DEVICE HYPOTHESIS TEST (M6b, 2026-08-21). Not a result -- a diagnostic.
+#
+# The Qwen per-cell continuity gate FAILS for the two trained wMSP components while the deterministic
+# floors reproduce exactly and SAPLMA reproduces at 5e-05. Every failing delta is within ~1 seed sd of
+# the master's own recorded prr_std, which points at a different numeric path rather than a wrong
+# population.
+#
+# The candidate cause: results/pdl_master__Qwen_Qwen2.5-14B.csv was produced on DoC by
+# slurm/qwen_pdl_ladder.sbatch, which requests --gres=gpu:1 (a30), so its trained components were fitted
+# on CUDA. The RCS pass is CPU-only. Torch takes a different arithmetic path on each, and the wMSP
+# pairwise soft-rank loss over 1800 examples is chaotic enough to diverge materially.
+#
+# The Llama control is consistent with that: BOTH the Llama master (pbs/pdl_*.pbs, no ngpus) and the
+# Llama ensemble pass ran on CPU, and every component reproduced at max |d| = 1.22e-04.
+#
+# THIS JOB runs the same eval on a GPU. If the wMSP deltas collapse toward the floors' level, the cause
+# is the device and the Qwen pass should be re-run on GPU to match its master. If they do not, the cause
+# is elsewhere (torch build, threading) and no local re-run can reproduce the master bit-for-bit.
+#
+#   qsub -v LUQ_EVAL=samsum pbs/qwen_gpu_devicetest.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE="${LUQ_CARVE:-legacy}"
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+
+echo "=== device test: eval=$EV on $(hostname) at $(date) ===" >&2
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+python -u scripts/checks/probedriftlong.py \
+    --model Qwen/Qwen2.5-14B --layer 23 --seeds 1,2,3 --evals "$EV" \
+    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --perex-dir results/_devtest_gpu_Qwen_Qwen2.5-14B \
+    --out "results/_devtest_gpu_${EV}__Qwen_Qwen2.5-14B.csv"
+
+echo "=== device test done at $(date) ===" >&2
