@@ -1,0 +1,63 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=RTX6000
+#PBS -l walltime=8:00:00
+#PBS -N luq_cv2_ptrue
+#PBS -j oe
+
+# P(True) features for the Llama MedQuAD clean-v2 population.
+#
+# P(True) reads the hidden state at an appended verification question. That state sits directly
+# after the generation, so any trailing fabricated Q/A block feeds into it -- it is the
+# representation most exposed to the junk this correction removes. Moving the verification question
+# earlier changes the forward pass, so unlike the mean-pool re-pool this CANNOT be produced by
+# slicing a cached array. That is why this job exists.
+#
+# TWO PASSES, AND THE FIRST ONE IS THE POINT.
+#   1. rawcheck : the same code path run over a byte-identical COPY of the canonical raw records
+#                 (cache/cleanv2_rawcheck/). Its output must reproduce the canonical feature cache.
+#                 Until it does, a difference in pass 2 could be this wiring rather than the span,
+#                 and the clean-v2 P(True) cells are not accepted.
+#   2. cleanv2  : the retained answer span.
+# Neither pass writes into the canonical namespace. The canonical
+# cache/features/..__ptrue_accurate.npz is opened by the comparison step read-only and never
+# overwritten.
+#
+# Both report-facing variants are covered, because they share this extraction:
+#   01b_ptrue.py --name ptrue_accurate  -> the verdict-state probe feature
+#   01g_ptrue_unsup.py                  -> training-free P(True), written into the record
+# Flags are exactly the canonical ones (slurm/llama_ptrue_accurate.sbatch, slurm/ptrue_unsup.sbatch)
+# plus --prompt-regime. The only intended change is the retained response span.
+#
+#   qsub pbs/cleanv2_ptrue.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+mkdir -p logs
+LIVE="logs/cleanv2_ptrue__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+DS="med_quad"
+echo "=== clean-v2 P(True) === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+STATUS=0
+for RG in cleanv2_rawcheck cleanv2; do
+  echo; echo "################ pass: $RG ################ $(date)"
+
+  echo "---- 01b_ptrue --name ptrue_accurate ($RG) ----"
+  python -u scripts/01b_ptrue.py --dataset "$DS" --ood ID --model "$MODEL" \
+      --name ptrue_accurate --prompt-regime "$RG" || { echo "!!! ptrue_accurate FAILED ($RG)"; STATUS=1; }
+
+  echo "---- 01g_ptrue_unsup ($RG) ----"
+  python -u scripts/01g_ptrue_unsup.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --prompt-regime "$RG" || { echo "!!! ptrue_unsup FAILED ($RG)"; STATUS=1; }
+done
+
+echo; echo "=== clean-v2 P(True) done status=$STATUS at $(date) ==="
+echo "NEXT: gate E -- compare cache/cleanv2_rawcheck/features/..__ptrue_accurate.npz against the"
+echo "      canonical cache/features/..__ptrue_accurate.npz before trusting the cleanv2 pass."
+exit $STATUS
