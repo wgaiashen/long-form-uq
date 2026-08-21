@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Integrity checks for the eight-dataset W-Models sensitivity grid (prereg M5 D6).
+"""Integrity checks for the eight-dataset W-Models sensitivity grid (the multi-model panel registration, deviation 6).
 
 Three checks, in one pass over the per-example sidecars.
 
@@ -46,7 +46,7 @@ from probe_drift_long.dataset_configs import LONG_DATASETS                 # noq
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# The six-dataset primary panel (prereg M5 section 2). Used only to work out which cells the widening
+# The six-dataset primary panel (the multi-model panel registration section 2). Used only to work out which cells the widening
 # leaves alone; it is not a claim about what should be run.
 PANEL6 = ["pubmed_qa", "xsum", "cnn_dailymail", "samsum", "asqa", "factscore"]
 
@@ -138,7 +138,7 @@ def main() -> int:
     changed = sorted(k for k in g8 if k in g6 and g6[k] != g8[k])
     added = sorted(k for k in g8 if k not in g6)
 
-    print("=== W-Models eight-dataset sensitivity: integrity checks (prereg M5 D6) ===")
+    print("=== W-Models eight-dataset sensitivity: integrity checks (the multi-model panel registration, deviation 6) ===")
     print(f"  model     {args.model}")
     print(f"  sens8     {s8_dir}")
     print(f"  primary   {pri_dir}")

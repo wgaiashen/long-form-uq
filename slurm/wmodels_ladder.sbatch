@@ -16,7 +16,7 @@
 # extraction/postextract for the scarce big cards. DoC's QoS still force-assigns 1 GPU regardless of
 # partition (see the project implementation notes), but that GPU is not needed and mostly goes unused.
 #
-# --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION (prereg M5 §4).
+# --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION (the multi-model panel registration §4).
 # --perex-dir IS REQUIRED -- the verification gate compares per-example vectors, not PRR.
 # THE CELL COUNT IS ASSERTED AFTERWARDS -- a missing dataset silently shrinks the grid instead of
 # erroring, so `probedriftlong` printing "<d>: no pertok cache -> skip" must be caught by hand.
@@ -37,7 +37,7 @@ EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
 RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"
 # λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
-# Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
+# Override to add the λ=1.5 supplementary sensitivity (the multi-model panel registration, deviation 5, 2026-08-19):
 #   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
 # The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
 # is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
@@ -46,7 +46,7 @@ WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink2}"
 
 case "$EVAL" in
   pubmed_qa|xsum|cnn_dailymail|samsum|asqa|factscore) ;;
-  *) echo "!!! '$EVAL' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
+  *) echo "!!! '$EVAL' is not in the six-dataset panel (the multi-model panel registration §2)." >&2; exit 3 ;;
 esac
 
 PANEL="pubmed_qa,xsum,cnn_dailymail,samsum,asqa,factscore"

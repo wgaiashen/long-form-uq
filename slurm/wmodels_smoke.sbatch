@@ -7,7 +7,7 @@
 #SBATCH --job-name=wm_smoke
 #SBATCH --output=logs/wmodels_smoke_%j.out
 
-# W-Models prompt-regime validity gate on DoC (prereg/M5_multimodel_far_ood.md §6).
+# W-Models prompt-regime validity gate on DoC (prereg/multimodel_far_ood_panel.md §6).
 # 40 DETERMINISTIC rows per dataset x 6 datasets, one GPU slot, then the report.
 # Slurm twin of pbs/wmodels_smoke.pbs, plus --chat-template support (D5: raw few-shot
 # failed the gate on 3/6 Llama-Instruct datasets on chatter -- see worklog 2026-08-19).

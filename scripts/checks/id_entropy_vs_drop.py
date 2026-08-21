@@ -1,6 +1,6 @@
 """0.2 — does the ID attention entropy ALONE predict the OOD drop?
 
-Pre-registered in `prereg/0.2_id_entropy_as_predictor.md`, committed before this ran.
+Pre-registered in `prereg/id_attention_entropy_as_drop_predictor.md`, committed before this ran.
 
 NOT BLIND, and the prereg says so up front: the `ne_ID` and `d_PRR` columns were already printed by the
 A1 run before the prereg was written. This fixes the PROCEDURE and the DECISION RULE, not a blind

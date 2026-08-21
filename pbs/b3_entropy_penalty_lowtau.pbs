@@ -35,7 +35,7 @@
 # move the attention at all), then delta on pubmed ID only.
 #
 # Pre-registered: helps pubmed, no-op on xsum; a uniform effect is SUSPICIOUS.
-# prereg/B3_one_sided_entropy_penalty.md
+# prereg/one_sided_entropy_penalty.md
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 export HF_HOME HF_HUB_OFFLINE=1

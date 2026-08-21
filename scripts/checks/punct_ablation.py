@@ -25,7 +25,7 @@ explanations are confounded in the data. A baseline-vs-punct comparison cannot s
   neither beats random           -> the signal is elsewhere entirely
 
 Pre-registered, with the predictions and the reading rule fixed in advance, at
-`prereg/R0_punctuation_ablation.md`.
+`prereg/punctuation_ablation.md`.
 
 CONTROLLED VARIABLES (an arm difference must not be a tuning difference)
 -----------------------------------------------------------------------

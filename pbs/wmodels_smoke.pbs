@@ -4,7 +4,7 @@
 #PBS -N luq_wm_smoke
 #PBS -j oe
 
-# W-Models prompt-regime validity gate (prereg/M5_multimodel_far_ood.md §6).
+# W-Models prompt-regime validity gate (prereg/multimodel_far_ood_panel.md §6).
 # 40 DETERMINISTIC rows per dataset x 6 datasets = 240 rows, one GPU slot, then the report.
 #
 # THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,

@@ -4,7 +4,7 @@
 #PBS -N luq_presid
 #PBS -j oe
 # PR1 -- PROMPT-RESIDUAL PROBING, ONE eval per job (all 5 of its rungs, 3 seeds).
-# Pre-registration: prereg/PR1_prompt_residual.md.
+# Pre-registration: prereg/prompt_residual_pooling.md.
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/prompt_residual_one_eval.pbs
 #

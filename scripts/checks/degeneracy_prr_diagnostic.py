@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Is a cell's PRR measuring uncertainty, or is it detecting malformed text? (prereg M5 D6)
+"""Is a cell's PRR measuring uncertainty, or is it detecting malformed text? (the multi-model panel registration, deviation 6)
 
 THE PROBLEM. `02_label_expertqa.py` and `02_label_factscore.py` apply a deterministic distrust rule:
 a generation that `luq.degeneracy.is_severe()` flags is NEVER sent to the judge and is written

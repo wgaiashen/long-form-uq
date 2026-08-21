@@ -7,7 +7,7 @@
 # W-Models generation + all-layer SAPLMA feature cache, ONE dataset per job (they fill queue slots
 # independently; queue wait, not compute, is the dominant cost here).
 #
-# The six-dataset reduced replication panel (prereg/M5_multimodel_far_ood.md §2):
+# The six-dataset reduced replication panel (prereg/multimodel_far_ood_panel.md §2):
 #   pubmed_qa, xsum, cnn_dailymail, samsum, asqa, factscore.   med_quad and expertqa are DROPPED.
 #
 # THE PER-DATASET SPEC IS BAKED IN HERE, NOT PASSED AT SUBMIT TIME. It is transcribed verbatim
@@ -71,7 +71,7 @@ case "$DS" in
   samsum)        BUD=56;  EXTRA="" ;;                                                      # 1800
   factscore)     BUD=256; EXTRA="--prompt-regime factscore_rp12 --repetition-penalty 1.2" ;;  # 500, eval-only
   # --- outside the primary six-dataset panel; IN SCOPE ONLY for the D6 eight-dataset sensitivity ---
-  # Added 2026-08-20 under prereg M5 D6. Generating these does NOT touch the primary panel: they land
+  # Added 2026-08-20 under the multi-model panel registration, deviation 6. Generating these does NOT touch the primary panel: they land
   # in their own cache files, and the contamination risk lives at the LADDER stage, which is why the
   # sensitivity has its own driver (pbs/wmodels_sens8_ladder.pbs) rather than a flag on the primary one.
   # Specs transcribed VERBATIM from slurm/qwen_generate_full.sbatch, the canonical second-model spec.
@@ -84,7 +84,7 @@ case "$DS" in
   # expertqa is the longest budget in the project and ~29% of the whole eight-dataset generation
   # token load. It is BORDERLINE against this script's 12h walltime -- submit it with -l walltime=24:00:00.
   expertqa)      BUD=384; EXTRA="--prompt-regime expertqa_rp12 --repetition-penalty 1.2" ;;   # 2016 rows
-  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2), and is not one of the two"; \
+  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2), and is not one of the two"; \
      echo "!!! datasets the D6 sensitivity adds (med_quad, expertqa). Anything else is a typo." >&2; \
      exit 3 ;;
 esac

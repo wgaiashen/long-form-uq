@@ -5,7 +5,7 @@
 #PBS -j oe
 
 # R2b -- B.3 (the one-sided entropy penalty) on the two SPREAD datasets, cnn_dailymail and samsum.
-# Pre-registered at prereg/R2b_entropy_penalty_spread.md.
+# Pre-registered at prereg/entropy_penalty_on_spread_datasets.md.
 #
 # READ THE PREREG FIRST: this run CORRECTS the approved plan's justification. The plan said SPREAD is
 # "the regime where a sharpness penalty has a mechanism". It is the opposite. The loss is
@@ -35,4 +35,4 @@ python -u scripts/checks/entropy_penalty_ladder.py \
     --layer 15 \
     --out results/regime_R2b_entropy_penalty_spread__meta-llama_Meta-Llama-3.1-8B.csv
 
-echo "DONE $(date). Read frac_bound_before FIRST, then delta. Prereg: prereg/R2b_entropy_penalty_spread.md"
+echo "DONE $(date). Read frac_bound_before FIRST, then delta. Prereg: prereg/entropy_penalty_on_spread_datasets.md"

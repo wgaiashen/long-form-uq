@@ -53,7 +53,7 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="google/gemma-2-9b")
     ap.add_argument("--panel", choices=["six", "eight"], default="six",
-                    help="'six' (default) = the primary reduced panel of prereg M5 section 2, with "
+                    help="'six' (default) = the primary reduced panel of the multi-model panel registration section 2, with "
                          "factscore/SameTask-long expected-absent. 'eight' = the D6 comparability "
                          "sensitivity over the full ProbeDriftLong universe, where nothing is out of "
                          "scope: restoring expertqa is exactly what gives factscore its SameTask "
@@ -84,7 +84,7 @@ def main() -> int:
         panel, expected_absent = list(PANEL), set(EXPECTED_ABSENT)
 
     # A run over eight sources must not be able to land on the primary master's filename. The
-    # six-dataset panel is the registered primary (prereg M5 D6 item 1) and its file has to stay
+    # six-dataset panel is the registered primary (the multi-model panel registration, deviation 6 item 1) and its file has to stay
     # byte-identical; an accidental overwrite here would be indistinguishable from a re-run.
     if a.panel == "eight" and a.out is None:
         print("!!! --panel eight requires an explicit --out. The default filename is the PRIMARY "

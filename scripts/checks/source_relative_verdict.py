@@ -109,7 +109,7 @@ def main():
     present = [a for a in ARMS if (df.method == a).any()]
     lines = ["# PR2 SOURCE-RELATIVE WEIGHTED MSP — preregistered evidence package", "",
              "Population: `meta-llama/Meta-Llama-3.1-8B`, canonical ProbeDriftLong, carve `legacy`, "
-             "layer 15, seeds 1/2/3, λ = 2. Prereg: `prereg/PR2_source_relative_wmsp.md`.", "",
+             "layer 15, seeds 1/2/3, λ = 2. Prereg: `prereg/source_relative_weighting.md`.", "",
              "Comparator is `wmsp_shrink2` computed by the **library** (`luq.weighted_msp`), not by "
              "this driver's copy of the loop, so every delta is against the real registry method."]
 

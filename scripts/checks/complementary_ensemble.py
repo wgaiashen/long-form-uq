@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Does CAWSA supply a complementary signal to SAPLMA?
 
-Pre-registration: prereg/M6_hapes_saplma_ensemble.md (committed before any ensemble PRR was read).
+Pre-registration: prereg/cawsa_saplma_ensemble.md (committed before any ensemble PRR was read).
 
 THE QUESTION (14 August 2026 supervision meeting, P0 #2)
 --------------------------------------------------------
@@ -119,7 +119,7 @@ DETERMINISTIC_COMPONENTS = {"floor_min", "floor_ppl", "floor_sum"}
 #   Qwen : model,eval,rung,method,prr_mean,... with RAW keys       ("wmsp_shrink2",  "saplma")
 # ALIAS is copied from scripts/checks/assemble_pdl_table.py, which is what BUILT the Llama master --
 # not from luq.method_names, whose display strings differ ("wMSP-normalised" vs the master's "wMSP-norm").
-# The ID reference scale, DERIVED FROM MEASURED VARIABILITY, not invented (prereg M6 §5.1). SAPLMA's
+# The ID reference scale, DERIVED FROM MEASURED VARIABILITY, not invented (the ensemble registration §5.1). SAPLMA's
 # ID macro across the three Llama seed sets is +0.5889 / +0.5822 / +0.5905 -> sd 0.0044. An ID delta
 # whose bootstrap CI lies entirely below -0.0044 exceeds run-to-run noise and counts as MATERIAL.
 # An interpretive scale, NOT a pass/fail target.
@@ -522,7 +522,7 @@ def main():
 
     # ---------------------------------------------------------------- the pre-registered verdict
     print("\n" + "=" * 104)
-    print("PRE-REGISTERED INTERPRETATION (prereg M6 §6) -- applied to the PRIMARY ensemble only")
+    print("PRE-REGISTERED INTERPRETATION (the ensemble registration §6) -- applied to the PRIMARY ensemble only")
     print("=" * 104)
     if ood_stat is None or id_stat is None:
         print("  PRIMARY ensemble not computable on this population (a component is ABSENT, not zero).")

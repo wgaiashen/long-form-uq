@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W8 verdict — compute the PREREGISTERED evidence package for the adaptive-Lehmer run.
 
-Runs ONCE, on the complete grid, after prereg/W8_adaptive_lehmer.md (committed a82a62b, before
+Runs ONCE, on the complete grid, after prereg/adaptive_lehmer_aggregation.md (committed a82a62b, before
 any PRR). It computes exactly the package §2/§3 of the prereg promise — no additional slicing,
 no new subgroups, no promotion logic beyond the prereg's report-promotion rule. Interpretation
 (the narrowest Decision-Gate-B pattern) is written by the researcher from this output; the
@@ -103,7 +103,7 @@ def main():
     lines = ["# W8 ADAPTIVE LEHMER — preregistered evidence package (computed once)", "",
              f"Grid: 40 cells × 3 seeds × 6 methods, complete (checked). Source: {CSV.name}. "
              f"Population: canonical Llama ProbeDriftLong, carve legacy, layer 15. "
-             f"Prereg: prereg/W8_adaptive_lehmer.md (a82a62b)."]
+             f"Prereg: prereg/adaptive_lehmer_aggregation.md (a82a62b)."]
 
     # ---- primary: NLL-SHAPE vs msp_min, and vs perplexity ----
     d_min = {e: ood_mean(g, PRIMARY, e) - M[("msp_min", e, "LOO-long")] for e in EVALS}

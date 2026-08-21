@@ -11,7 +11,7 @@ exactly zero for any example already broader than tau. `frac_bound` is reported 
 penalty that binds everywhere is just the two-sided entropy control we already ran and found
 PRR-neutral -- the one-sidedness has to be shown to be real rather than nominal.
 
-PRIMARY SCREEN IS pubmed ID (pre-registered, prereg/B3_one_sided_entropy_penalty.md). pubmed is the only
+PRIMARY SCREEN IS pubmed ID (pre-registered, prereg/one_sided_entropy_penalty.md). pubmed is the only
 dataset with genuinely concentrated ID attention (normalised entropy 0.61, ~half its mass on
 punctuation). If a sharpness penalty does anything anywhere it does it there. Its OOD rungs are NOT
 stable (their pools contain med_quad, regenerating) and xsum is undecided pending DoC's probe, so

@@ -15,7 +15,7 @@
 # slurm/qwen_lookback_longsrc.sbatch. The allowlist below refuses them rather than letting the
 # job OOM eight hours in.
 #
-# WHY THIS EXISTS. Same reason as slurm/qwen_ptrue.sbatch: prereg/M2_qwen14b_replication.md §4
+# WHY THIS EXISTS. Same reason as slurm/qwen_ptrue.sbatch: prereg/qwen14b_replication.md §4
 # names Lookback in the scored baseline set and no Qwen cache existed, so the first ladder run
 # left the column ABSENT. No registered claim reads it, so the replication verdict does not
 # depend on this job -- it closes a stated gap against our own pre-registration.

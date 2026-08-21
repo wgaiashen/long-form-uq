@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""W7 -- the PER-INSTANCE length blend of msp_min and SAPLMA (the 7 Aug §6, prereg W7).
+"""W7 -- the PER-INSTANCE length blend of msp_min and SAPLMA (the 7 Aug §6, the length-blend registration).
 
 u_i = w_i*z(msp_min)_i + (1-w_i)*z(saplma)_i,  w_i = exp(-len_i/L).  ONE parameter, LODO-selected.
 Reads results/pdl_perex/ (40 cells, 3 seeds). Join gate: recomputed msp_min must match the sidecar
-bit-for-bit. Registered expectation: NULL (prereg W7).
+bit-for-bit. Registered expectation: NULL (the length-blend registration).
 """
 import sys, glob
 from pathlib import Path

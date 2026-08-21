@@ -26,7 +26,7 @@ import sys
 
 PANEL = ["pubmed_qa", "xsum", "cnn_dailymail", "samsum", "asqa", "factscore"]
 
-# Pre-registered thresholds (prereg/M5_multimodel_far_ood.md §6), anchored to the accepted
+# Pre-registered thresholds (prereg/multimodel_far_ood_panel.md §6), anchored to the accepted
 # Llama-3.1-8B base population measured 2026-08-15.
 MAX_SEVERE = 5.0
 MAX_DEGRADED = 10.0

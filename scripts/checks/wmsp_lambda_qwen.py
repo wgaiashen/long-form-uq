@@ -3,7 +3,7 @@
 with a full paired lambda = 2 control.
 
 WHERE lambda = 1.5 COMES FROM, STATED PRECISELY. It is Llama's W5 pre-committed primary
-(prereg/W5_lambda_and_nll_prior.md, `sharpening_lambda.py:70` LAMBDA_PRIMARY = 1.5).
+(prereg/shrinkage_lambda_and_nll_prior.md, `sharpening_lambda.py:70` LAMBDA_PRIMARY = 1.5).
 
 DO NOT DESCRIBE IT AS "THE STRONGEST SHRINK SETTING ON LLAMA" WITHOUT THE OTHER HALF:
   * W5's REGISTERED CLAIM FAILED. lambda = 1.5 vs the incumbent shrink@2 was +0.0019 against a

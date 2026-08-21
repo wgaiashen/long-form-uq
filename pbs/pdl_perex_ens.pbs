@@ -5,7 +5,7 @@
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
 
-# W-Ensemble component pass -- prereg/M6_hapes_saplma_ensemble.md
+# W-Ensemble component pass -- prereg/cawsa_saplma_ensemble.md
 #
 # WHAT THIS PRODUCES, AND WHY IT IS ONE PASS
 # ------------------------------------------
@@ -23,7 +23,7 @@
 # unconstrained precursor (wmsp_norm) is kept
 # because M6 needs it as a reference or ablation and as a continuity check against the canonical master.
 #
-# LAMBDA IS FIXED AT 2. This is not a lambda sweep -- see prereg M6 sections 3 and 10.
+# LAMBDA IS FIXED AT 2. This is not a lambda sweep -- see the ensemble registration sections 3 and 10.
 #
 # OUTPUT DIRECTORY -- READ THIS
 # -----------------------------

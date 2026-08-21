@@ -73,7 +73,7 @@ EXPECTED_HIDDEN_DIM = {
     "Qwen/Qwen2.5-14B": 5120,
     # replication populations, W-Models (2026-08-15)
     "meta-llama/Llama-3.1-8B-Instruct": 4096,
-    "google/gemma-2-9b": 3584,        # base -- the population actually run (see prereg M5 §8)
+    "google/gemma-2-9b": 3584,        # base -- the population actually run (see the multi-model panel registration §8)
     "google/gemma-2-9b-it": 3584,     # instruct -- WITHDRAWN 2026-08-15, kept so old caches fail loudly
     "Qwen/Qwen2.5-32B": 5120,
 }

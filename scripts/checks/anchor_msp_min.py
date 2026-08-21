@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """F5 -- REGULARISE WEIGHTED MSP TOWARD msp_min INSTEAD OF TOWARD perplexity.
 
-Pre-registration: prereg/F5_anchor_at_msp_min.md.
+Pre-registration: prereg/anchor_at_min_token_probability.md.
 
 WHY, IN ONE PARAGRAPH
 ---------------------
@@ -118,7 +118,7 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
     n_seq = len(tr_idx)
     g = torch.Generator().manual_seed(seed)
     model.train()
-    # F5c WARM-START (prereg F5c §2a): push p[k] up on the PENALTY ALONE before the rank loss enters,
+    # F5c WARM-START (the anchor warm-start registration §2a): push p[k] up on the PENALTY ALONE before the rank loss enters,
     # so the anchor is actually reachable (F5b: the penalty never bit on 5 of 8 evals without this).
     # Control A calls this with pretrain_epochs=0, so its library-exactness is untouched.
     if pretrain_epochs and mode in ("anchor", "random", "combo", "wsonly") and lam > 0:
@@ -158,7 +158,7 @@ def train(states, records, y, tr_idx, device, *, lam, mode, seed, rng=None, pena
                     if mode == "uniform":
                         ps.append(shrink_to_uniform(wj))
                     elif mode == "combo":
-                        # prereg F5c §2b: BOTH pressures, uniform coefficient FIXED at the incumbent's
+                        # the anchor warm-start registration §2b: BOTH pressures, uniform coefficient FIXED at the incumbent's
                         # 2.0 (never tuned here); lam sweeps only the anchor term.
                         nk = torch.clamp(kep[j].sum(), min=1.0)
                         pkv = wj[anc[j]] / nk
@@ -219,7 +219,7 @@ def main():
     ap.add_argument("--pretrain-epochs", type=int, default=0,
                     help="F5c warm-start: N epochs on the penalty alone before the combined loss")
     ap.add_argument("--combo", action="store_true",
-                    help="F5c: add the shrink@2 + anchor combo arms (prereg F5c §2b)")
+                    help="F5c: add the shrink@2 + anchor combo arms (the anchor warm-start registration §2b)")
     ap.add_argument("--penalty", choices=["linear", "log"], default="linear",
                     help="F5b fallback: 'log' = -log p[k], gradients that cannot stall (prereg §3 C3)")
     ap.add_argument("--out", default=None)

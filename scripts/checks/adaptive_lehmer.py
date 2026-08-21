@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W8 — the adaptive-Lehmer grid on the canonical Llama ProbeDriftLong population.
 
-Prereg: prereg/W8_adaptive_lehmer.md (committed BEFORE any PRR from this script existed; the
+Prereg: prereg/adaptive_lehmer_aggregation.md (committed BEFORE any PRR from this script existed; the
 preregistration discloses that all Llama baselines/Lehmer curves and the Qwen W6/master results
 were inspected before the method was designed — this is a prospective test on a reused
 development population, not independent confirmation).

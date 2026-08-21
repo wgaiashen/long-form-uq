@@ -4,7 +4,7 @@
 #PBS -N luq_R1_taxonomy
 #PBS -j oe
 
-# R1 — is the regime taxonomy decidable from UNLABELLED data? (prereg/R1_taxonomy_label_free.md)
+# R1 — is the regime taxonomy decidable from UNLABELLED data? (prereg/label_free_regime_taxonomy.md)
 #
 # CPU-only and small by nature: it reads the cached per-token logprobs for 8 datasets and computes one
 # dimensionless statistic per example. No model load, no GPU, no pertok cache. Submitted as a job rather

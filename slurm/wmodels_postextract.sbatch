@@ -46,7 +46,7 @@ case "$DS" in
   pubmed_qa)                 REGIME="" ;;
   asqa)                      REGIME="asqa_rp12" ;;
   factscore)                 REGIME="factscore_rp12" ;;
-  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
+  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2)." >&2; exit 3 ;;
 esac
 if [ "${LUQ_CHAT:-0}" = "1" ]; then
   REGIME="${LUQ_CHAT_REGIME:-llama31i_chat}"

@@ -316,7 +316,7 @@ def main():
                          "EXPLICIT rather than an accident of which pertok caches happen to exist -- the "
                          "loader otherwise prints 'no pertok cache -> skip' and shrinks the pool silently. "
                          "Order is taken from LONG_SRC and never re-sorted, because 1ds-Diff-long reads "
-                         "diff[:1]. Added 2026-08-15 for the W-Models six-dataset panel (prereg M5).")
+                         "diff[:1]. Added 2026-08-15 for the W-Models six-dataset panel (the multi-model panel registration).")
     ap.add_argument("--rungs", default=None,
                     help="comma-separated BASE rung names to KEEP: ID,SameTask,DiffTask,LOO,1ds-Diff (they map "
                          "to the -long ladder names). Default None = every rung cells_long emits (RCS default "

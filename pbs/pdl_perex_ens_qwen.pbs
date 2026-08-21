@@ -5,7 +5,7 @@
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
 
-# M6b component pass on Qwen2.5-14B -- prereg/M6b_qwen14b_ensemble_replication.md
+# M6b component pass on Qwen2.5-14B -- prereg/cawsa_saplma_ensemble_qwen_replication.md
 #
 # The Qwen twin of pbs/pdl_perex_ens.pbs. Same driver, same component set, same seeds; only the
 # population changes. Persists per-example vectors so every ensemble afterwards is a free CPU read.

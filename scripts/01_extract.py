@@ -95,7 +95,7 @@ def main():
                     help="wrap the (already-formatted, possibly few-shot) prompt as a single user turn "
                          "via tok.apply_chat_template before tokenising, instead of feeding it raw. For "
                          "instruct checkpoints whose raw-few-shot generations fail the validity gate on "
-                         "assistant-persona chatter (prereg M5 §6). apply_chat_template acts on the "
+                         "assistant-persona chatter (the multi-model panel registration §6). apply_chat_template acts on the "
                          "FINAL prompt string, so this is dataset-agnostic including custom loaders. "
                          "MUST be paired with a fresh --prompt-regime, same reason as --max-new-tokens.")
     args = ap.parse_args()

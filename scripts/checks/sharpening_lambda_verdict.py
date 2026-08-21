@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W5 VERDICT -- does the pre-committed lambda = 1.5 beat the incumbent shrink@2?
 
-Pre-registration: prereg/W5_lambda_and_nll_prior.md.
+Pre-registration: prereg/shrinkage_lambda_and_nll_prior.md.
 Reads results/sharpening_lambda_<eval>__<slug>.csv plus the master table.
 
 WHAT IS BEING TESTED

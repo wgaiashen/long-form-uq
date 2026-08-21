@@ -5,7 +5,7 @@
 #PBS -j oe
 # PR4 — the TWO MISSING shrink lambdas on the short-form development cells.
 #
-# Protocol: prereg/PR4_wmsp_dev_selection_protocol.md (written and frozen BEFORE these cells ran).
+# Protocol: prereg/shrinkage_strength_selection_protocol.md (written and frozen BEFORE these cells ran).
 # Fills lambda = 1 and lambda = 1.5 only. lambda = 0 / 2 / 10 already exist on both cells at 3 seeds
 # from the cross-length run (results/xlen_long2short_othershort_*.csv) and are NOT recomputed.
 #

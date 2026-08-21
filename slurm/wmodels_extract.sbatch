@@ -55,7 +55,7 @@ case "$DS" in
   asqa)          BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 948
   samsum)        BUD=56;  PENALTY="" ;;                    # 1800
   factscore)     BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 500
-  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2). med_quad and expertqa are"; \
+  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2). med_quad and expertqa are"; \
      echo "!!! deliberately dropped; anything else is a typo." >&2; exit 3 ;;
 esac
 TRUNC="${TRUNC:-}"

@@ -4,7 +4,7 @@
 #PBS -N luq_R0_punct
 #PBS -j oe
 
-# R0 — the punctuation ablation (prereg/R0_punctuation_ablation.md).
+# R0 — the punctuation ablation (prereg/punctuation_ablation.md).
 # Four arms (baseline / punct / posmatch / random) x 3 datasets x 3 seeds x 3 aggregators, all retrained,
 # all on the COMMON population. Tests whether pubmed's punctuation-heavy attention is carrying the signal
 # or wasting it -- the premise three Track B experiments were designed against and nobody measured.

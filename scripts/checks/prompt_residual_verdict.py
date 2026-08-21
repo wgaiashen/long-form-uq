@@ -2,7 +2,7 @@
 """PR1 -- the preregistered evidence package for prompt-residual probing.
 
 Reads ONLY the committed per-eval CSVs written by scripts/checks/prompt_residual.py and emits the
-exact package prereg/PR1_prompt_residual.md promised. No fitting, no compute, no choices.
+exact package prereg/prompt_residual_pooling.md promised. No fitting, no compute, no choices.
 
     python scripts/checks/prompt_residual_verdict.py
 
@@ -121,7 +121,7 @@ def main():
     df, g = load()
     lines = ["# PR1 PROMPT-RESIDUAL PROBING — preregistered evidence package", "",
              "Population: `meta-llama/Meta-Llama-3.1-8B`, canonical ProbeDriftLong, carve `legacy`, "
-             "layer 15, seeds 1/2/3. Prereg: `prereg/PR1_prompt_residual.md`, committed before any "
+             "layer 15, seeds 1/2/3. Prereg: `prereg/prompt_residual_pooling.md`, committed before any "
              "`R1`/`R2` PRR existed.", "",
              "| arm | representation |", "|---|---|",
              "| `resid_R0_anchormean` | `s.mean(0)` — anchor-inclusive mean (the existing control) |",

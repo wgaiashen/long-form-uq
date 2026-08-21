@@ -2,7 +2,7 @@
 
 WHAT IT CHECKS AND WHY IT IS FREE
 ---------------------------------
-The reduced panel (prereg M5 §2) drops `med_quad` and `expertqa` from the SOURCE pool. That changes
+The reduced panel (the multi-model panel registration §2) drops `med_quad` and `expertqa` from the SOURCE pool. That changes
 which datasets a probe trains on, so it changes some rungs and leaves others untouched:
 
     ID            train = the eval's own rows            -> pool spec IDENTICAL to the full grid

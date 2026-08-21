@@ -21,7 +21,7 @@
 # cnn were both generated on DoC (slurm/llama_xsum.sbatch, slurm/cnn_dailymail_doc.sbatch). This adds
 # no new class of problem.
 #
-# CONFIG, pre-registered in prereg/A2_med_quad_degeneracy_gate.md:
+# CONFIG, pre-registered in prereg/med_quad_degeneracy_gate.md:
 #   budget 128 -> 768 (gold p90 591 x ~1.3); no_repeat_ngram_size 3; NO repetition penalty; fp32+eager.
 #
 # EXPECTED: DEGENERACY MAY RISE, and that is not a failure. At 97.7% capped, a cap of 128 truncates

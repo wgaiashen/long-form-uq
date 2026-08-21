@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""W7b -- per-instance length blend of msp_min <-> wMSP-shrink@1.5 (prereg W7b; expectation NULL).
+"""W7b -- per-instance length blend of msp_min <-> wMSP-shrink@1.5 (the length-blend registration; expectation NULL).
 
 u_i = w_i*z(msp_min)_i + (1-w_i)*z(wMSP@1.5)_i, w_i = exp(-len_i/L), ONE LODO-selected L.
 Controls: shuffled-length (does length carry anything?) and constant w=0.5 (is it just

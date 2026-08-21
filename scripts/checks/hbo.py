@@ -4,7 +4,7 @@ WHY THIS IS A STANDALONE STEP
 -----------------------------
 Our proposed system is structurally HBO. If HBO were implemented *as our comparison's baseline*, there
 would be a pull toward specifying it in whatever form makes us look good. So it is built and validated
-on its own first, against criteria fixed in `prereg/R4b_hbo_reproduction.md` BEFORE the numbers are seen.
+on its own first, against criteria fixed in `prereg/hybrid_backoff_reproduction.md` BEFORE the numbers are seen.
 
 THE METHOD (paper §5.2, equations 2-4) -- quoted, not remembered
 ----------------------------------------------------------------

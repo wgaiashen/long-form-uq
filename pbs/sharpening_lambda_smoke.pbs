@@ -5,7 +5,7 @@
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
 # W5 -- (B) the lambda sweep and (C) NLL in the weight logits, ONE eval per job (all 5 rungs, 3 seeds).
-# Pre-registration: prereg/W5_lambda_and_nll_prior.md (committed BEFORE this ran).
+# Pre-registration: prereg/shrinkage_lambda_and_nll_prior.md (committed BEFORE this ran).
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/sharpening_lambda.pbs
 #

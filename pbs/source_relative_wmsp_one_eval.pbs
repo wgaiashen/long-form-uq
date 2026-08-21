@@ -4,7 +4,7 @@
 #PBS -N luq_srcrel
 #PBS -j oe
 # PR2 -- SOURCE-RELATIVE weighted MSP, ONE eval per job.
-# Pre-registration: prereg/PR2_source_relative_wmsp.md.  CONDITIONAL on PR1 being neutral/negative.
+# Pre-registration: prereg/source_relative_weighting.md.  CONDITIONAL on PR1 being neutral/negative.
 #
 #   qsub -v LUQ_EVAL=asqa pbs/source_relative_wmsp_one_eval.pbs
 #   qsub -v LUQ_EVAL=asqa,LUQ_SMOKE=1 pbs/source_relative_wmsp_one_eval.pbs   # harness check

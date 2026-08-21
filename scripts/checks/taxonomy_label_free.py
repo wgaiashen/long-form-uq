@@ -7,7 +7,7 @@ i.e. whichever floor achieves the highest PRR, and PRR is computed against the j
 regime a dataset belongs to cannot be decided WITHOUT those labels, the routing story is fitted to its
 own evaluation and every result downstream of it is circular. This script is the gate.
 
-Pre-registered at `prereg/R1_taxonomy_label_free.md`, with the statistic, the population, the null
+Pre-registered at `prereg/label_free_regime_taxonomy.md`, with the statistic, the population, the null
 distribution and the success threshold all fixed BEFORE the first run.
 
 WHAT IT DOES NOT DO — and why that is the point

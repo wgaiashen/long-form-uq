@@ -1,4 +1,4 @@
-"""Reproduction control for the λ = 1.5 re-run (prereg D5).
+"""Reproduction control for the λ = 1.5 re-run (the multi-model panel registration, deviation 5).
 
 Adding `wmsp_shrink1_5` to the WMSP registry must not disturb the two variants that were already
 there. The re-run recomputes `wmsp_norm` and `wmsp_shrink2` from the SAME caches with the SAME seeds,

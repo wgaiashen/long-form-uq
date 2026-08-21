@@ -1,4 +1,4 @@
-"""Per-response adaptive Lehmer aggregation — W8 (prereg/W8_adaptive_lehmer.md).
+"""Per-response adaptive Lehmer aggregation — W8 (prereg/adaptive_lehmer_aggregation.md).
 
 THE IDEA IN ONE LINE: perplexity (mean NLL) and msp_min (max NLL) are the two ends of one
 concentration axis; instead of fixing the concentration, a tiny gate predicts ONE scalar

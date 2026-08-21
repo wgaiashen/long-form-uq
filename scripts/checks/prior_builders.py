@@ -65,7 +65,7 @@ def build_nll(record, state):
 def build_topk_surprisal(record, state, k, floor=0.0, shuffle_rng=None):
     """S4 — mass on the k MOST SURPRISING generated tokens, `floor` elsewhere. Label-free.
 
-    Pre-registered in `prereg/S4_topk_surprisal_prior.md`. This turns PART C's k-sweep taxonomy (pubmed
+    Pre-registered in `prereg/topk_surprisal_prior.md`. This turns PART C's k-sweep taxonomy (pubmed
     k=1 concentrated, cnn k=all spread) from a description of the unsupervised floors into a prior that
     points the pooler at the tokens the taxonomy says carry the signal.
 

@@ -11,7 +11,7 @@ otherwise concentrates its softmax mass on that content-free "I'm done" token.
 BUT THAT IS AN OBSERVATION ABOUT WHERE THE ATTENTION GOES, NOT A MEASUREMENT THAT GOING THERE
 HURTS. The mask was introduced because concentration on EOS looked wrong, never because the
 unmasked variant was run and scored worse. That is the same inference pattern that turned out to be
-wrong about punctuation (prereg/R0_punctuation_ablation.md). And §13 has since shown the completion
+wrong about punctuation (prereg/punctuation_ablation.md). And §13 has since shown the completion
 indicator carries real signal -- +0.268 on expertqa -- so "the EOS token is content-free" is not
 obviously true either.
 

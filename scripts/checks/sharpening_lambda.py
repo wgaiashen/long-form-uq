@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W5 -- (B) lambda = 1 and 1.5 from a July prediction, and (C) NLL inside the weight logits.
 
-Pre-registration: prereg/W5_lambda_and_nll_prior.md (committed BEFORE this was run).
+Pre-registration: prereg/shrinkage_lambda_and_nll_prior.md (committed BEFORE this was run).
 
 TWO QUESTIONS, ONE JOB (they share the training pass)
 -----------------------------------------------------

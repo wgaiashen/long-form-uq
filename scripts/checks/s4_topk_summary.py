@@ -1,4 +1,4 @@
-"""S4 — summarise the top-k surprisal prior run (pre-reg: prereg/S4_topk_surprisal_prior.md).
+"""S4 — summarise the top-k surprisal prior run (pre-reg: prereg/topk_surprisal_prior.md).
 
 Reads the per-eval CSVs written by fixed_prior_ladder.py and answers the three questions the
 pre-registration asks, in this order:

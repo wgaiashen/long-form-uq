@@ -5,7 +5,7 @@
 #PBS -j oe
 
 # DIAGNOSTIC ONLY -- predicts whether an instruct checkpoint will hit the two failures that withdrew
-# gemma-2-9b-it (prereg M5 D1), BEFORE it consumes a scarce 48GB card for 12 hours:
+# gemma-2-9b-it (the multi-model panel registration, deviation 1), BEFORE it consumes a scarce 48GB card for 12 hours:
 #   1. whitespace-fronting  -> a leading newline, which --truncate-long then cuts to EMPTY
 #   2. assistant persona    -> trailing chatter the judge grades as the answer
 #

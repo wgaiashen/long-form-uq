@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""THE R-claim scorer — one script, two populations (M2: prereg/M2_qwen14b_replication.md).
+"""THE R-claim scorer — one script, two populations (M2: prereg/qwen14b_replication.md).
 
 Scores R1a / R1b / R2 / R2-desc / R3 / R4' from a pdl master CSV. Written 2026-08-10 because the
 Llama numbers quoted in the pre-registration were produced with no committed script, and
@@ -67,7 +67,7 @@ CSV_DEFAULT = {
     "qwen": RES / "pdl_master__Qwen_Qwen2.5-14B.csv",
 }
 
-# The published Llama numbers (the project's planning notes / prereg M2 §1), the gate targets.
+# The published Llama numbers (the project's planning notes / the Qwen replication registration §1), the gate targets.
 GATE = {
     "r1a": (0.1310, 8, 0.0078), "r1b": (0.0686, 5, 0.46),
     "r2": (0.242, 0.195, 0.0041, -0.236, 0.720),

@@ -10,7 +10,7 @@
 # persistent home, not purgeable scratch, and the log is tee'd LIVE so progress is visible during the run
 # and survives a kill; PBS writes its own -o only at job exit.
 #
-# S7 — pooling heads with different FIXED recipes (pre-registered: prereg/S7_multi_recipe_heads.md).
+# S7 — pooling heads with different FIXED recipes (pre-registered: prereg/multi_recipe_pooling_heads.md).
 #
 # Pass with -v:  EVAL=<eval>  [RECIPES=<specs joined by '+'>]  [RUNGS=<base rungs joined by '+'>]  [OUT=<abs>]
 # '+' joins list values because PBS -v splits its own variables on commas.
@@ -40,8 +40,8 @@ grep -q "def pad_head_priors" "$LUQ_REPO/scripts/checks/attn_pool.py" || {
 
 # Guard 2: the pre-registration must be present. This arm's thresholds are only meaningful if they were
 # fixed before the numbers existed, and the file being in the tree is the cheapest evidence of that.
-[ -f "$LUQ_REPO/prereg/S7_multi_recipe_heads.md" ] || {
-  echo "FATAL: prereg/S7_multi_recipe_heads.md missing — refusing to run an unregistered arm"; exit 3; }
+[ -f "$LUQ_REPO/prereg/multi_recipe_pooling_heads.md" ] || {
+  echo "FATAL: prereg/multi_recipe_pooling_heads.md missing — refusing to run an unregistered arm"; exit 3; }
 
 # Guard 3: never clobber. A re-run goes to a new path so two populations cannot merge silently.
 if [ -e "$OUT" ]; then echo "FATAL: target exists, refusing to clobber: $OUT"; exit 4; fi

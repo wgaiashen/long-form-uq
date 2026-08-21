@@ -11,7 +11,7 @@
 # a fraction of the full eight-arm ladder that took ~97 CPU-hours across eight evals.
 #
 # --wmsp-only IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
-# prereg/M5_multimodel_far_ood.md §4: lambda=0 is the unregularised control and lambda=2 the
+# prereg/multimodel_far_ood_panel.md §4: lambda=0 is the unregularised control and lambda=2 the
 # pre-specified regularised configuration, both transferred unchanged from the development
 # populations. NO lambda grid and NO model-specific selection runs on a replication population --
 # that is the entire reason these populations are informative.
@@ -42,7 +42,7 @@ EVAL="${LUQ_EVAL:?set LUQ_EVAL}"
 SEEDS="${LUQ_SEEDS:-1,2,3}"
 RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds SameTask,LOO.
 # λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
-# Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
+# Override to add the λ=1.5 supplementary sensitivity (the multi-model panel registration, deviation 5, 2026-08-19):
 #   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
 # The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
 # is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
@@ -61,7 +61,7 @@ PEREX="${LUQ_PEREX:-results/perex_wmodels/${SLUG}}"
 
 case "$EVAL" in
   pubmed_qa|xsum|cnn_dailymail|samsum|asqa|factscore) ;;
-  *) echo "!!! '$EVAL' is not in the six-dataset panel (prereg M5 §2)." >&2; exit 3 ;;
+  *) echo "!!! '$EVAL' is not in the six-dataset panel (the multi-model panel registration §2)." >&2; exit 3 ;;
 esac
 
 LAYER=$(MODEL="$MODEL" python - <<'PY'

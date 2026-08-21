@@ -5,7 +5,7 @@ and how much performance drops? If so, that's a really useful signal."* It is th
 switching signal for the proposed system (weighted-MSP backing off to an attention probe). If it is weak,
 the back-off gates on OUTPUT LENGTH instead and the system is not rebuilt around entropy.
 
-Pre-registered in `prereg/0.1_entropy_delta_vs_prr_drop.md` BEFORE this ran. Registered predictions:
+Pre-registered in `prereg/attention_entropy_shift_as_drop_predictor.md` BEFORE this ran. Registered predictions:
   P1  dataset-level (n=8) correlation is WEAK, possibly wrong-signed (cnn is an explicit counterexample:
       its attention barely moves, -0.005, yet it drops as hard as pubmed, which flattens by +0.354).
   P2  per-cell (n=32) may carry more signal, because rung severity varies WITHIN a dataset.

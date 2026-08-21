@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W6 -- Lehmer beta = 1 on the Qwen2.5-14B grid, out-of-sample.
 
-Pre-registration: prereg/W6_lehmer_qwen.md, written and committed 2026-08-09 BEFORE any Qwen
+Pre-registration: prereg/lehmer_aggregation_qwen.md, written and committed 2026-08-09 BEFORE any Qwen
 record was labelled. beta = 1 is fixed there from Llama data only (argmax of the Llama cross-dataset
 mean, and the modal leave-one-dataset-out selection, 6 of 8 folds). Nothing is selected here.
 
@@ -205,7 +205,7 @@ def main():
     out = Path(args.out) if args.out else (ROOT / "results" / f"lehmer_qwen__{slug}.csv")
 
     print("=" * 100)
-    print("W6 -- LEHMER beta = 1, OUT-OF-SAMPLE   (prereg: prereg/W6_lehmer_qwen.md)")
+    print("W6 -- LEHMER beta = 1, OUT-OF-SAMPLE   (prereg: prereg/lehmer_aggregation_qwen.md)")
     print(f"model={args.model}   population = 8 long evals   unit of analysis = DATASET (n=8), NOT cell")
     print("beta = 1 is PRE-COMMITTED from Llama data only. No parameter is selected on Qwen.")
     print("V3 NLL CONVENTION: cached token_logprobs are natural-log logprobs (negative), one per")

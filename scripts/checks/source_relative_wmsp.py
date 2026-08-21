@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """PR2 -- SOURCE-RELATIVE RANK SUPERVISION FOR WEIGHTED MSP.
 
-Pre-registration: ../prereg/PR2_source_relative_wmsp.md (committed before any source-relative PRR).
+Pre-registration: ../prereg/source_relative_weighting.md (committed before any source-relative PRR).
 Output:           results/method_dev/source_relative/
 
 THE QUESTION

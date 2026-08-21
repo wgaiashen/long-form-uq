@@ -10,7 +10,7 @@
 # no way to see progress at all -- which cost a debugging cycle earlier today. The `tee` below fixes the
 # second half of that: the log is written line by line to persistent storage WHILE the job runs, so an
 # interrupted job still leaves everything it had printed.
-# S8 — beta sweep of the prior tilt (pre-registered: prereg/S8_beta_sweep.md).
+# S8 — beta sweep of the prior tilt (pre-registered: prereg/prior_tilt_beta_sweep.md).
 #
 # Pass with -v:  EVAL=<eval>  [PRIORS=<specs joined by '+'>]  [OUT=<abs path>]
 # '+' joins the priors list because PBS -v splits its own variables on commas; converted below.
@@ -53,8 +53,8 @@ echo "[s8] RUNGS=${RUNGS//+/,}${RUNGS:+  (RECOVERY: partial grid, merge with the
 grep -q -- "--betas" "$LUQ_REPO/scripts/checks/fixed_prior_ladder.py" || {
   echo "FATAL: --betas absent from $LUQ_REPO — this checkout cannot sweep beta and would silently
 run a SINGLE beta under an S8 filename"; exit 2; }
-[ -f "$LUQ_REPO/prereg/S8_beta_sweep.md" ] || {
-  echo "FATAL: prereg/S8_beta_sweep.md missing — refusing to run an unregistered sweep"; exit 5; }
+[ -f "$LUQ_REPO/prereg/prior_tilt_beta_sweep.md" ] || {
+  echo "FATAL: prereg/prior_tilt_beta_sweep.md missing — refusing to run an unregistered sweep"; exit 5; }
 
 # Guard 2: never clobber. A re-run must go to a new path so two populations cannot merge silently.
 if [ -e "$OUT" ]; then echo "FATAL: target exists, refusing to clobber: $OUT"; exit 3; fi

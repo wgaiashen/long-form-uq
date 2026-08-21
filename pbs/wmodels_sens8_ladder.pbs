@@ -4,11 +4,11 @@
 #PBS -N luq_wm_s8
 #PBS -j oe
 
-# The EIGHT-dataset ProbeDriftLong ladder for a W-Models population -- prereg M5 **D6**, the
+# The EIGHT-dataset ProbeDriftLong ladder for a W-Models population -- the multi-model panel registration **D6**, the
 # COMPARABILITY SENSITIVITY. One eval per job, all five rungs, 3 seeds, lambda in {0, 1.5, 2}.
 #
 # THIS IS NOT THE PRIMARY PANEL, AND IT MUST NEVER BE ABLE TO BECOME IT.
-# The primary result is the SIX-dataset panel (prereg M5 §2), which is complete at 29/29 cells and
+# The primary result is the SIX-dataset panel (the multi-model panel registration §2), which is complete at 29/29 cells and
 # whose files must be byte-identical after this runs. That is the entire reason this is a SEPARATE
 # SCRIPT rather than a mode on pbs/wmodels_ladder.pbs: a mis-set environment variable must not be
 # able to write eight-pool numbers into primary filenames. The output paths below are therefore
@@ -52,7 +52,7 @@ SEEDS="${LUQ_SEEDS:-1,2,3}"
 # was registered as opportunistic and droppable; here the whole grid is the deliverable.
 RUNGS="${LUQ_RUNGS:-ID,SameTask,DiffTask,LOO,1ds-Diff}"
 # lambda is TRANSFERRED, NOT SELECTED. {0, 1.5, 2} matches the primary lam3 run exactly so the two
-# grids are comparable method-for-method. Primary remains lambda=2 vs lambda=0 (prereg §4, D5);
+# grids are comparable method-for-method. Primary remains lambda=2 vs lambda=0 (the multi-model panel registration §4, deviation 5);
 # max(1.5, 2) is NEVER reported -- that would be a two-point grid search on a replication population.
 WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink1_5,wmsp_shrink2}"
 
@@ -86,7 +86,7 @@ PY
 [ -z "$LAYER" ] && { echo "!!! could not resolve layer for $MODEL" >&2; exit 4; }
 
 mkdir -p "$PEREX"
-echo "=== W-Models EIGHT-dataset sensitivity ladder (prereg M5 D6) ===" >&2
+echo "=== W-Models EIGHT-dataset sensitivity ladder (the multi-model panel registration, deviation 6) ===" >&2
 echo "  model=$MODEL layer=$LAYER eval=$EVAL rungs=$RUNGS seeds=$SEEDS" >&2
 echo "  wmsp=$WMSP" >&2
 echo "  sources=<driver default: all 8> (NOT passed -- see header)" >&2

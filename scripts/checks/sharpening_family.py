@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W1 -- THE TRAINING-FREE SHARPENING FAMILY between `perplexity` and `msp_min`.
 
-Pre-registration: prereg/W1_sharpening_axis.md  (written and committed BEFORE this file was run).
+Pre-registration: prereg/softmax_sharpening_axis.md  (written and committed BEFORE this file was run).
 
 WHAT THIS IS
 ------------
@@ -219,7 +219,7 @@ FAMILIES = {
 
 # ----------------------------------------------------------------------------------------------
 # W4 Q-D (--round2) -- THE RANK-WEIGHTED FAMILY, length-invariant BY CONSTRUCTION.
-# Pre-registration: prereg/W4_lodo_families_and_rank.md §2.
+# Pre-registration: prereg/sharpening_family_lodo_selection.md §2.
 #
 # WHY. Round 1 measured that the softmax-tau family behaves substantially as a LENGTH rule: ESS
 # correlates with answer length at rho >= 0.85 on three of eight datasets. The cause is structural --
@@ -338,7 +338,7 @@ def one_se_pick(curves, train_ds, grid):
 def argmax_pick(curves, train_ds, grid):
     """RAW-ARGMAX leave-one-dataset-out: the parameter with the best mean on the training datasets.
 
-    Reported ALONGSIDE `one_se_pick`, never instead of it (prereg W4 §1.2). Round 1's 1-SE rule
+    Reported ALONGSIDE `one_se_pick`, never instead of it (the sharpening LODO registration §1.2). Round 1's 1-SE rule
     turned out to be near-vacuous at this sample size: between-dataset PRR variance is so large that
     the band covered most of the grid and the registered tie-break decided the answer, returning
     tau = inf on all 8 folds. Reporting only one of the two rules would let the CHOICE OF RULE do the
@@ -390,7 +390,7 @@ def main():
                     help="W4: add the RANK-weighted family (Q-D) and run leave-one-dataset-out for "
                          "ALL families under BOTH selection rules (Q-A). Writes its own CSV so "
                          "round 1's output stays byte-reproducible. Prereg: "
-                         "prereg/W4_lodo_families_and_rank.md")
+                         "prereg/sharpening_family_lodo_selection.md")
     ap.add_argument("--out", default=str(OUT))
     args = ap.parse_args()
 
@@ -400,7 +400,7 @@ def main():
 
     carve = os.environ.get("LUQ_CARVE", "legacy")
     print("=" * 100)
-    print("W1 -- THE TRAINING-FREE SHARPENING FAMILY   (prereg: prereg/W1_sharpening_axis.md)")
+    print("W1 -- THE TRAINING-FREE SHARPENING FAMILY   (prereg: prereg/softmax_sharpening_axis.md)")
     print(f"model={MODEL}  LUQ_CARVE={carve}  population=8 long evals (n=8 datasets, NOT 32 cells)")
     print("V3 NLL CONVENTION: cached `token_logprobs` are NATURAL-LOG LOGPROBS (negative), one per")
     print("   generated token (length G, no prompt anchor). nll = -logprob, computed here.")
@@ -637,7 +637,7 @@ def main():
     print("\n" + "=" * 100)
     print("Q4 -- THE REGISTERED cnn_dailymail CONTROL")
     print("=" * 100)
-    print("  R1 (prereg/R1_taxonomy_label_free.md) was FALSIFIED with cnn_dailymail, the most SPREAD")
+    print("  R1 (prereg/label_free_regime_taxonomy.md) was FALSIFIED with cnn_dailymail, the most SPREAD")
     print("  dataset, carrying the HIGHEST ZGAP (3.93). So a fixed tau should concentrate cnn the most")
     print("  and push it toward msp_min -- the WRONG way, on the largest endpoint margin in the grid.")
     print(f"  cnn at tau=1: {a0_vals[i_cnn]:+.4f}   vs msp_min {d_cnn:+.4f}   vs perplexity {d_cnn_ppl:+.4f}")
@@ -650,12 +650,12 @@ def main():
 
     # ================================================================================================
     # W4 -- ROUND 2.  Q-A: honest selection in ALL families.  Q-D: the rank-weighted family.
-    # Pre-registration: prereg/W4_lodo_families_and_rank.md
+    # Pre-registration: prereg/sharpening_family_lodo_selection.md
     # ================================================================================================
     if args.round2:
         print("\n" + "=" * 100)
         print("W4 Q-A -- LEAVE-ONE-DATASET-OUT IN EVERY FAMILY, UNDER BOTH SELECTION RULES")
-        print("prereg: prereg/W4_lodo_families_and_rank.md §1")
+        print("prereg: prereg/sharpening_family_lodo_selection.md §1")
         print("=" * 100)
         print("THIS IS A SECOND LOOK AT DATA ROUND 1 ALREADY READ. A pass is WEAKER evidence than a")
         print("   round-1 pass would have been and is not a claim until it replicates on a population")

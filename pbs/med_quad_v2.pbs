@@ -17,7 +17,7 @@
 # pre-registered "med_quad should improve" prediction IS a v1-vs-v2 judge comparison and would inherit a
 # hardware difference if v2 came from DoC. RCS avoids that entirely.
 #
-# CONFIG, confirmed and pre-registered in prereg/A2_med_quad_degeneracy_gate.md:
+# CONFIG, confirmed and pre-registered in prereg/med_quad_degeneracy_gate.md:
 #   budget 128 -> 768   (gold p90 591 x ~1.3)
 #   no_repeat_ngram_size = 3   -- what v1 med_quad actually used
 #   NO repetition penalty      -- documented as producing ~35% EMPTY generations on med_quad, whose

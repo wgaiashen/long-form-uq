@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """wMSP shrinkage mechanism -- decomposition verification + the pre-registered diagnostic.
 
-Pre-registration: prereg/PR3_wmsp_shrinkage_mechanism.md (written before any arm comparison was
+Pre-registration: prereg/shrinkage_mechanism.md (written before any arm comparison was
 inspected). Report: results/analysis/WMSP_SHRINKAGE_MECHANISM.md.
 
 MECHANISM-ONLY. Every quantity here comes from ONE seed at the ID rung, read from the persisted

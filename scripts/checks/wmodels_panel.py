@@ -1,6 +1,6 @@
 """Score the W-Models reduced six-dataset panel exactly as pre-registered in M5.
 
-WHAT THIS COMPUTES (prereg/M5_multimodel_far_ood.md §5)
+WHAT THIS COMPUTES (prereg/multimodel_far_ood_panel.md §5)
 -------------------------------------------------------
 Primary, per population and per far-OOD rung:
 

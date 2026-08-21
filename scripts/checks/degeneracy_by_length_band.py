@@ -1,6 +1,6 @@
 """Severe-degeneracy rate split by generation length -- the test of the "hidden loops" prediction.
 
-WHY THIS EXISTS. `prereg/A2_med_quad_degeneracy_gate.md` registers that med_quad's v1 severe rate of
+WHY THIS EXISTS. `prereg/med_quad_degeneracy_gate.md` registers that med_quad's v1 severe rate of
 12.33% is a LOWER BOUND, because a cap at 128 tokens truncates a loop before `max_content_run` can
 reach its >=25 threshold. Raising the cap to 768 removes that truncator, so the severe rate is expected
 to RISE, and the prereg says that rise is not a failure.
@@ -167,7 +167,7 @@ def main():
     # THE READ. Deliberately stated as the two pre-registered stories rather than a single verdict,
     # and it reports the numbers that separate them rather than asserting which holds.
     print("\n" + "=" * 78)
-    print("THE PRE-REGISTERED READ (prereg/A2_med_quad_degeneracy_gate.md)")
+    print("THE PRE-REGISTERED READ (prereg/med_quad_degeneracy_gate.md)")
     print("=" * 78)
     short_v1 = v1.get(f"short  (<{BAND} tok)")
     short_v2 = v2.get(f"short  (<{BAND} tok)")

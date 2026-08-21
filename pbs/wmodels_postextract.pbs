@@ -45,14 +45,14 @@ case "$DS" in
   asqa)                      REGIME="asqa_rp12" ;;
   factscore)                 REGIME="factscore_rp12" ;;
   # --- outside the primary six-dataset panel; IN SCOPE ONLY for the D6 eight-dataset sensitivity ---
-  # Added 2026-08-20 under prereg M5 D6. Regimes transcribed verbatim from slurm/qwen_repool.sbatch
+  # Added 2026-08-20 under the multi-model panel registration, deviation 6. Regimes transcribed verbatim from slurm/qwen_repool.sbatch
   # and slurm/qwen_pertoken.sbatch, which are the canonical second-model specs.
   # med_quad lives in the DEFAULT namespace. Its --no-repeat-ngram-size 3 is a DECODING constraint
   # and is deliberately absent here: the re-pool is teacher-forced and replays the cached token ids,
   # so it reproduces the same window without re-deriving it.
   med_quad)                  REGIME="" ;;
   expertqa)                  REGIME="expertqa_rp12" ;;
-  *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2), and is not one of the two"; \
+  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2), and is not one of the two"; \
      echo "!!! datasets the D6 sensitivity adds (med_quad, expertqa)." >&2; exit 3 ;;
 esac
 RG=""; [ -n "$REGIME" ] && RG="--prompt-regime $REGIME"

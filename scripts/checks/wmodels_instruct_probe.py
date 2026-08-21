@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS
 ---------------
-`google/gemma-2-9b-it` was withdrawn (prereg M5 deviation D1) after two failures that are properties
+`google/gemma-2-9b-it` was withdrawn (the multi-model panel registration, deviation 1) after two failures that are properties
 of INSTRUCTION TUNING, not of Gemma:
 
   1. WHITESPACE-FRONTING. An instruct model under raw few-shot prompting emits a leading newline.

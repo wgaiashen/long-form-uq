@@ -13,7 +13,7 @@
 #
 # NOT SUBMITTABLE YET. Two things must land first, in this order:
 #
-#   1. prereg/M2_qwen14b_replication.md committed. The thresholds are already pre-committed in
+#   1. prereg/qwen14b_replication.md committed. The thresholds are already pre-committed in
 #      the project's planning notes (commit 9731fea, 7 August, before any Qwen record existed), but
 #      the transcription into prereg/ never happened. Once a single ladder number exists it can
 #      never honestly be written, so it is a hard predecessor to this job, not a tidy-up after it.

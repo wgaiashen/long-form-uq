@@ -5,7 +5,7 @@
 #PBS -j oe
 
 # R4b -- implement the HBO from the paper and VALIDATE it before it is used as a baseline anywhere.
-# Pre-registered at prereg/R4b_hbo_reproduction.md with V1-V4 fixed BEFORE the numbers.
+# Pre-registered at prereg/hybrid_backoff_reproduction.md with V1-V4 fixed BEFORE the numbers.
 #
 # Standalone by design (author's instruction): implementing HBO *as* our comparison's baseline creates a
 # pull toward specifying it in whatever form flatters us. If V1-V4 fail we report a FAILURE TO REPRODUCE

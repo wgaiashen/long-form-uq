@@ -1,4 +1,4 @@
-"""S9 — is the "selection law" really about ANSWER LENGTH? (prereg/S9_length_vs_selection_law.md)
+"""S9 — is the "selection law" really about ANSWER LENGTH? (prereg/response_length_vs_selection_law.md)
 
 THE LAW: probe advantage over the untrained `msp_min` baseline is strongly NEGATIVELY correlated with how
 strong `msp_min` already is (PDL r=-0.846 n=8; XL r=-0.895 n=10). Short-form QA sits at the extreme

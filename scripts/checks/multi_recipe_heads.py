@@ -19,7 +19,7 @@ Arms per cell (all trained HERE, nothing inherited, so no cross-population compa
                                                                    parameter count, same free head.
   mh_diverse_nofree  3 different recipes, no free head          <- is the free head carrying the ensemble?
 
-PRE-REGISTERED (prereg/S7_multi_recipe_heads.md), thresholds fixed before running:
+PRE-REGISTERED (prereg/multi_recipe_pooling_heads.md), thresholds fixed before running:
   PRIMARY   mh_diverse beats armA on the OOD rungs by > 0.02 (the aggregation-axis noise floor).
   SECONDARY mh_diverse beats mh_same by > 0.02. If not, any gain is "more classifiers", not "different
             recipes", and the line closes.

@@ -18,7 +18,7 @@
 # fp16 forward per row -- Llama measured 8-14 min per long dataset -- so the whole set is a few
 # hours sequentially and does not need the parallelism.
 #
-# WHY THIS EXISTS. prereg/M2_qwen14b_replication.md §4 names P(True) and Lookback in the scored
+# WHY THIS EXISTS. prereg/qwen14b_replication.md §4 names P(True) and Lookback in the scored
 # baseline set, but neither had a Qwen feature cache -- cache/features held only __saplma.npz for
 # all 8 -- so the first ladder run left both columns ABSENT. Absent is honest, but it is a stated
 # gap against our own pre-registration, so we close it. No registered claim (R1a/R1b/R2/R2-desc/

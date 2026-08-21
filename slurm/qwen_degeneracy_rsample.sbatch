@@ -17,7 +17,7 @@
 #
 # The degeneracy numbers now matter more than the budget numbers did. Degenerate generations carry no
 # adjudicable claim, which is what drives a row to `uncovered == 1.0` and so out of the labelled set.
-# That is the coverage divergence pre-registered in prereg/M4_qwen_coverage_divergence_prediction.md,
+# That is the coverage divergence pre-registered in prereg/qwen_coverage_divergence_prediction.md,
 # whose §3 explicitly marks the head-slice column as biased and to be REPLACED by this run. The
 # formula and the thresholds in M4 are fixed; only these inputs update.
 #

@@ -10,7 +10,7 @@
 # no way to see progress at all -- which cost a debugging cycle earlier today. The `tee` below fixes the
 # second half of that: the log is written line by line to persistent storage WHILE the job runs, so an
 # interrupted job still leaves everything it had printed.
-# S4 — top-k surprisal prior, ONE eval per job (pre-registered: prereg/S4_topk_surprisal_prior.md).
+# S4 — top-k surprisal prior, ONE eval per job (pre-registered: prereg/topk_surprisal_prior.md).
 #
 # Pass with -v:  EVAL=<eval>  [PRIORS=<specs joined by '+'>]  [OUT=<abs path>]
 # '+' joins the priors list because PBS -v splits its own variables on commas; converted below.

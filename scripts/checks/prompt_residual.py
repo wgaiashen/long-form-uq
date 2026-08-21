@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """PR1 -- PROMPT-RESIDUAL HIDDEN-STATE PROBING.
 
-Pre-registration: ../prereg/PR1_prompt_residual.md (committed BEFORE any R1/R2 PRR existed).
+Pre-registration: ../prereg/prompt_residual_pooling.md (committed BEFORE any R1/R2 PRR existed).
 Output:           results/method_dev/prompt_residual/
 
 THE QUESTION
