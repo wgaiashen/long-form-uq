@@ -15,7 +15,7 @@
 #
 # Uses the default forward (fp16/SDPA) to match how the unsupervised ptrue and the Gemma ptrue
 # features were extracted -- the ptrue family's own convention, evaluated on its own PRR.
-# Independent of the lookback/uhead jobs, so run in parallel.
+# Independent of the lookback job, so run in parallel.
 #
 # After this finishes, on the LOGIN NODE (CPU) score it at the middle layer 15:
 #   for DS in sciq trivia_qa pubmed_qa xsum; do

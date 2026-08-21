@@ -22,8 +22,8 @@ Two differences from SAPLMA:
 Matches the authors' released code (Chuang et al., lookback-src/step01_extract_attns.py):
 context/(ctx+new), where "new" is a plain MEAN over the row's new-token attention slice (the
 token's own self-attention included). Verified to ~1e-6 against that code in
-scripts/check_lookback_vs_authors.py. uhead's extractor orients this the other way
-(new/(ctx+new) = 1 - authors); we do NOT copy that. Response-level adaptation: we mean-pool the
+scripts/check_lookback_vs_authors.py. Note that some re-implementations orient the ratio the
+other way (new/(ctx+new) = 1 - authors); we follow the authors. Response-level adaptation: we mean-pool the
 per-token ratio over the generated tokens (the paper scores spans / a sliding window), dropping
 the last token to align with the authors' predicting-token indexing.
 """

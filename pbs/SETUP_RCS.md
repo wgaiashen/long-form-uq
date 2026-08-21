@@ -52,9 +52,8 @@ A100s are only 40GB and scarce; default to the **L40S (48GB)** on RCS.
    # core deps (versions match the working DoC env; let pip pick the right torch CUDA wheel)
    pip install torch transformers==4.57.6 datasets==5.0.0 numpy==1.26.4 \
        scikit-learn==1.9.0 scipy==1.12.0 openai==2.41.0
-   # two deps that live on GitHub (same as DoC):
+   # one dep that lives on GitHub (same as DoC):
    pip install "git+https://github.com/IINemo/lm-polygraph.git@dev"
-   pip install "git+https://github.com/IINemo/llm-uncertainty-head.git"
    ```
    - **ProbeDrift is local-only** (not on GitHub), so copy it from DoC and install it
      editable. From a **DoC login node**:
@@ -76,7 +75,6 @@ A100s are only 40GB and scarce; default to the **L40S (48GB)** on RCS.
    ```bash
    export HF_HOME=~/hf_cache       # matches the default; do NOT use $EPHEMERAL
    hf download google/gemma-2-9b-it
-   # for the uhead baseline: hf download llm-uncertainty-head/uhead_gemma-2-9b-it
    ```
 
 ---
@@ -105,7 +103,6 @@ Use the wrapper (it picks `qsub` on RCS, `sbatch` on DoC):
 export LUQ_CLUSTER=rcs               # or rely on hostname auto-detect
 ./scripts/submit.sh extract pubmed_qa ID      # parametrised extraction
 ./scripts/submit.sh gemma_gpu                  # all three datasets, all GPU features
-./scripts/submit.sh uhead                      # uhead baseline + eval
 ```
 Or `qsub` directly:
 ```bash

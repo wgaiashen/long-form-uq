@@ -50,7 +50,7 @@ DTYPE=bf16
 # ~1e-6 kernel-precision difference from eager -- the same order as other equivalence gates already
 # used in this project. Verified safe for this panel: none of its six methods (perplexity, msp_min,
 # SAPLMA, attention pooler, wmsp_norm, wmsp_shrink2) call output_attentions or need raw attention
-# weights (that requirement is Lookback Lens / uhead, neither of which is in this panel). Record as a
+# weights (that requirement is Lookback Lens, which is not in this panel). Record as a
 # prereg deviation alongside D1/D2 -- NOT done from DoC, docs are read-only here.
 ATTN=sdpa
 LAYER=31                       # ceil(64/2)-1, the fixed rule. Cross-checked against the registry.

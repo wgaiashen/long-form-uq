@@ -13,7 +13,7 @@ from luq.labels.llm_judge import parse_score
 
 def test_perplexity_is_mean_negative_log_likelihood():
     # The "perplexity" aggregate == -mean(logprob), which is exactly lm-polygraph's Perplexity
-    # estimator (`-np.mean(ll)`; uhead inherits it; the "Perplexity" baseline). Confirmed equal
+    # estimator (`-np.mean(ll)`, the "Perplexity" baseline). Confirmed equal
     # to the installed source by inspection; pinned here so the equivalence can't drift. (Name
     # follows lm-polygraph: it returns mean NLL, not exp(mean NLL) — PRR ranking is identical.)
     lp = [-0.1, -2.0, -0.5, -1.2]

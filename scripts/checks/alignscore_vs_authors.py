@@ -36,10 +36,11 @@ TOL = 1e-3
 def _stub_tensorflow():
     """Register a no-op tensorflow so the package imports without TF installed.
 
-    Importing his AlignScore pulls in lm_polygraph_lite, whose __init__ eagerly loads an
-    unrelated Keras SAPLMA head (luh/heads/full_seq_head_saplma.py) that does `import tensorflow`
-    + `tf.config...` + `from tensorflow.keras... import Sequential, Dense` at module load. AlignScore
-    itself uses torch, not TF, so a stub lets us run his REAL AlignScore code. No effect on scoring.
+    Importing AlignScore pulls in lm_polygraph_lite, whose __init__ eagerly loads an unrelated
+    Keras SAPLMA head that does `import tensorflow` + `tf.config...` +
+    `from tensorflow.keras... import Sequential, Dense` at module load. AlignScore itself uses
+    torch, not TF, so a stub lets us run the authors' real AlignScore code (yuh-zha/AlignScore).
+    No effect on scoring.
     """
     import types
     import importlib.machinery

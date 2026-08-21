@@ -2,9 +2,9 @@
 the Hidden Failures "middle" by block, not by copying an index number.
 
 HF `output_hidden_states=True` returns num_hidden_layers+1 tensors per step: index 0 is
-the embedding output, index k is the k-th decoder layer's output. the code selects
-`ceil(num_hidden/2)-1` and indexes that (embedding-included) tuple directly
-(luh/feature_extractors/utils.py + basic_hidden_states.py); our pipeline caches all layers
+the embedding output, index k is the k-th decoder layer's output. The Hidden Failures
+reference implementation selects `ceil(num_hidden/2)-1` and indexes that
+(embedding-included) tuple directly; our pipeline caches all layers
 and `03_probe.py` defaults to `n_layers//2` over the same tuple. For Llama-3.1-8B (32
 layers) the reference = index 15, ours = 16 — one slot apart. The paper's figures say "layer 16",
 which is the embedding-as-layer-1 name for HF index 15. The empirical {15,16} sweep is the

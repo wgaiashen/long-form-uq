@@ -19,8 +19,8 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
             others (fine for PRR, which only uses the ranking).
     "perplexity" : mean per-token negative log-likelihood = (1/L) * sum(-log p),
             the LENGTH-NORMALISED counterpart to "sum". This is exactly
-            lm-polygraph's `Perplexity` estimator (`-np.mean(ll)`; uhead inherits
-            it) and the "Perplexity" baseline in the Hidden Failures, so the
+            lm-polygraph's `Perplexity` estimator (`-np.mean(ll)`) and the
+            "Perplexity" baseline in Hidden Failures, so the
             name matches them. NOTE the name follows that convention rather than
             the textbook definition: lm-polygraph's "Perplexity" returns mean NLL
             (log-perplexity), NOT exp(mean NLL) — there is no exp. Under PRR only
@@ -49,7 +49,7 @@ FLOOR_AGGREGATES = ("sum", "perplexity", "min")
 # strongest averaged ACROSS datasets (cross-dataset mean PRR: min ~0.28 > perplexity ~0.21 > sum ~0.20),
 # and because pre-committing to one aggregate with no per-dataset hindsight is the deployment-honest choice.
 # Report the three-variant row per dataset regardless, and where a DIFFERENT variant is the strongest free
-# score on a dataset (cnn/samsum -> perplexity) DUAL-REPORT against it too (see the project record).
+# score on a dataset (cnn/samsum -> perplexity) DUAL-REPORT against it too (see the project's working notes).
 PRIMARY_FLOOR_AGG = "min"
 
 
@@ -89,7 +89,7 @@ def fair_floor(records_te, y_te, prr_fn, aggregates=FLOOR_AGGREGATES):
     length-normalised. On several datasets a different aggregate is far stronger -- pubmed_qa
     sum=+0.202 vs min=+0.371, ASQA sum=+0.148 vs perplexity=+0.316 -- so a "beats the floor" claim
     measured against `sum` alone can be more than twice the honest margin. That is exactly the
-    artefact that produced, and then killed, the cnn headline (the project record). A supervised
+    artefact that produced, and then killed, the cnn headline (the project's working notes). A supervised
     method should have to beat the best thing you can get for free, not the most convenient one.
 
     Returns (vector, name): the per-example uncertainty vector of the winning floor, and which it was.

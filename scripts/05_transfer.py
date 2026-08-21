@@ -31,8 +31,8 @@ from luq import cache, probe, results  # noqa: E402
 from luq.config import Config  # noqa: E402
 from luq.features import saplma  # noqa: E402
 
-# The supervised, probe-based methods (uhead is a pretrained head, not a trained probe of
-# ours, and MSP/perplexity are not probes — none of those transfer in this sense).
+# The supervised, probe-based methods. MSP and perplexity are not probes, so they do not
+# transfer in this sense.
 METHODS = ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback"]
 DATASETS = ["sciq", "pubmed_qa", "xsum"]
 

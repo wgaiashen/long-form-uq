@@ -31,7 +31,7 @@ ASQA, ExpertQA, FActScore-Bio) plus two short-form sets (SciQ, TriviaQA) used fo
 short/long contrasts.
 
 **Methods.** Three training-free token-probability floors (`msp_min`, `perplexity`, `msp_sum`),
-the supervised probes (SAPLMA, a linear probe, P(True), Lookback Lens, uhead), the aggregation
+the supervised probes (SAPLMA, a linear probe, P(True), Lookback Lens), the aggregation
 family (mean-pool, a learned attention pooler, multi-head and hierarchical pooling, segment
 aggregation), and the weighted-MSP line (normalised, shrinkage-regularised, adaptive Lehmer),
 with SAR and Orgad token-importance weighting.
@@ -44,7 +44,7 @@ its cache, so probes can be retrained without touching a GPU.
 | stage | what it does |
 |---|---|
 | `01_extract.py` | generate, cache the Tier-1 records (token ids, logprobs) and pooled hidden states |
-| `01b_ptrue.py`, `01c_lookback.py`, `01d/01i/01j_uhead*.py`, `01s_sar_relevance.py`, `01o_orgad_llm_extract.py` | extra per-method features, all from the cached records |
+| `01b_ptrue.py`, `01c_lookback.py`, `01s_sar_relevance.py`, `01o_orgad_llm_extract.py` | extra per-method features, all from the cached records |
 | `01e_repool.py` | re-pool the feature cache teacher-forced, so it matches the per-token cache |
 | `01h_pertoken.py` | per-token hidden states for the aggregation work |
 | `01f_alignscore.py` | the secondary AlignScore label |
@@ -56,7 +56,7 @@ its cache, so probes can be retrained without touching a GPU.
 ## Repository layout
 
 - `src/luq/` — the pipeline library: data, generation, cache, probe, results, plus
-  `features/` (saplma, ptrue, lookback, uhead, sar, orgad) and `labels/` (string match,
+  `features/` (saplma, ptrue, lookback, sar, orgad) and `labels/` (string match,
   LLM judge, AlignScore, FActScore).
 - `scripts/` — the numbered stages above, plus `checks/` (237 analysis and verification
   drivers, see `scripts/checks/README.md`) and `tools/` (20 helpers, mostly visualisation).
@@ -91,7 +91,7 @@ export HF_HOME=/path/to/big/volume/hf_cache   # NOT ~/.cache, home is usually ov
 export OPENAI_API_KEY=...                     # only for the long-form judge (02_label)
 ```
 
-Main dependencies: PyTorch, transformers, lm-polygraph, the uhead library (`luh`), ProbeDrift,
+Main dependencies: PyTorch, transformers, lm-polygraph, ProbeDrift,
 scikit-learn, scipy, and the OpenAI client for the long-form judge. The judge-comparison panel
 (`scripts/checks/judge_agreement.py`) additionally uses `krippendorff` and `irrCAC`
 (`pip install krippendorff irrCAC`) and degrades gracefully to `n/a` without them.

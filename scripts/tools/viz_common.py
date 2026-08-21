@@ -31,7 +31,7 @@ from luq import cache, msp  # noqa: E402
 # The supervised methods that 03_probe/04_eval may have scored for a run. We show whichever ones
 # actually have a scores file on disk; the rest are silently skipped. Both families show these in
 # each example's header so you can see what every probe predicted for the same generation.
-KNOWN_METHODS = ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback", "uhead", "uhead_v2"]
+KNOWN_METHODS = ["saplma", "linear", "ptrue", "ptrue_accurate", "lookback"]
 
 
 # --------------------------------------------------------------------------------------

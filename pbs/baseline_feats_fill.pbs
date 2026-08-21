@@ -13,7 +13,7 @@
 # missing for three datasets, so P(True) and Lookback Lens can appear on the full grid.
 #
 # WHY THIS IS THE GATE. assemble_pdl_table.py's ALIAS defines a 24-method universe that contains NO
-# ptrue, NO lookback and NO uhead -- i.e. none of the supervised baselines the report's central claim
+# ptrue and NO lookback -- i.e. none of the supervised baselines the report's central claim
 # ("our method beats existing probes") is measured against. The features exist for 7 of 10 datasets;
 # cnn_dailymail, med_quad and samsum are missing both. Six extractions unlock the whole comparison.
 #

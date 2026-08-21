@@ -36,8 +36,8 @@ from ood_refpools import (                          # noqa: E402
 )
 
 
-# the SAPLMA head recipe, read from the reference repo (grounded, not remembered):
-#   Temp_robust_UQ_probes/luh/heads/full_seq_head_saplma.py
+# The SAPLMA head recipe, read from the Hidden Failures reference implementation rather than
+# reproduced from memory:
 #     Dense(256, relu) -> Dense(128, relu) -> Dense(64, relu) -> Dense(1, sigmoid)
 #     optimizer='adam' (Keras default lr ~1e-3), loss='binary_crossentropy'
 #     model.fit(features, targets, epochs=5, batch_size=1)           # <- batch_size=1, hardcoded
@@ -51,7 +51,7 @@ REFERENCE_SAPLMA = {
     "standardize": False,
     "framework": "Keras/TF",
     "target": "1 - correctness (sigmoid output IS the uncertainty)",
-    "source": "luh/heads/full_seq_head_saplma.py:27-48 + feature_supervision.py:166",
+    "source": "Hidden Failures reference implementation, full-sequence SAPLMA head",
 }
 
 
