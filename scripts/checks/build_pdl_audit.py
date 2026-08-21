@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RESULTS = ROOT / "results"
-EPHEM = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+EPHEM = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
 ROUTER_OOD = ROOT / "cache" / "router_ood"
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 

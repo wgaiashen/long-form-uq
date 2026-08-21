@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 _BASE_RESULTS = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/results")
 _local = ROOT / "results"
 RESULTS = _local if list(_local.glob("pdl_fam_*.csv")) else _BASE_RESULTS
-EPHEM = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+EPHEM = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 
 LONG_EVALS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]

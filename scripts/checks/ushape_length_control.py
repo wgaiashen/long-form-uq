@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925")
+BASE = Path(__file__).resolve().parents[2]
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 NAME = f"id_entropy_vs_drop__{SLUG}.csv"
 PREREG_ALPHA = 0.025          # prereg/0.2's Bonferroni threshold, fixed before any of this was run

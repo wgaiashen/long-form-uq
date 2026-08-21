@@ -20,6 +20,7 @@ sources are the post-split runs; older files are read only where they are unaffe
 """
 import csv as _csv
 import glob
+import os
 import sys
 from pathlib import Path
 
@@ -27,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 RESULTS = ROOT / "results"
-EPHEM = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+EPHEM = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 
 # All ten. A `cache/records/*` glob silently returns 7 — asqa/expertqa/factscore live in *_rp12

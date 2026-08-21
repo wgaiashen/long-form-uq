@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925")
+BASE = Path(__file__).resolve().parents[2]
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 RUNG = "Long->Short"
 # All the UNSUPERVISED rows. msp_sum and perplexity are floors too -- an earlier version of this

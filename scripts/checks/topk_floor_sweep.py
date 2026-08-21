@@ -12,6 +12,7 @@ msp_min and my k=all PRR must equal published perplexity, on the SAME eval popul
 table uses (xl_rungs.eval_split, the driver's own test split). If an endpoint misses §B.2 the
 sweep is on the wrong population and nothing else is trustworthy.
 """
+import os
 import sys, csv as _csv
 from pathlib import Path
 import numpy as np
@@ -147,7 +148,7 @@ def main():
           else "FAIL -- population wrong, DO NOT read the curve")
 
     # ---- write the sweep CSV ----
-    outdir = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+    outdir = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
     outdir.mkdir(parents=True, exist_ok=True)
     csv_path = outdir / "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv"
     with open(csv_path, "w", newline="") as fh:

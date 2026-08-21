@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925")
+BASE = Path(__file__).resolve().parents[2]
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 SHORT = ["sciq", "trivia_qa"]

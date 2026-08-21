@@ -28,7 +28,7 @@ import os
 import sys
 from collections import defaultdict
 
-ROOT = "/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925"
+ROOT = str(Path(__file__).resolve().parents[2])
 RESULTS = os.path.join(ROOT, "results")
 ALL_RUNGS = ["ID", "SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 

@@ -18,6 +18,7 @@ gap -- so the matched join may not support the collapse story the mismatched one
 """
 import csv as _csv
 import glob
+import os
 import sys
 from pathlib import Path
 
@@ -53,7 +54,7 @@ def mean_norm_entropy(sidecar, records):
     return float(np.mean(vals)), len(vals)
 
 
-WIDENED_DIR = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
+WIDENED_DIR = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
 
 
 def csv_rows(dataset):

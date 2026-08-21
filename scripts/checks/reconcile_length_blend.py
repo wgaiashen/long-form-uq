@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # `results/` is NOT duplicated into a git worktree -- it is gitignored and lives in the main checkout
 # only. Resolving it relative to __file__ alone silently finds nothing when this runs from a worktree,
 # so fall back to the canonical path. Same trap as the attention sidecars, which are also base-only.
-BASE = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925")
+BASE = Path(__file__).resolve().parents[2]
 
 
 def results_dir():
