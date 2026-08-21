@@ -86,6 +86,12 @@ def main():
     ap.add_argument("--model", default=QWEN)
     ap.add_argument("--suffix", default="trunc_v1")
     ap.add_argument("--datasets", default=",".join(DATASETS))
+    ap.add_argument("--span-version", type=int, default=1, choices=(1, 2),
+                    help="luq.answer_span rule version, used only for the ANSWER_SPAN_DATASETS "
+                         "(med_quad). Default 1 = the historical rule, so every earlier invocation "
+                         "of this script reproduces exactly. 2 tolerates whitespace around the "
+                         "'Question:'/'Answer:' colon and is what the clean-v2 population is built "
+                         "with. Recorded per row in `trunc_standing`.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -117,8 +123,9 @@ def main():
         for r in recs:
             t = r.get("gen_text", "") or ""
             if d in ANSWER_SPAN_DATASETS:
-                _, ch, reason = A.answer_span(t, d, context=r.get("prompt"))
-                standing = "answer_span(promoted)"
+                _, ch, reason = A.answer_span(t, d, context=r.get("prompt"),
+                                              version=args.span_version)
+                standing = f"answer_span(promoted,v{args.span_version})"
                 if reason.startswith("no-cut") or ch in (0, None) or ch >= len(t):
                     ch = None
             else:
@@ -153,6 +160,21 @@ def main():
             # rather than align them. So keep the label when it is already the clean one.
             already_clean = (f"{lf}_clean" in r and r.get(lf) == r.get(f"{lf}_clean")
                              and d in ANSWER_SPAN_DATASETS)
+            # ...BUT ONLY IF THE SPAN IT WAS JUDGED ON IS THE SPAN WE ARE NOW KEEPING.
+            # The clean label was judged on the v1 answer_span slice. Under --span-version 2 the
+            # boundary moves on some rows (on Llama med_quad: 7 newly cut, and 3 where v1 cut at the
+            # `\nAnswer:` INSIDE the fabricated block and so kept the invented question stem). For
+            # those the existing clean label describes MORE text than we are retaining, which is the
+            # exact label/feature mismatch this whole correction exists to remove. So the retention
+            # test is span equality, checked per row, not merely "a clean label exists".
+            if already_clean and args.span_version != 1:
+                v1_txt, _, v1_rsn = A.answer_span(t, d, context=r.get("prompt"), version=1)
+                v1_span = v1_txt.rstrip() if v1_rsn != "no-cut" else t.rstrip()
+                vN_txt, _, vN_rsn = A.answer_span(t, d, context=r.get("prompt"),
+                                                  version=args.span_version)
+                vN_span = vN_txt.rstrip() if vN_rsn != "no-cut" else t.rstrip()
+                if v1_span != vN_span:
+                    already_clean = False                      # -> label dropped, relabeller re-judges
             if already_clean:
                 kept_label += 1
             else:
