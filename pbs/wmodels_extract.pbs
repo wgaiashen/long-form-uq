@@ -32,6 +32,14 @@
 # SMOKE MODE (the prompt-regime validity gate, prereg §6): set LUQ_LIMIT and LUQ_PROBE.
 # --limit N takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
 #   qsub -v LUQ_MODEL=...,LUQ_DTYPE=fp32,LUQ_DATASET=xsum,LUQ_LIMIT=40,LUQ_PROBE=llama31i_probe pbs/wmodels_extract.pbs
+#
+# CHAT-TEMPLATE MODE (prereg §6's instruct-chatter remedy): set LUQ_CHAT=1. Wraps the already-built
+# prompt string via tok.apply_chat_template before tokenising -- dataset-agnostic, so it applies to
+# all six datasets uniformly, including asqa/factscore's own asqa_rp12/factscore_rp12 regimes (which
+# it OVERRIDES, never mixes with -- those namespaces hold raw-few-shot records already). Mirrors
+# slurm/wmodels_extract.sbatch on DoC exactly, so a dataset can move cluster mid-population.
+#   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=samsum,LUQ_CHAT=1 \
+#       pbs/wmodels_extract.pbs
 
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
@@ -51,6 +59,8 @@ DS="${LUQ_DATASET:?set LUQ_DATASET}"
 ATTN="${LUQ_ATTN:-eager}"
 LIMIT="${LUQ_LIMIT:-}"
 PROBE="${LUQ_PROBE:-}"
+CHAT=""; [ "${LUQ_CHAT:-0}" = "1" ] && CHAT="--chat-template"
+CHAT_REGIME="${LUQ_CHAT_REGIME:-llama31i_chat}"
 
 # dataset : budget (LLAMA's, unchanged) : extra flags   -- verbatim from qwen_generate_full.sbatch
 case "$DS" in
@@ -84,6 +94,13 @@ esac
 if [ -n "$PROBE" ]; then
   EXTRA="$(printf '%s' "$EXTRA" | sed -E 's#--prompt-regime [^ ]+##')"
   EXTRA="--prompt-regime ${PROBE} ${EXTRA}"
+fi
+
+# Chat-template mode: OVERRIDE any dataset-specific regime (asqa_rp12/factscore_rp12 hold
+# raw-few-shot records already) with the chat namespace -- never mix the two under one name.
+if [ -n "$CHAT" ]; then
+  EXTRA="$(printf '%s' "$EXTRA" | sed -E 's#--prompt-regime [^ ]+##')"
+  EXTRA="--prompt-regime ${CHAT_REGIME} ${EXTRA} ${CHAT}"
 fi
 
 MNT=""
