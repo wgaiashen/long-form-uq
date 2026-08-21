@@ -42,6 +42,8 @@ LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "exp
 # report / Hidden Failures rung order. LOO before SameTask. Do not silently reorder.
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
 OOD = RUNGS[1:]
+# "HAPE"/"HAPES" are the historical method keys in this ablation's CSVs: the unconstrained
+# precursor and CAWSA. Left as written so the completed results stay joinable.
 METHODS = ["HAPE", "HAPES"]
 ALIGN = ["post_token", "pre_token"]
 GATE_4DP = 1e-4

@@ -5,9 +5,9 @@
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
-# Per-token HAPES lambda=2 weights for the three FIXED A5 figure examples (cnn #480, samsum #642,
+# Per-token CAWSA lambda=2 weights for the three fixed token-weight figure examples (cnn #480, samsum #642,
 # pubmed_qa #1264). CPU-only: loads one pertok cache at a time and retrains the small weighter MLP.
 # Also retrains lambda=0 and diffs it against the stored wMSP_pairwise vectors as a reproduction control.
 echo "[hapes-tokw] host $(hostname)"
-python -u scripts/tools/export_hapes_lambda2_token_weights.py
+python -u scripts/tools/export_cawsa_lambda2_token_weights.py
 echo "[hapes-tokw] DONE"

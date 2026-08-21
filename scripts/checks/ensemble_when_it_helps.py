@@ -8,8 +8,8 @@ result; it does not revise it. The registered verdict stays NULL.
 TWO QUESTIONS
 -------------
 1. WHAT PREDICTS THE GAIN? Per dataset, regress the ensemble's gain over SAPLMA on candidate predictors.
-   Finding: HAPES's OWN OOD level predicts it at rho = +0.952; SAPLMA's level predicts nothing (-0.071).
-   xsum is then not an anomaly: HAPES is nearly dead there (+0.043 OOD, -0.065 at DiffTask), so
+   Finding: CAWSA's own OOD level predicts it at rho = +0.952; SAPLMA's level predicts nothing (-0.071).
+   xsum is then not an anomaly: CAWSA is nearly dead there (+0.043 OOD, -0.065 at DiffTask), so
    rank-averaging a strong signal with a near-dead one drags it down.
 
 2. IS THE COMBINATION DOING ANYTHING BEYOND INTERPOLATING? `delta vs SAPLMA` is partly MECHANICAL -- a
@@ -19,7 +19,7 @@ TWO QUESTIONS
        bonus = ensemble PRR - mean(component PRRs)
 
    which is exactly 0 for an ensemble that merely interpolates. Finding: +0.0405 on 8/8 datasets for
-   {HAPES, SAPLMA} vs +0.0179 for the {SAPLMA, attention} control, and the difference is 8/8.
+   {CAWSA, SAPLMA} vs +0.0179 for the {SAPLMA, attention} control, and the difference is 8/8.
 
    A positive bonus is the EXPECTED direction from ordinary ensemble variance reduction, so its
    positivity alone is not news -- the PRIMARY vs CONTROL difference is. And at n = 8, 8/8 in one
@@ -50,7 +50,7 @@ for d in LONG:
         Z[(d,rg)]=({k[5:]:z[k] for k in z.files if k.startswith("unc__")}, z["y"])
 
 print("PER-DATASET, mean over the 4 OOD rungs")
-print(f"{'dataset':15s}{'SAPLMA':>9s}{'HAPES':>9s}{'gap':>8s}{'ens':>9s}{'delta':>9s}{'disatt r':>10s}")
+print(f"{'dataset':15s}{'SAPLMA':>9s}{'CAWSA':>9s}{'gap':>8s}{'ens':>9s}{'delta':>9s}{'disatt r':>10s}")
 rows=[]
 for d in LONG:
     sa=np.mean([prr_ps(Z[(d,r)][1],Z[(d,r)][0]["saplma"]) for r in OOD])
@@ -66,13 +66,13 @@ for d in LONG:
 import numpy as np
 gap=np.array([r[3] for r in rows]); dl=np.array([r[5] for r in rows]); dis=np.array([r[6] for r in rows])
 hp=np.array([r[2] for r in rows]); sa=np.array([r[1] for r in rows])
-print(f"\nSpearman(component gap SAPLMA-HAPES , ensemble delta) = {spearmanr(gap,dl).statistic:+.3f}")
-print(f"Spearman(HAPES OOD level            , ensemble delta) = {spearmanr(hp,dl).statistic:+.3f}")
+print(f"\nSpearman(component gap SAPLMA-CAWSA , ensemble delta) = {spearmanr(gap,dl).statistic:+.3f}")
+print(f"Spearman(CAWSA OOD level            , ensemble delta) = {spearmanr(hp,dl).statistic:+.3f}")
 print(f"Spearman(disattenuated corr         , ensemble delta) = {spearmanr(dis,dl).statistic:+.3f}")
 print(f"Spearman(SAPLMA OOD level           , ensemble delta) = {spearmanr(sa,dl).statistic:+.3f}")
 
 print("\nXSUM per rung")
-print(f"{'rung':16s}{'SAPLMA':>9s}{'HAPES':>9s}{'ens':>9s}{'delta':>9s}{'disatt':>9s}")
+print(f"{'rung':16s}{'SAPLMA':>9s}{'CAWSA':>9s}{'ens':>9s}{'delta':>9s}{'disatt':>9s}")
 for rg in RUNGS:
     m,y=Z[("xsum",rg)]
     sa1=prr_ps(y,m["saplma"]); hp1=prr_ps(y,m["wmsp_shrink2"]); en1=ens_ps(y,m["wmsp_shrink2"],m["saplma"])
@@ -98,7 +98,7 @@ for d in LONG:
                -0.5*(ps(Z[(d,r)][1],Z[(d,r)][0]["saplma"])+ps(Z[(d,r)][1],Z[(d,r)][0]["attention"])) for r in OOD])
     bp.append(p); bc.append(c); print(f"{d:15s}{p:>+15.4f}{c:>+15.4f}")
 bp,bc=np.array(bp),np.array(bc)
-for nm,v in [("PRIMARY {HAPES,SAPLMA}",bp),("CONTROL {SAPLMA,attn}",bc)]:
+for nm,v in [("PRIMARY {CAWSA,SAPLMA}",bp),("CONTROL {SAPLMA,attn}",bc)]:
     p=wilcoxon(v,alternative="two-sided",method="exact").pvalue
     print(f"\n{nm}: macro {v.mean():+.4f}  median {np.median(v):+.4f}  positive {int((v>0).sum())}/8  exact Wilcoxon p={p:.4f}")
 d=bp-bc; p=wilcoxon(d,alternative="two-sided",method="exact").pvalue

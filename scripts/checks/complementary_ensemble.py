@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-"""M6 -- DOES HAPES SUPPLY A COMPLEMENTARY SIGNAL TO SAPLMA?
+"""Does CAWSA supply a complementary signal to SAPLMA?
 
 Pre-registration: prereg/M6_hapes_saplma_ensemble.md (committed before any ensemble PRR was read).
 
 THE QUESTION (14 August 2026 supervision meeting, P0 #2)
 --------------------------------------------------------
-Does HAPES provide a complementary uncertainty signal to SAPLMA, such that a simple combination can
-retain SAPLMA's strong near-ID performance while benefiting from HAPES under stronger shift?
+Does CAWSA provide a complementary uncertainty signal to SAPLMA, such that a simple combination can
+retain SAPLMA's strong near-ID performance while benefiting from CAWSA under stronger shift?
 
-    HAPE       = wmsp_norm      (unregularised weighted token-NLL)
-    HAPES λ=2  = wmsp_shrink2   (weights shrunk toward uniform; λ FIXED at 2, never swept)
+    unconstrained = wmsp_norm    (unregularised activation-weighted token NLL)
+    CAWSA λ=2     = wmsp_shrink2 (weights shrunk toward uniform; λ fixed at 2, never swept)
 
 WHY THIS IS A PURE POST-HOC READ
 --------------------------------
@@ -24,7 +24,7 @@ length_blend_perinstance.py and must not be confused with this one.
 
 WHAT IS PRE-REGISTERED, AND THEREFORE NOT DECIDED HERE
 ------------------------------------------------------
-  * primary ensemble = rankavg{HAPES λ=2, SAPLMA}, equal weight, ONE combiner;
+  * primary ensemble = rankavg{CAWSA λ=2, SAPLMA}, equal weight, one combiner;
   * unit of analysis = DATASET, n = 8 (the 32 OOD cells are NOT 32 independent observations: the
     floors do not depend on the training pool, so cell pooling is 4x pseudo-replication);
   * estimand A = per-dataset mean over its 4 OOD rungs, ensemble - SAPLMA;
@@ -32,7 +32,7 @@ WHAT IS PRE-REGISTERED, AND THEREFORE NOT DECIDED HERE
   * ID reference scale 0.0044 = the measured seed-to-seed sd of SAPLMA's ID macro. An interpretive
     scale, NOT a pass/fail target and NOT an invented effect size;
   * control = rankavg{SAPLMA, attention} -- SECONDARY mechanism evidence only;
-  * references = rankavg{msp_min, SAPLMA} and rankavg{HAPE, SAPLMA}, recomputed from these same
+  * references = rankavg{msp_min, SAPLMA} and rankavg{unconstrained, SAPLMA}, recomputed from these same
     vectors so everything is internally comparable. They never enter a winner-selection sweep.
 
 rankavg IS TEST-COHORT DEPENDENT and that is reported, not hidden. rankdata ranks within the
@@ -129,16 +129,16 @@ ALIAS_TO_MASTER = {"floor_sum": "msp_sum", "floor_ppl": "perplexity", "floor_min
                    "wmsp_norm": "wMSP-norm", "wmsp_shrink2": "wMSP-shrink@2",
                    "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "attention": "armA(attention)"}
 
-NAMES = {"wmsp_shrink2": "HAPES λ=2", "wmsp_norm": "HAPE", "saplma": "SAPLMA",
+NAMES = {"wmsp_shrink2": "CAWSA λ=2", "wmsp_norm": "unconstrained", "saplma": "SAPLMA",
          "attention": "attention-pool", "uniform": "mean-pool", "floor_min": "msp_min",
          "floor_ppl": "perplexity", "floor_sum": "msp_sum"}
 
 # (label, component_a, component_b) -- PRIMARY first, then the control, then the references.
 ENSEMBLES = [
-    ("PRIMARY  HAPES λ=2 + SAPLMA", "wmsp_shrink2", "saplma"),
+    ("PRIMARY  CAWSA λ=2 + SAPLMA", "wmsp_shrink2", "saplma"),
     ("CONTROL  SAPLMA + attention-pool", "saplma", "attention"),
     ("REF      msp_min + SAPLMA", "floor_min", "saplma"),
-    ("REF      HAPE + SAPLMA", "wmsp_norm", "saplma"),
+    ("REF      unconstrained + SAPLMA", "wmsp_norm", "saplma"),
 ]
 
 
@@ -305,7 +305,7 @@ def main():
     out_path = args.out or str(ROOT / "results" / f"complementary_ensemble__{slug}{suffix}.csv")
 
     print("=" * 104)
-    print("M6 -- HAPES + SAPLMA: is the combination better than SAPLMA far OOD without losing ID?")
+    print("CAWSA + SAPLMA: is the combination better than SAPLMA far OOD without losing ID?")
     print(f"Population: ProbeDriftLong long grid, {len(LONG)} evals x 5 rungs, 3 seeds, {args.model}.")
     if excluded:
         print(f"SENSITIVITY ARM -- EXCLUDED: {excluded}. This never replaces the full-grid primary.")
@@ -526,7 +526,7 @@ def main():
     print("=" * 104)
     if ood_stat is None or id_stat is None:
         print("  PRIMARY ensemble not computable on this population (a component is ABSENT, not zero).")
-        print("     No verdict is issued. Run pbs/pdl_perex_ens.pbs to produce HAPES λ=2 + attention.")
+        print("     No verdict is issued. Run pbs/pdl_perex_ens.pbs to produce CAWSA λ=2 + attention.")
         _write(out_path, rows)
         return
     om, olo, ohi, op, opos, on = ood_stat
@@ -559,7 +559,7 @@ def main():
     print("  the project's working notes already recorded that distinctness != incremental value.")
     print("-" * 104)
     print(f"{'pair':40s}{'self A':>9s}{'self B':>9s}{'cross':>9s}{'disatt.':>10s}   population")
-    for label, a, b in [("HAPES λ=2 ~ SAPLMA", "wmsp_shrink2", "saplma"),
+    for label, a, b in [("CAWSA λ=2 ~ SAPLMA", "wmsp_shrink2", "saplma"),
                         ("SAPLMA ~ attention-pool", "saplma", "attention"),
                         ("msp_min ~ SAPLMA", "floor_min", "saplma")]:
         for pop, rset in [("OOD only", OOD), ("ID", ["ID"])]:

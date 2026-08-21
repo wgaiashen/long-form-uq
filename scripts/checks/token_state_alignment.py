@@ -90,6 +90,9 @@ ARMS = [("HAPE", "post_token", 0.0),
 # Control 2: the canonical post-token values these arms must reproduce, per (method, rung), macro over
 # the 8 datasets, from results/pdl_master__meta-llama_Meta-Llama-3.1-8B.csv.
 # Checked PER CELL against the master CSV at runtime; this table is only for the printed summary.
+# NOTE: "HAPE"/"HAPES" are the historical method keys written into this ablation's result CSVs
+# and read back by alignment_tables.py. They are the unconstrained precursor and CAWSA
+# respectively. The keys are left alone so the completed results stay joinable.
 CANON_METHOD = {"HAPE": "wMSP-norm", "HAPES": "wMSP-shrink@2"}
 GATE_4DP = 1e-4        # "to 4 dp" -- the same bar sharpening_lambda used for its outside check
 

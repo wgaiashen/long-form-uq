@@ -9,7 +9,7 @@
 #
 # WHAT THIS PRODUCES, AND WHY IT IS ONE PASS
 # ------------------------------------------
-# The M6 question is whether HAPES (wmsp_shrink2) supplies a signal complementary to SAPLMA. Every
+# The question is whether CAWSA (wmsp_shrink2) supplies a signal complementary to SAPLMA. Every
 # ensemble, correlation and rung-profile number in M6 is a function of the PER-EXAMPLE uncertainty
 # vectors, not of the per-cell PRRs. probedriftlong.py already computes all the components we need in
 # one pass (floors, SAPLMA, mean-pool `uniform`, attention pooler, and the wMSP variants) and already
@@ -19,7 +19,8 @@
 # So one compute pass makes every downstream ensemble a free post-hoc read. No driver is edited.
 #
 # --wmsp-only wmsp_norm,wmsp_shrink2 is what keeps this affordable: the default WMSP list would also
-# train the segmented and Blondel variants per cell, which M6 does not use. HAPE (wmsp_norm) is kept
+# train the segmented and Blondel variants per cell, which the ensemble does not use. The
+# unconstrained precursor (wmsp_norm) is kept
 # because M6 needs it as a reference or ablation and as a continuity check against the canonical master.
 #
 # LAMBDA IS FIXED AT 2. This is not a lambda sweep -- see prereg M6 sections 3 and 10.

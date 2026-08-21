@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Export per-token HAPES lambda=2 weights for the THREE fixed A5 token-weight figure examples.
+"""Export per-token CAWSA lambda=2 weights for the three fixed token-weight figure examples.
 
 Population discipline: the three (dataset, record idx) pairs are COPIED VERBATIM from
 scripts/tools/fig_wmsp_token_weights.py's PANELS list -- the deterministic A5 audit set
@@ -27,6 +27,7 @@ come off the same production path and are trustworthy. If it does NOT, the scrip
 still writes the file with the mismatch recorded, so a silent drift can never be mistaken for a result.
 
 Output: results/analysis/fig_hapes_lambda2_token_weights_data.csv (one row per generated token).
+The output filename keeps its original spelling so the committed figure data stays in place.
 Run on a COMPUTE NODE (it loads ~6.8 GB of per-token caches).
 """
 import sys
@@ -62,7 +63,7 @@ OUT = ROOT / "results" / "analysis" / "fig_hapes_lambda2_token_weights_data.csv"
 
 def train(states, records, y, tr, device, lam):
     """The production weighted-MSP training call. lam=0 -> the unregularised `wMSP-pairwise`
-    (what the old figure export used); lam=2 -> HAPES lambda=2 (`wmsp_shrink2` in the ladder)."""
+    (what the old figure export used); lam=2 -> CAWSA lambda=2 (`wmsp_shrink2` in the ladder)."""
     return weighted_msp.train_weighted_msp(
         states, records, y, tr, device, weight_mode="normalised", length_normalise=True,
         seed=1, loss="pairwise",
