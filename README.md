@@ -1,40 +1,64 @@
-# Long-Form Uncertainty Estimation for LLMs
+# CAWSA and ProbeDriftLong: uncertainty estimation for long-form generation
 
 MSc Computing project, Imperial College London.
 Author: Gaia Shen. Supervisors: Joe Stacey and Lihu Chen.
 
 ## What this is
 
-This project investigates white-box uncertainty quantification for long-form LLM
-generation. The aim is to train a probe on a model's internal states that produces one
-uncertainty score for a whole long-form output, and to test whether a single probe
-generalises across long-form task types (factuality and faithfulness) rather than being
-tied to one.
+This project studies white-box uncertainty estimation for long-form LLM generation: producing one
+uncertainty score for a whole generated response, and asking whether that score stays useful when
+the task changes.
+
+Two things come out of it.
+
+**ProbeDriftLong** is the evaluation framework. It takes eight long-form evaluation sets across
+three task families (question answering, summarisation and factual writing) and varies the labelled
+data a supervised estimator is trained on, from in-distribution through to a different task
+entirely. That makes cross-task transfer, rather than matched-task accuracy, the thing being
+measured.
+
+**CAWSA** (Constrained Activation-Weighted Surprisal Aggregation) is the method. It keeps token
+surprisal as the quantity being aggregated, uses middle-layer activations to learn which generated
+positions matter more, and shrinks those learned weights back towards uniform aggregation. The
+constraint is the point: supervision is used to learn *where to read* the probability signal rather
+than to learn an unrestricted mapping from activations to correctness, which is what loses its
+advantage under task shift.
 
 ## Approach
 
 1. Generate long-form outputs from a frozen base model.
-2. Label each output for correctness (string match for short QA, an LLM judge for long-form).
-3. Train a probe on internal features to predict correctness.
-4. Evaluate with the prediction-rejection ratio (PRR).
+2. Label each output for response quality (an LLM judge on a graded 0 to 1 scale, and a claim-level
+   factuality pipeline for ExpertQA and FActScore; string match is used only for the short-form sets).
+3. Fit the uncertainty estimator on cached internal features and token probabilities.
+4. Evaluate with the prediction-rejection ratio (PRR), in distribution and under task shift.
+
+PRR ranks responses by uncertainty and progressively rejects the most uncertain ones. If the score
+is informative, the average quality of what remains climbs. 1 is oracle ordering, 0 is no better
+than random, and below 0 is worse than random. It is used rather than AUROC because long-form
+response quality here is graded rather than binary.
 
 A method is just a feature extractor plus an aggregation choice. The rest of the pipeline is
 shared, so every method is scored by the identical harness on the identical population.
 
 **Models.** `meta-llama/Meta-Llama-3.1-8B` is the primary model (frozen, middle layer 15).
-`Qwen/Qwen2.5-14B` is a second model (layer 23) used as an external-validity replication, chosen
-to change both family and size. The two are never pooled into one table. They are compared only
-as a replication verdict per claim.
+`Qwen/Qwen2.5-14B` is a second model (layer 23), chosen to change both family and size, and carries
+its own full grid. The two are never pooled into one table: each result is reported per population,
+and cross-model agreement is stated as a replication verdict per claim rather than as an average.
 
 **Datasets.** Eight long-form evaluation sets (PubMedQA, XSum, CNN/DailyMail, SAMSum, MedQuAD,
-ASQA, ExpertQA, FActScore-Bio) plus two short-form sets (SciQ, TriviaQA) used for the
-short/long contrasts.
+ASQA, ExpertQA, FActScore) across three task families, plus two short-form sets (SciQ, TriviaQA)
+used for the short/long contrasts.
 
-**Methods.** Three training-free token-probability floors (`msp_min`, `perplexity`, `msp_sum`),
-the supervised probes (SAPLMA, a linear probe, P(True), Lookback Lens), the aggregation
-family (mean-pool, a learned attention pooler, multi-head and hierarchical pooling, segment
-aggregation), and the weighted-MSP line (normalised, shrinkage-regularised, adaptive Lehmer),
-with SAR and Orgad token-importance weighting.
+**Methods.** The baselines are three training-free probability aggregates (Minimum token
+probability `msp_min`, Mean token NLL `perplexity`, Sum NLL `msp_sum`), the hidden-state probes
+(SAPLMA, a mean-pool probe, P(True), Lookback Lens), and learned attention pooling. CAWSA is
+implemented as `wmsp_shrink2`, with its unconstrained precursor as `wmsp_norm`.
+
+The repository also contains the alternative designs that were tried and did not carry: hard top-k
+and softmax sharpening, adaptive Lehmer aggregation, SAR and Orgad token-importance weighting,
+attention-pooling position priors, and multi-head, hierarchical and segment pooling. Most of these
+are reported as negative or mixed results. `prereg/README.md` indexes the pre-registrations behind
+them. They are kept because knowing which nearby designs fail is part of the argument.
 
 ## Pipeline (`scripts/`)
 
@@ -58,13 +82,15 @@ its cache, so probes can be retrained without touching a GPU.
 - `src/luq/` — the pipeline library: data, generation, cache, probe, results, plus
   `features/` (saplma, ptrue, lookback, sar, orgad) and `labels/` (string match,
   LLM judge, AlignScore, FActScore).
-- `scripts/` — the numbered stages above, plus `checks/` (237 analysis and verification
-  drivers, see `scripts/checks/README.md`) and `tools/` (20 helpers, mostly visualisation).
-- `prereg/` — 36 pre-registrations, written and committed **before** the runs they describe, so
-  the commit timestamp shows a prediction pre-dates its result.
+- `scripts/` — the numbered stages above, plus `checks/` (254 analysis and verification
+  drivers, see `scripts/checks/README.md`) and `tools/` (21 helpers, mostly visualisation).
+- `prereg/` — 39 pre-registrations, written and committed **before** the runs they describe, so
+  the commit timestamp shows a prediction pre-dates its result. Indexed with their outcomes in
+  `prereg/README.md`. Several are recorded negatives and are kept deliberately.
 - `tests/` — 13 files, 73 CPU unit tests over the maths and the aggregation code.
 - `pbs/`, `slurm/` — cluster job scripts (see below).
-- `data/` — a fetch instruction for the FActScore data, which is not redistributed here.
+- FActScore's entity list and Wikipedia database are not redistributed here; `src/luq/factscore.py`
+  documents what the labeller expects and where it looks for them.
 
 ### `results/` is deliberately not in this repository
 
@@ -104,9 +130,9 @@ repository.
 Jobs run on either of two independent clusters. The Python pipeline is identical, only the
 submission wrapper and a few paths differ.
 
-- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (102 files).
+- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (108 files).
 - **RCS HPC (CX3)** — PBSPro, a larger pool (default L40S 48GB, and its A100 is a 40GB card).
-  Scripts in `pbs/` (221 files).
+  Scripts in `pbs/` (232 files).
 
 The two directories are **not** a one-for-one mirror. They accumulated per experiment and per
 cluster, so most jobs exist on one side only. Treat them as a record of what was actually
@@ -141,21 +167,22 @@ python scripts/reproduce.py                 # all ID datasets, all methods
 python scripts/reproduce.py --dataset xsum  # one dataset
 ```
 
-`scripts/reproduce.py` covers the **early** method set (SAPLMA, linear, P(True), Lookback on
-SciQ, PubMedQA and XSum) and is kept as the original end-to-end check. The full grid is produced
-by the drivers in `scripts/checks/`, principally `probedriftlong.py` (the long-form ladder) and
-`assemble_pdl_table.py` (which rolls the per-eval outputs into the master table).
+Note that `scripts/reproduce.py` does **not** reproduce the full set of results. It covers the early method set only
+(SAPLMA, the mean-pool probe, P(True) and Lookback on SciQ, PubMedQA and XSum) and is kept as the
+original end-to-end check. The results in the write-up come from the drivers in `scripts/checks/`,
+principally `probedriftlong.py` (the long-form ladder) and `assemble_pdl_table.py` (which rolls the
+per-eval outputs into the master table).
 
 Both require the cached records, which are not distributed with this repository.
 
 ## Tests and verification
 
 ```bash
-pytest -q    # 73 CPU unit tests: MSP and PRR maths, weighting, pooling, score parsing
+pytest -q    # 73 CPU unit tests: surprisal and PRR maths, weighting, pooling, score parsing
 ```
 
-The suite includes `msp_nll == lm-polygraph Perplexity` to ~1e-6, so a refactor that changes the
-uncertainty maths fails loudly.
+The suite pins the mean-NLL aggregate to lm-polygraph's `Perplexity` estimator to ~1e-6, so a
+refactor that changes the uncertainty maths fails loudly.
 
 Method-fidelity checks against the original authors' released code load the model, so they are
 GPU scripts run by hand: `scripts/checks/check_lookback_vs_authors.py` (Lookback Lens vs Chuang
@@ -165,8 +192,11 @@ reference repositories to be checked out alongside this one, and they are not ve
 
 ## Status
 
-The programme is complete on both models. The full long-form grid (8 evaluation sets by 5
-in-distribution and out-of-distribution rungs, 3 seeds) has been run for Llama-3.1-8B and
-replicated on Qwen2.5-14B, together with the cross-task transfer matrix, the aggregation-regime
-audit, and the weighted-MSP method line. Several results are pre-registered negatives, and the
-pre-registrations in `prereg/` record what was predicted before each run.
+The full long-form grid (8 evaluation sets by 5 in-distribution and out-of-distribution rungs, 3
+seeds) has been run for Llama-3.1-8B and replicated on Qwen2.5-14B, together with the cross-task
+transfer matrix, the aggregation-regime audit, the cross-length transfer experiment and the CAWSA
+method line. A reduced panel on further model families is still in progress, so the multi-model
+results are the least settled part of the work.
+
+Several results are pre-registered negatives. `prereg/` records what was predicted before each run
+and `prereg/README.md` indexes them.
