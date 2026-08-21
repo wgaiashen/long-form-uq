@@ -1,6 +1,6 @@
 # `scripts/checks/` — the analysis and verification drivers
 
-237 scripts. This is the largest directory in the repository and it is a **research record**, not a
+254 scripts. This is the largest directory in the repository and it is a **research record**, not a
 library: one driver per experiment, kept as it was run. It is not a curated API and it is not meant
 to be read end to end. This file explains the conventions so you can find what you need.
 
@@ -41,15 +41,17 @@ If you only read a few, read these:
 - **`xl_rungs.py`** — defines the train/eval populations for each rung. Highest blast radius in the
   directory: changing it changes what every ladder means.
 
-## Pre-registration codes
+## Pre-registrations
 
-Many filenames and comments cite a code such as `W8`, `S4`, `R0`, `PR4`, `M2`. These index the
-pre-registrations in `../../prereg/`, which were committed **before** the corresponding run so that
-the git timestamp shows the prediction pre-dated the result. The prefixes group them by workstream
-(for example `W` for the sharpening/weighting line, `S` for the surprisal-prior line, `R` for the
-regime and ablation checks, `PR` for the late method-development line, `M` for the second-model
-replication). To find the rule a verdict script applies, open the pre-registration with the matching
-code.
+A verdict script applies a rule that was fixed in advance. Those rules live in `../../prereg/`, one
+file per experiment, each committed **before** the run it describes so that the git timestamp shows
+the prediction pre-dated the result. `../../prereg/README.md` indexes them with what each registered
+and the outcome the file records.
+
+Some comments here still cite a short code such as `W8`, `S4`, `R0`, `PR4` or `M2`. These were the
+working labels while the experiments ran, and they survive where a document refers to its own
+sections or to an arm by name. The pre-registration filenames themselves are descriptive, so the
+index is the way in.
 
 ## Two conventions worth knowing before reading any output
 

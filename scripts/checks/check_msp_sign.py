@@ -9,7 +9,7 @@ Two parts:
      harness's MSP sign is right -> the NEGATIVE on pubmed is genuine (confident tokens
      anti-correlate with faithfulness), not a bug.
 
-    python scripts/check_msp_sign.py
+    python scripts/checks/check_msp_sign.py
 """
 import sys
 from pathlib import Path

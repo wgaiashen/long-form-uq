@@ -5,7 +5,7 @@ the new gen_token_ids equal the cached ones. Generation is greedy (do_sample=Fal
 no beams), so it should be deterministic given the same model + libraries + GPU -- which is what
 makes the Tier-1 cache reproducible.
 
-    srun --partition=t4 --gres=gpu:1 python scripts/check_determinism.py --dataset sciq --n 3
+    srun --partition=t4 --gres=gpu:1 python scripts/checks/check_determinism.py --dataset sciq --n 3
 
 NOTE: this regenerates from the LIVE ProbeDrift prompts, so run it with --prompt-regime matching the
 cache you are validating (i.e. the ProbeDrift version currently installed). It cannot re-validate a

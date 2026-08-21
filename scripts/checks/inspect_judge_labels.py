@@ -6,7 +6,7 @@ score. Read them by eye -- low scores should be wrong/unfaithful answers, high s
 No agreement metric, just a sanity read of the long-form ground truth. (No OpenAI calls: the
 labels are already cached.)
 
-    python scripts/inspect_judge_labels.py --n 20
+    python scripts/checks/inspect_judge_labels.py --n 20
 """
 import argparse
 import sys

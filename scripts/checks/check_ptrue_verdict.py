@@ -6,7 +6,7 @@ whose hidden state P(True) probes. Reports the top-5 next tokens and the combine
 yes/no variants, averaged over the records. If yes/no dominate, that position really encodes a
 yes/no verdict (so the probed hidden state is a verdict, not noise).
 
-    srun --partition=t4 --gres=gpu:1 python scripts/check_ptrue_verdict.py --dataset pubmed_qa
+    srun --partition=t4 --gres=gpu:1 python scripts/checks/check_ptrue_verdict.py --dataset pubmed_qa
 """
 import argparse
 import statistics

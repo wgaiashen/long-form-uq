@@ -6,7 +6,7 @@ like 02_label; the only difference is a thread pool. Records are judged independ
 labels are identical to the sequential run -- order does not affect any label.
 
     export OPENAI_API_KEY=...
-    python scripts/label_parallel.py --dataset xsum --ood ID --workers 16 --judge gpt-5-mini
+    python scripts/tools/label_parallel.py --dataset xsum --ood ID --workers 16 --judge gpt-5-mini
 
 The judge model MUST match the sibling long-form sets it will be compared against (xsum / samsum /
 pubmed_qa were all labelled with gpt-5-mini) -- never mix judges within one comparison. We therefore

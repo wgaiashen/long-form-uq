@@ -22,7 +22,7 @@ Two differences from SAPLMA:
 Matches the authors' released code (Chuang et al., lookback-src/step01_extract_attns.py):
 context/(ctx+new), where "new" is a plain MEAN over the row's new-token attention slice (the
 token's own self-attention included). Verified to ~1e-6 against that code in
-scripts/check_lookback_vs_authors.py. Note that some re-implementations orient the ratio the
+scripts/checks/check_lookback_vs_authors.py. Note that some re-implementations orient the ratio the
 other way (new/(ctx+new) = 1 - authors); we follow the authors. Response-level adaptation: we mean-pool the
 per-token ratio over the generated tokens (the paper scores spans / a sliding window), dropping
 the last token to align with the authors' predicting-token indexing.
@@ -91,6 +91,6 @@ def lookback_vector(model, tok, record: dict, max_seq: int = 2048) -> np.ndarray
     # Response-level mean-pool over the generated tokens (our adaptation). Drop the LAST token:
     # the authors attribute each row's ratio to the token it predicts, so the final generated
     # token never contributes a within-response ratio. With this, the per-token ratios reproduce
-    # the authors' released code (verified ~1e-6 in scripts/check_lookback_vs_authors.py).
+    # the authors' released code (verified ~1e-6 in scripts/checks/check_lookback_vs_authors.py).
     feat = lr[:, :, :-1].mean(-1).reshape(-1)          # (L*H,)
     return feat.numpy()

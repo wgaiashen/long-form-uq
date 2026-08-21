@@ -9,7 +9,7 @@ low-AlignScore and high-uncovered).
 
 Runs on GPU (AlignScore = roberta-large). Reads the labels already in the records; does NOT re-judge.
 
-    python scripts/checks/alignscore_vs_factuality.py --prompt-regime expertqa_rp12
+    python scripts/checks/alignscore_vs_faithfulness.py --prompt-regime expertqa_rp12
 """
 import argparse
 import sys

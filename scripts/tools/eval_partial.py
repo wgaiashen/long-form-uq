@@ -5,7 +5,7 @@ TRAIN rows and computes PRR on the labelled TEST rows, skipping unlabelled (None
 metric as 04_eval, just restricted to what's labelled -- a clearly preliminary number. Re-run the
 judge to fill the gaps, then use the normal 04_eval for the full result.
 
-    python scripts/eval_partial.py --dataset cnn_dailymail --ood ID
+    python scripts/tools/eval_partial.py --dataset cnn_dailymail --ood ID
 """
 import argparse
 import sys
