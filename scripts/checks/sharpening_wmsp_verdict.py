@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """W2 VERDICT -- assemble the length-conditioned temperature grid and select (T0, gamma) HONESTLY.
 
-Plan: ../PLAN_sharpening_axis.md §5.   Results doc: ../STOCKTAKE_sharpening_axis.md §4.
 Reads results/sharpening_wmsp_<eval>__<slug>.csv, written by scripts/checks/sharpening_wmsp.py.
 
 WHAT THIS DECIDES
@@ -9,7 +8,7 @@ WHAT THIS DECIDES
 The per-cell grid best is an ORACLE and is never the method's score. The method's score is what a
 LEAVE-ONE-DATASET-OUT procedure achieves: for each held-out eval, pick (T0, gamma) on the OTHER
 evals only, then apply it to the held-out one and report THAT. This is the whole point of the track
-(Joe, 7 Aug: "have we done that on some dev set, or have we done all the test set and picked the
+(design note, 7 Aug: "have we done that on some dev set, or have we done all the test set and picked the
 best one?").
 
 THREE COLUMNS, NEVER POOLED:
@@ -17,10 +16,10 @@ THREE COLUMNS, NEVER POOLED:
     LODO         selected on the other 7 evals, applied to the held-out one    <- THE RESULT
     ORACLE       best (T0, gamma) per cell, chosen on test                     <- CEILING ONLY
 
-⚠️ COVERAGE IS CHECKED AND FAILS LOUD. A partial grid is reported as partial, with the missing evals
+COVERAGE IS CHECKED AND FAILS LOUD. A partial grid is reported as partial, with the missing evals
 named. It is never silently averaged over whatever happened to finish (standing evaluation rule).
 
-⚠️ THE NO-OP IS RE-VERIFIED AGAINST THE MASTER LADDER HERE TOO, per cell. `sharpening_wmsp.py`
+THE NO-OP IS RE-VERIFIED AGAINST THE MASTER LADDER HERE TOO, per cell. `sharpening_wmsp.py`
 already asserts an exact identity against `predict_weighted_msp` in-process; this is the independent
 outside check that the whole thing sits on the published population.
 
@@ -100,7 +99,7 @@ def main():
     print("=" * 100)
     print(f"\nCOVERAGE: {len(present)}/8 evals present.")
     if missing:
-        print(f"⚠️ MISSING (named, not silently averaged over): {missing}")
+        print(f"MISSING (named, not silently averaged over): {missing}")
         print("   Every table below is on the PARTIAL population and says so. Do not quote it as the")
         print("   full grid (standing evaluation rule).")
     if not present:
@@ -121,7 +120,7 @@ def main():
             d = abs(mine - ref)
             if d > 0.0001:
                 bad += 1
-                print(f"  ⚠️ MISMATCH {ev}/{rg}: mine {mine:+.4f} vs master {ref:+.4f} (d={d:.4f})")
+                print(f"  MISMATCH {ev}/{rg}: mine {mine:+.4f} vs master {ref:+.4f} (d={d:.4f})")
     print(f"  {'ALL CELLS MATCH the master to 4 dp' if bad == 0 else f'{bad} CELLS DISAGREE'}"
           f"  ({len(present)} evals x 5 rungs)")
     if bad:
@@ -207,7 +206,7 @@ def main():
         print(f"  adding gamma on top of T0         : {dl.mean():+.4f}  wins {int((dl > 0).sum())}/"
               f"{len(dl)}  p={wilc(dl):.4f}   <- does LENGTH-CONDITIONING add anything?")
         print(f"  T0 picked per fold: " + "  ".join(f"{e}={lodo_t0_pick[e][0]}" for e in lodo_t0))
-        print("  ⚠️ If the second line is <= 0, length-conditioning is dead on the LEARNED side too,")
+        print("  If the second line is <= 0, length-conditioning is dead on the LEARNED side too,")
         print("     which would be the SECOND independent null on it (the free side was §3.8).")
 
     # ---- the gamma sign pattern: the registered failure mode ----
@@ -232,7 +231,7 @@ def main():
     npos = sum(1 for v in signs.values() if v > 0)
     nneg = sum(1 for v in signs.values() if v < 0)
     print(f"\n  datasets whose mean best-gamma is POSITIVE: {npos}   NEGATIVE: {nneg}")
-    print(f"  {'⚠️ SIGN FLIPS BETWEEN DATASETS -- LODO cannot work' if npos and nneg else 'consistent sign'}")
+    print(f"  {'SIGN FLIPS BETWEEN DATASETS -- LODO cannot work' if npos and nneg else 'consistent sign'}")
 
     # ---- the argmax control ----
     print("\n" + "-" * 100)
@@ -254,7 +253,7 @@ def main():
                         f"{oracle[ev]:.4f}", f"{floor_min[ev]:.4f}", len(present)])
     print(f"\nwrote {outp}")
     if missing:
-        print(f"⚠️ PARTIAL GRID: {len(present)}/8. Missing {missing}. Re-run when they land.")
+        print(f"PARTIAL GRID: {len(present)}/8. Missing {missing}. Re-run when they land.")
 
 
 if __name__ == "__main__":

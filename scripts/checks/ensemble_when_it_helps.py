@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """M6 POST-HOC (2026-08-20) -- WHY DOES xsum LOSE, AND WHEN DOES COMBINING HELP?
 
-Results: ../STOCKTAKE_ensemble.md §5.8.
 
-⚠️ EXPLORATORY, NOT PRE-REGISTERED. Run at the author's request AFTER the M6 verdict. It explains that
+EXPLORATORY, NOT PRE-REGISTERED. Run at the author's request AFTER the M6 verdict. It explains that
 result; it does not revise it. The registered verdict stays NULL.
 
 TWO QUESTIONS
@@ -22,7 +21,7 @@ TWO QUESTIONS
    which is exactly 0 for an ensemble that merely interpolates. Finding: +0.0405 on 8/8 datasets for
    {HAPES, SAPLMA} vs +0.0179 for the {SAPLMA, attention} control, and the difference is 8/8.
 
-   ⚠️ A positive bonus is the EXPECTED direction from ordinary ensemble variance reduction, so its
+   A positive bonus is the EXPECTED direction from ordinary ensemble variance reduction, so its
    positivity alone is not news -- the PRIMARY vs CONTROL difference is. And at n = 8, 8/8 in one
    direction always gives exactly p = 0.0078, the floor of the exact test.
 

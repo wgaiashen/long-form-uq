@@ -32,7 +32,7 @@ from luq.labels import llm_judge  # noqa: E402
 DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 GPT5 = "gpt-5-2025-08-07"
 
-# ⚠️ PORTED TO --model 2026-08-11 (Qwen2.5-14B). The default is the exact original string and the
+# PORTED TO --model 2026-08-11 (Qwen2.5-14B). The default is the exact original string and the
 # default --cut-source is still `answer_span`, so every pre-existing invocation is byte-identical.
 #
 # WHY A SECOND CUT SOURCE. `answer_span` has rules only for {med_quad, xsum, pubmed_qa} | SHORT_FORM.

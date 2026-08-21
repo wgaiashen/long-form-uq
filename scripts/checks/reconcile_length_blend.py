@@ -3,16 +3,16 @@
 THE SHORT ANSWER: it is not a bug, it is a COMPARATOR MISMATCH. Two correct numbers were being compared
 as if they answered the same question.
 
-  worklog.md:913   "+0.034"  = blend vs the ROUTER'S OWN pooler column (`always_pooler`)
+  the project log   "+0.034"  = blend vs the ROUTER'S OWN pooler column (`always_pooler`)
   master table     "+0.007"  = blend vs SAPLMA
 
 Both reproduce here. The rule this violates is the project's own: a margin quoted without naming what it
 is against is not a result. Every margin printed below carries its comparator.
 
-⚠️ AND A SECOND FINDING, which is why "+0.034 vs the attention pooler" still may not be quoted. The
+AND A SECOND FINDING, which is why "+0.034 vs the attention pooler" still may not be quoted. The
 router's `always_pooler` sits systematically BELOW the canonical 3-seed attention pooler on the same
 cells -- not by seed noise, but on 24 of 31 cells, which is a one-sided pattern a coin flip does not
-produce. So the +0.034 is measured against a weaker pooler than the one the STOCKTAKE reports, and the
+produce. So the +0.034 is measured against a weaker pooler than the one the project record reports, and the
 honest margin against the canonical pooler is smaller. The cause is narrowed but NOT closed here; see
 the two surviving hypotheses printed at the end.
 
@@ -42,9 +42,9 @@ SLUG = "meta-llama_Meta-Llama-3.1-8B"
 OOD = ["SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 DATASETS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 
-# The STOCKTAKE's 32-cell OOD column, transcribed with its source so the comparison is auditable.
-STOCKTAKE_OOD = {"SAPLMA": 0.2412, "armA_attention": 0.2225, "msp_min": 0.1855}
-STOCKTAKE_SRC = "STOCKTAKE_post31July.md, table 'OOD mean (32)'"
+# The project record's 32-cell OOD column, transcribed with its source so the comparison is auditable.
+RECORD_OOD = {"SAPLMA": 0.2412, "armA_attention": 0.2225, "msp_min": 0.1855}
+RECORD_SRC = "the project results log, table 'OOD mean (32)'"
 
 
 def load_router():
@@ -88,12 +88,12 @@ def main():
     print("=" * 78)
     floor_rt = st.mean([float(r["always_floor"]) for r in rt.values()])
     print(f"  router `always_floor`               {floor_rt:+.4f}   ({len(rt)} OOD cells)")
-    print(f"  STOCKTAKE `msp_min` OOD mean (32)   {STOCKTAKE_OOD['msp_min']:+.4f}   [{STOCKTAKE_SRC}]")
-    agree = abs(floor_rt - STOCKTAKE_OOD["msp_min"]) < 5e-4
+    print(f"  recorded `msp_min` OOD mean (32)   {RECORD_OOD['msp_min']:+.4f}   [{RECORD_SRC}]")
+    agree = abs(floor_rt - RECORD_OOD["msp_min"]) < 5e-4
     print(f"  -> {'SAME POPULATION' if agree else 'MISMATCH — refuse to compare'} "
           f"(the floor is training-free, so it can only differ if the CELLS differ)")
     if not agree:
-        raise SystemExit("population mismatch: margins against the STOCKTAKE would be cross-population")
+        raise SystemExit("population mismatch: margins against the project record would be cross-population")
 
     blend = st.mean([float(r["blend"]) for r in rt.values()])
     pooler = st.mean([float(r["always_pooler"]) for r in rt.values()])
@@ -102,10 +102,10 @@ def main():
     print("=" * 78)
     print(f"  blend                                    {blend:+.4f}")
     for name, ref in [("router's own pooler (always_pooler)", pooler),
-                      ("canonical attention pooler (armA)", STOCKTAKE_OOD["armA_attention"]),
-                      ("SAPLMA  <- the bar that matters", STOCKTAKE_OOD["SAPLMA"])]:
+                      ("canonical attention pooler (armA)", RECORD_OOD["armA_attention"]),
+                      ("SAPLMA  <- the bar that matters", RECORD_OOD["SAPLMA"])]:
         print(f"    vs {name:38s} {ref:+.4f}   margin {blend - ref:+.4f}")
-    print("\n  worklog.md:913 quoted +0.034 against the FIRST of these, not SAPLMA. Both numbers were")
+    print("\n  the project log quoted +0.034 against the FIRST of these, not SAPLMA. Both numbers were")
     print("  right; they were being compared as if they answered the same question. It is a comparator")
     print("  mismatch, not a provenance bug. Note the worklog's own caveat at the time: the significance")
     print("  rested on 'an optimistic within-cell bootstrap'.")
@@ -118,7 +118,7 @@ def main():
     n_low = sum(1 for x in d if x < 0)
     p = sign_test(n_low, len(d))
     print("\n" + "=" * 78)
-    print("⚠️ WHY '+0.034 vs the attention pooler' STILL MAY NOT BE QUOTED")
+    print("WHY '+0.034 vs the attention pooler' STILL MAY NOT BE QUOTED")
     print("=" * 78)
     print(f"  matched cells                     {len(common)}")
     print(f"  canonical attention (3-seed mean)  {st.mean([can[k] for k in common]):+.4f}")
@@ -129,7 +129,7 @@ def main():
     if p < 0.05:
         print("  This is ONE-SIDED, so it is not seed-to-seed noise: averaging three seeds instead of")
         print("  one changes the variance, not the expectation, and would land ~50/50. The router is")
-        print("  scoring a systematically WEAKER pooler than the STOCKTAKE reports.")
+        print("  scoring a systematically WEAKER pooler than the project record reports.")
     print("\n  Two surviving hypotheses, neither yet ruled out:")
     print("   (a) TOKEN WINDOW. router_pdl.cell_vectors pools over `states_full[rp]`, the full window,")
     print("       while the trained pooler pools under a MASK. If the two token sets differ the attention")
@@ -142,8 +142,8 @@ def main():
     print("\n  The reconstruction ARITHMETIC is not the problem: (a*s).sum()+b is exactly W·(Σ a_i x_i)+b")
     print("  for a linear head, which is verified algebraically.")
     print("\n  Until this is settled, quote the blend against SAPLMA (+%.4f) and against the canonical"
-          % (blend - STOCKTAKE_OOD["SAPLMA"]))
-    print("  pooler (%+.4f), NOT the +0.034." % (blend - STOCKTAKE_OOD["armA_attention"]))
+          % (blend - RECORD_OOD["SAPLMA"]))
+    print("  pooler (%+.4f), NOT the +0.034." % (blend - RECORD_OOD["armA_attention"]))
     return 0
 
 

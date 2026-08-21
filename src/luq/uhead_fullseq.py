@@ -1,8 +1,8 @@
 """UHead baseline, faithful to Hidden Failures (Joe Stacey's `full_sequence_uhead`).
 
 This is the "train a small uncertainty head FROM SCRATCH" baseline, NOT the orphaned
-pretrained `luh` checkpoint (that checkpoint will not load into any public or Joe's `luh`;
-`features/uhead.py` is the old pretrained-head attempt and stays only for reference). Joe's
+pretrained `luh` checkpoint (that checkpoint will not load into any public or the `luh`;
+`features/uhead.py` is the old pretrained-head attempt and stays only for reference). the
 Hidden Failures repo (`Temp_robust_UQ_probes`) never loads a pretrained head -- it trains a
 transformer-encoder head on the base model's own per-token hidden states. This module
 re-implements that head and its training loop in our own thin spine.
@@ -14,28 +14,28 @@ WHAT THE HEAD IS (mirrors `luh/heads/full_seq_head.py::FullSeqHead`):
     -> a 1-2 layer TransformerEncoder over the WHOLE sequence (context + generated)
     -> masked MEAN over the GENERATED tokens only
     -> classifier MLP -> one logit
-  sigmoid(logit) is the response-level UNCERTAINTY (Joe trains it to predict 1 - correctness).
+  sigmoid(logit) is the response-level UNCERTAINTY (the reference implementation trains it to predict 1 - correctness).
 
-WHICH FEATURE (mirrors Joe's `--probe_feature_extractor_setting hs_middle`):
+WHICH FEATURE (mirrors the `--probe_feature_extractor_setting hs_middle`):
   a single hidden layer, the "middle" = ceil(num_hidden_layers/2) - 1 (Llama-3.1-8B -> layer 15),
   over the full [prompt + generation] sequence. The transformer needs the context tokens as
   memory even though only the generated tokens are pooled, so the features span the whole
   sequence, not just the answer span.
 
 FEATURE / MASK ALIGNMENT (verified against `feature_supervision.py` + `heads/utils.py`):
-  Joe reads the generation-time hidden states, which have length seq-1 (they are the states that
+  the reference implementation reads the generation-time hidden states, which have length seq-1 (they are the states that
   PREDICT tokens 1..seq-1), and an output_mask that is also shifted by one (`output_mask[1:]`).
   We teacher-force the cached [prompt+gen] token ids through the frozen base and take all
   per-position states (length seq), then DROP THE LAST position -> length seq-1, the exact same
   "state that predicts the next token" set. A feature at index j is a generated token iff
-  j >= len(prompt) - 1, which gives exactly the len(gen) generated positions Joe pools.
+  j >= len(prompt) - 1, which gives exactly the len(gen) generated positions the reference implementation pools.
 
-WHY TRAIN ON CACHED STATES (a deviation in mechanism, not in maths): Joe trains end-to-end with a
+WHY TRAIN ON CACHED STATES (a deviation in mechanism, not in maths): the reference implementation trains end-to-end with a
 HuggingFace Trainer that re-runs the frozen base every step to recompute the states. The base is
 frozen, so no gradient ever flows into it -- precomputing the states once and training the tiny
 head on them is identical in expectation and vastly cheaper (it is exactly the project's
 "cache features, retrain the cheap head for free" design). The one numerical deviation we make
-explicit: Joe's Trainer uses fp16 autocast for the head; we compute the head in fp32 (the head's
+explicit: the Trainer uses fp16 autocast for the head; we compute the head in fp32 (the head's
 own `proj` already upcasts features to fp32), which is more stable for a reported baseline and is
 a precision choice, not a tuning knob.
 """
@@ -44,14 +44,14 @@ import torch
 import torch.nn as nn
 
 
-# The two head configurations Joe sweeps in `scripts/architecture_ablations.sh`. head_dim, the
+# The two head configurations the reference implementation sweeps in `scripts/architecture_ablations.sh`. head_dim, the
 # transformer depth/width and dropout differ; the optimiser settings below are shared. These are
-# Joe's numbers verbatim -- a faithful baseline, not tuned by us.
+# the numbers verbatim -- a faithful baseline, not tuned by us.
 VARIANTS = {
     "v1": dict(head_dim=768, n_layers=1, n_heads=16, dropout=0.05, num_train_epochs=6),
     "v2": dict(head_dim=768, n_layers=2, n_heads=4, dropout=0.20, num_train_epochs=7),
 }
-# Shared training hyperparameters (Joe's `feature_supervision.py` TrainingArguments + the
+# Shared training hyperparameters (the `feature_supervision.py` TrainingArguments + the
 # architecture_ablations flags): AdamW, linear schedule with warmup, gradient accumulation so the
 # effective batch is train_batch_size * grad_accum = 1 * 4 = 4.
 LEARNING_RATE = 2e-4
@@ -64,18 +64,18 @@ SEED = 1  # project convention (ProbeDrift seed=1)
 
 
 class FullSeqHead(nn.Module):
-    """Faithful re-implementation of Joe's `FullSeqHead` for one instance at a time.
+    """Faithful re-implementation of the `FullSeqHead` for one instance at a time.
 
     feature_dim = the base model's hidden size (we feed one hidden layer, so no layer concat).
     Processes a single (T, feature_dim) sequence -> one uncertainty logit. Batching is handled by
-    the training loop as gradient accumulation over single instances, which matches Joe's
+    the training loop as gradient accumulation over single instances, which matches the
     per-instance head loop (his `_compute_tensors` iterates the batch and pools each item alone).
     """
 
     def __init__(self, feature_dim: int, head_dim: int, n_layers: int, n_heads: int,
                  dropout: float):
         super().__init__()
-        # proj: Linear -> LN -> GELU -> Dropout -> Linear -> LN -> GELU (Joe's exact stack).
+        # proj: Linear -> LN -> GELU -> Dropout -> Linear -> LN -> GELU (the exact stack).
         self.proj = nn.Sequential(
             nn.Linear(feature_dim, head_dim * 2),
             nn.LayerNorm(head_dim * 2),
@@ -105,10 +105,10 @@ class FullSeqHead(nn.Module):
 
         Returns a scalar tensor: the uncertainty logit for this instance.
         """
-        features = self.proj(X.to(torch.float32))               # (T, head_dim); upcast like Joe
+        features = self.proj(X.to(torch.float32))               # (T, head_dim); upcast like the reference implementation
         ent = self.entity_embedding(output_mask)                # (T, head_dim)
         out = (features + ent).unsqueeze(0)                     # (1, T, head_dim)
-        # Single unpadded sequence, so there is no src_key_padding_mask (Joe's mask is all-valid
+        # Single unpadded sequence, so there is no src_key_padding_mask (the mask is all-valid
         # here). Disable the cuDNN SDPA kernel to match his workaround for the same shapes; it only
         # changes which kernel computes the identical attention.
         with torch.backends.cuda.sdp_kernel(enable_cudnn=False):
@@ -120,7 +120,7 @@ class FullSeqHead(nn.Module):
 
 
 def _reinitialize_weights(module):
-    """Joe's `CausalLMWithUncertaintyLayer.reinitialize_weights`, applied after construction.
+    """the `CausalLMWithUncertaintyLayer.reinitialize_weights`, applied after construction.
 
     Xavier-uniform for 2-D weights (Linear), uniform for 1-D weights (LayerNorm / embedding rows),
     zeros for biases. Skips positional-encoding weights (none here). Replicated for faithfulness.
@@ -136,7 +136,7 @@ def _reinitialize_weights(module):
 
 
 def build_head(feature_dim: int, variant: str) -> FullSeqHead:
-    """Construct a head for the named variant ('v1' or 'v2') and apply Joe's weight re-init."""
+    """Construct a head for the named variant ('v1' or 'v2') and apply the weight re-init."""
     if variant not in VARIANTS:
         raise ValueError(f"unknown uhead variant {variant!r}; choose from {sorted(VARIANTS)}")
     cfg = VARIANTS[variant]
@@ -148,7 +148,7 @@ def build_head(feature_dim: int, variant: str) -> FullSeqHead:
 
 def train_head(head: FullSeqHead, feats_train, masks_train, y_train, variant: str,
                device: str = "cuda", log_every: int = 500) -> FullSeqHead:
-    """Train the head to predict 1 - correctness with BCE, matching Joe's optimiser settings.
+    """Train the head to predict 1 - correctness with BCE, matching the optimiser settings.
 
     feats_train: list of (T_i, feature_dim) float arrays (per-token states, one per train example).
     masks_train: list of (T_i,) int arrays, 1 = generated token.
@@ -160,7 +160,7 @@ def train_head(head: FullSeqHead, feats_train, masks_train, y_train, variant: st
     head = head.to(device).train()
 
     n = len(feats_train)
-    targets = 1.0 - np.asarray(y_train, dtype=np.float32)      # uncertainty target (Joe: 1 - metric)
+    targets = 1.0 - np.asarray(y_train, dtype=np.float32)      # uncertainty target (reference: 1 - metric)
 
     opt = torch.optim.AdamW(head.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     # Effective batch = TRAIN_BATCH_SIZE * GRAD_ACCUM; one optimiser step per effective batch.

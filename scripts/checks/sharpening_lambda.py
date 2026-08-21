@@ -2,7 +2,6 @@
 """W5 -- (B) lambda = 1 and 1.5 from a July prediction, and (C) NLL inside the weight logits.
 
 Pre-registration: prereg/W5_lambda_and_nll_prior.md (committed BEFORE this was run).
-Plan: ../PLAN_sharpening_axis.md.   Results: ../STOCKTAKE_sharpening_axis.md §8.
 
 TWO QUESTIONS, ONE JOB (they share the training pass)
 -----------------------------------------------------
@@ -11,7 +10,7 @@ B. THE SHRINKAGE lambda. wMSP@2 is the best method at 3 of the 4 OOD rungs, incl
    three short/QA sets. A finer sweep on 2026-07-12 concluded the sweet spot was 1-2 and named the
    SAME two rungs (DiffTask, 1ds-Diff) where wMSP@2 now leads, and that refinement was never
    propagated. lambda = 1 and 1.5 have never been run on the long grid.
-   ⭐ lambda = 1.5 is PRE-COMMITTED in the prereg, justified ONLY by that dated prediction.
+   lambda = 1.5 is PRE-COMMITTED in the prereg, justified ONLY by that dated prediction.
 
 C. NLL IN THE WEIGHT LOGITS. Track 2 sharpened the LEARNED logits, and its T -> 0 limit lands on
    argmax(raw), which agrees with argmax(nll) only 6-13% of the time -- so it never spanned
@@ -21,22 +20,22 @@ C. NLL IN THE WEIGHT LOGITS. Track 2 sharpened the LEARNED logits, and its T -> 
        power       :  w = softmax( raw + beta * log(clip(nll, 1e-9)) )
 
    Both reach msp_min as their parameter -> inf REGARDLESS of what the query learned.
-   ⚠️ armD (attn_pool.py:463) already adds beta*log(prior) -- but to the ATTENTION POOLER, which
+   armD (attn_pool.py:463) already adds beta*log(prior) -- but to the ATTENTION POOLER, which
    pools hidden states, so its limit is a probe on the worst token's state and NOT msp_min. Only a
    tilt inside weighted MSP, which sums NLLs, reaches msp_min. This is not a re-run of S8.
-   ⚠️ Both tilts are run because with raw = 0 they ARE round 1's softmax-tau and Lehmer families,
+   Both tilts are run because with raw = 0 they ARE round 1's softmax-tau and Lehmer families,
    and round 1 found Lehmer the stronger. Running only one would rest the arm on the weaker form.
 
 THREE CONTROLS, PRINTED BEFORE ANY CURVE IS READABLE (prereg §3.3)
 ------------------------------------------------------------------
   1. tau = beta = 0 reproduces plain wMSP to < 1e-6 on the SAME trained model.
-  2. tau, beta -> inf reproduces msp_min's PRR exactly.  ⚠️ THIS IS THE CLAIM. If it fails the arm
+  2. tau, beta -> inf reproduces msp_min's PRR exactly.  THIS IS THE CLAIM. If it fails the arm
      is dead on arrival -- it is the check that would have caught the Track 2 error.
   3. argmax(w) vs argmax(nll) agreement -> 100% in the limit, against Track 2's 6-13%.
   Plus the OUTSIDE check: the lambda=norm rows must reproduce pdl_master to 4 dp (Track 2 passed
   this on 25/25 cells and it is the strongest control in the workstream).
 
-⚠️ ZERO SHARED-FILE EDITS. Imports from luq.weighted_msp and runs its own scoring loop.
+ZERO SHARED-FILE EDITS. Imports from luq.weighted_msp and runs its own scoring loop.
 `probedriftlong.py` and `weighted_msp.py` are both on the Qwen port's list and stay untouched.
 
     python scripts/checks/sharpening_lambda.py --evals pubmed_qa --seeds 1 --smoke
@@ -80,7 +79,7 @@ OUT = ROOT / "results"
 def tilt_logits(raw, nll_np, kind, param, device, keep_np=None):
     """raw + the NLL tilt. Returns the tilted logits, or a one-hot marker for the infinite limit.
 
-    ⚠️ BUGFIX 2026-08-09, caught by CONTROL 2 aborting the first smoke run. The infinite limit used
+    BUGFIX 2026-08-09, caught by CONTROL 2 aborting the first smoke run. The infinite limit used
     `argmax(nll)` over ALL tokens. But `_weights_from_raw` masks SPECIAL tokens to -inf before the
     softmax (weighted_msp.py:206-221, because ~70% of xsum/cnn generations end in EOS and the learned
     weighter otherwise dumps its mass there). So when the largest NLL fell on a special token, EVERY
@@ -128,7 +127,7 @@ def score_tilted(model, states, records, te_idx, device, kind, param):
             kmask = torch.from_numpy(keep_np).to(device)
             lg = tilt_logits(raw, nll_np, kind, param, device, keep_np=keep_np)
             out[k] = float(weighted_msp._seq_q(lg, nll, "normalised", True, keep=kmask).item())
-            # ⚠️ Compare against the argmax over KEPT tokens. The weighter cannot place mass on a
+            # Compare against the argmax over KEPT tokens. The weighter cannot place mass on a
             # special token, so scoring it against the all-token argmax caps this diagnostic at
             # ~89% by construction (10.9% of pubmed_qa examples have their largest NLL on a special)
             # and would look like a failure when nothing is wrong. Same token set, per the project conventions.
@@ -157,7 +156,7 @@ def main():
     print("=" * 100)
     print(f"W5 -- (B) lambda sweep + (C) NLL in the weight logits   [{tag}]")
     print(f"device={device} layer={args.layer} seeds={seeds} evals={evals} LUQ_CARVE={carve}")
-    print(f"⭐ PRE-COMMITTED PRIMARY: lambda = {LAMBDA_PRIMARY} (prereg/W5 §2.1, from the 2026-07-12 "
+    print(f"PRE-COMMITTED PRIMARY: lambda = {LAMBDA_PRIMARY} (prereg/W5 §2.1, from the 2026-07-12 "
           f"prediction)")
     print("=" * 100, flush=True)
 
@@ -205,7 +204,7 @@ def main():
 
             v_min = np.array([msp.msp_uncertainty(records[i]["token_logprobs"], "min") for i in te_idx])
             floors["msp_min"].append(results.prr(yte, v_min))
-            # ⚠️ SAME TOKEN SET. The learned weighter is forbidden special tokens, so the endpoint
+            # SAME TOKEN SET. The learned weighter is forbidden special tokens, so the endpoint
             # this family can reach is msp_min restricted to CONTENT tokens. Checking against the
             # all-token msp_min is a TOKEN-SET CONFOUND (the standing project rule), not a failure of
             # the method. Measured difference on pubmed_qa: 0.3478 (kept) vs 0.3710 (all), because
@@ -262,7 +261,7 @@ def main():
         fl = {k: float(np.mean(v)) for k, v in floors.items()}
         print(f"\n[{rung:16s} {X:14s}]  msp_min {fl['msp_min']:+.4f}  ppl {fl['perplexity']:+.4f}")
         print(f"   (B) lambda: " + "  ".join(f"{n}={m[n]:+.4f}" for n, _ in LAMBDAS))
-        print(f"   ⚠️ `norm` MUST match this cell's wMSP-norm in pdl_master to 4 dp (outside check).")
+        print(f"   `norm` MUST match this cell's wMSP-norm in pdl_master to 4 dp (outside check).")
         print(f"   (C) exp tilt:  " + "  ".join(
             f"{('inf' if not np.isfinite(t) else f'{t:g}')}={float(np.mean(exp_prr[t])):+.4f}" for t in TAUS))
         print(f"   (C) pow tilt:  " + "  ".join(
@@ -284,7 +283,7 @@ def main():
         for k, v in fl.items():
             rows.append((rung, X, "floor", k, v, 0.0, len(seeds), carve, "floor"))
         if args.smoke:
-            print("\n⚠️ SMOKE TEST -- one cell, one seed. NOT A RESULT.")
+            print("\nSMOKE TEST -- one cell, one seed. NOT A RESULT.")
             break
 
     ev = evals[0] if len(evals) == 1 else "multi"
@@ -298,7 +297,7 @@ def main():
         for r in rows:
             w.writerow(r)
     print(f"\nwrote {outp}  ({len(rows)} rows)")
-    print("\n⚠️ lambda = 1.5 is the PRE-COMMITTED primary. If it misses the bar that is a FAILURE OF "
+    print("\nlambda = 1.5 is the PRE-COMMITTED primary. If it misses the bar that is a FAILURE OF "
           "THE\n   PRE-COMMITTED VALUE, even if another lambda clears it -- promoting a different one "
           "afterwards\n   is banned by the pre-registration. The tilt arms have NO pre-committed "
           "parameter and are\n   exploratory; their per-cell grid best is an ORACLE, never a result.")

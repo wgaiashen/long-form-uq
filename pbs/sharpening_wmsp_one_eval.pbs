@@ -8,7 +8,7 @@
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/sharpening_wmsp_one_eval.pbs
 #
-# ⚠️ DO NOT SUBMIT UNTIL THE NO-OP IDENTITY HAS PASSED. `score_at_T(T0=1, gamma=0)` must equal the
+# DO NOT SUBMIT UNTIL THE NO-OP IDENTITY HAS PASSED. `score_at_T(T0=1, gamma=0)` must equal the
 # library's own `predict_weighted_msp` to <1e-6 on the same trained model. The driver raises and stops
 # if it does not, on every cell and seed -- but check the smoke log first rather than burning 8 jobs.
 #

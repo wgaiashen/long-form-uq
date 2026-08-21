@@ -132,10 +132,10 @@ def main():
         for b in sorted(bad, key=lambda x: -abs(x[5]))[:20]:
             print(f"  VIOLATION {b[0]}/{b[1]}/{b[2]}: shadow {b[3]:+.4f} vs canon {b[4]:+.4f} "
                   f"(Δ {b[5]:+.4f})")
-        print("⛔ CONTROL FAILED — the shadow moved cells the span fix cannot touch. The "
+        print("CONTROL FAILED — the shadow moved cells the span fix cannot touch. The "
               "sensitivity is NOT interpretable until this is explained. STOP.")
         sys.exit(1)
-    print("✅ control PASS — every moved cell below is attributable to the med_quad span fix.")
+    print("control PASS — every moved cell below is attributable to the med_quad span fix.")
 
     # ---------------- 3. report-level before/after ----------------
     print("\nMED_QUAD'S OWN ROWS (shadow vs canonical):")

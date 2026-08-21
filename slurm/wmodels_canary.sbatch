@@ -13,7 +13,7 @@
 # submitted -- an OOM discovered here costs ~1h, not a wasted multi-hour slot on a contended
 # partition plus a re-queue.
 #
-# ⚠️ THE SMOKE DOES NOT COVER THIS. `01_extract --limit 40` takes the FIRST 40 rows by index, and
+# THE SMOKE DOES NOT COVER THIS. `01_extract --limit 40` takes the FIRST 40 rows by index, and
 # the rows that OOM sit in the tail.
 #
 #   sbatch --partition=a40 --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum \

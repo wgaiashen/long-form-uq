@@ -21,12 +21,12 @@ entropy penalty) were designed to move or sharpen that attention.
 | LOO | 0.577 | 0.112 | 10.6% | 0.434 | 0.945 |
 | DiffTask | 0.574 | 0.113 | 11.2% | 0.464 | 0.961 |
 
-⚠️ **The configuration we called defective achieves the highest ID PRR in the study** (0.7127–0.7371),
+**The configuration we called defective achieves the highest ID PRR in the study** (0.7127–0.7371),
 while the content-attending OOD configurations score far lower. A delimiter's residual state summarising
 the preceding clause is a standard probing phenomenon, so "punctuation" and "uninformative" are not the
 same claim and only one of them has been measured.
 
-## ⚠️ REGISTERED PREDICTIONS
+## REGISTERED PREDICTIONS
 
 **P1 (primary).** Removing the punctuation/space positions from pubmed's pooling window, retraining, will
 **REDUCE** pubmed ID PRR — by more than the random-ablation control.
@@ -44,7 +44,7 @@ punctuation mass is genuinely inert, the original "unhelpful tokens" framing is 
 attention-redirection line is alive after all. Either outcome is reportable and the write-up is decided
 by the measurement, not by which one we prefer.
 
-## ⚠️ THE CONFOUND, AND WHY THERE ARE FOUR ARMS
+## THE CONFOUND, AND WHY THERE ARE FOUR ARMS
 
 Pubmed's peak sits at relative position **0.114** and is punctuation **94.95%** of the time. **Punctuation
 and position are confounded in the data**, so a two-arm test (baseline vs punct-ablated) cannot say which

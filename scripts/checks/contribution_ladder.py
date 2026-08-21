@@ -65,7 +65,7 @@ EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # ASQA + ExpertQA included (author's decision 2026-07-22): they are ORDINARY training sources, not
 # eval-only. Leaving them out here also silently starved canonical_ladder, which uses this as its
 # --sources default. See the loading guard added there.
-# ⚠️ factscore ADDED 2026-08-04. It was the only one of the ten missing, and that had two effects:
+# factscore ADDED 2026-08-04. It was the only one of the ten missing, and that had two effects:
 #   * expertqa lost its SameTask rung ENTIRELY (4 rungs, not 5). After the family split, expertqa's
 #     same-family partner is factscore ALONE — so with factscore absent the rung had no sources and
 #     cells() dropped it silently. A missing source became a missing rung with nothing said.
@@ -91,7 +91,7 @@ SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"),
 # beat the OOD-robust floor, do the poolers, and does the contribution beat the pooler?
 # The floor MUST be the FAIR floor = the best of the unsupervised baselines actually available, not the
 # bare `msp_sum`. Hard-coding msp_sum understates the bar whenever the length-normalised floor is stronger,
-# which is exactly the artefact that produced (and then killed) the cnn "win" -- see STOCKTAKE PART VI.
+# which is exactly the artefact that produced (and then killed) the cnn "win" -- see the project record PART VI.
 # Live example: on ASQA msp_sum=0.148 but perplexity=0.316, so every vs-msp_sum verdict was measured against
 # less than half the honest bar (attention_vs_floor read +0.458 SIG at ID; against the fair floor it is
 # +0.290, and at the two hardest OOD rungs EVERY supervised method is actually BELOW the floor).
@@ -199,7 +199,7 @@ def main():
         test_rows = [(X, int(i)) for i in X_te]
         if not test_rows:
             continue
-        # ⚠️ PER-RUNG, not per-eval (fixed 2026-08-04). This used to be `different_label_projection(X)`,
+        # PER-RUNG, not per-eval (fixed 2026-08-04). This used to be `different_label_projection(X)`,
         # which asks only "is the TARGET scored on a different projection?" and so flagged EVERY non-ID
         # expertqa rung as cross-label. That became wrong the moment factscore joined the cohort: expertqa's
         # SameTask rung now trains on factscore, which carries the SAME `factuality` projection, so that
@@ -296,7 +296,7 @@ def main():
         avail = [f for f in FLOOR_CANDIDATES if f in stats and f in avg_unc]
         if avail:
             # PRE-REGISTERED primary bar = msp_min, FIXED across every dataset (2026-07-24 meeting). This
-            # replaces the rejected max-of-three (Joe: "three shots for the baseline"). We still compute +
+            # replaces the rejected max-of-three (rejected: "three shots for the baseline"). We still compute +
             # persist all three variants (methods list) so the per-dataset 3-variant table stays available,
             # and where a DIFFERENT variant is the strongest free score (cnn/samsum -> perplexity) we print a
             # DUAL-REPORT note so the honest "also clears the strongest free score" claim can be made.

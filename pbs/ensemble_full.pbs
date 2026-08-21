@@ -5,7 +5,7 @@
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
 # 3E: ensemble grid on ALL 8 long evals (adds asqa + factscore) with the NEW {wMSP,MSP} model-side x model-side
-# pairing (Lihu's suggestion). --probes saplma -> {MSP,SAPLMA}, {wMSP,SAPLMA}, {wMSP,MSP}. wMSP trains per cell
+# pairing (the suggestion). --probes saplma -> {MSP,SAPLMA}, {wMSP,SAPLMA}, {wMSP,MSP}. wMSP trains per cell
 # (the bottleneck). Distinct --out so it does NOT clobber the 6-eval ensemble_wmsp_saplma CSV.
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
 echo "HOST $(hostname)"

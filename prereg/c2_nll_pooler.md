@@ -1,4 +1,4 @@
-# PRE-REGISTRATION — C2: token-probabilities as a pooler INPUT (Lihu idea) — written 2026-07-30 BEFORE running
+# PRE-REGISTRATION — C2: token-probabilities as a pooler INPUT (design note) — written 2026-07-30 BEFORE running
 
 ## What C2 is (and is NOT)
 C2 feeds the model's own per-token NLL (= −logprob) to the attention pooler as an EXTRA INPUT FEATURE

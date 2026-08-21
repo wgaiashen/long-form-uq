@@ -1,4 +1,4 @@
-"""Bug-hunt anchors against Joe's Table 11 (per-dataset AlignScore signal) + AlignScore liveness.
+"""Bug-hunt anchors against the Table 11 (per-dataset AlignScore signal) + AlignScore liveness.
 
 Two rerunnable checks, both from cached features/labels (no model, no cache writes):
 
@@ -7,12 +7,12 @@ A. AlignScore LIVENESS per dataset (item-1 housekeeping): SAPLMA trained+eval on
    phrasing where it is false: pubmed self-eval is ~0.24 (concentrated but LIVE), xsum may be genuinely
    deader. Report per-dataset so the claim is checked, not asserted.
 
-B. Table-11 ANCHORS (item-3): our restricted-pool sciq-LOO in Joe's two AlignScore configs —
-   AlignScore-train/AlignScore-eval (Joe Table 11 = 0.57) and AlignScore-train/Judge-eval (Joe = 0.73).
+B. Table-11 ANCHORS (item-3): our restricted-pool sciq-LOO in the two AlignScore configs —
+   AlignScore-train/AlignScore-eval (Hidden Failures Table 11 = 0.57) and AlignScore-train/Judge-eval (reference = 0.73).
    Short-form AlignScore is healthy, so these add two independent verification anchors on a different
    label axis. Caveats as always: restricted 3-of-9 pool, seed-averaged, ranges not cells.
 
-    PYTHONPATH=src python scripts/checks/joe_table_anchors_check.py
+    PYTHONPATH=src python scripts/checks/reference_table_anchors_check.py
 """
 import sys
 from pathlib import Path
@@ -72,11 +72,11 @@ for d in ("sciq", "trivia_qa", "pubmed_qa", "xsum"):
     a = a[np.isfinite(a)]
     print(f"{d:10s} {selfeval(d, 'correctness_alignscore'):>20.3f} {a.mean():>11.3f} {np.mean(a < 0.05):>10.2f}")
 
-print("\nB. Table-11 ANCHORS — restricted-pool sciq-LOO, 5-seed mean±std (Joe: align/align=0.57, align/judge=0.73):")
-for tl, el, joe in [("correctness_alignscore", "correctness_alignscore", 0.57),
+print("\nB. Table-11 ANCHORS — restricted-pool sciq-LOO, 5-seed mean±std (reference: align/align=0.57, align/judge=0.73):")
+for tl, el, ref in [("correctness_alignscore", "correctness_alignscore", 0.57),
                     ("correctness_alignscore", "correctness", 0.73)]:
     vals = [loo("sciq", tl, el, s) for s in range(NS)]
     print(f"  train={tl.split('_')[-1]:10s} eval={el.split('_')[-1]:10s} "
-          f"ours {np.mean(vals):+.3f} ± {np.std(vals):.3f}   Joe {joe:.2f}")
+          f"ours {np.mean(vals):+.3f} ± {np.std(vals):.3f}   reference {ref:.2f}")
 print("NOTE: restricted 3-of-9-source pool, seed-averaged — directional anchors on a different label "
       "axis, not cell reproductions.")

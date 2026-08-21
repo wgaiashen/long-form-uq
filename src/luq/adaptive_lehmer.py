@@ -23,7 +23,7 @@ Everywhere beta_i = BETA_MAX * sigmoid(g_i), BETA_MAX = 16 (the top of the canon
 Lehmer grid; fixed in advance, never tuned on results).
 
 TRAINING mirrors the canonical weighted-MSP recipe verbatim (weighted_msp.train_weighted_msp:
-AdamW lr=1e-3, 5 epochs, batch 32, Joe's pairwise sigmoid soft-rank MSE against 1-y, batches < 2
+AdamW lr=1e-3, 5 epochs, batch 32, the pairwise sigmoid soft-rank MSE against 1-y, batches < 2
 skipped, torch.manual_seed(seed)). Only the gate parameters train; the LLM is frozen; there is
 no validation sweep and no new hyperparameter.
 

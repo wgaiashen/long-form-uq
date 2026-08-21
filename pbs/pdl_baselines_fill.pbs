@@ -16,7 +16,7 @@
 # The caches are present now, so this re-runs ONLY those two methods. --skip-poolers --skip-wmsp drops the
 # two training bottlenecks, so this is a cheap pass, not a repeat of the 12-15h ladder.
 #
-# ⚠️ SEPARATE OUT PATH. probedriftlong rewrites its whole CSV from an in-memory list that starts empty, so
+# SEPARATE OUT PATH. probedriftlong rewrites its whole CSV from an in-memory list that starts empty, so
 # writing to the main pdl_fam_<eval> path would DESTROY the 40 completed cells. The `_base` suffix still
 # matches the assembler's `pdl_fam_*__<slug>.csv` glob at the same priority, and it only fills cells the
 # main run left blank, so there is no same-priority collision to resolve.

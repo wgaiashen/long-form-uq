@@ -18,7 +18,7 @@
 # --wmsp-only isolates the one variant and --skip-poolers drops the other training bottleneck, so this is
 # a fraction of a full ladder.
 #
-# ⚠️ SUFFIXED OUT PATH: probedriftlong rewrites its whole CSV from an empty in-memory list, so writing to
+# SUFFIXED OUT PATH: probedriftlong rewrites its whole CSV from an empty in-memory list, so writing to
 # the main pdl_fam_<eval> path would destroy every other method's rows.
 #
 #   qsub -v LUQ_EVAL=xsum pbs/pdl_segsoftmax_refill.pbs

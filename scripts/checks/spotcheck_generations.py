@@ -13,7 +13,7 @@ labelling to check what the judge did with them.
 For each: prompt tail, the full new generation, the reference answer, and the OLD generation at the
 same index, side by side.
 
-⚠️ ALIGNMENT IS ASSERTED, NOT ASSUMED. The old and new caches are only comparable row-by-row if index i
+ALIGNMENT IS ASSERTED, NOT ASSUMED. The old and new caches are only comparable row-by-row if index i
 is the same example in both. The prompts are compared at every sampled index and the run aborts on a
 mismatch -- comparing two different questions side by side would look perfectly plausible.
 
@@ -94,7 +94,7 @@ def main():
     for nme, idx in strata.items():
         for i in sorted(int(x) for x in idx):
             rn, ro = new[i], old[i]
-            # ⚠️ alignment guard: same index must be the same example in both caches
+            # alignment guard: same index must be the same example in both caches
             if (rn.get("prompt") or "")[-400:] != (ro.get("prompt") or "")[-400:]:
                 raise SystemExit(f"FATAL idx {i}: prompts differ between old and new caches. The two are "
                                  "NOT index-aligned; a side-by-side read would compare different "

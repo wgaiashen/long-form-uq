@@ -5,17 +5,17 @@ with a full paired lambda = 2 control.
 WHERE lambda = 1.5 COMES FROM, STATED PRECISELY. It is Llama's W5 pre-committed primary
 (prereg/W5_lambda_and_nll_prior.md, `sharpening_lambda.py:70` LAMBDA_PRIMARY = 1.5).
 
-⚠️ DO NOT DESCRIBE IT AS "THE STRONGEST SHRINK SETTING ON LLAMA" WITHOUT THE OTHER HALF:
+DO NOT DESCRIBE IT AS "THE STRONGEST SHRINK SETTING ON LLAMA" WITHOUT THE OTHER HALF:
   * W5's REGISTERED CLAIM FAILED. lambda = 1.5 vs the incumbent shrink@2 was +0.0019 against a
-    > +0.010 bar, signs 6/8 (STOCKTAKE_sharpening_axis.md §15). That is a TIE, not a win.
+    > +0.010 bar, signs 6/8 (the project results log). That is a TIE, not a win.
   * What justifies transferring it is the honest-selection result: it IS the best fixed value on
     the Llama cross-dataset mean (+0.2306), and the 5-arm leave-one-dataset-out selection picks it
     on 7 of 8 folds, which is why §18 re-baselined the incumbent to shrink@1.5. LODO is label-free
     selection, so this is a defensible fixed transfer -- but only the second bullet supports it.
 
-⚠️ THIS IS NOT A PRE-REGISTERED QWEN TEST. The Qwen master was already visible when it was run.
+THIS IS NOT A PRE-REGISTERED QWEN TEST. The Qwen master was already visible when it was run.
 No parameter is tuned on Qwen: lambda is fixed at 1.5 and 2.0 and nothing else is tried. Output
-carries provenance = post-hoc-transfer and sits OUTSIDE the M2 scorecard (STOCKTAKE_qwen.md §2).
+carries provenance = post-hoc-transfer and sits OUTSIDE the M2 scorecard (the project results log).
 
 WHY A SEPARATE FILE, WITH ZERO SHARED-FILE EDITS. Adding a `wmsp_shrink1p5` entry to
 `probedriftlong.py`'s WMSP list would touch a file on BOTH workstreams' collision lists, obliging
@@ -56,7 +56,7 @@ import probedriftlong as pdl                                      # noqa: E402
 
 MODEL_DEFAULT = "Qwen/Qwen2.5-14B"
 LLAMA = "meta-llama/Meta-Llama-3.1-8B"
-LAYER_DEFAULT = 23                       # Joe's fixed rule ceil(N/2)-1 on Qwen; not selected
+LAYER_DEFAULT = 23                       # the fixed rule ceil(N/2)-1 on Qwen; not selected
 
 # The two arms. shrink2 FIRST so the control is computed before the transfer in every cell -- if the
 # control is going to fail, it should fail before any lambda=1.5 number exists to look at.
@@ -129,7 +129,7 @@ def gate_only(slug):
     print(f"OUTSIDE CONTROL -- lambda = 2.0 arm vs the published wmsp_shrink2, tolerance {GATE_TOL}")
     print("=" * 100)
     if missing:
-        print(f"⚠️ no CSV yet for: {', '.join(missing)} -- the verdict below is PARTIAL")
+        print(f"no CSV yet for: {', '.join(missing)} -- the verdict below is PARTIAL")
     worst, fails = 0.0, []
     for k, v in sorted(ref.items()):
         if k not in got:
@@ -140,14 +140,14 @@ def gate_only(slug):
             fails.append((k, v, got[k], d))
     print(f"cells compared: {len([k for k in ref if k in got])}/40   max |delta| {worst:.6f}")
     if fails:
-        print(f"⛔ GATE FAIL on {len(fails)} cell(s) -- lambda = 1.5 is NOT interpretable. Diagnose:")
+        print(f"GATE FAIL on {len(fails)} cell(s) -- lambda = 1.5 is NOT interpretable. Diagnose:")
         for (rg, ev), a, b, d in fails[:10]:
             print(f"    {ev:16s} {rg:16s} master {a:+.4f}  here {b:+.4f}  d {d:.5f}")
         return 1
     if len([k for k in ref if k in got]) < 40:
-        print("🟡 every compared cell matches, but coverage is partial -- not yet a pass.")
+        print("every compared cell matches, but coverage is partial -- not yet a pass.")
         return 1
-    print("✅ GATE PASS on all 40 cells. This loop IS the ladder's loop; the paired lambda1.5 -")
+    print("GATE PASS on all 40 cells. This loop IS the ladder's loop; the paired lambda1.5 -")
     print("   lambda2 comparison below is on identical draws.")
     # the transfer, only now
     rows = []
@@ -170,7 +170,7 @@ def gate_only(slug):
         alld += ds
         print(f"{rg:18s}{np.mean(ds):>+15.4f}{sum(d > 0 for d in ds):>5d}/{len(ds)}")
     print(f"{'ALL 40 cells':18s}{np.mean(alld):>+15.4f}{sum(d > 0 for d in alld):>5d}/{len(alld)}")
-    print("\n⚠️ Cells are NOT independent observations -- the unit of analysis for any claim is the")
+    print("\nCells are NOT independent observations -- the unit of analysis for any claim is the")
     print("   DATASET (n = 8). This per-rung view is descriptive shape, not a test.")
     return 0
 
@@ -219,7 +219,7 @@ def main():
     print("   W5's registered claim FAILED on Llama as a tie with shrink@2. See the docstring.")
     print("=" * 100, flush=True)
 
-    # ⚠️ THE QWEN SPECIAL-TOKEN TRAP, carried over verbatim from probedriftlong.py:386-397.
+    # THE QWEN SPECIAL-TOKEN TRAP, carried over verbatim from probedriftlong.py:386-397.
     # weighted_msp.content_keep falls back to the Llama-3 `id >= 128000` range test. Qwen2.5's vocab
     # runs to 152,064 with specials at 151,643+, so under that rule 23,643 ORDINARY content tokens
     # would be zero-weighted: no crash, just a quietly different method. Registering the real ids is

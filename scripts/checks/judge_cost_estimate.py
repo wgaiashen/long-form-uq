@@ -1,7 +1,7 @@
 """What will the v2 judge run cost, measured rather than guessed (plan item 0.5).
 
 Committed version of an analysis that was originally an inline one-off, so the figures quoted in the
-stocktake had no reproducible source. It gates the regeneration spend, so it needs one.
+project record had no reproducible source. It gates the regeneration spend, so it needs one.
 
 WHAT IT MEASURES, AND WHAT IT ASSUMES. Input tokens are MEASURED: the judge prompt is built with
 `llm_judge.build_prompt`, the real code, and tokenised with the model's own encoding rather than a
@@ -9,7 +9,7 @@ chars/4 rule. Everything else is an assumption and is labelled as one:
   - the PRICE is a parameter, not a fact. Confirm it against the current price page.
   - OUTPUT tokens are NOT priced here. The judge emits a single number, but gpt-5-mini is a reasoning
     model and reasoning tokens bill as output while being invisible. This is the main unknown.
-  - ⚠️ THE BEST ANCHOR IS NOT THIS SCRIPT. Every one of these datasets has already been judged once, so
+  - THE BEST ANCHOR IS NOT THIS SCRIPT. Every one of these datasets has already been judged once, so
     the previous spend on the OpenAI dashboard is a better estimate than any token count -- and it is a
     FLOOR rather than a ceiling, because v1 covered SHORTER generations than v2 will.
 
@@ -47,7 +47,7 @@ def main():
                     help="the v2 budget per dataset, dataset=N")
     ap.add_argument("--sample", type=int, default=300, help="prompts tokenised per dataset")
     ap.add_argument("--price-in", type=float, default=0.25,
-                    help="$ per 1M INPUT tokens. ⚠️ ASSUMED -- confirm against the current price page.")
+                    help="$ per 1M INPUT tokens. ASSUMED -- confirm against the current price page.")
     ap.add_argument("--rejudge-n", type=int, default=200,
                     help="rows per dataset for the judge-effect / noise-floor re-judge")
     ap.add_argument("--out", default=str(ROOT / "results" / "judge_cost_estimate.csv"))
@@ -64,7 +64,7 @@ def main():
         tok_note = "tiktoken o200k_base (measured)"
     except Exception:                       # never silently swap in a worse estimator without saying so
         ntok = lambda s: max(1, len(s) // 4)                                   # noqa: E731
-        tok_note = "⚠️ tiktoken UNAVAILABLE -- falling back to a chars/4 APPROXIMATION"
+        tok_note = "tiktoken UNAVAILABLE -- falling back to a chars/4 APPROXIMATION"
     print(f"tokeniser: {tok_note}\n")
 
     rows = []
@@ -98,7 +98,7 @@ def main():
     print(f"  input tokens: {lo_t:.2f}M .. {hi_t:.2f}M")
     print(f"  INPUT cost @ ${args.price_in}/M (ASSUMED): ${lo_t*args.price_in:.2f} .. ${hi_t*args.price_in:.2f}")
     print("  output/reasoning tokens NOT priced -- the main unknown.")
-    print("  ⚠️ Better anchor: these sets were all judged once already. Use the previous dashboard spend")
+    print("  Better anchor: these sets were all judged once already. Use the previous dashboard spend")
     print("     x >=1.15, and treat that as a FLOOR, since v1 covered shorter generations.")
 
     with open(args.out, "w", newline="") as f:

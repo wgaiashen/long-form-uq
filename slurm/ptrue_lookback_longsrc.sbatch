@@ -12,7 +12,7 @@
 #   sbatch slurm/ptrue_lookback_longsrc.sbatch xsum
 #   sbatch slurm/ptrue_lookback_longsrc.sbatch cnn_dailymail
 #
-# ⛔ DO NOT SUBMIT until the regeneration question is settled for these two. Written in advance so
+# DO NOT SUBMIT until the regeneration question is settled for these two. Written in advance so
 # it is ready the moment it unblocks.
 #
 # STATE OF THAT DECISION (samsum pilot, 1 Aug): the pilot confirmed OVER-generation rather than
@@ -50,7 +50,7 @@
 # That truncation is `lookback_vector`'s documented behaviour, identical to how the existing v1 xsum
 # cache was built, so it is not a new deviation -- but it is worth stating in the writeup.
 #
-# ⚠️ IF THESE ARE REGENERATED, THE TIMINGS ABOVE BECOME OVERESTIMATES -- BUT THE PARTITION DOES NOT
+# IF THESE ARE REGENERATED, THE TIMINGS ABOVE BECOME OVERESTIMATES -- BUT THE PARTITION DOES NOT
 # CHANGE. Regeneration would use repetition-penalty 1.2, which makes generations SHORTER, not longer
 # (samsum's median generation went 56 -> 21 in the pilot). The numbers above are measured off the
 # CURRENT v1 records, so they would be a little high. Only a little, though, because the source

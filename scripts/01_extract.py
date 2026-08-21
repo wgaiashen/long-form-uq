@@ -29,7 +29,7 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--dtype", default="auto", choices=["auto", "fp32", "fp16", "bf16"],
-                    help="model load dtype. ⚠️ auto = load_model's per-model default, which is bf16 for "
+                    help="model load dtype. auto = load_model's per-model default, which is bf16 for "
                          "Gemma and **fp16 for everything else** — including Qwen. Every canonical "
                          "Llama long-eval cache was extracted fp32, and token logprobs ARE the msp_min "
                          "signal, so omitting this silently produces a cache in a different precision "
@@ -44,15 +44,15 @@ def main():
                     action="store_false", help=argparse.SUPPRESS)
     ap.add_argument("--attn", default="auto", choices=["auto", "eager", "sdpa"],
                     help="attention backend. auto = load_model's default (eager for "
-                         "Gemma, HF default otherwise). Use eager to match Joe's runs.")
+                         "Gemma, HF default otherwise). Use eager to match the runs.")
     ap.add_argument("--truncate-long", action="store_true",
                     help="ALSO truncate long-form generations at the first newline (D1). "
-                         "Matches Joe's generate_until=['\\n'] for every dataset; off by "
+                         "Matches the generate_until=['\\n'] for every dataset; off by "
                          "default since our convention leaves long-form untruncated. Use for "
                          "the pubmed_qa keystone reproduction.")
     ap.add_argument("--sample-n", type=int, default=None,
                     help="generate a RANDOM subsample of N examples per split, instead of --limit's "
-                         "first N. ⚠️ --limit is a HEAD SLICE, not a sample: on expertqa the first 200 "
+                         "first N. --limit is a HEAD SLICE, not a sample: on expertqa the first 200 "
                          "rows have gold p90 450 against 349 for the full set, outside the [316,376] "
                          "range of random 200-row draws. Any statistic read off a --limit run (length, "
                          "degeneracy, capping) is therefore biased. Use this for anything measured.")
@@ -112,7 +112,7 @@ def main():
         cfg.max_new_tokens_cap = args.max_new_tokens_cap
     # Validate the budget override BEFORE loading an 8B model -- a config error should cost a second,
     # not a GPU allocation and several minutes of weight loading.
-    # ⚠️ --truncate-answer-span only does anything for datasets answer_span has a RULE for. For any
+    # --truncate-answer-span only does anything for datasets answer_span has a RULE for. For any
     # other name it returns "no-cut" silently, so the run would generate uncut while appearing to have
     # been cut -- and the whole point of the flag is that the record, logprobs, features and label
     # describe the same text. Fail here, before the model loads, rather than produce a plausible cache.
@@ -136,7 +136,7 @@ def main():
                              "you did not ask for.")
     train_ds, eval_ds = data.load(cfg.dataset, cfg.ood_setting)
 
-    # ⚠️ THE fp16 TRAP (guard added 2026-08-08). `--dtype auto` resolves in generate.load_model to
+    # THE fp16 TRAP (guard added 2026-08-08). `--dtype auto` resolves in generate.load_model to
     # bf16 for Gemma and **fp16 for every other model**. Every canonical Llama long-eval cache was
     # extracted with an explicit `--dtype fp32`, so `auto` was never exercised there -- but for a NEW
     # model it silently produces a cache in a different precision from the one it will be compared
@@ -191,7 +191,7 @@ def main():
 
     # Few-shot short-form QA: the answer ends at the first newline; after that the
     # model just imitates the prompt format. Long-form output keeps its newlines by
-    # default, UNLESS --truncate-long is set (Joe's generate_until=['\n'] for the
+    # default, UNLESS --truncate-long is set (the generate_until=['\n'] for the
     # pubmed_qa keystone reproduction; see D1 in the analysis).
     truncate = (cfg.dataset in data.SHORT_FORM) or args.truncate_long
 

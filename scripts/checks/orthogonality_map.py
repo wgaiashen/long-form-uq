@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """F1 -- ARE HIDDEN STATES AND TOKEN PROBABILITIES REALLY ORTHOGONAL, OR IS THAT JUST NOISE?
 
-Plan: ../PLAN_sharpening_axis.md.   Results: ../STOCKTAKE_sharpening_axis.md §9.
 
 THE QUESTION
 ------------
@@ -10,7 +9,7 @@ the two probes, and that has been read as "the two signals are near-orthogonal, 
 both should win". Every attempt to build such a method has failed, and §8 has now shown the oracle
 headroom that motivated them was a max-over-K artefact.
 
-⭐ THE CONTROL THAT DECIDES BETWEEN THE TWO EXPLANATIONS (the author's, 2026-08-09):
+THE CONTROL THAT DECIDES BETWEEN THE TWO EXPLANATIONS (the author's, 2026-08-09):
 compare each method's correlation with ITSELF ACROSS SEEDS to its correlation with other methods.
 
     self-agreement HIGH (~0.7) and cross LOW (~0.18)
@@ -27,7 +26,7 @@ without it is uninterpretable. We report the raw cross, the ceiling, and the DIS
     r_xy / sqrt(r_xx * r_yy)
 which is the correlation the two signals would have if both were measured without noise.
 
-⚠️ SANITY CHECK, ASSERTED: the three floors are deterministic functions of the cached logprobs, so
+SANITY CHECK, ASSERTED: the three floors are deterministic functions of the cached logprobs, so
 their seed-to-seed self-agreement MUST be exactly 1.0. If it is not, the sidecars are not what they
 claim to be and nothing here is readable.
 
@@ -111,7 +110,7 @@ def main():
           f"({len({d for d, _ in cells})} evals x {len({r for _, r in cells})} rungs)")
     missing = [(d, r) for d in LONG for r in RUNGS if (d, r) not in cells]
     if missing:
-        print(f"⚠️ MISSING, named not silently dropped: {missing}")
+        print(f"MISSING, named not silently dropped: {missing}")
 
     # ---- V1: the determinism assertion ----
     print("\nV1 SANITY: the three floors are deterministic, so seed self-agreement MUST be 1.0")
@@ -171,18 +170,18 @@ def main():
     print(f"  SAPLMA seed-to-seed self-agreement (OOD): {slf_m:.3f}")
     print(f"  SAPLMA vs msp_min                  (OOD): {xmin_m:.3f}")
     if slf_m < 0.4:
-        print("\n  ⛔ SELF-AGREEMENT IS LOW. SAPLMA barely agrees with ITSELF across seeds, so a low")
+        print("\n  SELF-AGREEMENT IS LOW. SAPLMA barely agrees with ITSELF across seeds, so a low")
         print("     correlation with the floor is what noise looks like, not evidence of a second")
         print("     signal. The 'orthogonality' reading is NOT supported, and §8's missing headroom")
         print("     is fully explained: there was never a stable second signal to harvest.")
     elif slf_m > 2.5 * abs(xmin_m):
-        print("\n  ✅ SELF-AGREEMENT IS HIGH relative to the cross-correlation. The two are genuinely")
+        print("\n  SELF-AGREEMENT IS HIGH relative to the cross-correlation. The two are genuinely")
         print("     distinct, STABLE signals -- so the missing headroom in §8 needs a DIFFERENT")
         print("     explanation (most likely: the second signal is real but adds no INCREMENTAL")
         print("     information about correctness once the first is known).")
     else:
         print("\n  ~ INTERMEDIATE. Report both numbers and draw no strong conclusion.")
-    print("\n  ⚠️ A cross-correlation cannot exceed sqrt(reliability_x * reliability_y). Any future")
+    print("\n  A cross-correlation cannot exceed sqrt(reliability_x * reliability_y). Any future")
     print("     quote of 'the probe and the floor correlate only 0.18' MUST carry the ceiling.")
 
     outp = Path(args.out)

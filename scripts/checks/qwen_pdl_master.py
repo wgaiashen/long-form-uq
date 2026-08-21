@@ -103,7 +103,7 @@ def main():
     print("=" * 104)
     print(f"\nsources ({len(files)}/8): {', '.join(files) if files else '(none)'}")
     if missing_evals:
-        print(f"⚠️ MISSING EVALS (not yet run or failed): {', '.join(missing_evals)}")
+        print(f"MISSING EVALS (not yet run or failed): {', '.join(missing_evals)}")
 
     # ---------------- coverage, stated before any number ----------------
     present = sum(1 for ev in LONG_EVALS for rg in RUNGS
@@ -116,7 +116,7 @@ def main():
         print(f"  absent cells ({len(gaps)}), named not hidden:")
         for ev, rg in gaps:
             print(f"    {ev} x {rg}")
-    print(f"\n⚠️ DECLARED IN M2 §4 BUT NOT COMPUTABLE ON THIS POPULATION: {', '.join(DECLARED_BUT_ABSENT)}")
+    print(f"\nDECLARED IN M2 §4 BUT NOT COMPUTABLE ON THIS POPULATION: {', '.join(DECLARED_BUT_ABSENT)}")
     print("   No ptrue and no lookback pooled feature cache exists for Qwen (features/ holds only")
     print("   __saplma.npz for all 8). Their columns are ABSENT, not zero. Producing them needs a")
     print("   separate extraction per method; none of M2's registered claims (R1a/R1b/R2/R2-desc/")

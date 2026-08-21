@@ -131,7 +131,7 @@ def main():
         yte = np.array([PT[X][2][i] for i in te0], dtype=float)
         # PRIMARY floor (2026-07-24 meeting): the PRE-REGISTERED msp_min bar, fixed across datasets
         # (replaces the rejected max-of-three). Dual-report vs the strongest free score is done at the
-        # stocktake layer from the 3-variant rows.
+        # project record layer from the 3-variant rows.
         _fv, _fname = msp.primary_floor([PT[X][3][i] for i in te0])
         floor_prr = results.prr(yte, _fv)
 

@@ -1,6 +1,6 @@
 """B.3 -- the ONE-SIDED entropy penalty: penalise over-sharp attention, leave broad attention alone.
 
-⚠️ WHY THIS IS NOT A THIRD VARIANT OF B.1/B.2. Those supervised the attention toward a TARGET and both
+WHY THIS IS NOT A THIRD VARIANT OF B.1/B.2. Those supervised the attention toward a TARGET and both
 found the target carries no information (real ~= shuffled on every cell). This constrains a PROPERTY of
 the distribution and uses NO target, so the "a shuffled target does just as well" failure mode
 structurally cannot arise. That is what makes it worth running after two nulls.
@@ -117,7 +117,7 @@ def main():
             states = [PT[d][0][i] for d, i in allr]
             T, _ = select_temperature(states, y, tr_idx, device, sd, False, False)
             base, m0 = fit(states, y, tr_idx, te_idx, device, sd, T)
-            # ⭐ THE LEFT TAIL. A one-sided penalty can only act on examples BELOW tau, so if there is no
+            # THE LEFT TAIL. A one-sided penalty can only act on examples BELOW tau, so if there is no
             # mass down there it has nothing to act on -- and "no over-sharp subpopulation exists" is a
             # cleaner answer than "it acted and did not help". Reported before any penalty is applied.
             e0 = attention_entropies(m0, states, te_idx, device)

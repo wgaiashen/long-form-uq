@@ -17,7 +17,7 @@ class LocalJudge:
     """Load an instruct model once, then score records one at a time.
 
     Greedy decoding makes the judge deterministic (reproducible), which a judge should
-    be — unlike the GPT-5 path's temperature=1, kept only to match Joe's original.
+    be — unlike the GPT-5 path's temperature=1, kept only to match the original.
     """
 
     def __init__(self, model_name: str, dtype=torch.float16):

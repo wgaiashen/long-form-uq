@@ -32,7 +32,7 @@ Expressed WITHIN each example, so no cross-example scale choice is needed:
     zgap[i] = ( mean(lp_i) - min(lp_i) ) / std(lp_i)        # dimensionless, per example
     ZGAP(dataset) = mean over examples of zgap[i]
 
-⚠️ Dimensionless and invariant to affine rescaling of the logprobs — which is what killed the rejected
+Dimensionless and invariant to affine rescaling of the logprobs — which is what killed the rejected
 first draft (see prereg §3.0: comparing the spread of min-logprob against mean-logprob smuggled in a
 choice of measurement space, because PRR is rank-based and invariant to monotone transforms but standard
 deviation is not).
@@ -71,7 +71,7 @@ MIN_TOKENS = 2   # std() of a 1-token generation is undefined; such rows are exc
 def load_regime_labels():
     """The regime label per dataset, read from the taxonomy CSV rather than hard-coded.
 
-    ⚠️ Reads `reading` (the regime) ONLY. The PRR columns in this file are label-derived and are exactly
+    Reads `reading` (the regime) ONLY. The PRR columns in this file are label-derived and are exactly
     what R1 exists to avoid depending on — they are never used to compute ZGAP.
     """
     if not TAXONOMY_CSV.exists():
@@ -140,7 +140,7 @@ def main():
     datasets = sorted(labels)
     print(f"R1 taxonomy label-free test | {len(datasets)} datasets from {TAXONOMY_CSV.name}", flush=True)
 
-    # ⚠️ Assert the realised count and FAIL LOUD. A glob over cache/records returns 7 while claiming 10;
+    # Assert the realised count and FAIL LOUD. A glob over cache/records returns 7 while claiming 10;
     # this test's whole population is 8, and a short load would silently change the null distribution.
     if len(datasets) != 8:
         sys.exit(f"expected 8 long evals in the taxonomy, found {len(datasets)}: {datasets}. "
@@ -178,7 +178,7 @@ def main():
     print(f"\nPRIMARY: {correct:g}/{total} cross-group pairs correct, AUC {auc:.3f}, "
           f"one-sided p {p:.3f}  ->  {reading}", flush=True)
     if correct < total:
-        print("  ⚠️ Anything short of perfect separation is a near miss, not support (prereg §4): with "
+        print("  Anything short of perfect separation is a near miss, not support (prereg §4): with "
               "n=7 nothing weaker is worth acting on.", flush=True)
 
     # ---- P2: the competing simple explanation. Reported ALWAYS, pass or fail.
@@ -194,7 +194,7 @@ def main():
     print(f"  Does LENGTH ALONE separate the groups? {len_correct:g}/{len_total} pairs "
           f"(AUC {len_correct/len_total:.3f}) vs ZGAP's {correct:g}/{total} (AUC {auc:.3f}).", flush=True)
     if len_correct >= correct:
-        print("  ⚠️ LENGTH SEPARATES AT LEAST AS WELL AS ZGAP. Per the pre-registration the mechanism "
+        print("  LENGTH SEPARATES AT LEAST AS WELL AS ZGAP. Per the pre-registration the mechanism "
               "claim is NOT established even if P1 passed: the honest report is 'regime is predictable "
               "from length', which is weaker and much less interesting. It goes in the write-up as that.",
               flush=True)

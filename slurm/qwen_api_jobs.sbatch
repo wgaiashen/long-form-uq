@@ -9,7 +9,7 @@
 # CPU-only: neither job touches a GPU, and requesting one had it queue behind GPU work.
 # The two API jobs -- relabelling the truncated population and the step-4 judge-agreement test.
 #
-# ⚠️ WHY THESE RUN AS A BATCH JOB AND NOT ON THE SHELL VM. They were started on cloud-vm-40-244 and
+# WHY THESE RUN AS A BATCH JOB AND NOT ON THE SHELL VM. They were started on cloud-vm-40-244 and
 # both were KILLED mid-run: that box terminates long processes. Both are resumable (02_label skips
 # rows already stamped on the field; rejudge writes one JSON per dataset), so nothing was lost and
 # nothing is re-paid for -- but they belong on a compute node. A GPU is requested only because every

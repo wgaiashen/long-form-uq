@@ -27,7 +27,7 @@ WHAT IT FLAGS (each is a place an absence can masquerade as a measurement)
   D. absence -> number     `.get(k, 0)` / `or 0` / `fillna(0)` on a value column (not-measured becoming 0)
   E. glob-and-take-first   `glob(...)[0]` — picks one match with no check that it is the right one
 
-⚠️ This is a LINT, not a proof. Every hit needs judgement: some drops are correct and documented. The
+This is a LINT, not a proof. Every hit needs judgement: some drops are correct and documented. The
 output is a worklist, and a hit that is deliberate should get a comment saying so, which is also what
 makes it disappear from a future reading of this report.
 
@@ -57,7 +57,7 @@ PATTERNS = [
 ]
 
 # A comment within this many lines of a hit that acknowledges the drop makes it "reviewed".
-ACK = re.compile(r"⚠️|LOUD|loud|deliberate|intentional|by design|never zero|reported|skip(ped)? loudly",
+ACK = re.compile(r"|LOUD|loud|deliberate|intentional|by design|never zero|reported|skip(ped)? loudly",
                  re.I)
 
 
@@ -121,7 +121,7 @@ def main():
             print(f"  {rel}:{ln}\n      {txt}")
         print()
 
-    print("⚠️ A hit is a QUESTION, not a defect. Two things make one real:")
+    print("A hit is a QUESTION, not a defect. Two things make one real:")
     print("   (a) the dropped thing was actually computed somewhere, and")
     print("   (b) nothing downstream says it went missing.")
     print("Where a drop is deliberate, add a comment saying so — that also clears it from this report.")

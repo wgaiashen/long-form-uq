@@ -278,7 +278,7 @@ def run_dataset(model_name, dataset, layer, label_field, seeds, device, tok):
 
     # Significance = a PAIRED BOOTSTRAP over test examples (real data variance), on the seed-averaged
     # predictions. HEADLINE = attention vs the strong mean-pool+MLP baseline (what a reader compares
-    # to, what we reproduced against Joe). SUPPORTING = attention vs uniform (same head), which
+    # to, what we reproduced against the reference implementation). SUPPORTING = attention vs uniform (same head), which
     # isolates the mechanistic "learned weighting helps holding the head fixed" claim only.
     avg_attn, avg_mean, avg_uni = (np.mean(p, axis=0) for p in (pred_attn, pred_mean, pred_uni))
     verdicts = {

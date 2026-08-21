@@ -8,7 +8,7 @@
 
 # W-Models: download Qwen/Qwen2.5-32B on DoC and verify it. Slurm twin of pbs/wmodels_download.pbs.
 #
-# ⚠️ HF_HOME IS OVERRIDDEN TO /vol/bitbucket, AND THAT IS THE WHOLE POINT OF THIS SCRIPT.
+# HF_HOME IS OVERRIDDEN TO /vol/bitbucket, AND THAT IS THE WHOLE POINT OF THIS SCRIPT.
 # pbs/_env.sh defaults DoC's HF_HOME to /vol/gpudata/gs925-msc_project/hf_cache, which sits inside
 # the HARD 50GB CephFS quota that already holds Qwen-14B (27.5GB) and had ~4GB free as of
 # 2026-08-08. Qwen2.5-32B is ~65GB in bf16 and cannot possibly fit there; the download would die
@@ -17,7 +17,7 @@
 # 88GB of luq_cache. Exporting BEFORE sourcing works because _env.sh assigns with `:=`, which
 # respects an already-set value.
 #
-# ⚠️ NO --gres=gpu HERE (fixed 2026-08-16, was --gres=gpu:1). This script never touches CUDA -- it
+# NO --gres=gpu HERE (fixed 2026-08-16, was --gres=gpu:1). This script never touches CUDA -- it
 # is snapshot_download + a tokenizer load, both CPU/net, matching its own PBS twin
 # (pbs/wmodels_download.pbs) and the Qwen-14B precedent (pbs/download_qwen.pbs), neither of which
 # requests a GPU. The original comment claiming "a GPU is requested so the load test is meaningful"

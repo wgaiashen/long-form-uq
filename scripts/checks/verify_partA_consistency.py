@@ -15,20 +15,24 @@ Checks:
   2. CROSS-DATASET DUPLICATE-TRIPLE scan: two rows from DIFFERENT datasets sharing an identical
      (msp_sum, msp_perplexity, msp_min) triple is the copy-paste signature (identical values WITHIN a dataset
      are legitimate -- short bands where the three aggregates coincide -- and are not flagged).
-  3. MARKDOWN == CSV: parse Table A1 out of STOCKTAKE_post24July.md and assert every rendered numeric cell
+  3. MARKDOWN == CSV: parse Table A1 out of the project results log and assert every rendered numeric cell
      matches the CSV to tolerance. This is the check that would have caught the trivia bug at the source.
 
 Exit 1 (fail loud) on any violation.  Read-only.  Run:  python scripts/checks/verify_partA_consistency.py
 """
 import csv as _csv
 import re
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL_SLUG = "meta-llama_Meta-Llama-3.1-8B"
 CSV = ROOT / "results" / f"probe_vs_msp_length__{MODEL_SLUG}.csv"
-DOC = ROOT.parent / "STOCKTAKE_post24July.md"
+# The rendered results table lives in the project record, which is outside this repository.
+# Point LUQ_RESULTS_DOC at it to enable the markdown cross-check; without it the check is
+# skipped and only the CSV checks run (see the DOC.exists() branch below).
+DOC = ROOT.parent / os.environ.get("LUQ_RESULTS_DOC", "results_record.md")
 TOL = 2e-3          # rendered table shows 3 dp; allow half-ULP + rounding slack
 
 FAILS = []
@@ -40,7 +44,7 @@ def fail(msg):
 
 def num(s):
     """parse a table cell like '+0.902', '−0.052' (unicode minus), '**0.906**' -> float, or None."""
-    s = s.strip().replace("*", "").replace("−", "-").replace("✓", "").strip()
+    s = s.strip().replace("*", "").replace("−", "-").replace("", "").strip()
     m = re.search(r"[-+]?\d*\.?\d+", s)
     return float(m.group()) if m else None
 

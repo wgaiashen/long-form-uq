@@ -1,10 +1,10 @@
-"""Constrain the learned weighting to meaningful tokens (Joe #4) — the keep-set sweep.
+"""Constrain the learned weighting to meaningful tokens (design note 4) — the keep-set sweep.
 
 Runs weighted-MSP (normalised) with the softmax RESTRICTED to different token subsets, via the `keep=`
 channel, across ID + the 5-rung ladder × all eval datasets. The subsets stack (each excludes more):
   special        drop only special/reserved tokens (the EOS fix; the post-fix baseline)
   special_punct  + drop punctuation / whitespace pieces
-  content        + drop stop-words (negation carved back)  <- Joe's "exclude stop words" idea
+  content        + drop stop-words (negation carved back)  <- the "exclude stop words" idea
 The learner can only place weight on the kept tokens (the softmax is over that subset only, pre-softmax
 -inf on the rest), so it cannot fixate on EOS/punctuation/filler -- the failure the visualiser exposed.
 
@@ -36,7 +36,7 @@ from xl_rungs import label_of  # noqa: E402
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"
 # special/special_punct/content restrict the softmax to a token subset (keep=); segment learns one weight
-# per SENTENCE and broadcasts it (segment_ids=, Joe #7). All keep the EOS fix (exclude_special).
+# per SENTENCE and broadcasts it (segment_ids=, design note 7). All keep the EOS fix (exclude_special).
 MODES = ["special", "special_punct", "content", "segment"]
 
 
@@ -100,7 +100,7 @@ def main():
             continue
         yte = np.array([PT[X][2][i] for i in te0], float)
         # FAIR floor, not bare msp_sum (fixed 2026-07-22): the `floor` column is what every keep-variant
-        # margin in the STOCKTAKE is measured against, and msp_sum is not length-normalised, so on sets
+        # margin in the project record is measured against, and msp_sum is not length-normalised, so on sets
         # where perplexity or msp_min is stronger every "beats the floor" count was overstated.
         _fv, _fname = msp.primary_floor([PT[X][3][i] for i in te0])  # PRE-REGISTERED msp_min bar (2026-07-24)
         floor = results.prr(yte, _fv)

@@ -7,11 +7,11 @@ produce the same pattern without entropy meaning anything.
 The control is `|length - centre|` vs the drop, on the same 8 datasets and the same harness. If it
 matches or beats the entropy version, the observation is length wearing an entropy costume.
 
-⚠️ POST-HOC, and labelled as such. Both the functional form (distance from a centre) and the centre
+POST-HOC, and labelled as such. Both the functional form (distance from a centre) and the centre
 itself are chosen after seeing the data, on n = 8. `prereg/0.2` already recorded this analysis as NOT
 BLIND. Nothing here can be promoted to a finding on its own.
 
-⚠️ THE RESULT IS FAVOURABLE TO THE OBSERVATION, so it is treated as a suspect. The extra checks below are
+THE RESULT IS FAVOURABLE TO THE OBSERVATION, so it is treated as a suspect. The extra checks below are
 the ones that would have been run had the control gone the other way:
   - CENTRE SENSITIVITY. The centre is estimated from the same 8 points. If the pattern only survives at
     the median it is an artifact of that one choice.
@@ -152,7 +152,7 @@ def main():
     print(f"  BUT the observation STILL misses its own pre-registered threshold of {PREREG_ALPHA}")
     print(f"  (p={p_ne:.4f}). Surviving a confound check does not promote it.")
     print("  n=8, a post-hoc functional form, and a centre fitted to the same points. This stays an")
-    print("  OBSERVATION to raise with Joe -- not a finding, and not a foundation for a router.")
+    print("  OBSERVATION to raise in review -- not a finding, and not a foundation for a router.")
     return 0
 
 

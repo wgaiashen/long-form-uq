@@ -138,7 +138,7 @@ def main():
                         cached = cache.load_scores(cache_dir, key_eval, method)["unc"]
                         if len(cached) != len(unc) or not np.allclose(cached, unc, atol=args.tol):
                             diagonal_failures.append((method, eval_ds))
-                            tag = "✗"      # flag the failing diagonal cell
+                            tag = "X"      # flag the failing diagonal cell
                         else:
                             tag = "="      # verified identical to 04_eval
                     cells.append(f"{prr:6.3f}{tag}")
@@ -159,7 +159,7 @@ def main():
         w.writeheader()
         w.writerows(out_rows)
     print(f"\nwrote {out_path}")
-    print("Legend: '=' diagonal verified identical to 04_eval; '✗' diagonal MISMATCH.")
+    print("Legend: '=' diagonal verified identical to 04_eval; 'X' diagonal MISMATCH.")
 
     if diagonal_failures:
         sys.exit(f"\nDIAGONAL GATE FAILED for {diagonal_failures} — the cross-dataset wiring "

@@ -5,7 +5,7 @@
 02:49), which is after those runs completed. Every future run stamps; these ten cannot be fixed except by
 re-running ~45 GPU-hours purely for a label.
 
-⚠️ **This file is RECONSTRUCTED EVIDENCE, not a stamp.** It records what the artifacts, job logs and git
+**This file is RECONSTRUCTED EVIDENCE, not a stamp.** It records what the artifacts, job logs and git
 history jointly imply. It is weaker than a stamp and is labelled as such wherever it is relied on. It
 exists so the gap is documented rather than silently absent.
 

@@ -1,10 +1,10 @@
-"""ONE-HARNESS OOD grid: every method x {ID, LOO, DiffTask} through Joe's PINNED ProbeDrift-light
+"""ONE-HARNESS OOD grid: every method x {ID, LOO, DiffTask} through the PINNED ProbeDrift-light
 pools, seed-averaged, PAIRED seeds, ID-diagonal-gated.
 
 This retires the two ad-hoc grids (aggregation_ood_light = wrong 2-source pool; the transfer matrix
 = single-source). Here ALL methods run in ONE harness on ONE OOD definition:
   * Pools = probe_drift.ood_settings.get_training_spec(eval, setting), restricted to the sources we
-    have Llama features for {sciq, trivia_qa, pubmed_qa, xsum}, at Joe's per-source caps
+    have Llama features for {sciq, trivia_qa, pubmed_qa, xsum}, at the per-source caps
     (LOO 200/source, DiffTask 600/source). ID = train on eval's own full train split.
   * PAIRED seeds: for each seed we draw the pool subsample ONCE and feed the SAME sampled examples
     to every method (poolers read per-token states; baselines read pooled vectors of the same rows).
@@ -46,7 +46,7 @@ from provenance import provenance  # noqa: E402  ONE provenance stamp, shared by
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
 LAB = "correctness"  # legacy default; per-dataset reads go through cohort.LABEL_FIELD
-# ⚠️ WIDENED 2026-08-04, and this fixed TWO defects at once.
+# WIDENED 2026-08-04, and this fixed TWO defects at once.
 # It used to be the 4 sets ("sciq","trivia_qa","pubmed_qa","xsum"), which are both the datasets LOADED
 # and the pool `cells()` filtered its training sources to. Consequences, both found while assembling the
 # XL master table:
@@ -78,7 +78,7 @@ GATE_TOL = 0.03
 def cells(evals):
     """Rungs for this driver, delegated to the SHARED builder.
 
-    ⚠️ REWRITTEN 2026-08-04 to call `xl_rungs.cells`, the same function contribution_ladder uses.
+    REWRITTEN 2026-08-04 to call `xl_rungs.cells`, the same function contribution_ladder uses.
     It previously built its own: ID + LOO + DiffTask only, filtered to a 4-dataset pool. Two problems,
     both fixed by delegating rather than by adding the missing rungs here:
 
@@ -89,7 +89,7 @@ def cells(evals):
         ended up describing two different training pools; a shared builder makes that impossible by
         construction, which is a stronger guarantee than keeping two copies in step.
 
-    ⚠️ The ID cell is `[(X, None)]` in BOTH builders, so the ID_ANCHOR gate values below are unaffected
+    The ID cell is `[(X, None)]` in BOTH builders, so the ID_ANCHOR gate values below are unaffected
     by this change — that invariance is the control that the rewrite did not move the verified numbers.
     The LOO/DiffTask pools DO change (4-dataset -> full pool); that is the point, and it is why runs
     write to new files rather than over the historical ood_onegrid__*.csv.
@@ -100,7 +100,7 @@ def cells(evals):
 def sampled_train_idx(split, seed, cap):
     """Indices of the train split, subsampled to `cap` with `seed` (cap=None -> all).
 
-    ⚠️ The `len(tr) == 0` fallback matches contribution_ladder's (Round-3 Task A, 2026-07-27): a source
+    The `len(tr) == 0` fallback matches contribution_ladder's (Round-3 Task A, 2026-07-27): a source
     that is EVAL-ONLY (asqa/expertqa/factscore are all `split=="test"`) has no rows labelled `train` and
     would otherwise contribute ZERO rows to a pool that names it — the V-A0 silent-admission bug. Drawing
     from all rows is safe HERE because build_rows only routes a source through this function when
@@ -142,7 +142,7 @@ def _flush_rows(out, rows, fields):
 
 def main():
     ap = argparse.ArgumentParser()
-    # ⚠️ DEFAULT UNCHANGED (the original 3 evals) so every existing run stays byte-identical. The XL
+    # DEFAULT UNCHANGED (the original 3 evals) so every existing run stays byte-identical. The XL
     # grid needs all 10, because this is the only driver that scores the SUPERVISED BASELINES
     # (linear/ptrue/lookback/mean-pool+MLP) -- without extending it, 7 of 10 XL evals would have no
     # baseline rows and the "beats existing probes" comparison would be missing its comparators.
@@ -162,7 +162,7 @@ def main():
 
     # per-token states (poolers) + pooled vectors (baselines), per dataset, positionally aligned.
     #
-    # ⚠️ TWO PER-DATASET FACTS, BOTH OF WHICH USED TO BE ONE GLOBAL CONSTANT (fixed 2026-08-04, same
+    # TWO PER-DATASET FACTS, BOTH OF WHICH USED TO BE ONE GLOBAL CONSTANT (fixed 2026-08-04, same
     # failure family as AVAIL itself — a value that was correct for the original four core sets and
     # silently wrong once the cohort widened to ten):
     #   * CACHE DIR. It was resolved ONCE off dataset="sciq" and reused for every dataset, so the
@@ -182,7 +182,7 @@ def main():
         st, split, y, _, records = loaded
         if not np.isfinite(y).any():
             raise SystemExit(f"{d}: label field '{lab}' is entirely NaN in the records. Wrong field?")
-        # ⚠️ DROP UNLABELLED ROWS (added 2026-08-04). ExpertQA's factuality label is None on 292 of 2016
+        # DROP UNLABELLED ROWS (added 2026-08-04). ExpertQA's factuality label is None on 292 of 2016
         # rows and factscore's on 45 of 500. Keeping them puts NaN in the probe's TRAINING TARGET, and a
         # probe fitted on NaN emits NaN for every example — so the whole cell came back NaN and both jobs
         # died. contribution_ladder and probedriftlong have always filtered here; this driver never did,
@@ -217,7 +217,7 @@ def main():
         per_method = {m: [] for m in POOLERS + list(BASE)}
         for sd in seeds:
             # --- one shared subsample for THIS seed, used by every method (paired) ---
-            # ⚠️ USE THE SHARED build_rows (fixed 2026-08-04). This was an INLINE DUPLICATE that read the
+            # USE THE SHARED build_rows (fixed 2026-08-04). This was an INLINE DUPLICATE that read the
             # raw split column: `np.where(PT[X][1] == "test")` for the test rows and the bare sampler for
             # the train rows. That is correct only for the five CORE sets, which carry a real baked-in
             # train/test split. The five XL sets are SPLIT-LESS — med_quad and samsum are all `train`,

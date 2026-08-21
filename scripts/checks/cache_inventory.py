@@ -79,7 +79,7 @@ def classify(path: Path, base: Path):
 def walk(base: Path, quick: bool, label: str, seen: dict, rows: list):
     """Add a row per file under `base`, resolving symlinks and recording their target.
 
-    ⚠️ DEDUPLICATION IS LOAD-BEARING, not tidiness. On DoC the same bytes are reachable twice: once
+    DEDUPLICATION IS LOAD-BEARING, not tidiness. On DoC the same bytes are reachable twice: once
     through cache/pertok/<name> (a symlink) and again through the --extra sweep of the volume the
     symlink points into. Counting both double-counts ~12 GB, inflates the total by a quarter, and
     puts two rows for one file into a table whose whole purpose is a row-by-row diff. So a file is
@@ -167,7 +167,7 @@ def main():
     print(f"  {'TOTAL':<46s} {len(rows):>5d}  {tot/1073741824:>8.2f} GB", file=sys.stderr)
     dang = [r for r in rows if r[5] == "DANGLING"]
     if dang:
-        print(f"\n⚠️ {len(dang)} DANGLING symlink(s) -- the cache LOOKS present but will fail at load:",
+        print(f"\n{len(dang)} DANGLING symlink(s) -- the cache LOOKS present but will fail at load:",
               file=sys.stderr)
         for r in dang:
             print(f"    {r[6]} -> {r[7]}", file=sys.stderr)

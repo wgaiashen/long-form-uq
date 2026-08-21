@@ -1,6 +1,6 @@
 """P1.2 — MSP ablation battery: which tokens carry the plain-MSP signal?
 
-Joe's email asks us to understand *what drives MSP* by scoring it over token SUBSETS, so we know what a
+the email asks us to understand *what drives MSP* by scoring it over token SUBSETS, so we know what a
 good learned weighting (weighted-MSP, P1.1) should look like. Every ablation is also a cheap unsupervised
 baseline. All from the cached per-token logprobs — NO GPU, NO training.
 

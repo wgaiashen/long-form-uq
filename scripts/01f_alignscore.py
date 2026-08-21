@@ -1,7 +1,7 @@
 """Label cached records with AlignScore (FREE, local correctness signal).
 
 Writes record["correctness_alignscore"] (+ _model provenance), resumable + checkpointed.
-Joe's runnable pipeline evaluates long-form PRR against AlignScore (not the judge), so this
+the runnable pipeline evaluates long-form PRR against AlignScore (not the judge), so this
 is the free, like-for-like eval label AND our Gemma/Llama cross-check. AlignScore is a
 RoBERTa model -> prefers a GPU (works on CPU, just slower). No API cost.
 

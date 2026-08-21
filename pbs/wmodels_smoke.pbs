@@ -7,14 +7,14 @@
 # W-Models prompt-regime validity gate (prereg/M5_multimodel_far_ood.md §6).
 # 40 DETERMINISTIC rows per dataset x 6 datasets = 240 rows, one GPU slot, then the report.
 #
-# ⚠️ THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,
+# THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,
 # invented continuations, cap behaviour and generation length. It never computes or looks at PRR.
 # Choosing a prompt regime by looking at PRR would be selecting the population on the outcome.
 #
-# ⚠️ --limit takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
-# ⚠️ --prompt-regime <slug>_probe isolates every write, so a probe cache can never contaminate a
+# --limit takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
+# --prompt-regime <slug>_probe isolates every write, so a probe cache can never contaminate a
 # real one. That namespacing is also why --max-new-tokens becomes legal for all six datasets.
-# ⚠️ generation_quality.py MUST be given --out: its default path writes a TRACKED results file.
+# generation_quality.py MUST be given --out: its default path writes a TRACKED results file.
 #
 #   qsub -v LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_PROBE=llama31i_probe pbs/wmodels_smoke.pbs
 #   qsub -v LUQ_MODEL=google/gemma-2-9b-it,LUQ_DTYPE=bf16,LUQ_PROBE=gemma29it_probe pbs/wmodels_smoke.pbs

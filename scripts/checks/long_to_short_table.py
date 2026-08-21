@@ -4,13 +4,13 @@ THE GAP THIS CLOSES. The ProbeDriftLong grid is **42 cells per method**: 8 long 
 `sciq` and `trivia_qa` at the `Long->Short` rung (2). `assemble_pdl_table.py` hardcodes
 `LONG_EVALS` (8 long sets) and `RUNGS` (5 long rungs), so those 2 cells are excluded from BOTH the tables
 and the coverage denominator -- the master reports "1664/1680" and reads as near-complete while a whole
-rung is missing. Recorded as a known gap in the stocktake on 2026-08-05 and not closed until now.
+rung is missing. Recorded as a known gap in the project record on 2026-08-05 and not closed until now.
 
 WHY IT MATTERS: transferring a probe trained on long-form generation to a SHORT-form test set is the
-setting Joe singled out, and it is the rationale offered for weighted-MSP as the base component of the
+setting singled out in review, and it is the rationale offered for weighted-MSP as the base component of the
 proposed system. It cannot be checked from either master table.
 
-⚠️ SEPARATE POPULATION, NEVER POOLED. These are short-form evals with a different label regime and a very
+SEPARATE POPULATION, NEVER POOLED. These are short-form evals with a different label regime and a very
 different floor (msp_min is +0.75 here against +0.19 on the long OOD rungs). Averaging them into the
 32-cell long OOD mean would be exactly the cross-population comparison the standing rule forbids. They get
 their own table and their own caption.
@@ -30,7 +30,7 @@ RUNG = "Long->Short"
 # script excluded only msp_min and so reported a floor variant as the best "supervised" method.
 FLOORS = {"floor_min", "floor_sum", "floor_ppl", "fair_floor"}
 
-# Same spelled-out names the stocktake uses; a code name in a table is unreadable.
+# Same spelled-out names the project record uses; a code name in a table is unreadable.
 PRETTY = {
     "floor_min": "msp_min (floor)", "floor_sum": "msp_sum (floor)", "floor_ppl": "perplexity (floor)",
     "fair_floor": "max-of-three (footnote only)",
@@ -103,7 +103,7 @@ def main():
     else:
         best = max((mean_of(d), m) for m, d in rows
                    if mean_of(d) is not None and m not in FLOORS)
-        print(f"  ⭐ NO supervised method beats the floor on this rung.")
+        print(f"  NO supervised method beats the floor on this rung.")
         print(f"     Best is {PRETTY.get(best[1], best[1])} at {best[0]:+.4f}, i.e. {best[0]-floor:+.4f}.")
     return 0
 

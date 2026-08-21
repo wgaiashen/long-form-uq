@@ -46,11 +46,11 @@ LONG_CELLS = ([(e, r) for e in LONG_8 for r in LONG_RUNGS]
 def scan(patterns):
     """method -> (measured cells, NaN cells).
 
-    ⚠️ A CELL COUNTS ONLY IF IT HOLDS A FINITE NUMBER (fixed 2026-08-05). This used to count any row whose
+    A CELL COUNTS ONLY IF IT HOLDS A FINITE NUMBER (fixed 2026-08-05). This used to count any row whose
     key existed, so a cell written as `nan` scored as covered. That is the SAME error as the "50/50 cells"
     claim it was written to replace — presence is not measurement. It mattered immediately:
     `wmsp_seg_softmax` reported 42/42 while 17 of those 42 were NaN, and that would have gone into the
-    stocktake as a complete method.
+    project record as a complete method.
     """
     got = collections.defaultdict(set)
     bad = collections.defaultdict(set)
@@ -88,7 +88,7 @@ def report(title, got, bad, cells, groups, show_missing):
             mark = "OK  " if len(have) == n else ("--  " if not have else "..  ")
             nbad = len(bad.get(m, set()) & cellset)
             print(f"    {mark}{m:26s} {len(have):3d}/{n}  [{bar}] {pct:5.1f}%"
-                  + (f"   ⚠️ {nbad} cell(s) NaN — computed but NOT measured" if nbad else "")
+                  + (f"   {nbad} cell(s) NaN — computed but NOT measured" if nbad else "")
                   + (f"   !! {len(stray)} row(s) outside the grid" if stray else ""))
             if show_missing and have and len(have) < n:
                 miss = sorted(cellset - have)

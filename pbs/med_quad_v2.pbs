@@ -6,7 +6,7 @@
 
 # A.2 -- med_quad v2 regeneration. GENERATION ONLY, no judge call: the gates are read first.
 #
-# ⚠️ WHY THIS DOES NOT WAIT FOR THE samsum PILOT. The pilot decides whether the OTHER THREE regenerate,
+# WHY THIS DOES NOT WAIT FOR THE samsum PILOT. The pilot decides whether the OTHER THREE regenerate,
 # by testing whether their capping is truncation or over-generation. med_quad is not in that question:
 # its budget is 128 against a gold reference p90 of 591, i.e. 0.22x, versus 1.25-1.7x for the others.
 # It is the one dataset with a genuine budget defect, so it regenerates either way. Waiting would
@@ -25,7 +25,7 @@
 #                                 penalty falls on legitimately repeated context words and forces EOS.
 #   fp32 + eager, matching v1, so the pooling-consistency guard can pass at TOL=1e-4 later.
 #
-# ⚠️ EXPECTED GATE BEHAVIOUR, pre-registered: med_quad's DEGENERACY MAY RISE. At 97.7% capped, a cap at
+# EXPECTED GATE BEHAVIOUR, pre-registered: med_quad's DEGENERACY MAY RISE. At 97.7% capped, a cap at
 # 128 truncates loops before they are long enough for the detector to see, so the 12.3% severe rate is a
 # LOWER BOUND. A rise is the expected consequence of removing a loop-truncator, NOT evidence the fix
 # failed; the response is to keep BOTH the larger budget and the anti-loop measure. This exemption is

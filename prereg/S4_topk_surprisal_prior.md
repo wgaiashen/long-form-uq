@@ -24,13 +24,13 @@ It is deliberately a different point in target-space from the existing arms:
 | **`topk`** | **YES** (k of G) | **YES** (uses RANK of NLL, not magnitude) | no |
 | `orgad` | yes | yes | **yes** |
 
-⭐ **`topk` fixes BOTH defects of the `nll` prior at once** — density and scale — while holding the
+**`topk` fixes BOTH defects of the `nll` prior at once** — density and scale — while holding the
 information source constant. So `topk` vs `nll` is a clean two-factor test: if `topk` beats `nll`, it is
 the *sparsity/scale* of the target that matters, not the information in it. That contrast is the reason to
 run it, and it is why `nll` must be re-run in the same job as the paired reference rather than compared to
 the existing table.
 
-## ⚠️ THE k-SELECTION TRAP, AND HOW IT IS HANDLED
+## THE k-SELECTION TRAP, AND HOW IT IS HANDLED
 
 `topk_floor_sweep` chose k per dataset **by PRR**, i.e. **using that dataset's labels**. Using those k
 values at the eval dataset would leak eval labels into the method and make every number an oracle. This is
@@ -54,7 +54,7 @@ motivation for a label-free k-selector and nothing more.
   resolved per example as `max(1, round(f*G))`, so a fraction means the same thing on a 32-token pubmed
   answer and a 219-token expertqa one.
 - **`floor`:** the prior is `1.0` on the top-k positions and `floor` elsewhere. `floor=0.0` is a hard
-  filter. ⚠️ **Registered design note:** with `floor=0` arm D's additive `beta*log(prior)` clamps to
+  filter. **Registered design note:** with `floor=0` arm D's additive `beta*log(prior)` clamps to
   `log(1e-9) ≈ -20.7`, so **any β > 0 hard-masks the non-top-k tokens and β stops interpolating**. Two
   floors are therefore run — **`floor=0.0` (hard filter, the Orgad-style filter-then-aggregate) and
   `floor=0.05` (soft, so β retains its meaning)** — and the difference between them is itself informative
@@ -87,7 +87,7 @@ motivation for a label-free k-selector and nothing more.
    fixed k lands mid-range and the per-dataset pattern does *not* track the sweep, the taxonomy does not
    transfer from floors to probes, which is itself worth reporting.
 3. **I do not expect the fixed-k primary to beat SAPLMA's +0.241 OOD mean.** The honest target is beating
-   the paired `armD:nll` (+0.222) and `armA` (+0.222) on the concentrated subset. ⚠️ Both `topk` and `nll`
+   the paired `armD:nll` (+0.222) and `armA` (+0.222) on the concentrated subset. Both `topk` and `nll`
    point a hidden-state probe at where the *probability* family finds signal, so they import a ceiling
    already measured at `msp_min` = +0.186 OOD.
 
@@ -99,7 +99,7 @@ motivation for a label-free k-selector and nothing more.
 - **DROP** if it is within ±0.02 of `nll` everywhere. Sparsity and scale-freeness then do not matter for
   this target, which narrows the Phase 2 target list to Orgad (the only independent one) and is a useful
   negative.
-- ⚠️ **A favourable result is a suspect.** If `topk` wins, the check to run before believing it is the
+- **A favourable result is a suspect.** If `topk` wins, the check to run before believing it is the
   **k = G uniform control** (does the win vanish when the prior is degenerate?) and the **shuffled-position
   control** (top-k positions permuted within the example, holding sparsity fixed and destroying only
   *which* tokens are selected). A win that survives a positional shuffle is not a win.

@@ -59,7 +59,7 @@ def main():
         for r in rows:
             got, want = str(r["file_best_finite"]), r["argmax_finite"]
             if float(got) != float(want):
-                print(f"  ⚠️ {r['eval']}: file oracle_best_finite_beta={got} but recomputed "
+                print(f"  {r['eval']}: file oracle_best_finite_beta={got} but recomputed "
                       f"finite argmax={want}")
 
         fs = [r for r in rows if r["eval"] == "factscore"][0]

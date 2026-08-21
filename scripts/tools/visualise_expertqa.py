@@ -196,8 +196,8 @@ function card(d){
  let m = badge('#'+d.idx)+badge(d.field)+(d.specific_field?badge(d.specific_field):'')+badge(d.cluster);
  d.types.forEach(t=>m+=badge(t));
  m += badge(d.n_tokens+' tok', d.capped?'warn':'ok');
- if(d.capped) m += badge('⚠ CAPPED (hit '+CAP+')','warn');
- if(d.degenerate) m += badge('⚠ degenerate (d3='+d.distinct3+', sent×'+d.max_sent_repeat+')','bad');
+ if(d.capped) m += badge('CAPPED (hit '+CAP+')','warn');
+ if(d.degenerate) m += badge('degenerate (d3='+d.distinct3+', sent×'+d.max_sent_repeat+')','bad');
  if(d.correctness!=null) m += badge('judge '+d.correctness+' ('+(d.correctness_model||'?')+')');
  meta.innerHTML = m;
  c.appendChild(meta);

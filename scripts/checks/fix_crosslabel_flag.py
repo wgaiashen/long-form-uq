@@ -18,7 +18,7 @@ The PRR values are unaffected — each dataset is always scored on its own label
 was already per-dataset. This is a caveat/metadata correction only, so the numbers are not recomputed;
 the flag is re-derived from the `eval` and `train` columns the run itself recorded.
 
-⚠️ RUN ONLY AFTER EVERY xlcontrib JOB HAS FINISHED. A job still running holds its rows in memory and
+RUN ONLY AFTER EVERY xlcontrib JOB HAS FINISHED. A job still running holds its rows in memory and
 rewrites the whole CSV at each cell, so patching underneath it would be overwritten.
 
     python scripts/checks/fix_crosslabel_flag.py --dry-run     # report, change nothing
@@ -56,7 +56,7 @@ def main():
             continue
         changed = 0
         for r in rows:
-            # ⚠️ BLANKS STAY BLANK. The `fair_floor:` and `VERDICT:` rows were written by two append
+            # BLANKS STAY BLANK. The `fair_floor:` and `VERDICT:` rows were written by two append
             # sites that never carried this field, so their flag is EMPTY = "not stated". Filling it
             # here would be recording a value the run never emitted, which the standing rule forbids
             # (a blank reads as "not measured", a value reads as "measured"). The driver now stamps

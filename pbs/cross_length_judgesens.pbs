@@ -11,7 +11,7 @@
 # gpt-5-mini into the shadow regime `cache/trivia_mini/` (pertok symlinked -- the representation is
 # byte-identical, only the label moves). This re-scores the TriviaQA-EVAL arms against it.
 #
-# ⚠️ SCOPE. Only the arms where trivia_qa is the EVAL are re-scored, because that is where the label
+# SCOPE. Only the arms where trivia_qa is the EVAL are re-scored, because that is where the label
 # change moves the PRR yardstick. In the short->long arms trivia is only a TRAINING source and the
 # eval label (asqa/xsum/factscore) is untouched; with 98.6% binarised agreement, re-labelling 1.4% of
 # training rows cannot plausibly move those. Stated rather than assumed.

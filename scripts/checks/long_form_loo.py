@@ -1,6 +1,6 @@
 """P1.5 — Long-form-LOO: does SAPLMA's leave-one-out strength come from SHORT-FORM training data?
 
-Joe's hypothesis (email): SAPLMA does well at LOO because the LOO mixture contains short-form sets it can
+the hypothesis (email): SAPLMA does well at LOO because the LOO mixture contains short-form sets it can
 learn easy heuristics from; strip the short-form data (keep the training SIZE the same) and its edge should
 shrink, while the OOD-robust log-prob methods (MSP, weighted-MSP) hold. If so, our methods win on the
 cleaner, harder setting.
@@ -165,7 +165,7 @@ def main():
                 print(f"    {m:18s} normal {row.get('normal_LOO_prr')}  longform {row.get('longform_LOO_prr')}"
                       f"  Δ(norm-long) {mg:+.3f} [{lo:+.3f},{hi:+.3f}] {'SIG' if sig else 'ns'}", flush=True)
             # the confound-killer: matched (same #sources, short forced in) vs longform. + => short-form
-            # helps even at fixed source COUNT -> Joe's hypothesis holds cleanly, not just a diversity effect.
+            # helps even at fixed source COUNT -> the hypothesis holds cleanly, not just a diversity effect.
             if "matched_LOO" in res and res["matched_LOO"][m]["unc"] and res["longform_LOO"][m]["unc"]:
                 am = np.mean(np.stack(res["matched_LOO"][m]["unc"]), axis=0)
                 al2 = np.mean(np.stack(res["longform_LOO"][m]["unc"]), axis=0)

@@ -21,7 +21,7 @@
 # long processes; a parallel snapshot_download of a multi-GB model is exactly what it kills. The
 # --mem=64G here is what lets the parallel download succeed.
 #
-# ⚠️ HF_HUB_OFFLINE is deliberately NOT set -- this is the one job that needs the network.
+# HF_HUB_OFFLINE is deliberately NOT set -- this is the one job that needs the network.
 # HF_HOME resolves to /vol/gpudata/.../hf_cache, which is a SYMLINK to /vol/bitbucket/gs925/hf_cache,
 # i.e. OUTSIDE the 50GB CephFS quota. The 27.5GB of weights therefore do not count against it.
 # Qwen2.5-14B is ungated apache-2.0, so no HF token is needed.

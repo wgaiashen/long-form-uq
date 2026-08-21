@@ -1,7 +1,7 @@
 """Label the cached records for correctness.
 
 Short-form (sciq, trivia_qa, qa): string match, no model, runs anywhere.
-Long-form (pubmed_qa, xsum, cnn_dailymail): Joe's LLM judge, LOGIN NODE only.
+Long-form (pubmed_qa, xsum, cnn_dailymail): the LLM judge, LOGIN NODE only.
 
     python scripts/02_label.py --dataset sciq --ood ID
 
@@ -31,7 +31,7 @@ def judge_into(records, field, cfg, judge_model, save_every=25, strip_newlines=F
     already done (just rerun the command to pick up where it stopped). Each new
     label is stamped with `field`_model so we always know which judge produced it
     (the "never mix judges within one comparison" discipline). `strip_newlines`
-    reproduces Joe's newline-collapsed judge input (faithful Hidden Failures repro).
+    reproduces the newline-collapsed judge input (faithful Hidden Failures repro).
     """
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     new_count = n_failed = 0
@@ -66,7 +66,7 @@ def _stamped_judges(cache_dir, key, field):
     Records carry `<field>_model` provenance (written by judge_into). Returns a set, because more than
     one value means the file is ALREADY mixed and that is itself a finding.
 
-    ⚠️ An ABSENT stamp is not evidence that nothing was judged — sciq/trivia were judged and then had the
+    An ABSENT stamp is not evidence that nothing was judged — sciq/trivia were judged and then had the
     judge label promoted into `correctness` without carrying the stamp across (see the audit note further
     down this file). So absence is reported as unknown, never as "safe to use any judge".
     """
@@ -122,7 +122,7 @@ def _resolve_judge(args, cfg, key, field):
                     "would confound the comparison, and a probe can learn a judge's biases. Either drop "
                     f"--judge (it will inherit `{inherited}`), or pass --allow-judge-mismatch if you "
                     "genuinely intend a judge-vs-judge study into a separate field.")
-            print(f"⚠️  JUDGE MISMATCH ACCEPTED: labelling with `{args.judge}` while {src} carry "
+            print(f"JUDGE MISMATCH ACCEPTED: labelling with `{args.judge}` while {src} carry "
                   f"`{inherited}`. You passed --allow-judge-mismatch.", flush=True)
             return args.judge
         print(f"judge = `{inherited}` (inherited from {src}; not the pinned default). "
@@ -179,7 +179,7 @@ def main():
                          "costs money. Resumable — Ctrl-C and rerun to continue.")
     ap.add_argument("--strip-newlines", action="store_true",
                     help="Collapse all newlines out of the model answer before judging, "
-                         "matching Joe's Hidden Failures judge input "
+                         "matching the Hidden Failures judge input "
                          "(collect_llm_judge_inputs.py:92). Use ONLY for faithful "
                          "reproduction of his labels (e.g. the Llama keystone).")
     ap.add_argument("--promote-judge", action="store_true",
@@ -222,7 +222,7 @@ def main():
         _report(records, "correctness_strmatch", "string-match (kept for comparison)")
         return
 
-    # ⚠️ READ THIS BEFORE CONCLUDING WHICH LABEL A DATASET ACTUALLY USES (audit, 2026-08-02).
+    # READ THIS BEFORE CONCLUDING WHICH LABEL A DATASET ACTUALLY USES (audit, 2026-08-02).
     # This routing has now twice been read as "sciq/trivia are string-matched, so their labels are
     # overlap labels". THAT IS NOT WHAT IS IN THE CACHE. On the shipped records, sciq's and trivia's
     # `correctness` is BYTE-IDENTICAL to `correctness_judge` (max|diff| 0.0) and carries graded values
@@ -246,7 +246,7 @@ def main():
             judge_into(records, "correctness_judge", cfg, judge,
                        strip_newlines=args.strip_newlines)
     else:
-        # Long-form: Joe's LLM judge is the only label. The judge is RESOLVED, not defaulted --
+        # Long-form: the LLM judge is the only label. The judge is RESOLVED, not defaulted --
         # see _resolve_judge() for why a forgettable flag was the wrong safeguard.
         judge = _resolve_judge(args, cfg, key, "correctness")
         judge_into(records, "correctness", cfg, judge,

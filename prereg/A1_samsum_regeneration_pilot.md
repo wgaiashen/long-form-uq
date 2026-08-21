@@ -41,14 +41,14 @@ its budget most exceeds its reference in relative terms after xsum.
 1. **samsum (this pilot): FLAT or SLIGHTLY WORSE.** H-over. Predicted before running.
 2. **med_quad (later): IMPROVES.** H-trunc — it is the one dataset with a genuine budget defect.
 3. **xsum, cnn (later): FLAT or SLIGHTLY WORSE.** H-over.
-4. ⚠️ **If ALL FOUR improve, be suspicious.** That pattern is better explained by the judge than by the
+4. **If ALL FOUR improve, be suspicious.** That pattern is better explained by the judge than by the
    decoding change. Check the noise-floor result (below) before believing any of it.
 
 ## Order of operations — this matters, and step 1 is not what it first appeared
 
 **Step 1 — the noise floor, on UNCHANGED v1 text, BEFORE any regeneration.**
 
-⚠️ **Correction to the plan as briefed:** samsum's v1 labels were **already produced by gpt-5-mini**
+**Correction to the plan as briefed:** samsum's v1 labels were **already produced by gpt-5-mini**
 (verified: all 1800 rows carry `correctness_model = gpt-5-mini`). So there is **no judge change to
 isolate** for samsum. What re-judging unchanged v1 text actually measures is **judge run-to-run
 variance**, because `llm_judge._gpt_response` calls at `temperature=1, top_p=1` — the judge is

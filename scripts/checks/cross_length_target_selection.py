@@ -8,7 +8,7 @@ The question it answers, per family (correctness_qa / summ / factuality):
     which dataset behaves like its family, is stable across the two models, is genuinely long,
     and carries no measurement caveat that would undermine a small auxiliary experiment?
 
-⚠️ THE TWO MODELS ARE NEVER POOLED. Every quantity is computed inside one model's own population and
+THE TWO MODELS ARE NEVER POOLED. Every quantity is computed inside one model's own population and
 compared across models only as an agreement/stability statement. Llama-3.1-8B and Qwen2.5-14B are
 separate populations with separate labels, layers and generations; a joint table would be a
 cross-population comparison rather than a result. The per-model loading below is what enforces it.
@@ -329,10 +329,10 @@ def main():
     w("> transfer experiment **before any cross-length result exists**, so the targets cannot be")
     w("> cherry-picked after the fact.")
     w(">")
-    w("> ⚠️ **The two models are never pooled.** Every quantity is computed inside one model's own")
+    w("> **The two models are never pooled.** Every quantity is computed inside one model's own")
     w("> population; the models meet only as an agreement statement (§6).")
     w(">")
-    w("> ⚠️ **`oracle_best_finite_beta` is an argmax on TEST labels — descriptive only, never a")
+    w("> **`oracle_best_finite_beta` is an argmax on TEST labels — descriptive only, never a")
     w("> method result.**")
     w("")
     w("Populations: each model's own complete ProbeDriftLong ladder, 8 long evals × 5 rungs, 3 seeds, "
@@ -418,7 +418,7 @@ def main():
             w(f"| {fam} | `{d}` | {res['llama'].loc[d,'within_family']:.2f} | "
               f"{res['qwen'].loc[d,'within_family']:.2f} |")
     w("")
-    w("⚠️ **factuality has only two members**, so its two entries are the *same* symmetric pair "
+    w("**factuality has only two members**, so its two entries are the *same* symmetric pair "
       "distance and cannot rank ExpertQA against FActScore. They are compared directly in §7 "
       "instead of being given a meaningless outlier score.")
     w("")
@@ -449,7 +449,7 @@ def main():
           f"{SL.loc[d,'oracle_best_finite_beta']:g} / {SQ.loc[d,'oracle_best_finite_beta']:g} | "
           f"{beta_bucket(SL.loc[d,'oracle_best_finite_beta'])} / {beta_bucket(SQ.loc[d,'oracle_best_finite_beta'])} |")
     w("")
-    w("⚠️ **oracle beta is selected on test labels — descriptive only.**")
+    w("**oracle beta is selected on test labels — descriptive only.**")
     w("")
     w("### Cross-model stability")
     w("")
@@ -528,7 +528,7 @@ def main():
       "otherwise the highest-representativeness survivor in each family is `PREFERRED` and the rest "
       "are `GOOD ALTERNATIVE`.")
     w("")
-    w("⚠️ The recommendation deliberately does **not** rank on the raw 0–5 stability score. That "
+    w("The recommendation deliberately does **not** rank on the raw 0–5 stability score. That "
       "score weights checks that do not speak to representativeness (same regime bucket, small "
       "SAPLMA delta) equally with the one that does. `cnn_dailymail` is exactly that trap: it scores "
       "3/5 while failing **both** ranking checks (rho_global +0.12 on Llama, cross-model rank rho "
@@ -554,7 +554,7 @@ def main():
       "shortcut: on this benchmark the datasets that behave typically are also the ones without "
       "measurement defects. Reported honestly rather than manufacturing a third distinct set.")
     w("")
-    w("### ⭐ Recommended for the cross-length experiment: `asqa` + `xsum` + `factscore`")
+    w("### Recommended for the cross-length experiment: `asqa` + `xsum` + `factscore`")
     w("")
     w("**QA → ASQA, and it is not close.** The only HIGH cross-model stability in the table (4/5), "
       "the highest cross-model rank agreement of any dataset (+0.93), rho_global +0.67/+0.90, low "
@@ -580,7 +580,7 @@ def main():
     w("")
     w("**Factuality → FActScore**, as the more stable of only two candidates. Rank agreement +0.72 "
       "cross-model vs ExpertQA's +0.12, a small SAPLMA gap (0.065), and better label coverage (91% "
-      "vs 85.5%). ⚠️ Its cost is real and must be reported: **n = 136/140, the smallest eval in the "
+      "vs 85.5%). Its cost is real and must be reported: **n = 136/140, the smallest eval in the "
       "benchmark**, so its PRR carries wide seed spread and single-dataset effects should not be "
       "over-read. ExpertQA is larger (517/481) and much longer, but is LOW stability, the single "
       "most divergent dataset on Qwen (7.75), carries a different label projection (claim precision, "

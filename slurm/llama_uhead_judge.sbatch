@@ -7,7 +7,7 @@
 #SBATCH --time=20:00:00
 #SBATCH --output=logs/llama_uhead_judge-%j.out
 
-# BUG-HUNT item 2 + main-table uniformity: retrain uhead (Joe's luh, v1+v2) on the JUDGE label
+# BUG-HUNT item 2 + main-table uniformity: retrain uhead (the luh, v1+v2) on the JUDGE label
 # instead of AlignScore, and re-evaluate. Two purposes:
 #   (1) item-2 verdict: does the pubmed judge-eval inversion (-0.19/-0.21, AlignScore-trained)
 #       persist when the TRAINING label is healthy (judge)? gone = downstream of the label, closed;
@@ -17,7 +17,7 @@
 #       "AlignScore-trained". Judge-training all four makes the table uniformly judge-trained.
 #
 # Writes to DISTINCT score names (uhead_judge / uhead_judge_v2) so the frozen AlignScore-trained
-# uhead / uhead_v2 scores are PRESERVED for the item-2 comparison. fp32 + eager (Joe's config;
+# uhead / uhead_v2 scores are PRESERVED for the item-2 comparison. fp32 + eager (the config;
 # eager REQUIRED for the attention features). If xsum OOMs, add --dtype bf16 to its calls.
 
 set -uo pipefail
@@ -33,11 +33,11 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 # pubmed FIRST (settles item 2 early), then the rest to make the table uniformly judge-trained.
 for DS in pubmed_qa sciq trivia_qa xsum; do
   echo "================ $DS : uhead_judge v1 (his luh, JUDGE label) ================ $(date)"
-  PYTHONPATH=src python scripts/01j_uhead_joe.py --dataset "$DS" --ood ID --model "$MODEL" \
+  PYTHONPATH=src python scripts/01j_uhead_reference.py --dataset "$DS" --ood ID --model "$MODEL" \
       --variant v1 --name uhead_judge --label-field correctness \
     || echo "!!! uhead_judge v1 $DS FAILED"
   echo "================ $DS : uhead_judge v2 (his luh, JUDGE label) ================ $(date)"
-  PYTHONPATH=src python scripts/01j_uhead_joe.py --dataset "$DS" --ood ID --model "$MODEL" \
+  PYTHONPATH=src python scripts/01j_uhead_reference.py --dataset "$DS" --ood ID --model "$MODEL" \
       --variant v2 --name uhead_judge_v2 --label-field correctness \
     || echo "!!! uhead_judge v2 $DS FAILED"
 done

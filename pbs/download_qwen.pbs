@@ -7,12 +7,12 @@
 # Download Qwen/Qwen2.5-14B into HF_HOME. A hard prerequisite for the second model, and completely
 # independent of G1 -- so it runs in parallel rather than after it.
 #
-# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. This pulls ~28GB. The project conventions are explicit that login nodes are
+# WHY A JOB AND NOT THE LOGIN NODE. This pulls ~28GB. The project conventions are explicit that login nodes are
 # for editing and qsub only, and lists "a large pip install" as exactly the kind of thing that got
 # processes killed by RCS IT on 2026-07-06. A 28GB download is the same shape, so it goes through the
 # scheduler.
 #
-# ⚠️ COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out, the script says so
+# COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out, the script says so
 # LOUDLY and exits non-zero rather than half-downloading and leaving a cache that looks present but
 # is incomplete -- a partial snapshot is worse than none, because `from_pretrained` fails deep in a
 # later job instead of here.
@@ -40,7 +40,7 @@ import os, sys
 from huggingface_hub import snapshot_download
 MODEL = "Qwen/Qwen2.5-14B"
 # max_workers=4: enough to saturate a cluster link, low enough not to spike RAM the way the default
-# parallel download did on the 8GB DoC jump box (implementation_notes.md §8).
+# parallel download did on the 8GB DoC jump box (the project implementation notes).
 path = snapshot_download(
     MODEL,
     max_workers=4,

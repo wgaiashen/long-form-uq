@@ -14,7 +14,7 @@
 #   n-gram only (768) median sits EXACTLY at the cap, 92.6% fabricated -- the same defect, bigger number
 #   rep-pen 1.2 (768) 30% EMPTY (all emitting <|end_of_text|> alone), MORE looping, worse fabrication
 #
-# ⚠️ THE PROBLEM WAS NEVER REPETITION. Base Llama is not instruction-tuned: it finishes the answer and
+# THE PROBLEM WAS NEVER REPETITION. Base Llama is not instruction-tuned: it finishes the answer and
 # then CONTINUES THE FEW-SHOT FORMAT, writing a fresh "Question:" and inventing both question and
 # answer, often on an unrelated topic. A repetition penalty cannot fix "invents a new question", which
 # is why it perturbed the decoding without touching the mechanism. Lowering it to 1.05-1.1 would do
@@ -40,7 +40,7 @@
 #   LUQ_SMOKE=1 sbatch slurm/med_quad_v2_span_doc.sbatch   # 50-row smoke FIRST
 #   sbatch slurm/med_quad_v2_span_doc.sbatch               # full, after the smoke passes
 #
-# ⚠️ Use the ENV-VAR PREFIX form above, NOT `sbatch --export=ALL,LUQ_SMOKE=1 …`. On DoC the explicit
+# Use the ENV-VAR PREFIX form above, NOT `sbatch --export=ALL,LUQ_SMOKE=1 …`. On DoC the explicit
 # --export gets the job HELD with "user env retrieval failed" (reported from DoC, 2026-08-02). The
 # prefix form works because sbatch already exports the submitting environment by default.
 #

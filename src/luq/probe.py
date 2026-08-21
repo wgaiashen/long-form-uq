@@ -6,7 +6,7 @@ The judge's correctness label is GRADED (0..1), not binary, and PRR is scored on
 graded label. So we train on the SOFT label directly instead of thresholding it at 0.5:
 sigmoid(logit) -> binary cross-entropy against the graded target, so the gradation is
 kept (0.6 and 1.0 are no longer both "correct"). This is the standard soft-label BCE and
-is Joe's setup. The output is an UNCERTAINTY score = 1 - P(correct), higher = more uncertain.
+is the setup. The output is an UNCERTAINTY score = 1 - P(correct), higher = more uncertain.
 
 Two probe ARCHITECTURES share that soft-label objective:
 
@@ -134,7 +134,7 @@ def train_probe_mlp(X: np.ndarray, y: np.ndarray,
     A&M control overfitting purely via few epochs + minibatch-SGD noise (no explicit
     regulariser). We keep exactly that.
 
-    Two deliberate, project-wide deviations (both exactly as Joe did in Hidden Failures, so
+    Two deliberate, project-wide deviations (both exactly as Hidden Failures does, so
     every method is comparable under one yardstick):
       (1) train on the GRADED 0..1 label via BCEWithLogitsLoss, not a binary 0/1 label (PRR
           is graded);

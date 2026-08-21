@@ -8,7 +8,7 @@
 #SBATCH --output=logs/overnight_gpu-%j.out
 
 # All GPU-heavy AlignScore + pubmed-D1 work in ONE allocation (submitted by overnight.sh via
-# sbatch --wait). pubmed: truncate to Joe's newline-stop, re-pool with corrected pooling,
+# sbatch --wait). pubmed: truncate to the newline-stop, re-pool with corrected pooling,
 # AlignScore-RE-SCORE the truncated text. Then AlignScore-label sciq/trivia/xsum (free). The
 # env vars point torch.hub / nltk at the big volume (ckpt + punkt_tab pre-cached there).
 set -uo pipefail

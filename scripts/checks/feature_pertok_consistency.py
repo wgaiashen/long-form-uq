@@ -7,7 +7,7 @@ Root cause it guards against (traced 2026-07-22): the SAPLMA feature cache can b
 were re-pooled (sciq/trivia/pubmed/xsum → match pertok at ~1e-6), others were not (med_quad/cnn/samsum/
 ExpertQA/ASQA → inline capture → ~8e-3 gap). The ladder drivers use the teacher-forced PERTOK, so they are
 safe; but code that reads the FEATURE cache directly (aggregation_table §A ID SAPLMA, canonical_ladder ID-gate,
-ood_joepools, joe_table_anchors, expertqa_loco, aggregators) then mixes the two conventions.
+ood_refpools, reference_table_anchors, expertqa_loco, aggregators) then mixes the two conventions.
 
 This guard asserts, per dataset: feats[:, L15].mean-pool == pertok(L15).mean over the SAME window, to ~1e-6.
 Run it after ANY extraction; a failure means the feature cache is inline-only -> re-pool it (01e_repool).
@@ -80,7 +80,7 @@ def main():
     skipped = []
     for d in args.datasets.split(","):
         name, ok, detail = check(d, args.prompt_regime, args.layer, full=args.full, model=args.model)
-        v = "SKIP" if ok is None else ("PASS ✓" if ok else "FAIL ✗ (inline-only → repool)")
+        v = "SKIP" if ok is None else ("PASS" if ok else "FAIL (inline-only -> repool)")
         if ok is False:
             any_fail = True
         if ok is None:
@@ -89,13 +89,13 @@ def main():
     if any_fail:
         print("\nFAIL: one or more feature caches are inline-only (not teacher-forced). Re-pool with 01e_repool.")
         sys.exit(1)
-    # ⚠️ A SKIP IS NOT A PASS. Until 2026-08-15 a run where every dataset skipped (typically because
+    # A SKIP IS NOT A PASS. Until 2026-08-15 a run where every dataset skipped (typically because
     # the pertok cache did not exist yet) still printed "ALL consistent" and exited 0 -- a guard
     # reporting success for having checked nothing, which is the exact failure mode this guard exists
     # to prevent elsewhere. Found when a W-Models post-extract job ran the guard BEFORE 01h_pertoken:
     # it skipped every dataset and passed, so it could never have caught anything.
     if skipped:
-        print(f"\n⚠️ SKIPPED (nothing compared): {skipped}. A skip is NOT a pass — the pertok cache "
+        print(f"\nSKIPPED (nothing compared): {skipped}. A skip is NOT a pass — the pertok cache "
               f"must exist, so run this AFTER 01h_pertoken.")
         if args.require_checked:
             print("--require-checked: exiting non-zero because at least one dataset was not checked.")

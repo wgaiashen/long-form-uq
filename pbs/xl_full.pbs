@@ -8,7 +8,7 @@
 #   contribution_ladder  the contribution methods (wMSP family + poolers + floors) + the SameTask rung
 # Keeping them apart means a bug in the new methods cannot break the baseline ladder.
 #
-# ⚠️ FAMILY SPLIT (2026-08-03): expertqa+factscore are their own `factuality` BROAD family; asqa stays
+# FAMILY SPLIT (2026-08-03): expertqa+factscore are their own `factuality` BROAD family; asqa stays
 # long_qa. This changes SameTask for 5 evals and DiffTask for all 10 -> NEW output files, and earlier
 # numbers for those three datasets are NOT comparable.
 # CPU by design: cache-bound, poolers fall back to device=cpu.

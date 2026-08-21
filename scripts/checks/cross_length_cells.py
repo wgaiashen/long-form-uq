@@ -7,7 +7,7 @@ weight rather than a list someone retyped.
     python scripts/checks/cross_length_cells.py            # table of the cells
     python scripts/checks/cross_length_cells.py --qsub     # the qsub lines to submit
 
-⚠️ `qsub -v` splits on commas, so the spec is emitted with '+' between sources; `pbs/cross_length.pbs`
+`qsub -v` splits on commas, so the spec is emitted with '+' between sources; `pbs/cross_length.pbs`
 translates it back. That is why the separator looks odd.
 """
 import argparse

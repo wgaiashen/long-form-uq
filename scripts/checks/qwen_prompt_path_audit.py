@@ -6,7 +6,7 @@ system/user/assistant wrapper, ProbeDrift's instruct prompts -- then the populat
 implementation defect (case C of the audit's decision framework) and nothing downstream is
 interpretable. So this runs first, alone, before any degeneracy scan or visualiser.
 
-⚠️ IT DOES NOT GREP FOR `chat_template`. The audit brief is explicit that a grep is not a trace, and
+IT DOES NOT GREP FOR `chat_template`. The audit brief is explicit that a grep is not a trace, and
 it is right: a grep can miss a wrapper applied inside a helper, and it cannot tell you what is
 actually in the cached bytes. This checks the ARTIFACT -- the prompt strings and token ids that were
 really written -- against a freshly re-tokenised copy, and looks for chat markers by token ID.
@@ -110,7 +110,7 @@ def main():
                     ("HAS a chat_template", lambda t: "YES" if getattr(t, "chat_template", None) else "no")]:
         w(f"| {name} | {f(tq)} | {f(tl)} |")
     w()
-    w("⚠️ Qwen **ships** a chat template (it is a base checkpoint with one defined in the tokenizer "
+    w("Qwen **ships** a chat template (it is a base checkpoint with one defined in the tokenizer "
       "config). Having one is not the same as using one — §2 checks whether it was ever applied.")
     w()
 
@@ -148,9 +148,9 @@ def main():
             continue
         pid = r["prompt_token_ids"]
         re_tok = tq(r["prompt"]).input_ids
-        rt = "✅ exact" if re_tok == pid else f"❌ {len(re_tok)} vs {len(pid)}"
+        rt = "exact" if re_tok == pid else f"MISMATCH {len(re_tok)} vs {len(pid)}"
         found = sorted(set(pid) & chat_ids)
-        marks = "none ✅" if not found else f"⚠️ {[tq.decode([i]) for i in found]}"
+        marks = "none" if not found else f"found {[tq.decode([i]) for i in found]}"
         lead = pid[0]
         verdicts[d] = "OK" if (not found and re_tok == pid) else "SUSPECT"
         w(f"| {d} | {len(pid):,} | {marks} | {rt} | {lead} | `{tq.decode([lead])!r}` | "
@@ -203,9 +203,9 @@ def main():
     w()
     bad = [d for d, v in verdicts.items() if v != "OK"]
     if bad:
-        w(f"⛔ **SUSPECT / MISSING on {len(bad)}**: {', '.join(bad)}. See the table above.")
+        w(f"**SUSPECT / MISSING on {len(bad)}**: {', '.join(bad)}. See the table above.")
     else:
-        w("✅ **No chat markers in any cached prompt on any of the 8 datasets, and every prompt "
+        w("**No chat markers in any cached prompt on any of the 8 datasets, and every prompt "
           "round-trips exactly through the plain tokenizer.** The cached bytes are consistent with "
           "`tok(prompt)` on a base checkpoint, and inconsistent with any template having been "
           "applied before caching.")

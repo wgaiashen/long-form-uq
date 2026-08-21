@@ -7,7 +7,7 @@
 # R2b -- B.3 (the one-sided entropy penalty) on the two SPREAD datasets, cnn_dailymail and samsum.
 # Pre-registered at prereg/R2b_entropy_penalty_spread.md.
 #
-# ⚠️ READ THE PREREG FIRST: this run CORRECTS the approved plan's justification. The plan said SPREAD is
+# READ THE PREREG FIRST: this run CORRECTS the approved plan's justification. The plan said SPREAD is
 # "the regime where a sharpness penalty has a mechanism". It is the opposite. The loss is
 #     L = L_task + lambda * mean( relu(tau - H_norm)^2 )
 # which penalises entropy BELOW tau, i.e. BROADENS over-sharp attention, and is exactly zero for anything

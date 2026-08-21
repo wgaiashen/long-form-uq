@@ -1,9 +1,9 @@
-"""Orgad exact-answer location the RIGHT way (Joe's way): extract the MODEL'S OWN short answer with an
+"""Orgad exact-answer location the RIGHT way (the way): extract the MODEL'S OWN short answer with an
 LLM, then locate that span -- instead of string-matching the GOLD answer.
 
 WHY (the audit fix): locating the GOLD answer makes "located" ~ the correctness label (located|correct
 99%, located|incorrect 0.2%), so masked (located) rows are ~all correct and unmasked (unlocated) rows are
-~all wrong -> the +/-mask comparison is confounded along the label axis (see the STEP-2 leak). Joe's code
+~all wrong -> the +/-mask comparison is confounded along the label axis (see the STEP-2 leak). the code
 instead asks the model to extract ITS OWN short answer from ITS OWN generation (right or wrong), so a span
 is found for correct AND incorrect rows and "located" no longer tracks correctness.
 
@@ -11,16 +11,16 @@ This is a faithful port of `temp_idea_1_msp_probe/extract_exact_answer/get_exact
 (`extract_exact_answer` + `get_indices_of_exact_answer`), with two deliberate changes, both documented in
 the report's method section:
   * we use an API LLM (gpt-5-mini) for the extraction instead of a local Llama generate() -- cheaper and
-    what the author asked for; the prompt is Joe's verbatim (2 few-shot examples, "NO ANSWER" escape).
-  * SHORT-FORM only, exactly like Joe (his code asserts dataset in {truthfulqa, sciq, medquad}); a long
+    what the author asked for; the prompt is the verbatim (2 few-shot examples, "NO ANSWER" escape).
+  * SHORT-FORM only, exactly like the reference implementation (which asserts dataset in {truthfulqa, sciq, medquad}); a long
     multi-sentence answer has no single short answer.
-Validity rule is Joe's: the extracted string must be a non-empty substring of the model answer and not
+Validity rule is the: the extracted string must be a non-empty substring of the model answer and not
 "NO ANSWER"; else the row is unlocated.
 """
 import os
 import time
 
-# Joe's extraction prompt, verbatim (extract_exact_answer, the f-string body).
+# the extraction prompt, verbatim (extract_exact_answer, the f-string body).
 EXTRACT_PROMPT = """
 Extract from the following long answer the short answer, only the relevant tokens. If the long answer does not answer the question, output NO ANSWER.
 
@@ -53,7 +53,7 @@ def _get_client():
 
 def extract_model_answer(question, model_answer, model="gpt-5-mini", max_retries=4):
     """Ask the LLM to extract the model's OWN short answer from its generation. Returns the extracted
-    string (a substring of model_answer) or "NO ANSWER". Joe's validity rule: non-empty substring of the
+    string (a substring of model_answer) or "NO ANSWER". the validity rule: non-empty substring of the
     model answer, not "NO ANSWER"."""
     if not isinstance(model_answer, str) or not model_answer.strip():
         return "NO ANSWER"
@@ -68,7 +68,7 @@ def extract_model_answer(question, model_answer, model="gpt-5-mini", max_retries
         except Exception:
             time.sleep(2)
             continue
-        out = out.split("\n")[0].strip()                      # first line (Joe truncates at newline)
+        out = out.split("\n")[0].strip()                      # first line (the reference implementation truncates at newline)
         for junk in ("<|end_of_text|>", "<|begin_of_text|>", "Exact answer:"):
             out = out.replace(junk, "")
         out = out.strip().strip(".").strip()
@@ -146,7 +146,7 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 # the important-token CONCEPT becomes the SET of claim-bearing spans (the verdict PLUS the findings/
 # entities/numbers), exactly like the summary variant but keeping the yes/no verdict. Returns a list.
 # --------------------------------------------------------------------------------------------------
-# ⚠️ A DATASET MISSING FROM THIS SET DOES NOT FAIL -- IT SILENTLY GETS THE WRONG PROMPT. `extract_important`
+# A DATASET MISSING FROM THIS SET DOES NOT FAIL -- IT SILENTLY GETS THE WRONG PROMPT. `extract_important`
 # falls through to `extract_model_answer`, the SHORT-ANSWER prompt, which asks for "the short answer" to a
 # question. On a biography or a long-form QA answer that mostly returns "NO ANSWER", so the run completes,
 # costs real money, and writes a cache that looks fine and is nearly empty. Caught 2026-08-06 before
@@ -156,7 +156,7 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 #                exactly right for them, and the short-answer prompt is exactly wrong
 LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa", "asqa", "factscore"}
 
-# ⚠️ DOMAIN-NEUTRAL BY DESIGN (rewritten 2026-08-06). The first version named medical entity types
+# DOMAIN-NEUTRAL BY DESIGN (rewritten 2026-08-06). The first version named medical entity types
 # explicitly -- "drugs, genes, conditions, procedures" -- and BOTH few-shot examples were biomedical
 # (DMSO/telomerase, ETHE1). That was written when this path served pubmed_qa and med_quad only. Applied to
 # a BIOGRAPHY (factscore) it asks for drugs and genes when the claim-bearing terms are names, dates, places
@@ -200,7 +200,7 @@ Answer: {model_answer}
 Spans:"""
 
 
-# ⚠️ PER-DOMAIN PROMPT SPLIT (author's decision, 2026-08-06). The claim-span prompt comes in two forms and
+# PER-DOMAIN PROMPT SPLIT (author's decision, 2026-08-06). The claim-span prompt comes in two forms and
 # the dataset chooses. This is a DELIBERATE, RECORDED inconsistency, not an accident, and it must be stated
 # in any table caption that uses Orgad masks:
 #   MEDICAL_QA_DATASETS  -> the biomedical prompt (drugs/genes/conditions/procedures, biomedical examples).
@@ -208,7 +208,7 @@ Spans:"""
 #                           masks were built with it, so they need no re-extraction.
 #   everything else      -> the domain-neutral prompt (people/places/organisations/works/substances, with
 #                           biomedical + biographical + general-knowledge examples).
-# ⚠️ expertqa is NOT medical -- it is multi-domain expert QA (law, engineering, healthcare, and more) -- so
+# expertqa is NOT medical -- it is multi-domain expert QA (law, engineering, healthcare, and more) -- so
 # it moves to the neutral prompt and its old masks are DISCARDED and re-extracted. Extracting cross-domain
 # answers under a prompt that names only biomedical entity types would bias every span it produced.
 MEDICAL_QA_DATASETS = {"pubmed_qa", "med_quad"}
@@ -308,7 +308,7 @@ def locate_important_rows(tokenizer, gen_ids, cached):
 
 def locate_extracted_rows(tokenizer, gen_ids, extracted):
     """Locate the EXTRACTED answer's token span in the generated tokens, mapped to per-token-cache ROW
-    indices (window [P-1:P+G], so gen token j -> row j+1). Faithful to Joe's get_indices_of_exact_answer
+    indices (window [P-1:P+G], so gen token j -> row j+1). Faithful to the get_indices_of_exact_answer
     binary search, run over the generation only. Returns (rows, found)."""
     if not extracted or extracted == "NO ANSWER":
         return [], False

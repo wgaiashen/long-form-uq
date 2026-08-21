@@ -79,7 +79,7 @@ def build_topk_surprisal(record, state, k, floor=0.0, shuffle_rng=None):
     means the same thing on a 32-token answer and a 219-token one). k >= G degenerates to uniform, which
     is control #1 in the prereg (arm C must then reproduce mean-pool).
 
-    `floor`: weight on the non-selected tokens. 0.0 is a hard filter. ⚠️ With floor=0 arm D's additive
+    `floor`: weight on the non-selected tokens. 0.0 is a hard filter. With floor=0 arm D's additive
     `beta*log(prior)` clamps at log(1e-9), so ANY beta > 0 hard-masks the rest and beta stops
     interpolating -- hence the registered floor=0.05 arm, where beta keeps its meaning.
 
@@ -151,7 +151,7 @@ class OrgadCoverageError(Exception):
 
 
 def build_soft_orgad(records_list, states_list, datasets, tok, variant="broad", floor=0.0):
-    """S3.6 — soft-Orgad prior (Joe's lead): reuse the τ soft-tier `build_masks` (RAISES on a missing cache),
+    """S3.6 — soft-Orgad prior (the lead): reuse the τ soft-tier `build_masks` (RAISES on a missing cache),
     NOT the hard build_answer_masks. EXAMPLE-LOCAL + per-dataset, so EVERY source dataset must be covered; if
     any isn't, raise OrgadCoverageError (the driver skips the cell). floor=0 -> pool over located tokens."""
     from weighted_msp_orgad_ladder import build_masks

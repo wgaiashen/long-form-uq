@@ -1,6 +1,6 @@
-"""ProbeDrift-light OOD for SAPLMA, using JOE'S EXACT pool composition (his code, not his README).
+"""ProbeDrift-light OOD for SAPLMA, using the reference pool composition (its code, not its README).
 
-We drive `probe_drift.ood_settings.get_training_spec(eval, setting)` — the SAME function Joe's
+We drive `probe_drift.ood_settings.get_training_spec(eval, setting)` — the SAME function the
 `run_polygraph.py` uses (via `load_datasets_via_probe_drift(..., seed=1)`) — so the training pool is
 his: LEAVE_ONE_OUT = the other 9 datasets at 200 each; DIFF_TASK (QA eval) = samsum+xsum+cnn at 600
 each. We keep his per-source CAP and restrict to the sources we have Llama features for
@@ -10,9 +10,9 @@ NOT a reproduction — see the note below on why cell-by-cell reproduction is im
 SAPLMA = the A&M MLP on the mean-pooled middle-layer (L15) hidden state, judge-labelled — the same
 `full_sequence_saplma` / `hs_middle` probe whose ID numbers reproduce Table 14 exactly.
 
-WHY SEED-AVERAGED (not Joe's single seed=1): with only 3-of-9 LOO sources the pool is small, and the
+WHY SEED-AVERAGED (not the single seed=1): with only 3-of-9 LOO sources the pool is small, and the
 OOD PRR is dominated by WHICH 200-example subsample gets drawn (measured: subsample-only std ~0.043 vs
-training-only std ~0.014 on pubmed-LOO). Joe's seed=1 draw is stable-but-arbitrary; restricting the
+training-only std ~0.014 on pubmed-LOO). the seed=1 draw is stable-but-arbitrary; restricting the
 sources changes the RNG draw path, so his exact subsample — and thus his exact cell value — cannot be
 reproduced from a subset EVEN IN PRINCIPLE. So we report a seed-averaged mean±std range, not a single
 cell claimed to match his.
@@ -20,8 +20,8 @@ cell claimed to match his.
 ID-diagonal GATE (mirrors 05_transfer): load the cached ID probe, score its eval features, assert the
 uncertainties equal the cached 04_eval scores (allclose). Fail loudly if not.
 
-    python scripts/checks/ood_joepools.py --model meta-llama/Meta-Llama-3.1-8B          # seed-averaged table
-    python scripts/checks/ood_joepools.py --diagnose pubmed_qa                          # variance + paired xsum test
+    python scripts/checks/ood_refpools.py --model meta-llama/Meta-Llama-3.1-8B          # seed-averaged table
+    python scripts/checks/ood_refpools.py --diagnose pubmed_qa                          # variance + paired xsum test
 """
 import argparse
 import csv as _csv
@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from luq import cache, probe, results          # noqa: E402
 from luq.config import Config                   # noqa: E402
 from luq.features import saplma                 # noqa: E402
-from probe_drift.ood_settings import get_training_spec  # noqa: E402  (JOE'S code)
+from probe_drift.ood_settings import get_training_spec  # noqa: E402  (reference code)
 
 LAYER = 15
 LABEL = "correctness"
@@ -83,7 +83,7 @@ def _prr(fe, E, specs, sub_seed, train_seed, batch):
 
 
 def _restrict(E, setting):
-    """Joe's pool (src, n), restricted to available sources (drop the eval dataset and any absent)."""
+    """the pool (src, n), restricted to available sources (drop the eval dataset and any absent)."""
     spec = get_training_spec(E, setting)
     kept = [(s, n) for s, n in spec if s in AVAIL and s != E]
     omitted = [s for s, n in spec if (s not in AVAIL) and s != E]
@@ -93,7 +93,7 @@ def _restrict(E, setting):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=Config.model_name)
-    ap.add_argument("--batch", type=int, default=1, help="SAPLMA MLP batch size (1 = keystone/Joe)")
+    ap.add_argument("--batch", type=int, default=1, help="SAPLMA MLP batch size (1 = keystone/reference)")
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--diagnose", default=None,
                     help="eval dataset for the variance-decomposition + paired-xsum diagnostic")
@@ -108,7 +108,7 @@ def main():
         return
 
     out_rows = []
-    print(f"SAPLMA OOD, Joe's pools restricted to {list(AVAIL)}, {args.seeds}-seed mean±std "
+    print(f"SAPLMA OOD, the pools restricted to {list(AVAIL)}, {args.seeds}-seed mean±std "
           f"(batch={args.batch}, L{LAYER}, judge):")
     for E in EVALS:
         # ID reference = cached keystone score (deterministic), gated against 04_eval.
@@ -136,14 +136,14 @@ def main():
                              "n_seeds": args.seeds, "omitted": ";".join(omitted)})
 
     out = Path(args.out) if args.out else (ROOT / "results" /
-          f"ood_joepools__{cache._slug(args.model)}.csv")
+          f"ood_refpools__{cache._slug(args.model)}.csv")
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="") as f:
         w = _csv.DictWriter(f, fieldnames=["eval", "setting", "pool", "prr_mean", "prr_std",
                                            "n_seeds", "omitted"])
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}")
-    print("NOTE: OOD cells are a SUBSET of Joe's pools (fewer sources) and seed-AVERAGED — NOT a "
+    print("NOTE: OOD cells are a SUBSET of the pools (fewer sources) and seed-AVERAGED — NOT a "
           "cell-by-cell reproduction of his numbers (impossible from a restricted pool; see docstring).")
 
 

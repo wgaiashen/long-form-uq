@@ -19,7 +19,7 @@ owns them.
     # on RCS, after syncing the CSVs into results/sidecar_ptrue_unsup/:
     python scripts/checks/ptrue_unsup_sidecar.py --merge --datasets cnn_dailymail,med_quad,samsum
 
-⚠️ KEYED BY POSITION, AND THE MERGE PROVES THE ALIGNMENT. `idx` is NOT unique in these records (the
+KEYED BY POSITION, AND THE MERGE PROVES THE ALIGNMENT. `idx` is NOT unique in these records (the
 per-token loader documents this), so position is the only safe key — and position is only safe if both
 sides hold the same file. The merge therefore refuses unless the row count matches AND a fingerprint of
 the gold targets matches. Without that check a misaligned merge would attach every score to the wrong
@@ -91,7 +91,7 @@ def merge(datasets):
             rows = list(_csv.reader(fh))
         hdr = rows[0]
         n_claimed, fp_claimed = int(hdr[1]), hdr[3]
-        # ⚠️ REFUSE ON ANY DOUBT. A positional merge onto a different file attaches every score to the
+        # REFUSE ON ANY DOUBT. A positional merge onto a different file attaches every score to the
         # wrong example and produces a perfectly well-formed, entirely wrong dataset.
         if n_claimed != len(recs):
             sys.exit(f"{ds}: sidecar says {n_claimed} rows, local records have {len(recs)}. "

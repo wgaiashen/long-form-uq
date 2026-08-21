@@ -1,17 +1,17 @@
 # PRE-REGISTRATION — W4: honest selection across the sharpening families, and a rank-weighted arm
 
-> **Status (2026-08-09):** run. Lehmer under raw-argmax LODO is a consistent small positive (+0.027, 6/8) that misses its registered bar (p = 0.250); the rank arm removes the length confound and still fails on PRR. Per-dataset record and the corrected mechanism statistic: `STOCKTAKE_sharpening_axis.md` §7.1b–c, §7.2–7.3.
+> **Status (2026-08-09):** run. Lehmer under raw-argmax LODO is a consistent small positive (+0.027, 6/8) that misses its registered bar (p = 0.250); the rank arm removes the length confound and still fails on PRR. Per-dataset record and the corrected mechanism statistic: the project results log
 
 **Written 2026-08-09, BEFORE either analysis was implemented or run.**
 Population: `meta-llama/Llama-3.1-8B`, the 8 long ProbeDriftLong evals, legacy carve, judge label.
 Free methods are rung-invariant, so **the unit is the DATASET, n = 8**, and every number is
 equivalently the ID and the OOD value.
-Plan: `../../PLAN_sharpening_axis.md`. Results: `../../STOCKTAKE_sharpening_axis.md` §7.
+Plan: `../the project plan. Results: `../the project results log
 Predecessor: `W1_sharpening_axis.md` (round 1).
 
 ---
 
-## 0. ⚠️ THE HONESTY POSITION OF THIS DOCUMENT, STATED FIRST
+## 0. THE HONESTY POSITION OF THIS DOCUMENT, STATED FIRST
 
 **Round 1 already read this test data.** `W1` swept three families over 24 grid points and reported
 their per-dataset curves. So W4 is a **SECOND LOOK AT DATA ALREADY SEEN**, and that has two
@@ -37,14 +37,14 @@ measured, not to fit a result.
 Round 1's A1 arm ran leave-one-dataset-out for **softmax-τ only**, and it returned `τ = ∞` on all 8
 folds, i.e. it reproduced `msp_min` exactly. It was never run for **power-p** or **Lehmer-β**.
 
-### 1.1 ⚠️ ALL THREE FAMILIES, NOT JUST LEHMER
+### 1.1 ALL THREE FAMILIES, NOT JUST LEHMER
 
 Lehmer looks like the strongest of the three *because round 1 looked at the test means*. Running LODO
 on Lehmer alone would therefore smuggle in a **family-selection step** chosen on test. All three
 families are run. This costs nothing (the curves are already on disk) and it makes the family
 comparison itself honest.
 
-### 1.2 ⚠️ TWO SELECTION RULES, BOTH REPORTED
+### 1.2 TWO SELECTION RULES, BOTH REPORTED
 
 Round 1's one-standard-error rule proved **near-vacuous** at this sample size: between-dataset PRR
 variance is so large that the 1-SE band covered most of the grid, and the registered tie-break
@@ -76,7 +76,7 @@ and the **transfer rate** — on how many of the 8 did the selected parameter be
   **"the procedure declines to leave the endpoint"** — a null, not a small positive.
 - If the raw-argmax and 1-SE rules disagree in verdict, **neither is reported as the answer**; the
   disagreement is the finding, and it says the selection is rule-dependent at n = 8.
-- ⚠️ **Three families are tested, so a single p < 0.05 among them is roughly what chance produces.**
+- **Three families are tested, so a single p < 0.05 among them is roughly what chance produces.**
   A pass is only interesting if it is the family round 1's curves already favoured (Lehmer) **and**
   the two selection rules agree. This is stated now so a lone hit cannot be promoted later.
 
@@ -111,7 +111,7 @@ score = sum_t w_t * nll_t                                      scored with the R
   soft **top-fraction** rule rather than a soft **top-count** rule. That is the confound removed by
   construction rather than by fitting.
 
-### 2.3 ⚠️ THE GRID MUST BE MUCH LARGER, AND WHY
+### 2.3 THE GRID MUST BE MUCH LARGER, AND WHY
 
 Because `ESS/n ≈ 2/tau`, reaching roughly one token in a hundred needs **tau ≈ 200**. Round 1's grid
 (max 32) would barely move this family off uniform, and reusing it would manufacture a null.
@@ -128,7 +128,7 @@ from the stated principle, not from any result.
 
 ### 2.5 REGISTERED SUCCESS CONDITION — TWO PARTS, BOTH REQUIRED
 
-⚠️ **PRR alone is not sufficient here, and that is the point of the arm.**
+**PRR alone is not sufficient here, and that is the point of the arm.**
 
 1. **PRR:** `tau = 2` clears the same three-part bar as §1.3 against `msp_min`.
 2. **MECHANISM:** `ρ(ESS, length)` **collapses toward zero** on the datasets where round 1 measured
@@ -140,7 +140,7 @@ any PRR gain is not attributable to the fix. If (2) passes and (1) fails, that i
 informative outcome and is reported as such: **the confound was real, removing it did not help, and
 therefore the confound was not what was holding the family back.**
 
-### 2.6 ⚠️ REGISTERED PRIOR — THE HONEST EXPECTATION IS NEGATIVE
+### 2.6 REGISTERED PRIOR — THE HONEST EXPECTATION IS NEGATIVE
 
 - The **hard** top-fraction version of exactly this idea is already measured. The `frac` sweep in
   `results/topk_floor_sweep__…csv` peaks at the endpoint on the cross-dataset mean (`k = 0.01`,

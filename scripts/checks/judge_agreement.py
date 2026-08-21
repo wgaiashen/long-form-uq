@@ -9,7 +9,7 @@ graded-first agreement panel (with percentile-bootstrap CIs):
     * Krippendorff alpha (interval) -- chance-corrected agreement on the graded score.
   CALIBRATION (the soft label is also the training TARGET, a value not a rank):
     * Pearson r + MAE + mean bias (+ both judges' means).
-  BINARY appendix (>= --binary-threshold; for comparability with Joe / SATMD):
+  BINARY appendix (>= --binary-threshold; for comparability with Hidden Failures / SATMD):
     * % agreement, MCC/phi, Cohen kappa, Gwet AC1, and the kappa-AC1 gap (skew diagnostic
       -- under ~90%-positive labels kappa collapses but AC1 does not).
 The PRR-stability headline (does the judge swap change method RANKING?) lives in the
@@ -39,7 +39,7 @@ from luq.data import SHORT_FORM  # noqa: E402
 
 # --- agreement-metric helpers (graded-first panel; 2026-06-28 judge-panel design) ----
 # The label is graded 0-1 and feeds PRR (rank) + soft-label training (magnitude), so the
-# panel leads with rank/graded metrics; the binary block is for comparability with Joe /
+# panel leads with rank/graded metrics; the binary block is for comparability with Hidden Failures /
 # SATMD only. Cohen's kappa collapses under our ~90%-positive labels (prevalence paradox),
 # so Gwet's AC1 is the trustworthy chance-corrected number; the kappa-AC1 gap is itself the
 # skew diagnostic. krippendorff/irrCAC are optional — the panel degrades to n/a without them.
@@ -231,7 +231,7 @@ def main():
     print(f"MAE (0-1)      : {np.mean(np.abs(g - c)):.3f}")
     print(f"mean bias      : {np.mean(c - g):+.3f}   (cand - GPT-5; + = scores higher)")
 
-    print(f"\n-- BINARY appendix (>= {thr}; for Joe/SATMD comparability) --")
+    print(f"\n-- BINARY appendix (>= {thr}; for Hidden Failures / SATMD comparability) --")
     print(f"% agreement    : {float(np.mean(gb == cb)):.3f}")
     try:
         print(f"MCC / phi      : {_mcc(gb, cb):+.3f}")

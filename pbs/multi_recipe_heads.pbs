@@ -4,7 +4,7 @@
 #PBS -N luq_mrh
 #PBS -o /rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/logs/
 #PBS -j oe
-# ⚠️ 48h, NOT 24h. On 2026-08-05 four S4 jobs were killed at a 24h wall with two rungs still to compute,
+# 48h, NOT 24h. On 2026-08-05 four S4 jobs were killed at a 24h wall with two rungs still to compute,
 # and the LOO rung (train on all seven other datasets) is the expensive one in every ladder we have run.
 # RCS has 72h queues, so a 24h request was never a constraint -- just a bad default. The -o path is
 # persistent home, not purgeable scratch, and the log is tee'd LIVE so progress is visible during the run

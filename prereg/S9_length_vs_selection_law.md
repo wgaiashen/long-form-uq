@@ -58,7 +58,7 @@ goes in the limitations regardless of what the between-dataset correlations say.
 
 ## Length definition — one definition for all 10, and it is NOT the one already on file
 
-⚠️ `mean_len` in `results/id_entropy_vs_drop__*.csv` is **T = G + 1**: the generated tokens **plus one
+`mean_len` in `results/id_entropy_vs_drop__*.csv` is **T = G + 1**: the generated tokens **plus one
 prompt token** (the pooling window is `[last_prompt_token] + gen_tokens`, `entropy_delta_vs_drop.py:89-97`).
 It therefore **includes a prompt token** and is not "generation only".
 
@@ -71,7 +71,7 @@ must equal mean(G) on the shared rows, since T = G+1 for every kept row.
 
 - Report Pearson **and** Spearman, with n and p, for every pair.
 - Report bootstrap CIs.
-- ⚠️ **A partial correlation on n = 8 is NOT reported as significant.** It is reported as a point estimate
+- **A partial correlation on n = 8 is NOT reported as significant.** It is reported as a point estimate
   with its CI and read as a direction only. With n = 8 and one control variable there are 5 residual
   degrees of freedom, and nothing at that size settles a confound.
 - Flag any dataset with **n_examples < 200**.
@@ -147,7 +147,7 @@ controlling for `msp_min` **−0.2171**.
 VERDICT: length does NOT explain the relationship.** The 10-dataset variant agrees (0.3818 FAIL,
 0.8689 FAIL).
 
-⚠️ **Note what the last row of that table is.** `msp_min` vs probe advantage at −0.8455 **is the coupled
+**Note what the last row of that table is.** `msp_min` vs probe advantage at −0.8455 **is the coupled
 statistic from A1** (it is the same quantity as the coupled r² of 0.7150 reported in the verification
 pack, and √0.7150 = 0.8456). The partial correlation at −0.8386 is coupled for the same reason:
 controlling for *length* does nothing about `msp_min` appearing on both axes. **So this experiment rules
@@ -160,9 +160,9 @@ This is the part that matters most, and it is not visible from the verdict line.
 
 | # | predicted | observed | outcome |
 |---|---|---|---|
-| 2 | `length` vs `msp_min_OOD` **negative** | **+0.2104** | ❌ wrong sign |
-| 3 | `length` vs `perplexity_OOD` **markedly weaker** than for `msp_min` | **+0.1686** vs +0.2104, essentially the same | ❌ control does not separate |
-| 4 | `length` vs `probe_advantage` **positive** | **−0.2912** | ❌ wrong sign |
+| 2 | `length` vs `msp_min_OOD` **negative** | **+0.2104** | wrong sign |
+| 3 | `length` vs `perplexity_OOD` **markedly weaker** than for `msp_min` | **+0.1686** vs +0.2104, essentially the same | control does not separate |
+| 4 | `length` vs `probe_advantage` **positive** | **−0.2912** | wrong sign |
 
 Prediction 3 is the one I said "carries the argument, not either correlation alone". It fails. The
 length-normalised control tracks `msp_min` almost exactly, which is the opposite of what the mechanism
@@ -193,7 +193,7 @@ The monotone direction registered in prediction 1 is also not met.
 
 ## A6. What may and may not be claimed from S9
 
-| ✅ supported | ❌ not supported |
+| supported | not supported |
 |---|---|
 | **Answer length is not the confound** in the baseline-strength / probe-advantage relationship, on both the clean 8-set and the mixed 10-set populations, by the rule fixed in advance. | That the selection law survives. It does not, for the unrelated reason in A1. |
 | The length definition question is settled: `G = len(gen_token_ids)` computed identically for all 10 datasets, with the `T = G + 1` column reproduced as a cross-check. | That `msp_min` drifts with length for the registered order-statistics reason. Predictions 2, 3 and 4 all failed and the tercile control does not separate. |

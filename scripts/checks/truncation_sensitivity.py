@@ -5,7 +5,7 @@ WHAT THIS ANSWERS. The trailing next-template continuation is inside the token s
 token-probability method aggregates over. This measures what that junk is doing to the SCORES, with
 the LABELS HELD FIXED at raw — isolating score-side contamination from label-side contamination.
 
-⛔ WHAT IT MUST NOT BE USED FOR. Nothing here decides whether a truncation boundary is valid. That
+WHAT IT MUST NOT BE USED FOR. Nothing here decides whether a truncation boundary is valid. That
 was decided in `luq.template_restart` from the dataset's own prompt template, written and committed
 BEFORE this ran. Choosing a boundary because it improves a PRR is selection on the outcome, and this
 project has already measured methods latching onto junk signal. **A correction remains a correction
@@ -86,7 +86,7 @@ def main():
     print(f"STEP 2b — FROZEN-SCORE TRUNCATION SENSITIVITY   model={args.model}")
     print("Labels held at RAW. Only the scored token span changes. Nothing trained, no probe touched.")
     print("Boundary: luq.template_restart, frozen from the prompt templates BEFORE this ran.")
-    print("⛔ These numbers do NOT decide whether the boundary is valid. That was decided from the")
+    print("These numbers do NOT decide whether the boundary is valid. That was decided from the")
     print("   template. A correction stays a correction even if a method gets worse.")
     print("=" * 118)
 
@@ -165,7 +165,7 @@ def main():
     for r in rows:
         if r["method"].startswith("NUISANCE"):
             print(f"  {r['dataset']:14s} {r['method'][9:]:18s} PRR {r['prr_raw_score_raw_label']:+.4f}")
-    print("\n⛔ BLOCKED, not skipped: SAPLMA / uniform / attention / wMSP-norm / wMSP-shrink@2 need")
+    print("\nBLOCKED, not skipped: SAPLMA / uniform / attention / wMSP-norm / wMSP-shrink@2 need")
     print("   EXISTING trained probes, and none exist for this model (cache/probes/ has Llama")
     print("   attention poolers only). Running them would require either persisting probes from a")
     print("   ladder run, or training once and scoring both arms with the same model — the latter")

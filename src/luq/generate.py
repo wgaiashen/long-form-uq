@@ -27,7 +27,7 @@ def load_model(name: str, attn_implementation: str | None = None,
     byte-identical. Pass device_map="auto" to shard across several GPUs, which is what
     a model too big for one card needs (fp32 Qwen-14B is ~59GB vs the L40S's 48GB).
 
-    ⚠️ device_map="auto" ALONE DOES NOT GUARANTEE SHARDING: accelerate fills GPU 0
+    device_map="auto" ALONE DOES NOT GUARANTEE SHARDING: accelerate fills GPU 0
     first, so a 32GB fp32 Llama-8B lands entirely on one 48GB card and any
     "sharding test" built on that is vacuous. Pass max_memory to FORCE a real split,
     e.g. max_memory={0: "20GiB", 1: "20GiB"}, and assert afterwards that
@@ -57,7 +57,7 @@ def load_model(name: str, attn_implementation: str | None = None,
         # and wMSP signal, so a run that meant fp32 and silently got fp16 produces a plausible but
         # different number rather than a crash. The pipeline drivers (01_extract / 01e_repool /
         # 01h_pertoken) all take --dtype; this warning exists for every other caller.
-        print(f"⚠️  load_model({name}): no explicit dtype -> defaulting to {dtype}. "
+        print(f"load_model({name}): no explicit dtype -> defaulting to {dtype}. "
               f"Pass dtype= explicitly if this run must match a cached population.", flush=True)
     if attn_implementation is None and is_gemma:
         attn_implementation = "eager"
@@ -82,7 +82,7 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
     pooled_all_layers: tensor (n_layers, hidden) = mean over the last-prompt (pre-answer)
-    position + the output tokens, per layer (Joe's SAPLMA masked-mean; see the pooling note).
+    position + the output tokens, per layer (the SAPLMA masked-mean; see the pooling note).
 
     truncate_at_newline: for few-shot short-form QA the answer ends at the first
     newline; what follows is the model imitating the prompt format (inventing the
@@ -134,7 +134,7 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
         # affects 47.8% of generations at a 128-token budget and 92.6% at 768, where ~66% of the
         # average generation is the invented part -- and the judge scores the whole saved output.
         #
-        # ⚠️ THE POINT OF CUTTING HERE rather than at scoring time: gen_ids is truncated BEFORE the
+        # THE POINT OF CUTTING HERE rather than at scoring time: gen_ids is truncated BEFORE the
         # logprobs (out.scores[:n_gen]) and BEFORE the hidden-state pooling below, so the record, the
         # MSP floors, the pooled features and the label all describe the SAME text. Cutting later
         # would leave features computed over text the label never saw.
@@ -179,20 +179,20 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     pooled = []
     for layer in range(n_layers):
         # Average the last-prompt (pre-answer) position PLUS the generated-token states,
-        # matching Joe's SAPLMA masked-mean: his output_mask aligns so the averaged window
+        # matching the SAPLMA masked-mean: his output_mask aligns so the averaged window
         # starts at the last prompt position (the state that PREDICTS the first answer
         # token). That pre-answer state encodes the whole question and DOMINATES for short
         # answers -- excluding it (our earlier bug) meant a 2-token answer like "friday"
         # ['fr','iday'] was pooled from just ['fr'], and a 1-token answer from the prompt's
         # ':' alone. The final generated token has no fed-back state in generate(), so it is
-        # dropped (Joe drops it too). Verified against compiled_features.py + full_seq_head_saplma.py.
+        # dropped (the reference implementation drops it too). Verified against compiled_features.py + full_seq_head_saplma.py.
         vecs = [out.hidden_states[0][layer][0, -1, :]]                       # last prompt token (pre-answer)
         # range(1, n_gen+1) -- include the LAST kept answer token's state too. We generate the
         # full budget with NO stop criterion and truncate at EXTRACTION, so out.hidden_states
         # extends PAST n_gen; out.hidden_states[n_gen] (the last kept answer token, whose
         # fed-back state exists because the now-truncated continuation followed) is real. The
         # old range(1, n_gen) dropped it -- catastrophic for short answers (trivia mean 2.9
-        # tokens; a 1-token answer pooled ZERO answer tokens). Joe includes all answer-token
+        # tokens; a 1-token answer pooled ZERO answer tokens). the reference implementation includes all answer-token
         # states. min(...) guards the rare case where generation stopped exactly at n_gen (EOS).
         last = min(n_gen + 1, len(out.hidden_states))
         vecs += [out.hidden_states[s][layer][0, -1, :] for s in range(1, last)]  # answer tokens 0..G-1

@@ -11,13 +11,13 @@
 #   short -> long : at a MATCHED 1,800-example budget, does substituting half the long-form
 #                   supervision with short-form supervision help or hurt long-form OOD?
 #
-# ⚠️ NOT a causal claim about response length — the datasets differ in domain and task too. The
+# NOT a causal claim about response length — the datasets differ in domain and task too. The
 # framing is cross-length TRANSFER / a short-form supervision ablation.
 #
 # CPU-only by design: the driver loads per-token caches + records + a tokenizer, never model
 # weights. The RCS GPU queue is heavily contended; the small CPU queues are not.
 #
-# ⚠️ LUQ_SPEC USES '+' AS ITS SEPARATOR, NOT ','. `qsub -v` splits its argument on commas, so a
+# LUQ_SPEC USES '+' AS ITS SEPARATOR, NOT ','. `qsub -v` splits its argument on commas, so a
 # comma inside the spec would be parsed as another variable. Translated to ',' below.
 #
 #   qsub -v LUQ_EVAL=trivia_qa,LUQ_RUNG=ID-short,LUQ_SPEC=trivia_qa:1800,LUQ_TAG=idshort \

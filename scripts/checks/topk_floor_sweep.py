@@ -170,7 +170,7 @@ def main():
         ax.plot([xnum[0]], [pnum[0]], marker="s", color=c, ms=6, mec="k", mew=0.5, zorder=5)    # k=1
     ax.set_xscale("log")
     ax.axhline(0.0, color="0.6", lw=0.8, ls="--")
-    ax.set_xlabel("k  (mean of the k lowest token logprobs;  □ = k=1 IS msp_min,  ★ = k=all IS perplexity @ medT)")
+    ax.set_xlabel("k  (mean of the k lowest token logprobs;  = k=1 IS msp_min,  = k=all IS perplexity @ medT)")
     ax.set_ylabel("PRR")
     ax.set_title("Where does the error signal live? top-k floor sweep (§D.6)")
     ax.legend(fontsize=7.5, ncol=2, loc="best")

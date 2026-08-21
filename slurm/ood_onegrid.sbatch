@@ -8,7 +8,7 @@
 #SBATCH --output=logs/ood_onegrid-%j.out
 
 # ONE-HARNESS OOD rigour run: every method (attention/uniform/per-token/per-sentence/last-token/
-# mean-pool+MLP + lookback/ptrue_accurate/linear) through Joe's PINNED ProbeDrift-light pools,
+# mean-pool+MLP + lookback/ptrue_accurate/linear) through the PINNED ProbeDrift-light pools,
 # {ID, LOO, DiffTask}, PAIRED seeds (one subsample per seed shared across methods),
 # ID-diagonal-gated. Retires the two ad-hoc grids. GPU for the attention pooler; 128G for the
 # per-token caches. Judge label throughout.

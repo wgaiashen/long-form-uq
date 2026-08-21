@@ -3,7 +3,7 @@
 #PBS -l walltime=14:00:00
 #PBS -N luq_idea2P2
 #PBS -j oe
-# ITEM 4: close the unsupervised-vs-LEARNED-pooler gap (the one open W-B2 question, = Joe's steer as posed).
+# ITEM 4: close the unsupervised-vs-LEARNED-pooler gap (the one open W-B2 question, = the steer as posed).
 # 2 evals only (expertqa: pooler strong OOD; cnn: pooler collapses) x 5 free sentence sources x --with-pooler.
 # Driver now writes INCREMENTALLY (per cell), so a wall-kill still leaves a usable partial table.
 set -uo pipefail

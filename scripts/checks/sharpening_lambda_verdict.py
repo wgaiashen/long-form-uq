@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W5 VERDICT -- does the pre-committed lambda = 1.5 beat the incumbent shrink@2?
 
-Pre-registration: prereg/W5_lambda_and_nll_prior.md.  Results: ../STOCKTAKE_sharpening_axis.md §15.
+Pre-registration: prereg/W5_lambda_and_nll_prior.md.  Results: the project results log
 Reads results/sharpening_lambda_<eval>__<slug>.csv plus the master table.
 
 WHAT IS BEING TESTED
@@ -10,12 +10,12 @@ lambda = 1.5 was PRE-COMMITTED (prereg §2.1) on the strength of a prediction ma
 a month before the widened long grid existed: "Sweet spot ~ shrink@1-2", naming the same two rungs
 (DiffTask, 1ds-Diff) where wMSP@2 now leads. lambda = 1 and 1.5 had never been run on the long grid.
 
-⚠️ THE BAR IS shrink@2 (+0.2287), NOT `norm`. Beating the UNREGULARISED wMSP is not the question --
+THE BAR IS shrink@2 (+0.2287), NOT `norm`. Beating the UNREGULARISED wMSP is not the question --
 that only re-establishes that some shrinkage helps, which is already known (+0.090, the largest
 single lever measured in the project). The question is whether the July-predicted value beats the
 incumbent that was chosen by looking at test.
 
-⚠️ REGISTERED FAILURE READING (prereg §2.4): if lambda = 1.5 misses, that is a failure OF THE
+REGISTERED FAILURE READING (prereg §2.4): if lambda = 1.5 misses, that is a failure OF THE
 PRE-COMMITTED VALUE, even if some other lambda in the sweep clears the bar. Promoting a different one
 afterwards is banned.
 
@@ -94,7 +94,7 @@ def main():
     print("=" * 100)
     print(f"\nCOVERAGE: {len(present)}/8 evals.")
     if missing:
-        print(f"⚠️ MISSING, named not silently averaged over: {missing}")
+        print(f"MISSING, named not silently averaged over: {missing}")
         print("   Everything below is on the PARTIAL population and says so.")
     if not present:
         raise SystemExit("no eval CSVs yet")
@@ -156,7 +156,7 @@ def main():
         print(f"  Wilcoxon p {p:.4f}   bar < {BAR_P}       {'PASS' if p < BAR_P else 'FAIL'}")
         print(f"\n  VERDICT: {'YES' if ok else 'NO'}"
               + ("" if len(present) == 8 else "   (PARTIAL -- not final until 8/8)"))
-        print("\n  ⚠️ Registered reading: if lambda=1.5 misses, that is a failure OF THE PRE-COMMITTED")
+        print("\n  Registered reading: if lambda=1.5 misses, that is a failure OF THE PRE-COMMITTED")
         print("     VALUE even if another lambda clears the bar. Promoting a different one is banned.")
         rows.append(("registered", PRIMARY, "shrink@2", f"{d.mean():.4f}", signs, f"{p:.4f}",
                      len(present)))
@@ -197,7 +197,7 @@ def main():
             w.writerow(r)
     print(f"\nwrote {outp}")
     if missing:
-        print(f"⚠️ PARTIAL: {len(present)}/8. Missing {missing}. Re-run when they land.")
+        print(f"PARTIAL: {len(present)}/8. Missing {missing}. Re-run when they land.")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """F-A -- RETROSPECTIVE SHUFFLED-CANDIDATE AUDIT of every oracle ceiling this project quotes.
 
-Plan: ../PLAN_sharpening_axis.md.   Results: ../STOCKTAKE_sharpening_axis.md §9.
 
 WHY THIS EXISTS
 ---------------
@@ -10,8 +9,8 @@ SHUFFLED candidate bought +0.091 and pure Gaussian noise +0.087, against multima
 over K candidates is upward-biased even when no candidate is genuinely better on any particular unit,
 because the max picks up noise.
 
-⚠️ That does not only bound future work -- it invalidates ORACLE CEILINGS ALREADY BEING QUOTED, in the
-stocktake, in the deck, and in this workstream's own summaries. The most-quoted one is the
+That does not only bound future work -- it invalidates ORACLE CEILINGS ALREADY BEING QUOTED, in the
+project record, in the deck, and in this workstream's own summaries. The most-quoted one is the
 best-of-two-endpoints oracle at +0.2472 (i.e. +0.062 over msp_min). This script computes the shuffled
 baseline for each and reports the NET figure. **Anything that does not clear its shuffled baseline is
 retracted.**
@@ -29,7 +28,7 @@ noise-max bias, at the same K, the same n, and the same marginal spread.
 So `net = real_oracle - shuffled_oracle` is the headroom attributable to genuine per-unit signal.
 Reporting `real_oracle - always_best_single` (what the project has been doing) conflates the two.
 
-⚠️ PREDICTION, STATED IN THE PLAN BEFORE THIS WAS RUN, so it can be wrong: the 2-ENDPOINT oracle
+PREDICTION, STATED IN THE PLAN BEFORE THIS WAS RUN, so it can be wrong: the 2-ENDPOINT oracle
 should largely survive (its candidates differ hugely per dataset -- 0.545 on pubmed -- and max-of-K
 bias is worst when candidates are equal in expectation), while the per-cell LAMBDA oracle over 3
 near-identical candidates should mostly evaporate. If that ordering is violated, the intuition behind
@@ -71,7 +70,7 @@ def load():
 
 
 def shuffled_oracle_INDEP(M, rng, n_perm=N_PERM):
-    """⚠️ THE FIRST NULL I WROTE, AND IT IS WRONG. Kept, and reported, because it nearly caused a
+    """THE FIRST NULL I WROTE, AND IT IS WRONG. Kept, and reported, because it nearly caused a
     blanket retraction of every oracle in the project on a broken control.
 
     It permutes each candidate's residuals INDEPENDENTLY down the units. That destroys the
@@ -121,7 +120,7 @@ def audit(name, M, labels, rng, rows):
     bad, _ = shuffled_oracle_INDEP(M, rng)
     gross = real - best_single
     net = real - sh
-    # ⚠️ The verdict is a PERMUTATION p, not a fixed threshold on the net. A fixed cutoff (my first
+    # The verdict is a PERMUTATION p, not a fixed threshold on the net. A fixed cutoff (my first
     # draft used +0.005) is arbitrary and, at n = 8 where the null's own spread is ~0.011-0.015, it
     # would call differences of one standard deviation "survivors". p = fraction of null oracles that
     # reach the real one.
@@ -192,9 +191,9 @@ def main():
     print("  'gross headroom' is real_oracle - always_best_single: what has been quoted.")
     print("  'NET headroom'   is real_oracle - shuffled_oracle:    what is actually attributable")
     print("                   to genuine per-unit signal rather than to taking a max over K.")
-    print("  Anything with NET <= +0.005 is RETRACTED from the stocktake and the deck.")
+    print("  Anything with NET <= +0.005 is RETRACTED from the project record and the deck.")
     if net_lam <= 0.005:
-        print("\n  ⚠️ G3 VERDICT: the per-cell LAMBDA headroom does NOT clear its shuffled baseline.")
+        print("\n  G3 VERDICT: the per-cell LAMBDA headroom does NOT clear its shuffled baseline.")
         print("     F4 (pool-aware shrinkage) is DEAD BEFORE W5 LANDS -- there is no real per-cell")
         print("     lambda signal to map onto, so no mapping from pool features can recover one.")
     else:

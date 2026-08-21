@@ -10,7 +10,7 @@
 # Feature extraction for Qwen2.5-14B trivia_qa, W-CrossLen replication
 # (DOC_BRIEF_qwen_crosslength.md §5).
 #
-# ⚠️ CORRECTS A BUG IN THE BRIEF. §5 of DOC_BRIEF_qwen_crosslength.md says to run
+# CORRECTS A BUG IN THE BRIEF. §5 of DOC_BRIEF_qwen_crosslength.md says to run
 # `01e_repool.py --cache-per-token` for the per-token cache. That is WRONG for Qwen:
 # 01e_repool's internal "middle layer" formula is n_layers//2 where n_layers = 49
 # (48 hidden + embedding), giving L24 -- and it stores fp16. Neither matches the
@@ -18,7 +18,7 @@
 # exactly this: fp16 L24 dumps from 01e_repool were built and then DELETED
 # (2026-08-09) because Qwen's large-magnitude residual states round 2-6e-3 in fp16,
 # far above the 1e-4 consistency-guard tolerance, and because the layer itself was
-# wrong -- the canonical layer is L23 (Joe's ceil(N/2)-1 convention, matching
+# wrong -- the canonical layer is L23 (the ceil(N/2)-1 convention, matching
 # Llama's L15), produced instead by 01h_pertoken.py --layer 23 --dtype fp32 for all
 # 8 existing Qwen long-form datasets. Verified by reading 01e_repool.py's source
 # directly (mid = (n_hidden_layers+1)//2 = 24) rather than trusting either script's

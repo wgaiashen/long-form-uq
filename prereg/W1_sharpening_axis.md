@@ -1,10 +1,10 @@
 # PRE-REGISTRATION — W1: the training-free sharpening family
 
-> **Status (2026-08-09):** run. The primary claim FAILED its registered bar (margin +0.0209 PASS, signs 6/8 PASS, Wilcoxon p = 0.148 FAIL — NOT ESTABLISHED); both honest selection arms collapsed to msp_min on every fold. What survives is the regime map (descriptive). Record: `STOCKTAKE_sharpening_axis.md` §3.
+> **Status (2026-08-09):** run. The primary claim FAILED its registered bar (margin +0.0209 PASS, signs 6/8 PASS, Wilcoxon p = 0.148 FAIL — NOT ESTABLISHED); both honest selection arms collapsed to msp_min on every fold. What survives is the regime map (descriptive). Record: the project results log
 
 **Written 2026-08-08, BEFORE the driver was implemented and before any cell was run.**
 Population: `meta-llama/Llama-3.1-8B`, the 8 long ProbeDriftLong evals, legacy carve.
-Plan: `../../PLAN_sharpening_axis.md`. Results doc: `../../STOCKTAKE_sharpening_axis.md`.
+Plan: `../the project plan. Results doc: `../the project results log.
 
 ---
 
@@ -38,7 +38,7 @@ score = Σ_t w_t · nll_t                        scored with the RAW nll, not th
 answer's own NLL distribution. An answer with one dominant bad token concentrates; an answer with a
 flat NLL profile stays near uniform. No gate, no length rule, no extra parameter.
 
-## 2. ⚠️ PRIOR EVIDENCE THAT ALREADY BEARS ON THIS, RECORDED BEFORE THE RUN
+## 2. PRIOR EVIDENCE THAT ALREADY BEARS ON THIS, RECORDED BEFORE THE RUN
 
 This section exists so that a negative cannot be presented afterwards as new information, and a
 positive cannot be presented as unsurprising. Three closely related things have already been tested
@@ -47,7 +47,7 @@ in this project and have come back negative.
 | # | test | source | outcome |
 |---|---|---|---|
 | P1 | best FIXED k in the hard version of this family (mean of the k lowest logprobs), cross-dataset mean | `results/topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv` | **k = 1 (= `msp_min`) is the maximum, at +0.151 over the 7 datasets covered.** Every interior k is lower; k = all gives +0.087. The per-example fractional version also peaks at the endpoint. |
-| P2 | label-free leave-one-dataset-out selection of that k | `STOCKTAKE_post24July.md:1040-1046` | **NULL.** Every one-feature predictor lands +0.254 to +0.258, **below always-`msp_min` +0.284.** |
+| P2 | label-free leave-one-dataset-out selection of that k | the project results log | **NULL.** Every one-feature predictor lands +0.254 to +0.258, **below always-`msp_min` +0.284.** |
 | P3 | `ZGAP = (mean − min)/std` predicts which regime a dataset is in | `prereg/R1_taxonomy_label_free.md`, `results/regime_R1_label_free__meta-llama_Meta-Llama-3.1-8B.csv` | **FALSIFIED.** 8/12 pairs, AUC 0.667. `cnn_dailymail`, the most spread dataset in the grid, has the **highest** ZGAP of all eight (3.93). Plain generation length separated the groups better than ZGAP did. |
 
 P3 is the most directly damaging, and it must be stated plainly: **`ZGAP` is exactly the quantity
@@ -64,7 +64,7 @@ answer's own distribution, helps on average even though per-dataset selection of
 does not. That is the only thing this pre-registration tests. **The prior is not good, and that is
 recorded here rather than discovered afterwards.**
 
-## 3. ⚠️ A STRUCTURAL FACT THE DESIGN DEPENDS ON
+## 3. A STRUCTURAL FACT THE DESIGN DEPENDS ON
 
 **Training-free methods are rung-invariant.** Verified on the master ladder: `msp_min` on
 `pubmed_qa` is +0.3710 at all five rungs, and the same holds for `perplexity` and `msp_sum` on all
@@ -79,7 +79,7 @@ Three consequences, all registered:
    1ds-DiffTask single-source problem does not arise.
 3. **Any free-vs-free comparison reported over "32 OOD cells" is 8 values counted four times.** Every
    interval in this workstream is computed on n = 8. This is already recorded at
-   `STOCKTAKE_post31July.md:11-23`; it is restated here because it sets the sample size for every
+   the project results log; it is restated here because it sets the sample size for every
    test below.
 
 ## 4. THE REGISTERED QUESTIONS, WITH THRESHOLDS FIXED NOW
@@ -102,7 +102,7 @@ first principles.
 | sign count | beats `msp_min` on at least **6 of 8** datasets |
 | test | two-sided Wilcoxon signed-rank on the 8 paired differences, **p < 0.05** |
 
-⚠️ The margin alone is deliberately **not** sufficient. At n = 8 with per-dataset endpoint margins
+The margin alone is deliberately **not** sufficient. At n = 8 with per-dataset endpoint margins
 ranging from 0.066 to 0.545, a point estimate can move +0.010 on one dataset's noise. The minimum
 attainable two-sided Wilcoxon p at n = 8 is 0.0078, so the test is achievable but demanding, which
 is the intent.
@@ -157,7 +157,7 @@ explained, not as a stronger result.
   not the raw argmax, because with 8 noisy units the argmax is optimistic. **All 8 selected `τ` and
   their spread are reported.** Agreement across folds is the evidence that a single global constant
   exists; disagreement is a finding, not a nuisance, and is reported as one.
-  ⚠️ **The tie-break is fixed here, before the run, because it is a free choice.** "Nearest an
+  **The tie-break is fixed here, before the run, because it is a free choice.** "Nearest an
   endpoint" is measured in grid-index steps as `min(i, last − i)`. If two candidates are equidistant
   from opposite ends, the one with the **higher training mean** wins. Stating this afterwards would
   be a parameter chosen on results.
@@ -190,7 +190,7 @@ not, the result is about the **specific weighting function**; if all three behav
 the **family**. Running only one and reporting it would leave that unresolved, and it is the obvious
 reviewer question.
 
-⚠️ Recorded asymmetry: softmax-`τ` standardises and is therefore dimensionless, while the power mean
+Recorded asymmetry: softmax-`τ` standardises and is therefore dimensionless, while the power mean
 and Lehmer act on raw NLL magnitudes and are not. They are not like-for-like on scale invariance,
 only on endpoints. That is a property of the comparison, stated now so it is not presented later as
 a discovery.
@@ -200,7 +200,7 @@ a discovery.
 **V1. ENDPOINT IDENTITY.** At `τ = 0` the score's PRR must equal `perplexity`'s, and at `τ → ∞` it
 must equal `msp_min`'s, on every dataset, on the same test rows.
 
-⚠️ **This is a RANKING identity, not a value identity.** `src/luq/msp.py:39` computes `msp_min` as
+**This is a RANKING identity, not a value identity.** `src/luq/msp.py:39` computes `msp_min` as
 `1 − min(exp(lp))`, which is a monotone transform of `max(nll)` and **not equal to it**. PRR is
 rank-based, so the PRRs are identical while the score vectors are not. A check written as
 "values agree to 1e-6" would fail for the wrong reason. The registered check is
@@ -218,7 +218,7 @@ that both reproduce the published master values within 0.01:
 | cnn_dailymail | +0.1198 | +0.4096 |
 | samsum | −0.0243 | +0.1128 |
 
-**⚠️ IF V1 FAILS THE RUN STOPS AND THE FAILURE IS REPORTED.** It would mean the NLL convention or
+**IF V1 FAILS THE RUN STOPS AND THE FAILURE IS REPORTED.** It would mean the NLL convention or
 the row population differs from the master table, and nothing downstream would be interpretable.
 
 **V2. DEGENERATE CASES.** `std = 0` (all NLLs in an answer identical) falls back to uniform weights
@@ -231,13 +231,13 @@ are **natural-log LOGPROBS (negative), not NLLs**, one per generated token (leng
 anchor). The driver negates them itself and prints the convention it used.
 
 **V4. AVAILABILITY.** Cached records must exist for all 8 long datasets **and** for `sciq`/`trivia_qa`
-(needed for A2). ⚠️ `expertqa`, `asqa` and `factscore` live under `cache/*_rp12/`, so a hard-coded
+(needed for A2). `expertqa`, `asqa` and `factscore` live under `cache/*_rp12/`, so a hard-coded
 `cache/` glob sees only 5 of 8. Resolution goes through
 `Config(prompt_regime=PROMPT_REGIME.get(dataset, ""))`. **The realised dataset count is asserted and
 the run fails loud on a short load.** The model slug is pinned; no model-agnostic glob is used.
 
 **V5. POPULATION.** The same test rows as the master table: `xl_rungs.eval_split`, seed 0, judge
-label, finite-label filter. ⚠️ The carve-then-filter change **has landed** (`LUQ_CARVE`, added
+label, finite-label filter. The carve-then-filter change **has landed** (`LUQ_CARVE`, added
 2026-08-08) and **defaults to `legacy`**, which reproduces the pre-change behaviour exactly. This
 run uses the default legacy carve so it is comparable with the existing numbers, and **stamps the
 realised `LUQ_CARVE` value into every output row**, because the new carve moves `expertqa` and
@@ -252,7 +252,7 @@ names the missing cells rather than reporting a partial grid as a full one.
 - **Weight concentration.** Per example, `ESS = 1 / Σ w²`, the effective number of tokens the weight
   lands on. Reported per dataset at `τ = 1`, and correlated within dataset against answer length and
   against `ZGAP`.
-  ⚠️ **Registered confound.** The largest attainable `z` in an answer of `n` tokens is bounded by
+  **Registered confound.** The largest attainable `z` in an answer of `n` tokens is bounded by
   roughly `√(n − 1)`. So at a fixed `τ`, a long answer **can** concentrate far more than a short one,
   which means the family is **implicitly length-dependent**. Any claim that "length is not the axis"
   must be checked against this, not asserted.

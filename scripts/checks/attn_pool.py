@@ -42,7 +42,7 @@ import torch.nn as nn
 
 # HF_HOME fallback for callers that did not source an env script. On RCS, pbs/_env.sh already
 # exports HF_HOME, so this whole block is a no-op there.
-# ⚠️ It must NOT hard-code DoC's /vol/gpudata: that path is inside the hard 50 GB quota and already
+# It must NOT hard-code DoC's /vol/gpudata: that path is inside the hard 50 GB quota and already
 # holds Qwen-14B (27.5 GB), so a 32B checkpoint (~65 GB in bf16) cannot fit. Prefer the un-quota'd
 # /vol/bitbucket root and only fall back to gpudata when bitbucket is absent.
 if "HF_HOME" not in os.environ:
@@ -62,10 +62,10 @@ MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
 # Expected residual-stream width per model. The per-token cache guard below checks against THIS,
 # not against a bare 128000-style constant, so a wrong-model cache still fails loudly while a
 # legitimately different model is simply a new entry here.
-# ⚠️ The guard exists because a model-agnostic glob once loaded the dropped Qwen-1.5B cache into
+# The guard exists because a model-agnostic glob once loaded the dropped Qwen-1.5B cache into
 # PART A's headline rows (the project conventions). Keeping it FAIL-LOUD is the point; only its constant was
 # ever wrong.
-# ⚠️ Values are read from each checkpoint's own config.json (`hidden_size`), never assumed from the
+# Values are read from each checkpoint's own config.json (`hidden_size`), never assumed from the
 # family: gemma-2-9b-it is 3584, NOT the 4096 an 8-9B model invites you to guess.
 EXPECTED_HIDDEN_DIM = {
     # development populations (the two the hypothesis was formed on)
@@ -154,7 +154,7 @@ def load_per_token(model, dataset, layer, label_field="correctness"):
     # RUNTIME MODEL GUARD (2026-07-27; made model-aware 2026-08-08). Fail loud if the cache on disk is
     # not the width THIS model should produce — that is how the dropped Qwen-1.5B cache once got loaded
     # into PART A's headline rows via a model-agnostic glob (the project conventions).
-    # ⚠️ The guard is still FAIL-LOUD and still per-model; only the hard-coded 4096 was wrong. A model
+    # The guard is still FAIL-LOUD and still per-model; only the hard-coded 4096 was wrong. A model
     # absent from EXPECTED_HIDDEN_DIM is itself an error, NOT a pass — an unknown model must not skip
     # the check, or the guard quietly stops guarding exactly when a new model is introduced.
     if model not in EXPECTED_HIDDEN_DIM:
@@ -240,7 +240,7 @@ def aux_penalty(a, D, mask, normalise=False):
     sum it was not: at a fixed lambda the supervision strength varied with output length, confounding it
     with the very variable the ID headline rests on.
 
-    ⚠️ NO clamp_min ON THE DENOMINATOR. `aux_ref` is exactly 0 when D is uniform, which is the documented
+    NO clamp_min ON THE DENOMINATOR. `aux_ref` is exactly 0 when D is uniform, which is the documented
     degenerate case the content-mass builder falls back to. Clamping would turn 0/0 into a large finite
     penalty, handing rows that carry NO target the largest gradient in the batch -- the "silent default
     that returns a plausible number" class this project bans. Those rows are DROPPED from the penalty and
@@ -328,7 +328,7 @@ def mean_attention_entropy(model, states, idx, device, bs=64, answer_only=False,
 def head_attention_correlation(model, states, idx, device, bs=64, answer_only=False, head_priors=None):
     """B.2's PRIMARY diagnostic: do the K attention heads actually differ after training?
 
-    ⚠️ This, not PRR, is the question. We already measured the heads collapsing to pairwise correlation
+    This, not PRR, is the question. We already measured the heads collapsing to pairwise correlation
     0.996–1.000, which made multi-head indistinguishable from a control using K classifiers on ONE
     attention pattern. Selective supervision is supposed to prevent that collapse STRUCTURALLY. **If it
     does not, the PRR is uninformative and the whole multi-head line closes with it** — a PRR difference
@@ -437,8 +437,8 @@ class AttnPool(nn.Module):
         # S3 (prior-init pooling): a per-token PRIOR weight can replace / seed the learned query.
         #   frozen_prior=True  -> attention IS the renormalised prior; head-only training (arm C, ours).
         #   frozen_prior=False + prior given -> CONSTANT additive log-prior: scores = X@q + beta*log(prior)
-        #     (arm D, Joe's "start from a distribution, then learn away"; beta scales the prior's pull).
-        #     ⚠️ beta is a CONSTANT, not a schedule -- this used to be described as "annealed", which is
+        #     (arm D, the "start from a distribution, then learn away"; beta scales the prior's pull).
+        #     beta is a CONSTANT, not a schedule -- this used to be described as "annealed", which is
         #     wrong and was corrected 2026-08-06. `q` is initialised to ZEROS, so at step 0 the attention is
         #     exactly softmax(beta*log(prior)) = the renormalised prior at beta=1, i.e. arm D starts exactly
         #     where arm C sits. It "learns away" because `q` moves and X@q grows to overwhelm a FIXED tilt,
@@ -446,16 +446,16 @@ class AttnPool(nn.Module):
         #     auxiliary loss, which is a different mechanism.)
         self.frozen_prior = frozen_prior
         self.beta = beta
-        # S6 (Joe idea 2 — multi-head): ADDITIONAL queries/heads beyond the primary, created ONLY when K>1, so
+        # S6 (design note 2 — multi-head): ADDITIONAL queries/heads beyond the primary, created ONLY when K>1, so
         # the default single-head pooler (n_query=n_head=1) is BYTE-IDENTICAL to before — same self.q/self.head,
         # same forward path, same RNG draw order -> arm A reproduced <1e-6. Extra queries init small-random (not
         # 0) to break symmetry so the heads CAN diverge (else all-zero queries share a gradient and collapse by
-        # construction, which would fake Joe's "do they converge" test).
+        # construction, which would fake the "do they converge" test).
         self.n_query = n_query
         self.n_head = n_head
         self.q_rest = nn.Parameter(torch.randn(n_query - 1, d) * 0.02) if n_query > 1 else None
         self.heads_rest = nn.ModuleList([_make_head(d, head_hidden) for _ in range(n_head - 1)]) if n_head > 1 else None
-        # S7 (Joe ideas 3+4 — heads with DIFFERENT FIXED recipes): indices of query heads whose attention
+        # S7 (design notes 3+4 — heads with DIFFERENT FIXED recipes): indices of query heads whose attention
         # IS a supplied recipe rather than a learned query. This is the whole point of the arm: B.2 measured
         # heads that share a condition collapsing to pairwise correlation 1.0000, and recipes CANNOT collapse
         # into each other because what makes them differ is not learned. Empty tuple => nothing changes and
@@ -484,7 +484,7 @@ class AttnPool(nn.Module):
             return self.head(pooled).squeeze(-1), a
         # MULTI-HEAD path (S6): Q queries -> Q attention distributions -> Q pooled vectors -> H classifier heads,
         # each ensembled. MH: Q=H=K, head k reads query k's pooled. ABLATION: Q=1, H=K, all heads share one
-        # attention/pooled (isolates "more classifiers" from "attention diversity" — Joe's mandatory control).
+        # attention/pooled (isolates "more classifiers" from "attention diversity" — the mandatory control).
         q_all = self.q.unsqueeze(0) if self.n_query == 1 else torch.cat([self.q.unsqueeze(0), self.q_rest], 0)
         scores = (X @ q_all.t()) / (self.scale * self.temperature)     # (B, T, Q)
         if self.use_position:
@@ -548,7 +548,7 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
 
         L_total = L_task + (λ/H) · Σ_h Σ_i (a_hi − d_i)²
 
-    ⚠️ This is a different mechanism from anything already here. `prior_list` (S3) modifies the attention
+    This is a different mechanism from anything already here. `prior_list` (S3) modifies the attention
     SCORE — the attention is pushed, and when the push is removed it jumps back. This trains the attention
     to MATCH the target, so it moves away smoothly when the constraint lifts.
 
@@ -645,7 +645,7 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                 # B.3: ONE-SIDED entropy penalty. Penalise ONLY when the attention is too SHARP, and
                 # leave already-broad distributions completely untouched.
                 #
-                # ⚠️ WHY THIS IS A DIFFERENT TEST, NOT A THIRD VARIANT OF B.1/B.2. Those supervised the
+                # WHY THIS IS A DIFFERENT TEST, NOT A THIRD VARIANT OF B.1/B.2. Those supervised the
                 # attention toward a TARGET, and both found the target carries no information (real ≈
                 # shuffled on every cell). This constrains a PROPERTY of the distribution and uses no
                 # target at all, so the "a shuffled target does just as well" failure mode structurally
@@ -661,7 +661,7 @@ def train_attn(states, y, tr_idx, device, seed=SEED, temperature=1.0, use_positi
                     loss = loss + ent_lambda * (viol ** 2).mean()
                 # B.1: auxiliary supervision toward a target attention distribution. Active only while the
                 # schedule says so -- aux_drop_epoch=N is the paper-adjacent "strong then removed" variant
-                # (Joe's suggestion at the 31 July meeting; the paper itself has no annealing schedule).
+                # (the suggestion at the 31 July meeting; the paper itself has no annealing schedule).
                 if aux_lambda > 0 and (aux_drop_epoch is None or ep < aux_drop_epoch):
                     D = pad_prior([aux_target[i] for i in idx], X.shape[1], device)
                     D = normalise_target(D, mask)

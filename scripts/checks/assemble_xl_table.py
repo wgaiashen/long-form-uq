@@ -11,7 +11,7 @@ Deliberately mirrors `assemble_pdl_table.py`: same ALIAS-canonicalisation, same 
 list with lower priority winning a shared cell, same >0.02 cross-source disagreement check, same
 CSV+MD emission. Divergence between the two assemblers is itself a bug, so the shapes are kept identical.
 
-⚠️ THE FAMILY SPLIT (2026-08-03) CHANGES THIS GRID. expertqa+factscore are now their own `factuality`
+THE FAMILY SPLIT (2026-08-03) CHANGES THIS GRID. expertqa+factscore are now their own `factuality`
 BROAD family and asqa stays in long_qa, so SameTask changes for 5 evals and DiffTask for all 10. Any
 CSV produced before that date describes a DIFFERENT rung composition for those cells. The `*_famsplit__`
 sources are the post-split runs; older files are read only where they are unaffected.
@@ -30,14 +30,14 @@ RESULTS = ROOT / "results"
 EPHEM = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results")
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 
-# All ten. ⚠️ A `cache/records/*` glob silently returns 7 — asqa/expertqa/factscore live in *_rp12
+# All ten. A `cache/records/*` glob silently returns 7 — asqa/expertqa/factscore live in *_rp12
 # namespaces — so the eval list is stated explicitly and the realised count is asserted below.
 XL_EVALS = ["sciq", "trivia_qa", "pubmed_qa", "med_quad", "asqa",
             "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 RUNGS = ["ID", "SameTask", "LOO", "DiffTask", "OneDatasetDiffTask"]
 TARGET_CELLS = len(XL_EVALS) * len(RUNGS)          # 50
 
-# ⚠️ HEADLINE vs APPENDIX (author's decision 2026-08-03). The headline table carries the baselines and
+# HEADLINE vs APPENDIX (author's decision 2026-08-03). The headline table carries the baselines and
 # the contribution; the closed Track B screening arms move to the appendix. They are still COMPUTED and
 # still emitted to the CSV — only the rendered headline table is filtered. A method that vanishes from
 # the repo cannot be pointed at in a viva, and B.1/B.2/B.3 are cited negative results.
@@ -55,13 +55,13 @@ ALIAS = {
     "weighted_msp_norm": "wMSP-norm", "weighted_msp_unc": "wMSP-unconstrained",
     "wmsp": "wMSP-norm", "wmsp_blondel": None,
     "saplma": "SAPLMA", "mean-pool+MLP": "SAPLMA",
-    # ⭐ THE THREE THE LONG ASSEMBLER DROPS ON THE FLOOR. Without these the supervised baselines the
+    # THE THREE THE LONG ASSEMBLER DROPS ON THE FLOOR. Without these the supervised baselines the
     # report's central claim is measured against never reach the table.
     # SUPPRESSED 2026-08-04 (author's decision): the `linear` logistic probe is not a baseline the
     # report uses. It is still COMPUTED (a logistic regression on pooled vectors already in memory,
     # seconds per cell) and its rows stay in the CSVs; None routes it through the EXISTING explicit-
     # suppression path, so it is dropped on purpose rather than falling out as an unknown method.
-    # ⚠️ This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
+    # This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
     # to "SAPLMA" below and above. `linear` is the author's own linear probe on the same features.
     "linear": None,
     "ptrue": "P(True)", "ptrue_accurate": "P(True)",
@@ -114,7 +114,7 @@ def read_rows(path, valcol):
             if canon in (None, "__skip__"):
                 continue
             ev = (row.get("eval") or "").strip()
-            # ⚠️ ood_onegrid.py names this column `setting`, every other driver names it `rung`. Reading
+            # ood_onegrid.py names this column `setting`, every other driver names it `rung`. Reading
             # only `rung` would silently drop EVERY supervised-baseline row (linear/ptrue/lookback), which
             # is exactly the comparison the XL table exists to show.
             rg = (row.get("rung") or row.get("setting") or "").strip()
@@ -147,7 +147,7 @@ def main():
     present_cells = {(rg, ev) for (rg, ev, _m) in best}
     missing = [(rg, ev) for ev in XL_EVALS for rg in RUNGS if (rg, ev) not in present_cells]
     methods = sorted({m for (_r, _e, m) in best})
-    # ⚠️ PER-METHOD, NOT "cells present" (fixed 2026-08-05). `len(present_cells)` counts a cell as
+    # PER-METHOD, NOT "cells present" (fixed 2026-08-05). `len(present_cells)` counts a cell as
     # covered if ANY ONE method landed in it, so it read 50/50 while six of seventeen methods had no
     # data at all. That exact number was reported as "the XL grid is complete" on 2026-08-04 and was
     # wrong. A grid is complete when EVERY method covers EVERY cell; anything else must be per method.
@@ -161,11 +161,11 @@ def main():
         print(f"     {'OK ' if _have == TARGET_CELLS else '.. '}{_m:26s} {_have:3d}/{TARGET_CELLS}")
     print(f"XL master | {_full}/{len(methods)} methods cover the full grid")
     if missing:
-        print(f"⚠️ {len(missing)} CELLS MISSING — named, not summarised:")
+        print(f"{len(missing)} CELLS MISSING — named, not summarised:")
         for rg, ev in missing:
             print(f"     {rg:20s} {ev}")
     if conflicts:
-        print(f"⚠️ {len(conflicts)} SAME-PRIORITY DISAGREEMENTS >0.02 (one of each pair is wrong):")
+        print(f"{len(conflicts)} SAME-PRIORITY DISAGREEMENTS >0.02 (one of each pair is wrong):")
         for key, a, b, sa, sb in conflicts:
             print(f"     {key}: {a:+.4f} ({sa}) vs {b:+.4f} ({sb})")
 
@@ -182,9 +182,9 @@ def main():
              f"Coverage: {len(present_cells)}/{TARGET_CELLS} target cells "
              f"({len(XL_EVALS)} evals x {len(RUNGS)} rungs).", ""]
     if missing:
-        lines += [f"⚠️ **{len(missing)} cells missing:** "
+        lines += [f"**{len(missing)} cells missing:** "
                   + ", ".join(f"{rg}/{ev}" for rg, ev in missing), ""]
-    lines += ["⚠️ Population: v1 generations, post-family-split rungs (expertqa+factscore = `factuality` "
+    lines += ["Population: v1 generations, post-family-split rungs (expertqa+factscore = `factuality` "
               "family, asqa = long_qa). Judge label throughout; expertqa/factscore carry a FACTUALITY "
               "label, a different projection of correctness — never pool their PRR with the rest "
               "unflagged.", ""]
@@ -221,7 +221,7 @@ def main():
     out_md.write_text("\n".join(lines) + "\n")
     print(f"\nwrote {out_csv}\nwrote {out_md}")
     if missing:
-        print("\n⚠️ Grid INCOMPLETE — do not report this as a full XL grid until the cells above exist.")
+        print("\nGrid INCOMPLETE — do not report this as a full XL grid until the cells above exist.")
 
 
 if __name__ == "__main__":

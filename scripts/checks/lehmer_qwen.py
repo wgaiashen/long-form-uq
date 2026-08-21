@@ -65,7 +65,7 @@ BOOT_B = 2000                                 # as registered
 BOOT_SEED = 12345                             # same convention as aggregation_table.paired_bootstrap
 GATE_TOL = 1e-9                               # the endpoint identity is exact, not approximate
 
-# ⚠️ THE PARTIAL-LABELLING GUARD. The finite-label filter drops non-finite rows, which means a
+# THE PARTIAL-LABELLING GUARD. The finite-label filter drops non-finite rows, which means a
 # dataset that is still being judged scores CLEANLY on whatever fraction has landed and prints a
 # number indistinguishable from a complete one. That is the project's recurring failure shape: an
 # absence quietly becoming a plausible value. Judging is asynchronous here, so this is not
@@ -88,8 +88,8 @@ JUDGE_SIBLINGS = ("uncovered", "coherent")    # written by the dedicated expertq
 MAX_UNJUDGED_FRAC = 0.01                      # >1% never seen by the judge = still labelling
 
 # Llama's beta = 1 and beta = inf (= msp_min) PRR per dataset, for Q3's pooled arm ONLY.
-# Source: STOCKTAKE_sharpening_axis.md appendix A1 (sharpening_family__meta-llama_...__round2.csv).
-# Transcribed at the 3-dp the stocktake publishes -- Q3 is secondary and reported alongside Q1,
+# Source: the project results log appendix A1 (sharpening_family__meta-llama_...__round2.csv).
+# Transcribed at the 3-dp the project record publishes -- Q3 is secondary and reported alongside Q1,
 # never instead of it, so 3-dp is adequate; the sign of every difference is unambiguous at 3-dp.
 LLAMA_A1 = {           # dataset: (lehmer beta=1, msp_min)
     "pubmed_qa":     (+0.365, +0.371),
@@ -232,7 +232,7 @@ def main():
     print("  'declined' = the judge ran and returned no score (distrust rule, prereg/M4 app. B);")
     print("  those rows are dropped by the same finite-filter the Llama grid used. 'unjudged' = the")
     print("  judge never saw the row, and any nonzero count there would have stopped the run.")
-    print("  ⚠️ n_test is POST-split; declined/unjudged are counted over the FULL population, before")
+    print("  n_test is POST-split; declined/unjudged are counted over the FULL population, before")
     print("  the split, because that is the population the judge ran on. They are not two columns of")
     print("  one total -- do not subtract them from n_test.")
 
@@ -334,7 +334,7 @@ def main():
     p_stat, p_p = wilcoxon(pooled, alternative="two-sided")
     print("\n" + "=" * 100)
     print("Q3 -- SECONDARY, pooled n = 16 (8 Llama + 8 Qwen). Reported ALONGSIDE Q1, never instead.")
-    print("   Llama half transcribed from STOCKTAKE_sharpening_axis.md appendix A1 at 3 dp.")
+    print("   Llama half transcribed from the project results log appendix A1 at 3 dp.")
     print("=" * 100)
     print(f"  Llama mean diff {llama_diffs.mean():+.4f} ({int((llama_diffs > 0).sum())}/8)   "
           f"Qwen mean diff {margin:+.4f} ({signs}/8)")

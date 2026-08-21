@@ -2,7 +2,7 @@
 
 Pre-registered in `prereg/0.2_id_entropy_as_predictor.md`, committed before this ran.
 
-⚠️ NOT BLIND, and the prereg says so up front: the `ne_ID` and `d_PRR` columns were already printed by the
+NOT BLIND, and the prereg says so up front: the `ne_ID` and `d_PRR` columns were already printed by the
 A1 run before the prereg was written. This fixes the PROCEDURE and the DECISION RULE, not a blind
 prediction, and no result from it may be presented as if it were pre-registered in the 0.1 sense.
 
@@ -11,7 +11,7 @@ OOD pass to compute -- you had to run the probe on the target data to know how f
 `ne_ID` is a property of the TRAINED PROBE ALONE, measurable once before deployment with no target data.
 So if it carried signal it would be a CHEAPER gate than the one we just lost, not merely a replacement.
 
-⚠️ THE HONEST n IS 8, NOT 32. `ne_ID` is CONSTANT within a dataset, so a per-cell correlation over the 32
+THE HONEST n IS 8, NOT 32. `ne_ID` is CONSTANT within a dataset, so a per-cell correlation over the 32
 cells repeats each predictor value four times, adds no independent information, and would narrow the CI by
 roughly a factor of two for free. The dataset-level n=8 test IS the test; the per-cell number is printed
 only so nobody recomputes it and thinks it was missed, and it is labelled pseudo-replicated in the output.
@@ -111,7 +111,7 @@ def main():
 
     print("0.2 — ID attention entropy as a predictor of the OOD drop")
     print(f"  population: ProbeDriftLong cells_long, method=attention (armA); source {Path(args.a1).name}")
-    print("  ⚠️ POST-HOC: the inputs were visible before the prereg was written. Procedure and decision")
+    print("  POST-HOC: the inputs were visible before the prereg was written. Procedure and decision")
     print("     rule were fixed in advance; the prediction was not blind.")
     print("  Registered TWO-SIDED. Honest n = 8 (ne_ID is constant within a dataset).\n")
 
@@ -164,7 +164,7 @@ def main():
     if adopt:
         mech = ("sharp ID attention is brittle" if s > 0 else "flat ID attention means nothing was learned")
         print(f"  CLEARS THE BAR (|rho| >= 0.70, CI excludes 0, perm p < 0.05). Sign supports: {mech}.")
-        print("  ⚠️ SUSPECT until the required follow-up clears it: leave-one-dataset-out — refit on 7,")
+        print("  SUSPECT until the required follow-up clears it: leave-one-dataset-out — refit on 7,")
         print("     predict the 8th, report whether the ordering holds out of sample. n=8 with a post-hoc")
         print("     rule is far too easy to fit. Then head-to-head against the LENGTH gate before adoption.")
     else:

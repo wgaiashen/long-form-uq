@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """SPECIAL-TOKEN AUDIT -- which methods exclude end-of-text tokens, which do not, and does it matter?
 
-Results: ../STOCKTAKE_sharpening_axis.md §12.
 
 WHY THIS EXISTS
 ---------------
@@ -17,7 +16,7 @@ THE AUDIT, read from the code (see the table printed below for the citations):
   weighted MSP, LEARNED modes      **EXCLUDE** -- `_weights_from_raw` masks id>=128000 to -inf
   weighted MSP, `constant` mode    INCLUDE -- deliberately, to keep the constant==MSP invariant
 
-⭐ So weighted MSP is the ONLY method on the ladder that excludes them. That exclusion exists for a
+So weighted MSP is the ONLY method on the ladder that excludes them. That exclusion exists for a
 documented reason (weighted_msp.py:216-219: ~70% of xsum/cnn generations end in EOS and the learned
 weighter otherwise concentrates its softmax mass on that content-free "I'm done" token), but it means
 wMSP is scored on a different token set from the floor it is compared against.
@@ -137,11 +136,11 @@ WHICH METHODS EXCLUDE END-OF-TEXT TOKENS (read from the code)
         print("    so NO master-table number needs recomputing and the pre-registered bar stands.")
     else:
         print("  ⇒ MATERIAL. The bar itself moves; the master aggregate must be dual-reported.")
-    print("\n  ⚠️ BUT THE PER-DATASET DIFFERENCES DO NOT CANCEL, and they matter for per-dataset")
+    print("\n  BUT THE PER-DATASET DIFFERENCES DO NOT CANCEL, and they matter for per-dataset")
     print("     claims. The largest is pubmed_qa. Any statement of the form 'wMSP beats the floor on")
     print("     dataset X' should carry the content-token floor as well, because wMSP is the only")
     print("     method scored on that token set.")
-    print("\n  ⚠️ DIRECTION OF THE BIAS IS MIXED, so it does not systematically flatter anything:")
+    print("\n  DIRECTION OF THE BIAS IS MIXED, so it does not systematically flatter anything:")
     for d, a in zip(LONG, agg):
         dd = a["msp_min_kept"] - a["msp_min_all"]
         who = "handicaps wMSP (floor gains from specials)" if dd < 0 else "flatters wMSP (floor loses to specials)"

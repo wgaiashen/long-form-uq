@@ -67,14 +67,14 @@ def shrink_to_uniform(w):
 
 def tv_penalty(w):
     """Total variation (1/n) Σ_t |w_t − w_{t−1}|. 0 when the weights are flat; penalises choppy,
-    lone-token spikes → gentle peaks/troughs (Joe's neighbour-smoothing idea, as a loss term)."""
+    lone-token spikes → gentle peaks/troughs (the neighbour-smoothing idea, as a loss term)."""
     if w.shape[0] < 2:
         return torch.zeros((), device=w.device, dtype=w.dtype)
     return (w[1:] - w[:-1]).abs().sum() / w.shape[0]
 
 
 def entropy_hinge(w, threshold=0.7):
-    """Joe's SPECIFIC idea (item 1): a penalty that fires ONLY when the weight distribution gets too peaked
+    """the SPECIFIC idea (item 1): a penalty that fires ONLY when the weight distribution gets too peaked
     — i.e. only when its NORMALISED entropy H(p)/log n drops BELOW `threshold` (1 = uniform floor, 0 = one
     token gets everything). Unlike `kl_to_uniform`/`entropy_penalty` (which push toward uniform on EVERY
     batch), this is a hinge: **0 while the weights stay smooth**, and only pushes back once they cross the
@@ -99,11 +99,11 @@ REGULARISERS = {"kl_uniform": kl_to_uniform, "entropy": entropy_penalty,
 # --------------------------------------------------------------------------------------
 
 def smooth_raw(raw, k, causal=False):
-    """Moving-average of the raw per-token logits over a window of k tokens (Joe's 'smooth over the
+    """Moving-average of the raw per-token logits over a window of k tokens (the 'smooth over the
     previous n tokens → gentle peaks/troughs'). Replicate-pads the ends so length is preserved. k ≤ 1 is a
     no-op. Applied BEFORE the softmax so it shapes the weight distribution.
     `causal=False` (default): SYMMETRIC/centered window (uses both neighbours). `causal=True`: BACKWARD-only
-    window (each token averaged with the k−1 tokens BEFORE it) — Joe's literal 'previous n tokens'."""
+    window (each token averaged with the k−1 tokens BEFORE it) — the literal 'previous n tokens'."""
     if k <= 1 or raw.numel() <= 1:
         return raw
     T = raw.shape[0]

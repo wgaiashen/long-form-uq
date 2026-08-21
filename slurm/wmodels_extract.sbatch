@@ -15,14 +15,14 @@
 # 48GB card and none can use RCS's abundant RTX6000. DoC's a40 is a separate pool from the jammed
 # a100 one, so this does NOT compete with the Qwen32 work.
 #
-# ⚠️ SAFE TO SPLIT A POPULATION ACROSS CLUSTERS **BY DATASET**. Different datasets write different
+# SAFE TO SPLIT A POPULATION ACROSS CLUSTERS **BY DATASET**. Different datasets write different
 # cache files, so two clusters cannot corrupt each other. Running the SAME dataset on both would --
 # never do that. Sync the pertok caches into one place before the ladder, which needs all six.
 #
-# ⚠️ THE PER-DATASET SPEC IS BAKED IN, transcribed from slurm/qwen_generate_full.sbatch. Budgets are
+# THE PER-DATASET SPEC IS BAKED IN, transcribed from slurm/qwen_generate_full.sbatch. Budgets are
 # LLAMA's, unchanged. Passing them by hand is how a population ends up on different decoding settings.
 #
-# ⚠️ --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the msp_min
+# --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the msp_min
 # and wMSP signal.
 #
 #   sbatch --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum \

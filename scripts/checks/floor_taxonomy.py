@@ -1,8 +1,8 @@
 """Where does the error signal live: in the token probabilities, or not?
 
 This is the committed version of the analysis behind the cnn finding (plan item 0.4). It was originally
-run as an inline one-off, which meant the numbers were quoted in the stocktake with no way to reproduce
-them. ⚠️ **It must be re-run on v2**: cnn and xsum, the two datasets that anchor both ends of the
+run as an inline one-off, which meant the numbers were quoted in the project record with no way to reproduce
+them. **It must be re-run on v2**: cnn and xsum, the two datasets that anchor both ends of the
 taxonomy, are both being regenerated.
 
 THE ARGUMENT. The MSP floors are UNSUPERVISED -- they read nothing but the model's own token

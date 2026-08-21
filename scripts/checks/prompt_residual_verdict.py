@@ -6,10 +6,10 @@ exact package prereg/PR1_prompt_residual.md promised. No fitting, no compute, no
 
     python scripts/checks/prompt_residual_verdict.py
 
-⚠️ THE UNIT OF ANALYSIS IS THE DATASET, n = 8. Not "32 OOD cells", which is 8 values counted four
+THE UNIT OF ANALYSIS IS THE DATASET, n = 8. Not "32 OOD cells", which is 8 values counted four
 times and yields an interval roughly twice too narrow.
 
-⚠️ THE PRIMARY COMPARISON IS R2 - R1 (residual vs generated-only), NOT R2 - R0. Comparing the
+THE PRIMARY COMPARISON IS R2 - R1 (residual vs generated-only), NOT R2 - R0. Comparing the
 residual only against the anchor-inclusive mean would confound "subtracting h0" with "dropping h0",
 which is the entire reason the R1 arm exists.
 """
@@ -71,7 +71,7 @@ def package(deltas, label, lines, gate=False):
     """The standing evidence package: per-dataset deltas, macro, signs, Wilcoxon, bootstrap, LODO."""
     have = [e for e in EVALS if deltas.get(e) is not None]
     if len(have) < 3:
-        lines.append(f"\n### {label}\n\n⚠️ only {len(have)}/8 datasets measured -- not scored.")
+        lines.append(f"\n### {label}\n\nonly {len(have)}/8 datasets measured -- not scored.")
         return None
     d = np.array([deltas[e] for e in have])
     _, p = wilcoxon(d, alternative="two-sided") if np.any(d != 0) else (None, 1.0)
@@ -87,7 +87,7 @@ def package(deltas, label, lines, gate=False):
     for e in have:
         lines.append(f"| `{e}` | {deltas[e]:+.4f} |")
     if len(have) < 8:
-        lines.append(f"\n⚠️ MISSING (not measured, not zero): {sorted(set(EVALS) - set(have))}")
+        lines.append(f"\nMISSING (not measured, not zero): {sorted(set(EVALS) - set(have))}")
     lines.append(f"\n- macro mean delta **{d.mean():+.4f}**, median {np.median(d):+.4f}, "
                  f"signs {(d > 0).sum()}/{len(d)}, exact two-sided Wilcoxon p = "
                  + (f"{p:.4f}" if p is not None else "n/a"))
@@ -142,7 +142,7 @@ def main():
     n_want = len(EVALS) * len(ALL_RUNGS) * len(ALL_ARMS)
     lines.append(f"- {n_want - len(missing)}/{n_want} (eval × rung × arm) cells present.")
     if missing:
-        lines.append(f"- ⚠️ **MISSING (not measured, never zero):** {len(missing)} — "
+        lines.append(f"- **MISSING (not measured, never zero):** {len(missing)} — "
                      + ", ".join(f"`{x}`" for x in missing[:12])
                      + (" …" if len(missing) > 12 else ""))
     else:
@@ -167,7 +167,7 @@ def main():
     lines.append(f"| PRR gap (rank-discretised) | {pg.max():.3e} | abort above 1e-3 | "
                  f"{'PASS' if pg.max() <= 1e-3 else 'FAIL'} |")
     lines.append("")
-    lines.append("⚠️ The gate is on the **per-example uncertainties**, not PRR. PRR is a rank "
+    lines.append("The gate is on the **per-example uncertainties**, not PRR. PRR is a rank "
                  "statistic and therefore discontinuous in the scores: a measured `1e-7` "
                  "perturbation moves it by up to `1.57e-04`, and a single adjacent-pair swap by "
                  "`4.58e-06`. Gating a rank metric at `1e-6` tests 'no tie flipped', not 'same "
@@ -245,7 +245,7 @@ def main():
             lines.append("(hard OOD does exceed ID, but the full ordering does not hold — "
                          "report as partial.)")
         lines.append("")
-        lines.append("⚠️ prereg §5 also fixed the converse in advance: if `R2` improves ID but not "
+        lines.append("prereg §5 also fixed the converse in advance: if `R2` improves ID but not "
                      "the hard OOD rungs, the mechanism claim is **refuted** even under a positive "
                      "macro mean.")
 
@@ -260,12 +260,12 @@ def main():
         lines.append(f"| `{e}` | " + " | ".join(f"{v:+.4f}" if v is not None else "—"
                                                 for v in vals + fl) + " |")
     lines.append("")
-    lines.append("⚠️ The floors are training-free, so they are rung-invariant by construction and "
+    lines.append("The floors are training-free, so they are rung-invariant by construction and "
                  "are entered once per dataset (from `LOO-long`), not once per rung. `SAPLMA` is "
                  "the standing OOD bar and is read from the canonical master, not refitted here.")
 
     # ---- EXPLORATORY: is the effect just a short-generation artifact? ---------------------------
-    # ⚠️ NOT PRE-REGISTERED. Added 2026-08-12 after seeing pubmed_qa, and labelled exploratory.
+    # NOT PRE-REGISTERED. Added 2026-08-12 after seeing pubmed_qa, and labelled exploratory.
     # Motivation: h0 is ONE row of a (G+1)-row window, so it contributes 1/(G+1) of the
     # anchor-inclusive mean. On pubmed_qa (Llama median 22 tokens) that is a large share; on
     # expertqa (median 200) it is small. If the residual gain tracks generation length, the
@@ -299,7 +299,7 @@ def main():
                      f"**r = {r:+.3f}** (n = {len(xs)} datasets).")
         lines.append("")
         if r < -0.5:
-            lines.append("⚠️ **Strongly negative: the gain concentrates on SHORT generations.** That "
+            lines.append("**Strongly negative: the gain concentrates on SHORT generations.** That "
                          "is the anchor-contamination story, not the task-relative one. Any claim "
                          "must be stated as length-dependent, and the method should not be presented "
                          "as improving long-form transfer in general.")

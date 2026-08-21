@@ -1,6 +1,6 @@
 """P1.1 — does moderating / smoothing the weighted-MSP weights buy OOD robustness?
 
-The diagnosed failure (Joe's email): the learned per-token weighting spikes on single tokens that don't
+The diagnosed failure (the email): the learned per-token weighting spikes on single tokens that don't
 generalise. This driver sweeps the P1.1 smoothing knobs (all from luq.weighting, shared with the pooler)
 and asks whether a moderated weighting keeps the ID gain while surviving distribution shift:
 

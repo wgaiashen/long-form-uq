@@ -97,7 +97,7 @@ def scan_dir(d, presence, sources):
                 m = (row.get("method") or "").strip()
                 if m.startswith("VERDICT:") or m == "":
                     continue
-                # ⚠️ Third instance of the same mechanism found on 2026-08-03 (after assemble_pdl_table
+                # Third instance of the same mechanism found on 2026-08-03 (after assemble_pdl_table
                 # and assemble_xl_table): an unrecognised method is dropped with no message, so a
                 # computed method silently vanishes and "not measured" becomes indistinguishable from
                 # "measured then discarded". Reported at the end of this script rather than swallowed.
@@ -198,7 +198,7 @@ def main():
 def _report_unknown_methods():
     """Loud, at the end. Silence here is how ptrue/lookback/linear went missing from the master table."""
     if _UNKNOWN_METHODS:
-        print(f"\n⚠️ {len(_UNKNOWN_METHODS)} METHOD(S) COMPUTED BUT NOT IN ALIAS -- dropped from this "
+        print(f"\n{len(_UNKNOWN_METHODS)} METHOD(S) COMPUTED BUT NOT IN ALIAS -- dropped from this "
               f"audit: {', '.join(sorted(_UNKNOWN_METHODS))}")
 
 

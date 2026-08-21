@@ -59,7 +59,7 @@ def load(patterns):
 def check(grid_name, cfg, verbose):
     rows = load(cfg["patterns"])
     if not rows:
-        print(f"  ⚠️ {grid_name}: no source files matched — nothing to verify")
+        print(f"  {grid_name}: no source files matched — nothing to verify")
         return ["no source files"]
     fails = []
     cellset = set(cfg["cells"])
@@ -100,7 +100,7 @@ def check(grid_name, cfg, verbose):
         if verbose or bad or (m not in EXEMPT and len(have) < len(cellset)):
             flag = "OK " if (not bad and (len(have) == len(cellset) or m in EXEMPT)) else "FAIL"
             print(f"  {flag} {m:28s} {len(have):3d}/{len(cellset)}"
-                  + (f"   ⚠️ {len(bad)} NaN" if bad else ""))
+                  + (f"   {len(bad)} NaN" if bad else ""))
     print(f"  -- NaN cells across the grid: {nan_tot}")
 
     # 3 + 4
@@ -130,11 +130,11 @@ def main():
         fails += check(n, GRIDS[n], args.verbose)
     print("\n" + "=" * 76)
     if fails:
-        print(f"❌ {len(fails)} PROBLEM(S) — do not read these numbers yet:")
+        print(f"{len(fails)} PROBLEM(S) — do not read these numbers yet:")
         for f in fails:
             print(f"   {f}")
         sys.exit(1)
-    print("✅ ALL CHECKS PASS — grids are complete, finite, traceable, and internally consistent.")
+    print("ALL CHECKS PASS — grids are complete, finite, traceable, and internally consistent.")
 
 
 if __name__ == "__main__":

@@ -7,17 +7,17 @@
 # W-Models post-extraction, ONE dataset per job:
 #   01e_repool  ->  feature/pertok consistency GUARD  ->  01h_pertoken
 #
-# ⚠️ 01e_repool IS MANDATORY, NOT OPTIONAL. There are two ways to produce the pooled SAPLMA feature:
+# 01e_repool IS MANDATORY, NOT OPTIONAL. There are two ways to produce the pooled SAPLMA feature:
 # the INLINE autoregressive capture during 01_extract, and the TEACHER-FORCED re-pool here. They
 # differ by ~8e-3 absolute on the residual stream -- not precision -- and the pertok cache is
 # teacher-forced. Skipping this is exactly the med_quad/cnn/ASQA/ExpertQA gap that had to be fixed
 # once already. The guard turns that silent 8e-3 into a hard failure, so it runs before pertok and
 # a non-zero exit stops the job.
 #
-# ⚠️ --dtype MUST MATCH THE EXTRACTION DTYPE or the re-pooled states are not the ones that were
+# --dtype MUST MATCH THE EXTRACTION DTYPE or the re-pooled states are not the ones that were
 # generated from. It is passed through explicitly, never defaulted.
 #
-# ⚠️ THE LAYER IS COMPUTED, NOT TRANSCRIBED. ceil(num_hidden_layers/2) - 1 is read off the
+# THE LAYER IS COMPUTED, NOT TRANSCRIBED. ceil(num_hidden_layers/2) - 1 is read off the
 # checkpoint's own config, so a mistyped layer cannot silently produce a valid-looking cache at the
 # wrong depth. It is cross-checked against the registry in scripts/checks/slice_caches_truncated.py.
 #
@@ -47,7 +47,7 @@ case "$DS" in
   # --- outside the primary six-dataset panel; IN SCOPE ONLY for the D6 eight-dataset sensitivity ---
   # Added 2026-08-20 under prereg M5 D6. Regimes transcribed verbatim from slurm/qwen_repool.sbatch
   # and slurm/qwen_pertoken.sbatch, which are the canonical second-model specs.
-  # ⚠️ med_quad lives in the DEFAULT namespace. Its --no-repeat-ngram-size 3 is a DECODING constraint
+  # med_quad lives in the DEFAULT namespace. Its --no-repeat-ngram-size 3 is a DECODING constraint
   # and is deliberately absent here: the re-pool is teacher-forced and replays the cached token ids,
   # so it reproduces the same window without re-deriving it.
   med_quad)                  REGIME="" ;;
@@ -100,7 +100,7 @@ echo "--- 2/3 per-token cache at layer $LAYER ---" >&2
 python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DS" --ood ID \
     --layer "$LAYER" --dtype "$DTYPE" --attn "$ATTN" $RG || { echo "!!! pertoken failed" >&2; exit 8; }
 
-# ⚠️ ORDER FIXED 2026-08-15. The guard compares the pooled feature cache against the TEACHER-FORCED
+# ORDER FIXED 2026-08-15. The guard compares the pooled feature cache against the TEACHER-FORCED
 # pertok cache, so it needs BOTH. It was previously run between repool and 01h_pertoken, where the
 # pertok cache does not exist yet -- so it skipped every dataset, printed "ALL consistent" and exited
 # 0. A guard that runs before the thing it checks is not a guard; it is a rubber stamp.

@@ -7,14 +7,14 @@ template. That decision changes the population, so it must be made on pre-regist
 nothing else. Reading six rows of a CSV and deciding by eye is exactly how a threshold quietly
 becomes "close enough".
 
-⚠️ IT NEVER READS PRR. Only generation-validity signals: degeneracy, empties, invented
+IT NEVER READS PRR. Only generation-validity signals: degeneracy, empties, invented
 continuations, cap behaviour. Choosing a prompt regime on downstream uncertainty performance would
 be selecting the population on the outcome.
 
-⚠️ THE DECISION IS PER MODEL, INDEPENDENTLY. One instruct model failing must not push another onto a
+THE DECISION IS PER MODEL, INDEPENDENTLY. One instruct model failing must not push another onto a
 chat template (prereg §6). So this scores exactly one population per invocation.
 
-⚠️ A PARTIAL SMOKE CANNOT PASS. All six panel datasets must be present. A missing dataset is not a
+A PARTIAL SMOKE CANNOT PASS. All six panel datasets must be present. A missing dataset is not a
 silent pass -- it is a FAIL with the missing names listed.
 
     python scripts/checks/wmodels_gate.py --smoke-csv <path>            # thresholds only
@@ -33,7 +33,7 @@ MAX_DEGRADED = 10.0
 MAX_EMPTY = 1.0
 MAX_FABRICATED = 10.0
 MIN_ANSWER_FRAC = 0.90
-# ⚠️ ADDED 2026-08-15. The instruct failure mode pct_fabricated cannot see: the model answers
+# ADDED 2026-08-15. The instruct failure mode pct_fabricated cannot see: the model answers
 # correctly then continues in its assistant persona. gemma-2-9b-it samsum scored 80% chatter with
 # pct_fabricated at 0.0%, i.e. the gate would have PASSED a population where ~30% of the saved text
 # is filler that the judge then grades as if it were the answer.
@@ -77,14 +77,14 @@ def main():
     print(f"gate: {args.smoke_csv}")
     print(f"  datasets present: {len(smoke)}/6")
     if missing:
-        print(f"  ❌ FAIL — smoke is incomplete, missing {missing}")
+        print(f"  FAIL — smoke is incomplete, missing {missing}")
         print("  A partial smoke is not a pass. Re-run the missing datasets.")
         sys.exit(1)
 
     thin = [(d, int(float(smoke[d].get("n", 0) or 0))) for d in PANEL
             if float(smoke[d].get("n", 0) or 0) < args.min_rows]
     if thin:
-        print(f"  ⏳ UNDECIDED — too few rows to judge: {thin} (need >= {args.min_rows} each)")
+        print(f"  UNDECIDED — too few rows to judge: {thin} (need >= {args.min_rows} each)")
         print("  Not a pass and not a fail. Let generation add rows, then re-run this gate.")
         sys.exit(3)
 
@@ -117,7 +117,7 @@ def main():
                 why.append(f"chatter {cht}>{MAX_CHATTER}")
             if pcf < MIN_PRECHATTER_FRAC:
                 why.append(f"prechatter_frac {pcf}<{MIN_PRECHATTER_FRAC}")
-        # ⚠️ A cap check with no baseline value must READ as unevaluated, not pass silently. The `~`
+        # A cap check with no baseline value must READ as unevaluated, not pass silently. The `~`
         # marks exactly that: the number is the smoke's own %capped, with nothing to compare it to.
         bcap = f(base.get(d), "pct_capped") if base else None
         if cap is None:
@@ -137,16 +137,16 @@ def main():
               f"{capstr} {chtstr}  {verdict}")
 
     if uncompared:
-        print(f"  ⚠️ %capped marked `~` = NOT COMPARED (no baseline row): {uncompared}. "
+        print(f"  %capped marked `~` = NOT COMPARED (no baseline row): {uncompared}. "
               f"Reported, never silently passed.")
 
     print()
     if failures:
-        print(f"  ❌ RAW FEW-SHOT FAILS on {failures}")
+        print(f"  RAW FEW-SHOT FAILS on {failures}")
         print("  Per prereg §6: THIS population moves to its native chat template. Do not move any")
         print("  other population. Record the regime and make no causal claim about instruction tuning.")
         sys.exit(2)
-    print("  ✅ RAW FEW-SHOT PASSES on all six — keep raw few-shot for this population.")
+    print("  RAW FEW-SHOT PASSES on all six — keep raw few-shot for this population.")
     print("  (Decision made on generation-validity signals only; no PRR was read.)")
 
 

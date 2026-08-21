@@ -1,4 +1,4 @@
-"""C2 — token probabilities as a pooler INPUT (Lihu's idea), on the long-form OOD ladder.
+"""C2 — token probabilities as a pooler INPUT (the idea), on the long-form OOD ladder.
 
 C2 concatenates the model's own per-token NLL (= -logprob) onto each 4096-dim hidden state, so the attention
 pooler reads a 4097-dim input. The learned query can weight tokens partly by the model's confidence, and the

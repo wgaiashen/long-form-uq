@@ -10,7 +10,7 @@ wall). This joins them back and answers the only two questions that matter befor
      held-out-source lambda SELECTION is only exercised where the training pool had >1 source, which is
      11 of 20 cells on the 4-eval grid. The two are reported separately and never pooled.
 
-⚠️ COLUMN UNION. Job 270751 started before `head_selection` / the three head-correlation columns were
+COLUMN UNION. Job 270751 started before `head_selection` / the three head-correlation columns were
 added, so its CSV has 19 columns and the rest 23. The extra four are blank for every single-head (K=1)
 row by definition, so the union is semantically identical -- but it is filled explicitly here rather
 than left to whatever a reader's CSV tool does with a ragged join.
@@ -53,7 +53,7 @@ def fnum(r, k):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--glob", default="results/aux_rerun_*.csv")
-    # ⚠️ The output must NOT be named so that it matches the input glob. It was
+    # The output must NOT be named so that it matches the input glob. It was
     # `results/aux_rerun_COMBINED.csv`, which `results/aux_rerun_*.csv` matches -- so a second run READ ITS
     # OWN OUTPUT and double-counted every row (198 reported for 99 real). Means survived that, but every
     # `n` was inflated, and an n is what a significance claim rests on. Renamed so the glob cannot reach
@@ -150,7 +150,7 @@ def main():
             m = sum(sf) / len(sf)
             print(f"supervised x free correlation: mean {m:+.4f} over {len(sf)} rows")
             if m > 0.95:
-                print("⚠️  >0.95: the free heads did NOT diverge from the supervised ones. This arm did "
+                print(">0.95: the free heads did NOT diverge from the supervised ones. This arm did "
                       "not test\n    the paper's structural claim -- it re-confirmed that the heads will "
                       "not diverge. Write it up\n    that way, NOT as 'subset-of-heads does not help'.")
         print("Caption: greedy per-head ranking was not implemented. At zero-init the heads are "

@@ -6,7 +6,7 @@
 #PBS -j oe
 
 # W-Align -- post_token (l_t <-> h_t, current) vs pre_token (l_t <-> h_(t-1)) alignment of token losses
-# to hidden states, on HAPE (lambda 0) and HAPES (lambda 2). Results: ../STOCKTAKE_alignment.md.
+# to hidden states, on HAPE (lambda 0) and HAPES (lambda 2). Results: the project results log.
 #
 # POST-HOC SENSITIVITY ABLATION. lambda is FIXED, not swept, and no alignment will be selected on test
 # performance.
@@ -19,7 +19,7 @@
 #   for E in med_quad asqa xsum cnn_dailymail samsum expertqa factscore; do \
 #     qsub -v LUQ_EVAL=$E pbs/token_state_alignment.pbs; done                # remaining seven
 #
-# ⛔ CHECK CONTROL 2 IN THE PROBE LOG BEFORE READING ANY pre_token NUMBER. It requires the post_token
+# CHECK CONTROL 2 IN THE PROBE LOG BEFORE READING ANY pre_token NUMBER. It requires the post_token
 # arm to reproduce pdl_master's wMSP-norm / wMSP-shrink@2 to 4 dp on every cell. If it fails, the
 # post arm is not current behaviour and the comparison means nothing.
 #
@@ -29,7 +29,7 @@
 # headroom for the long-generation evals (expertqa has the largest pertok cache at 6.2 GB).
 #
 # CPU ONLY, deliberately: the W-Models extraction work owns the GPUs on both clusters.
-# ⚠️ Each job loads the FULL LONG_SRC pool, because the OOD rungs train on the other datasets -> 64gb.
+# Each job loads the FULL LONG_SRC pool, because the OOD rungs train on the other datasets -> 64gb.
 
 set -uo pipefail
 cd "$PBS_O_WORKDIR"

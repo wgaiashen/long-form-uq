@@ -128,7 +128,7 @@ def main():
             fail(ds, f"G1 row count {len(recs)} != expected {exp_rows}")
 
         # ---- G2 splits.
-        # ⚠️ The RAW `split` field is not the evaluation split, and confusing the two is an easy way
+        # The RAW `split` field is not the evaluation split, and confusing the two is an easy way
         # to raise a false alarm (this check did, on its first run). Three of the datasets carry a
         # baked-in train/test split that eval_split passes through untouched; the rest arrive
         # all-train and eval_split CARVES the test rows at XL_TEST_FRAC. So the thing that must be
@@ -292,7 +292,7 @@ def main():
     if FAIL:
         print(f"\n{len(FAIL)} FAILURE(S) -- DO NOT START THE LADDER:")
         for f in FAIL:
-            print(f"  ✗ {f}")
+            print(f"  - {f}")
         print("=" * 108)
         return 1
     print("\nALL CHECKS PASS. Generation and labelling are sound for the ladder.")

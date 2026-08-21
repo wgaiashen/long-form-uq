@@ -10,7 +10,7 @@
 
 # The CANONICAL Qwen2.5-14B per-token cache: 01h_pertoken at LAYER 23, fp32, one dataset per task.
 #
-# ⚠️ LAYER 23, BY JOE'S RULE, DECIDED BY THE AUTHOR 2026-08-09. The fixed protocol is Joe's
+# LAYER 23, BY THE FIXED RULE, DECIDED BY THE AUTHOR 2026-08-09. The fixed protocol is the
 # middle-layer convention ceil(N/2)-1 — the rule the Llama grid ACTUALLY consumed (every Llama
 # pertok file on disk is __L15 = ceil(32/2)-1, produced by 01h_pertoken fp32; verified from the
 # files and the Llama sbatch precedents expertqa_pertoken/asqa_pertoken/cnn_dailymail_pertoken_doc).
@@ -18,12 +18,12 @@
 # consumed Llama artifact used — the fp16 __L24 dumps it wrote for Qwen were deleted for exactly
 # the stale-cache reason (a file that exists in the wrong dtype/layer reads as measured).
 #
-# ⚠️ fp32 STORAGE IS THE POINT. 01e_repool's --cache-per-token stores fp16, and on Qwen's
+# fp32 STORAGE IS THE POINT. 01e_repool's --cache-per-token stores fp16, and on Qwen's
 # large-magnitude residual states fp16 rounding is 2-6e-3 — far above the consistency guard's 1e-4
 # tolerance (that is what failed the guard on 2026-08-09, NOT an inline feature cache). 01h stores
 # fp32 (its docstring says fp16; the code at 01h_pertoken.py:75 says float32 and the code is right).
 #
-# ⚠️ 01h's built-in SANITY (probe-PRR match) is OPPORTUNISTIC here, not the gate: it trains a probe
+# 01h's built-in SANITY (probe-PRR match) is OPPORTUNISTIC here, not the gate: it trains a probe
 # with --label-field on a train split, so it CRASHES AFTER CACHING on the three eval-only sets
 # (no train rows) and on any dataset whose labels have not landed yet (cnn/med_quad at submit
 # time). The cache is written and fsynced BEFORE that block, so the artifact survives the crash.

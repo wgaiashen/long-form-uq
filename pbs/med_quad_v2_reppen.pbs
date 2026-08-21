@@ -6,7 +6,7 @@
 
 # A.2b -- med_quad v2, SECOND ARM: budget 768 + repetition-penalty 1.2 (keeping no_repeat_ngram 3).
 #
-# ⚠️ STANDBY. Submit ONLY if the first arm (pbs/med_quad_v2.pbs, budget 768 + n-gram blocking, no
+# STANDBY. Submit ONLY if the first arm (pbs/med_quad_v2.pbs, budget 768 + n-gram blocking, no
 # rep-pen) comes back with a MEDIAN AT OR NEAR 768. Read the LENGTH DISTRIBUTION, not the truncation
 # rate: the samsum pilot showed the model writes to whatever cap it is given (median went 56 -> 96 when
 # the cap moved 56 -> 96), so a median near the cap means the budget is still not the binding constraint
@@ -18,7 +18,7 @@
 # empty. On that evidence the empty risk did not materialise, and med_quad plausibly needs BOTH the
 # larger budget AND general drift control rather than n-gram blocking alone.
 #
-# ⚠️ BUT THE samsum EVIDENCE DOES NOT FULLY TRANSFER, AND THIS IS THE REASON THE GATE STAYS HARD.
+# BUT THE samsum EVIDENCE DOES NOT FULLY TRANSFER, AND THIS IS THE REASON THE GATE STAYS HARD.
 # The empty-generation mechanism is a repetition penalty applied over a LONG FEW-SHOT CONTEXT, which
 # penalises context words a real answer legitimately repeats and forces immediate EOS. Measured prompt
 # lengths: samsum 147 tokens, med_quad 1184 -- EIGHT TIMES longer. So samsum is the WEAKEST available

@@ -8,7 +8,7 @@
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/prompt_residual_one_eval.pbs
 #
-# ⚠️ RUNS FROM A WORKTREE, NOT THE MAIN CHECKOUT. This workstream lives on the branch
+# RUNS FROM A WORKTREE, NOT THE MAIN CHECKOUT. This workstream lives on the branch
 # `method-dev-residual` so it cannot collide with the cross-length work in the main checkout --
 # probedriftlong._provenance() ABORTS on a dirty tracked tree, so two agents editing one checkout
 # cannot both run. The worktree has no cache/ of its own (cache/ is gitignored), hence

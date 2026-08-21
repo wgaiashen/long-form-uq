@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate Appendix A of STOCKTAKE_sharpening_axis.md: full per-cell tables for every method tried
+"""Generate Appendix A of the project results log: full per-cell tables for every method tried
 since 7 August, straight from the results CSVs (no hand-copied numbers).
 
 For FREE methods the per-dataset curve IS the full grid (rung-invariant, stated per table).
@@ -191,7 +191,7 @@ def main():
                + [f"λ10 {r.replace('-long','')}" for r in RUNGS]
                + [f"a−r {r.replace('-long','')}" for r in RUNGS])
         emit("A6 — F5b anchored wMSP (log penalty): per cell, λ=0 vs λ=10 vs (anchor − random)@λ=10",
-             "⚠️ The penalty BITES only on pubmed_qa/xsum/cnn_dailymail (§16.2); other rows are "
+             "The penalty BITES only on pubmed_qa/xsum/cnn_dailymail (§16.2); other rows are "
              "UNTESTED, not null. λ=0 ≡ `wMSP-norm` (matches `pdl_master` to 4 dp). Full λ grids and "
              "`p[k]`: `anchor_msp_min_<eval>__logpen__…csv`.",
              hdr, rows)

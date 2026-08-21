@@ -8,16 +8,16 @@ test spans truncated at the frozen `luq.template_restart` boundary. Labels stay 
 Nothing is trained on truncated data, so the two columns differ only in what the fixed model was
 shown at scoring time.
 
-⚠️ CALL IT WHAT IT IS: **FROZEN-PROBE EVAL-SIDE SENSITIVITY**. The training population is still
+CALL IT WHAT IT IS: **FROZEN-PROBE EVAL-SIDE SENSITIVITY**. The training population is still
 uncorrected, so the CLEAN column is not a corrected result for a supervised method — it is a
 diagnostic of how much the junk was contributing at scoring time. Only after the training cells are
 refreshed does a corrected number exist.
 
-⛔ NOT A VALIDITY TEST. The boundary was fixed in `luq.template_restart` from the datasets' own
+NOT A VALIDITY TEST. The boundary was fixed in `luq.template_restart` from the datasets' own
 prompt templates and committed before any of this ran. No number here may be used to move it.
 
 ────────────────────────────────────────────────────────────────────────────────────────────────
-⚠️ THE ALIGNMENT TRAP, AND HOW IT IS HANDLED.
+THE ALIGNMENT TRAP, AND HOW IT IS HANDLED.
 The per-token cache window is `[last_prompt_token] + gen_tokens`, i.e. **G+1 rows for G generated
 tokens** (implementation_notes §6 — the project has already paid for getting this wrong once). So
 keeping `n_keep` GENERATED tokens means keeping `states[:n_keep + 1]`, not `states[:n_keep]`. The
@@ -145,7 +145,7 @@ def main():
             yte = np.array([y[i] for i in te_idx], float)
             states = [PT[d][0][i] for d, i in allrows]
             records = [PT[d][3][i] for d, i in allrows]
-            # ⚠️ THE TRUNCATED VIEW MUST SLICE THE RECORD TOO, NOT ONLY THE STATES.
+            # THE TRUNCATED VIEW MUST SLICE THE RECORD TOO, NOT ONLY THE STATES.
             # `weighted_msp` derives BOTH the per-token NLL and the content-keep mask from the
             # RECORD, and multiplies them against the weights it computes from the STATES. Slicing
             # only the states leaves a 24-row state tensor being masked by a 56-token keep vector,
@@ -214,7 +214,7 @@ def main():
             w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
             w.writeheader(); w.writerows(rows)
     print(f"\nwrote {out} ({len(rows)} rows)")
-    print("⚠️ FROZEN-PROBE EVAL-SIDE ONLY. Training populations are uncorrected, so the truncated")
+    print("FROZEN-PROBE EVAL-SIDE ONLY. Training populations are uncorrected, so the truncated")
     print("   column is a diagnostic of scoring-time contribution, not a corrected method score.")
 
 

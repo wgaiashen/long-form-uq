@@ -18,7 +18,7 @@ against its gate. If PR1 passes, the remaining time goes to replicating PR1 on Q
   pool-aware shrinkage, ensembles). A positive here would be the exception, not the expectation.
 - The comparator is `wmsp_shrink2`, the registry's main regularised configuration. Two standing
   corrections are carried, not re-imported: the honest leave-one-dataset-out incumbent has moved to
-  **λ = 1.5**, and *"wMSP-shrink@2 beats SAPLMA at the hardest OOD rung"* is ⛔ **do-not-claim** — it
+  **λ = 1.5**, and *"wMSP-shrink@2 beats SAPLMA at the hardest OOD rung"* is **do-not-claim** — it
   was a tie in every population.
 
 ## 1. What the audit found (verified in code, `src/luq/weighted_msp.py`)

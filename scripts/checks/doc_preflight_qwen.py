@@ -14,7 +14,7 @@ seconds to run.
     python scripts/checks/doc_preflight_qwen.py
     python scripts/checks/doc_preflight_qwen.py --model Qwen/Qwen2.5-14B
 
-⚠️ A MISSING ITEM IS REPORTED, NEVER WORKED AROUND. This script does not create directories, does
+A MISSING ITEM IS REPORTED, NEVER WORKED AROUND. This script does not create directories, does
 not download, and does not fall back. It tells you what is absent and exits non-zero.
 """
 import argparse
@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-OK, BAD, WARN = "  ✅", "  ❌", "  ⚠️ "
+OK, BAD, WARN = "  ok", "  BAD", "  warn "
 _fail = []
 _warn = []
 
@@ -120,7 +120,7 @@ def main():
     print("\n--- dataset loaders (the ones the one-way sync tends to leave behind) ---", flush=True)
     from luq import data
 
-    # ⚠️ ASYMMETRY FOUND BY THIS SCRIPT'S FIRST RUN (2026-08-08): factscore's SOURCE data master
+    # ASYMMETRY FOUND BY THIS SCRIPT'S FIRST RUN (2026-08-08): factscore's SOURCE data master
     # lives on DoC (`/vol/gpudata/.../factscore_data`, 21 GB, the default in `luq/factscore.py:23`)
     # and does NOT exist on RCS at all. RCS only ever had the cached RECORDS, which is why the Llama
     # grid ran there without anyone noticing. So RCS cannot regenerate factscore prompts -- had Qwen
@@ -143,7 +143,7 @@ def main():
                                      "NOT set — label on RCS, or export it here"), fatal=False)
 
     def _net():
-        # ⚠️ ANY HTTP RESPONSE MEANS REACHABLE, INCLUDING AN ERROR STATUS. A bare GET to
+        # ANY HTTP RESPONSE MEANS REACHABLE, INCLUDING AN ERROR STATUS. A bare GET to
         # api.openai.com returns 421 Misdirected Request -- the server answered, so the network is
         # fine. Treating that as "no internet" is a false negative that would send someone hunting a
         # firewall that is not there (it did exactly that on the RCS smoke run).
@@ -183,12 +183,12 @@ def main():
     # ---- verdict -----------------------------------------------------------------------------
     print("\n" + "=" * 74)
     if _warn:
-        print(f"⚠️  {len(_warn)} non-fatal: {', '.join(_warn)}")
+        print(f"{len(_warn)} non-fatal: {', '.join(_warn)}")
     if _fail:
-        print(f"❌ PREFLIGHT FAILED — {len(_fail)} blocking: {', '.join(_fail)}")
+        print(f"PREFLIGHT FAILED — {len(_fail)} blocking: {', '.join(_fail)}")
         print("   Report these; do not work around them.")
         return 1
-    print("✅ PREFLIGHT PASSED — every input the Qwen pipeline touches is present here.")
+    print("PREFLIGHT PASSED — every input the Qwen pipeline touches is present here.")
     return 0
 
 

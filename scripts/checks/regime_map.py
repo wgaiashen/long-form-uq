@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """F2/F3 -- WHO WINS WHERE, WHY IT DEGRADES, AND WHETHER THE POOL-COMPOSITION STORY IS TESTABLE.
 
-Plan: ../PLAN_sharpening_axis.md.   Results: ../STOCKTAKE_sharpening_axis.md §10.
 
 F2 -- THE REGIME MAP (descriptive)
     Who wins each of the 40 (dataset x rung) cells, and the DEGRADATION ORDERING: how much each
@@ -10,7 +9,7 @@ F2 -- THE REGIME MAP (descriptive)
 
 F3 -- POOL COMPOSITION: IS THE HYPOTHESIS EVEN IDENTIFIED?
     The hypothesis is that the probes collapse because the training pool gets thin/mismatched, not
-    because of "distance" per se. ⚠️ Before fitting anything, this script checks whether the grid can
+    because of "distance" per se. Before fitting anything, this script checks whether the grid can
     SEPARATE those two, by tabulating n_sources per cell against rung and task family.
 
     Pool structure, read statically from ProbeDriftLong/probe_drift_long/ood_settings.py:30-69 --
@@ -20,7 +19,7 @@ F3 -- POOL COMPOSITION: IS THE HYPOTHESIS EVEN IDENTIFIED?
         LOO-long      : all 7 others
         1ds-Diff-long : exactly ONE source (diff[:1]), given the whole budget
 
-⚠️ THIS SCRIPT IS DESCRIPTIVE. It is computed on test data at n = 8, and the label-free version of
+THIS SCRIPT IS DESCRIPTIVE. It is computed on test data at n = 8, and the label-free version of
 exactly this rule was already FALSIFIED (prereg/R1). It is a MAP, not a predictor, and any rule built
 on it needs its own out-of-sample test.
 
@@ -79,7 +78,7 @@ def main():
 
     print("=" * 100)
     print("F2 -- THE REGIME MAP.  Population: widened cells_long, Llama-3.1-8B, 3-seed.")
-    print("⚠️ DESCRIPTIVE, not predictive: computed on test at n=8, and the label-free version of")
+    print("DESCRIPTIVE, not predictive: computed on test at n=8, and the label-free version of")
     print("   this rule (prereg/R1) was already FALSIFIED.")
     print("=" * 100)
     rows = []
@@ -115,7 +114,7 @@ def main():
         if drops:
             print(f"{m:22s}{np.mean(drops):>+11.3f}{np.mean(ids):>+10.3f}{np.mean(hards):>+11.3f}")
             rows.append(("degradation", "ALL", "ID-minus-hard", m, f"{np.mean(drops):.4f}", "", ""))
-    print("\n  ⭐ The ordering is monotone in how much a method leans on hidden states, and msp_min")
+    print("\n  The ordering is monotone in how much a method leans on hidden states, and msp_min")
     print("     loses exactly 0.000 because it never sees the training pool.")
 
     # ---------------------------------------------------------------------------------------
@@ -140,7 +139,7 @@ def main():
         else:
             groups = {lv: [d for d in LONG if vals[d] == lv] for lv in levels}
             fams = {lv: sorted({FINE[d] for d in groups[lv]}) for lv in levels}
-            # ⚠️ The confound test is NOT "every level maps to one family" (an earlier version used
+            # The confound test is NOT "every level maps to one family" (an earlier version used
             # that and mislabelled these rungs "partially separable", contradicting the verdict).
             # The right test: is the n_sources indicator a PERFECT FUNCTION of some family
             # indicator? Here n_sources is binary, so check whether one level is exactly one family.
@@ -162,7 +161,7 @@ def main():
     print("  * The only within-rung variation is SameTask (1 vs 2) and DiffTask (5 vs 6), and in both")
     print("    cases the odd group is exactly {expertqa, factscore} -- the factuality family.")
     print("    So n_sources is PERFECTLY CONFOUNDED WITH TASK FAMILY wherever it varies at all.")
-    print("\n  ⛔ THE POOL-DIVERSITY HYPOTHESIS IS UNIDENTIFIED ON THIS GRID. Any coefficient fitted")
+    print("\n  THE POOL-DIVERSITY HYPOTHESIS IS UNIDENTIFIED ON THIS GRID. Any coefficient fitted")
     print("     for 'n_sources' would be indistinguishable from a factuality-vs-rest effect, and")
     print("     across rungs it is indistinguishable from distance. Fitting it would manufacture a")
     print("     result. Reported as unidentified rather than estimated.")

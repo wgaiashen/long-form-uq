@@ -18,7 +18,7 @@ fields, 0.161 -- validated in results/expertqa/label_validation.txt). 'other' ha
 few for a meaningful held-out PRR, so it is NEVER a test fold -- it stays in the training pool.
 
 Per label, per held-out cluster we report SAPLMA-L15 PRR and the MSP floor PRR (present in EVERY table,
-Lihu's note), plus an ID reference (a stratified random pooled split) so the ID->LOCO drop = the
+the note), plus an ID reference (a stratified random pooled split) so the ID->LOCO drop = the
 domain-shift penalty. A paired test-set bootstrap gives a CI on SAPLMA-vs-floor per cluster.
 
     python scripts/checks/expertqa_loco.py                 # both labels, seeds 1,2,3

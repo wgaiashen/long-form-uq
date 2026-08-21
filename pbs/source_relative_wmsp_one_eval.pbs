@@ -9,7 +9,7 @@
 #   qsub -v LUQ_EVAL=asqa pbs/source_relative_wmsp_one_eval.pbs
 #   qsub -v LUQ_EVAL=asqa,LUQ_SMOKE=1 pbs/source_relative_wmsp_one_eval.pbs   # harness check
 #
-# ⚠️ RUNS FROM THE `method-dev-residual` WORKTREE (see pbs/prompt_residual_one_eval.pbs for why).
+# RUNS FROM THE `method-dev-residual` WORKTREE (see pbs/prompt_residual_one_eval.pbs for why).
 #
 # SIZING follows pbs/sharpening_wmsp_one_eval.pbs, not the prompt-residual job: this trains FOUR
 # weighters per (cell, seed) -- the library canonical, our no-op copy, masked and pure -- so it is

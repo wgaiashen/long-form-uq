@@ -1,5 +1,5 @@
 """Phase-4 sanity: does the Blondel soft-rank loss actually train the token weighter, and does it hold
-up against Joe's pairwise fallback? Runs on a SYNTHETIC set with a KNOWN answer, so we can check
+up against the pairwise fallback? Runs on a SYNTHETIC set with a KNOWN answer, so we can check
 recovery, not just that the loss decreases.
 
 Construction: each sequence has T tokens with random hidden states h_t and per-token NLLs. A FIXED
@@ -79,7 +79,7 @@ def main():
     print(f"untrained baseline  Spearman(q_pred, q_true) = {base:+.3f}", flush=True)
 
     s_pair = recovery(states, records, y, q_true, tr, te, device, "pairwise")
-    print(f"pairwise (Joe)      Spearman = {s_pair:+.3f}", flush=True)
+    print(f"pairwise (reference)      Spearman = {s_pair:+.3f}", flush=True)
 
     if W._HAVE_TORCHSORT:
         s_bl = recovery(states, records, y, q_true, tr, te, device, "blondel")

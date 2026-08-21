@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """The XL grid's headline numbers, computed the SAME way as the Long grid's, so the two are comparable.
 
-Mirrors the analysis written into STOCKTAKE_post31July.md for ProbeDriftLong:
+Mirrors the analysis written into the project results log for ProbeDriftLong:
   * ID mean and OOD mean per method, with the cell count behind each.
-  * The comparison against BOTH bars — `msp_min` (pre-registered, Joe's agreed bar) and the strongest
+  * The comparison against BOTH bars — `msp_min` (pre-registered, the agreed bar) and the strongest
     free floor chosen PER DATASET. On the Long grid these disagree about whether training beats free at
     all, so reporting only one is not an option.
   * Per-dataset floor winners, because the standing rule is to report which floor won per cell.
@@ -86,7 +86,7 @@ def main():
             print(f"  {'SKIP ' + lab:22s} {'':>9s} {len(idv):3d} {'':>9s} {len(ov):3d}   "
                   f"PARTIAL — not comparable, use --allow-partial to see it")
             continue
-        mark = "" if full else "  ⚠️PARTIAL"
+        mark = "" if full else "  PARTIAL"
         i, o = (st.mean(idv) if idv else float('nan')), (st.mean(ov) if ov else float('nan'))
         rows.append((lab, o, full))
         print(f"  {lab:22s} {i:+9.4f} {len(idv):3d} {o:+9.4f} {len(ov):3d}  "

@@ -17,11 +17,11 @@ The model is trained ONCE per cell and scored on both row sets, so the two colum
 which rows are scored — never in what was learned. That isolates "how much of this PRR is the
 method detecting degeneracy?" from "how much is it detecting uncertainty?".
 
-⚠️ SCOPE, STATED PLAINLY. Flagged rows are removed from the TEST set only, not the training pool.
+SCOPE, STATED PLAINLY. Flagged rows are removed from the TEST set only, not the training pool.
 Removing them from training too is a different and larger counterfactual (it changes what the probe
 learns and the pool size); it is NOT done here and no claim is made about it.
 
-⚠️ THIS IS A DIAGNOSTIC SENSITIVITY. It writes its own CSV, it does not touch `pdl_master`, and no
+THIS IS A DIAGNOSTIC SENSITIVITY. It writes its own CSV, it does not touch `pdl_master`, and no
 example is dropped from the canonical population. A clean-subset PRR is not a corrected result —
 the clean subset is a different, easier population (mean label 0.896 vs 0.652 on expertqa), so the
 two columns are not directly comparable as method scores. The informative quantity is the COLLAPSE.
@@ -174,7 +174,7 @@ def main():
             w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
             w.writeheader(); w.writerows(rows)
     print(f"\nwrote {out} ({len(rows)} rows)")
-    print("⚠️ The CLEAN column is a DIFFERENT, EASIER population, not a corrected score. Read the")
+    print("The CLEAN column is a DIFFERENT, EASIER population, not a corrected score. Read the")
     print("   collapse (or its absence), not the level.")
 
 

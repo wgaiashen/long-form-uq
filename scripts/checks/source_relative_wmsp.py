@@ -24,13 +24,13 @@ TWO ARMS (prereg §2)
           source dominates by size. Confounds batching with the comparison set -- which is why
           `masked` is primary and why the interpretation table in prereg §4 is fixed in advance.
 
-⚠️ THE CONTROL THE BRIEF ASKED FOR IS LOGICALLY IMPOSSIBLE, AND IS NOT CREATED.
+THE CONTROL THE BRIEF ASKED FOR IS LOGICALLY IMPOSSIBLE, AND IS NOT CREATED.
 `wmsp_sourcepure_global` -- source-pure batches with a global ranking loss -- cannot exist: inside a
 source-pure batch every comparison is ALREADY within-source, so "source-pure batching" and
 "within-source ranking" are the same intervention. Building it would produce a third name for the
 `pure` arm and invite a comparison that is a tautology.
 
-⚠️ TWO RUNGS CANNOT DIFFER, AND THAT IS USED AS A CONTROL.
+TWO RUNGS CANNOT DIFFER, AND THAT IS USED AS A CONTROL.
 `ID` and `1ds-Diff-long` are single-source pools, so within-source ranking IS global ranking there.
 Both arms are constructed so that a single-source pool takes exactly the canonical RNG draws, and
 those cells are run at seed 1 as an EXACT-INVARIANCE CONTROL: they must reproduce canonical to
@@ -106,7 +106,7 @@ def train_srcrel(states, records, y, tr_idx, sources, device, *, mode="canonical
     model.train()
     for _ep in range(n_epochs):
         if mode == "pure":
-            # ⚠️ RNG EQUIVALENCE. With ONE source this draws torch.randperm(n_seq, generator=g) and
+            # RNG EQUIVALENCE. With ONE source this draws torch.randperm(n_seq, generator=g) and
             # slices it in 32s -- byte-identical to the canonical path. That is what makes the
             # single-source cells an exact-invariance control rather than an approximate one.
             chunked = []
@@ -137,7 +137,7 @@ def train_srcrel(states, records, y, tr_idx, sources, device, *, mode="canonical
             if mode in ("masked", "masked_scaled"):
                 # Rank only within each source subgroup, then average over the valid subgroups.
                 #
-                # ⚠️ WHY `masked_scaled` EXISTS (added 2026-08-13, prereg §7 amendment).
+                # WHY `masked_scaled` EXISTS (added 2026-08-13, prereg §7 amendment).
                 # The rank loss is an MSE between soft and hard ranks, so its SCALE grows with the
                 # number of items ranked: ranks run 1..m, and the MSE is O(m^2). Ranking inside
                 # subgroups of ~5 instead of a batch of 32 therefore shrinks the rank term by
@@ -225,7 +225,7 @@ def main():
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} "
           f"env_hash={prov['env_hash']} carve={prov['carve']}", flush=True)
     if args.smoke:
-        print("⚠️  SMOKE TEST -- results are NOT reportable", flush=True)
+        print("SMOKE TEST -- results are NOT reportable", flush=True)
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     _valid = {"masked", "masked_scaled", "pure"}
@@ -267,7 +267,7 @@ def main():
             if not train_rows or not test_rows:
                 continue
             if args.smoke:
-                # ⚠️ STRIDE, DO NOT TRUNCATE. `build_rows` returns SOURCE-BLOCKED rows (splits.py:180
+                # STRIDE, DO NOT TRUNCATE. `build_rows` returns SOURCE-BLOCKED rows (splits.py:180
                 # concatenates one contiguous block per source), so train_rows[:96] would take every
                 # row from the FIRST source and hand a silently SINGLE-SOURCE pool to a method whose
                 # whole point is multi-source behaviour -- the smoke would pass while testing nothing.

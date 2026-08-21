@@ -15,7 +15,7 @@ assignment is unambiguous** — pubmed (concentrated → msp_min), cnn (spread �
 and **LEAST on the plateau/ambiguous ones** (expertqa, med_quad). **A uniform gain everywhere would be SUSPICIOUS**
 (would indicate capacity, not signal-location information).
 
-**⚠️ The §D.6 predictability NULL DOES NOT APPLY here.** That test tried to predict ONE k per dataset from 8
+**The §D.6 predictability NULL DOES NOT APPLY here.** That test tried to predict ONE k per dataset from 8
 datapoints (near-guaranteed to fail). THIS is per-example, thousands of rows, gate fit LODO — a different
 experiment. The decisive quantity is **(real-feature gate) − (shuffled-feature gate)**, reported BEFORE the
 headline score; if shuffling the features within each cell does not drop the score, the gain is bin/parameter

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ⚠️ 64gb, NOT 40gb (raised 2026-08-04). At 40gb the SUCCESSFUL jobs peaked at 39.0 GB — every one of
+# 64gb, NOT 40gb (raised 2026-08-04). At 40gb the SUCCESSFUL jobs peaked at 39.0 GB — every one of
 # them finished inside 1 GB of the cgroup limit, which is luck, not headroom. expertqa and factscore were
 # OOM-killed outright. The driver holds all TEN datasets' per-token states plus three pooled feature
 # matrices each, so the footprint is set by the cohort, not by which eval is being scored.

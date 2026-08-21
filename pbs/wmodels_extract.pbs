@@ -10,19 +10,19 @@
 # The six-dataset reduced replication panel (prereg/M5_multimodel_far_ood.md §2):
 #   pubmed_qa, xsum, cnn_dailymail, samsum, asqa, factscore.   med_quad and expertqa are DROPPED.
 #
-# ⚠️ THE PER-DATASET SPEC IS BAKED IN HERE, NOT PASSED AT SUBMIT TIME. It is transcribed verbatim
+# THE PER-DATASET SPEC IS BAKED IN HERE, NOT PASSED AT SUBMIT TIME. It is transcribed verbatim
 # from slurm/qwen_generate_full.sbatch, which is the canonical second-model spec. Budgets are
 # LLAMA's, unchanged -- changing a budget on one model only would manufacture exactly the confound
 # the replication exists to avoid. Passing these by hand at qsub time is how a population silently
 # ends up on different decoding settings.
 #
-# ⚠️ --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime (01_extract:116 refuses it otherwise,
+# --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime (01_extract:116 refuses it otherwise,
 # to stop non-default-budget records landing in the default namespace beside the frozen v1 records).
 # So it is passed only where a regime exists; --max-new-tokens-cap (a pure ceiling, no guard) carries
 # the budget elsewhere. The budget is evidenced after the fact by max(len(gen_token_ids)) per
 # dataset, which is a stronger check than a printed intention.
 #
-# ⚠️ --dtype AND --attn ARE PASSED EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model, and
+# --dtype AND --attn ARE PASSED EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model, and
 # token logprobs ARE the msp_min and wMSP signal. 01_extract's --require-explicit-dtype is on by
 # default for non-keystone models and would refuse `auto` anyway; this is the belt to that braces.
 #
@@ -66,12 +66,12 @@ case "$DS" in
   # sensitivity has its own driver (pbs/wmodels_sens8_ladder.pbs) rather than a flag on the primary one.
   # Specs transcribed VERBATIM from slurm/qwen_generate_full.sbatch, the canonical second-model spec.
   #
-  # ⚠️ med_quad takes --no-repeat-ngram-size 3 and specifically NOT --repetition-penalty: rep-pen
+  # med_quad takes --no-repeat-ngram-size 3 and specifically NOT --repetition-penalty: rep-pen
   # penalises its long few-shot context and forces immediate EOS, which produced ~35% EMPTY generations.
   # Budget 128 is the hash-pinned v1 (prereg/CANONICAL_v1_MANIFEST.sha256), deliberately the CAPPED
   # version, not the archived v2 at 768.
   med_quad)      BUD=128; EXTRA="--no-repeat-ngram-size 3" ;;                                # 1800 rows
-  # ⚠️ expertqa is the longest budget in the project and ~29% of the whole eight-dataset generation
+  # expertqa is the longest budget in the project and ~29% of the whole eight-dataset generation
   # token load. It is BORDERLINE against this script's 12h walltime -- submit it with -l walltime=24:00:00.
   expertqa)      BUD=384; EXTRA="--prompt-regime expertqa_rp12 --repetition-penalty 1.2" ;;   # 2016 rows
   *) echo "!!! '$DS' is not in the six-dataset panel (prereg M5 §2), and is not one of the two"; \

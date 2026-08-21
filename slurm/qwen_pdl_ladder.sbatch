@@ -11,10 +11,10 @@
 # The ProbeDriftLong ladder on Qwen2.5-14B: one eval per array task, 3 seeds, the COMPLETE grid
 # (every rung cells_long emits -- no --rungs subset, per the standing evaluation rule).
 #
-# ⛔ NOT SUBMITTABLE YET. Two things must land first, in this order:
+# NOT SUBMITTABLE YET. Two things must land first, in this order:
 #
 #   1. prereg/M2_qwen14b_replication.md committed. The thresholds are already pre-committed in
-#      PLAN_execution_post7Aug.md §3 (commit 9731fea, 7 August, before any Qwen record existed), but
+#      the project plan (commit 9731fea, 7 August, before any Qwen record existed), but
 #      the transcription into prereg/ never happened. Once a single ladder number exists it can
 #      never honestly be written, so it is a hard predecessor to this job, not a tidy-up after it.
 #   2. scripts/checks/probedriftlong.py ported to --model. Line 43 hardcodes
@@ -31,7 +31,7 @@
 # the only GPU work is training the attention pooler. a30 nodes carry 515 GB and 8 cards; a100 is
 # where the pertok extraction array lives, so keeping the ladder off it avoids self-contention.
 #
-# WHY LAYER 23. Joe's middle-layer rule ceil(N/2)-1, fixed protocol on both models, decided by the
+# WHY LAYER 23. the middle-layer rule ceil(N/2)-1, fixed protocol on both models, decided by the
 # author 2026-08-09 -- the same rule the Llama grid actually consumed (every Llama pertok on disk is
 # __L15). See slurm/qwen_pertoken.sbatch for the artifact evidence.
 

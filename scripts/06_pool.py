@@ -40,7 +40,7 @@ DATASETS = ["sciq", "pubmed_qa", "xsum"]
 def _split_features(cache_dir, model, dataset, ood, feature_method, layer_arg, memo):
     """Return (X_train, y_train, X_test, y_test) for a dataset at `layer_arg` (0 for the
     single-layer lookback feature). Memoised so each big all-layer feature file is loaded once.
-    layer_arg MUST match the layer 03_probe/04_eval/the ID table used (Llama middle = 15, Joe's
+    layer_arg MUST match the layer 03_probe/04_eval/the ID table used (Llama middle = 15, the
     ceil(N/2)-1), NOT n_layers//2 = 16: the ptrue_accurate feature is stored L15-ONLY (other layers
     NaN), so layer 16 is NaN, and saplma at 16 would not be apples-to-apples with the ID table."""
     mk = (dataset, feature_method, layer_arg)

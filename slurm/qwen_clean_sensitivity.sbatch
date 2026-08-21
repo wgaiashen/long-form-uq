@@ -17,7 +17,7 @@
 # PRR +0.666 -> -0.060, and the same collapse happens on Llama. This asks the same question of the
 # SUPERVISED comparison: is wMSP@2-vs-SAPLMA on the hardest rungs also partly degeneracy detection?
 #
-# ⚠️ DIAGNOSTIC, NOT A CORRECTION. Writes its own CSV under results/analysis/. It does not touch
+# DIAGNOSTIC, NOT A CORRECTION. Writes its own CSV under results/analysis/. It does not touch
 # pdl_master, drops no example from the canonical population, and the CLEAN column is a different,
 # easier population (expertqa mean label 0.896 clean vs 0.652 overall) rather than a fixed score.
 # The informative quantity is the collapse, not the level.

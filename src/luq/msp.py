@@ -13,14 +13,14 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
     "mean": 1 - mean token probability (smooth, whole-sequence view).
     "min" : 1 - least-confident token's probability (weakest-link view).
     "sum" : minus the sum of logprobs = -log p(sequence). This is what
-            lm-polygraph calls MaximumSequenceProbability (and what Joe's Hidden
+            lm-polygraph calls MaximumSequenceProbability (and what the Hidden
             Failures reports as "MSP"), so use it when comparing against those
             numbers. Not length-normalised, and not bounded to [0, 1] like the
             others (fine for PRR, which only uses the ranking).
     "perplexity" : mean per-token negative log-likelihood = (1/L) * sum(-log p),
             the LENGTH-NORMALISED counterpart to "sum". This is exactly
             lm-polygraph's `Perplexity` estimator (`-np.mean(ll)`; uhead inherits
-            it) and the "Perplexity" baseline in Joe's Hidden Failures, so the
+            it) and the "Perplexity" baseline in the Hidden Failures, so the
             name matches them. NOTE the name follows that convention rather than
             the textbook definition: lm-polygraph's "Perplexity" returns mean NLL
             (log-perplexity), NOT exp(mean NLL) — there is no exp. Under PRR only
@@ -44,12 +44,12 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
 FLOOR_AGGREGATES = ("sum", "perplexity", "min")
 
 # ---- the PRE-REGISTERED primary floor (2026-07-24 meeting decision) ---------------------------------
-# Joe rejected max-of-three ("gives the baseline three shots; one may look good by chance"). Instead we
+# Max-of-three was rejected ("gives the baseline three shots; one may look good by chance"). Instead we
 # FIX ONE aggregate in advance and use it as the bar on EVERY dataset. `min` is chosen because it is the
 # strongest averaged ACROSS datasets (cross-dataset mean PRR: min ~0.28 > perplexity ~0.21 > sum ~0.20),
 # and because pre-committing to one aggregate with no per-dataset hindsight is the deployment-honest choice.
 # Report the three-variant row per dataset regardless, and where a DIFFERENT variant is the strongest free
-# score on a dataset (cnn/samsum -> perplexity) DUAL-REPORT against it too (see STOCKTAKE_post24July).
+# score on a dataset (cnn/samsum -> perplexity) DUAL-REPORT against it too (see the project record).
 PRIMARY_FLOOR_AGG = "min"
 
 
@@ -89,7 +89,7 @@ def fair_floor(records_te, y_te, prr_fn, aggregates=FLOOR_AGGREGATES):
     length-normalised. On several datasets a different aggregate is far stronger -- pubmed_qa
     sum=+0.202 vs min=+0.371, ASQA sum=+0.148 vs perplexity=+0.316 -- so a "beats the floor" claim
     measured against `sum` alone can be more than twice the honest margin. That is exactly the
-    artefact that produced, and then killed, the cnn headline (STOCKTAKE PART VI/XI/XII). A supervised
+    artefact that produced, and then killed, the cnn headline (the project record). A supervised
     method should have to beat the best thing you can get for free, not the most convenient one.
 
     Returns (vector, name): the per-example uncertainty vector of the winning floor, and which it was.

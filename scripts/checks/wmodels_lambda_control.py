@@ -5,10 +5,10 @@ there. The re-run recomputes `wmsp_norm` and `wmsp_shrink2` from the SAME caches
 so both must come back **bit-identical** to the committed values. If they do not, the registry edit
 changed something it should not have, and the λ = 1.5 numbers must not be read at all.
 
-⚠️ COMPARES PER-EXAMPLE VECTORS, NOT PRR. PRR moves ~1e-4 on 1e-7 of round-off, so agreeing PRRs
+COMPARES PER-EXAMPLE VECTORS, NOT PRR. PRR moves ~1e-4 on 1e-7 of round-off, so agreeing PRRs
 would pass runs that are not the same computation.
 
-⚠️ A cell present in one run and absent from the other is reported, never skipped silently -- that is
+A cell present in one run and absent from the other is reported, never skipped silently -- that is
 the "blank reads as measured" failure this project bans.
 
     python scripts/checks/wmodels_lambda_control.py --model google/gemma-2-9b
@@ -87,20 +87,20 @@ def main():
     print(f"\n--- summary ---\n  cells compared     {n_cells}\n  vector comparisons {n_cmp}")
     print(f"  worst max|Δ|       {worst:.10f}"
           f"{'   (every carried vector bit-identical)' if worst == 0.0 else ''}")
-    if missing_new: print(f"  ⏳ not re-run yet ({len(missing_new)}): {missing_new}")
-    if missing_old: print(f"  ℹ️ new only ({len(missing_old)}): {missing_old}")
+    if missing_new: print(f"  not re-run yet ({len(missing_new)}): {missing_new}")
+    if missing_old: print(f"  new only ({len(missing_old)}): {missing_old}")
 
     if fails:
         print(f"\n!!! CONTROL FAILED -- {len(fails)} problem(s):", file=sys.stderr)
         for f in fails: print(f"    - {f}", file=sys.stderr)
-        print("    ⛔ Do NOT read or record any λ = 1.5 number.", file=sys.stderr)
+        print("    Do NOT read or record any λ = 1.5 number.", file=sys.stderr)
         return 1
     if n_cells == 0:
         print("\n!!! nothing compared -- NOT a pass", file=sys.stderr); return 1
-    print(f"\n✅ CONTROL PASSED on {n_cells} cells: λ=0 and λ=2 reproduce exactly, and "
+    print(f"\nCONTROL PASSED on {n_cells} cells: λ=0 and λ=2 reproduce exactly, and "
           f"{NEW} is present only in the new run.")
     if missing_new:
-        print(f"   ⚠️ PARTIAL: {len(missing_new)} cell(s) have not been re-run yet.")
+        print(f"   PARTIAL: {len(missing_new)} cell(s) have not been re-run yet.")
     return 0
 
 

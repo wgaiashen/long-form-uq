@@ -10,15 +10,15 @@
 # 3 seeds. Slurm twin of pbs/wmodels_ladder.pbs.
 # (slurm/wmodels_qwen32_ladder.sbatch stays as the Qwen32-specific array.)
 #
-# ⚠️ CPU ON PURPOSE, SAME AS THE PBS TWIN. probedriftlong.py falls back to device=cpu, and the
+# CPU ON PURPOSE, SAME AS THE PBS TWIN. probedriftlong.py falls back to device=cpu, and the
 # ladder reads only cached pertok/features -- no model forward pass -- so it does not need a40/a100
 # at all. Routed to t4 (usually the least contended DoC partition) rather than competing with
 # extraction/postextract for the scarce big cards. DoC's QoS still force-assigns 1 GPU regardless of
-# partition (see implementation_notes.md), but that GPU is not needed and mostly goes unused.
+# partition (see the project implementation notes), but that GPU is not needed and mostly goes unused.
 #
-# ⚠️ --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION (prereg M5 §4).
-# ⚠️ --perex-dir IS REQUIRED -- the verification gate compares per-example vectors, not PRR.
-# ⚠️ THE CELL COUNT IS ASSERTED AFTERWARDS -- a missing dataset silently shrinks the grid instead of
+# --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION, NOT AN OPTIMISATION (prereg M5 §4).
+# --perex-dir IS REQUIRED -- the verification gate compares per-example vectors, not PRR.
+# THE CELL COUNT IS ASSERTED AFTERWARDS -- a missing dataset silently shrinks the grid instead of
 # erroring, so `probedriftlong` printing "<d>: no pertok cache -> skip" must be caught by hand.
 #
 #   sbatch --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_EVAL=xsum slurm/wmodels_ladder.sbatch
@@ -39,7 +39,7 @@ RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"
 # λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
 # Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
 #   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
-# ⛔ The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
+# The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
 # is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
 # that exists precisely because nothing has been selected on it.
 WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink2}"

@@ -4,7 +4,7 @@
 every threshold and decision rule below is fixed while only the Llama numbers are known.
 
 Companion to `prereg/M2_qwen14b_replication.md` (the four replication claims) and
-`PLAN_probedriftlong_library.md` (the implementation).
+the project plan (the implementation).
 
 ---
 
@@ -46,7 +46,7 @@ because row order is a deterministic function of the data (verified: `load_recor
 order; all five carve-relevant datasets are single-split, contiguous and idx-ordered), and an **order
 guard** now enforces that rather than assuming it.
 
-⚠️ **HONESTY CLAUSE — carried verbatim into every write-up of this change.**
+**HONESTY CLAUSE — carried verbatim into every write-up of this change.**
 *Freezing the row set does NOT fully equalise the populations. Each model is still scored on the
 subset its own judge could label, so the compared row sets still differ. The gain is that the
 difference is now fixed, visible and measurable rather than silent. Do not claim the problem is
@@ -80,7 +80,7 @@ size R3 is testing**, and the worst single draw shifted PRR by ~0.09 — larger 
 effect. Beyond that, a per-dataset cross-model difference of the size we care about could be
 manufactured by coverage divergence rather than by the model.
 
-⚠️ **These are LOWER bounds.** The simulation drops rows *at random*; the real drop is **not**
+**These are LOWER bounds.** The simulation drops rows *at random*; the real drop is **not**
 random. Measured (§5): dropped rows are significantly shorter and score-correlated —
 `perplexity` differs by **+0.058 (expertqa)** and **+0.310 (factscore)** between dropped and kept
 rows. So 10 pp is if anything generous.
@@ -109,7 +109,7 @@ rescued by exclusion, so there is no gain to offset narrowing the thesis claim t
 or the appearance of post-hoc selection.
 
 **Intersection sensitivity.** R1–R4 additionally recomputed on the rows **both** models' judges could
-label, in its own table, marked as a sensitivity analysis. ⚠️ **Never written back into the frozen
+label, in its own table, marked as a sensitivity analysis. **Never written back into the frozen
 master** — that would let Qwen retroactively change the Llama numbers.
 
 ## 5. Registered finding: the dropped rows are SHORTER, not longer
@@ -169,17 +169,17 @@ the DiffTask rung**:
 | 1ds-Diff-long | +0.2320 | +0.2092 | +0.0228 | 6/8 | 0.6406 | [−0.068, +0.106] |
 
 **Registered as: wMSP@2 is directionally ahead at `1ds-Diff-long` (6/8, +0.023) and TIES at
-`DiffTask-long` (4/8, +0.002).** ⚠️ Both CIs span zero, so **neither rung is a significant win** —
+`DiffTask-long` (4/8, +0.002).** Both CIs span zero, so **neither rung is a significant win** —
 `1ds-Diff-long` is directional only. R4 remains descriptive with no inferential claim, and a Qwen
 non-replication of it carries no information.
 
 ## 8. Order of operations
 
-1. Gate 1 (index equivalence) — ✅ passed 2026-08-08, 126/126 byte-identical.
+1. Gate 1 (index equivalence) — passed 2026-08-08, 126/126 byte-identical.
 2. Commit the modified tracked files (the ladder refuses to run on a dirty tree).
 3. Gate 2 — re-run samsum + factscore under `LUQ_CARVE=legacy`; PRR must match exactly.
 4. Gate 3 — `LUQ_CARVE=all-rows`, re-score expertqa + factscore only; the other six must not move.
-5. Record old beside new in `STOCKTAKE_post31July.md` as a dated revision, never a silent edit.
+5. Record old beside new in the project results log as a dated revision, never a silent edit.
 
 Re-runs use the **paper method set only**: floors, SAPLMA, attention pooler + mean-pool control,
 `wmsp_norm` + `wmsp_shrink2` — matching the Qwen Tier 1 set so both models stay method-matched.

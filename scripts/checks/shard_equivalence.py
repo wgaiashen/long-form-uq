@@ -13,7 +13,7 @@ The question is narrow: *does splitting the layers across two devices perturb fp
 It is answered by running the SAME code path twice on the SAME node over the SAME inputs, once
 single-GPU and once sharded, and diffing. Anything else is a confound:
 
-  ⚠️ Do NOT compare a sharded TEACHER-FORCED pass against the cached AUTOREGRESSIVE logprobs and
+  Do NOT compare a sharded TEACHER-FORCED pass against the cached AUTOREGRESSIVE logprobs and
      call the difference "sharding". The cache was written by generate() decoding one token at a
      time with a KV cache; a teacher-forced forward over the same ids is a DIFFERENT computation
      and is documented in this project to differ by ~1e-4 relative (the same AR-vs-TF gap that
@@ -21,7 +21,7 @@ single-GPU and once sharded, and diffing. Anything else is a confound:
      gate for the wrong reason. Check C below MEASURES that gap separately so it cannot be
      mistaken for the thing under test.
 
-  ⚠️ `device_map="auto"` ALONE DOES NOT SHARD. accelerate fills GPU 0 first, and a 32GB fp32
+  `device_map="auto"` ALONE DOES NOT SHARD. accelerate fills GPU 0 first, and a 32GB fp32
      Llama-8B fits entirely on one 48GB card — so the "sharded" arm would be the single-GPU arm
      and the test would pass vacuously while proving nothing. We force a real split with
      max_memory and then ASSERT the model actually spans >1 device.
@@ -134,12 +134,12 @@ def load(device_map, max_memory, want_shard):
     n_dev = len(devs)
     if want_shard:
         if n_dev < 2:
-            raise SystemExit(f"❌ SHARDING DID NOT HAPPEN — model sits on {n_dev} device(s): {devs}. "
+            raise SystemExit(f"SHARDING DID NOT HAPPEN — model sits on {n_dev} device(s): {devs}. "
                              "The test would be vacuous. Lower max_memory and retry.")
         if any(v in ("cpu", "disk") for v in dmap.values()):
-            raise SystemExit("❌ part of the model was offloaded to CPU/disk — that is a different "
+            raise SystemExit("part of the model was offloaded to CPU/disk — that is a different "
                              "computation, not GPU sharding. Raise max_memory.")
-        print(f"    ✅ genuinely sharded across {n_dev} devices: {sorted(map(str, devs))}", flush=True)
+        print(f"    genuinely sharded across {n_dev} devices: {sorted(map(str, devs))}", flush=True)
     else:
         print(f"    single-device load ({n_dev} device: {sorted(map(str, devs))})", flush=True)
     return model, tok
@@ -187,7 +187,7 @@ def main():
     ngpu = torch.cuda.device_count()
     print(f"G1 shard-equivalence | {MODEL} | fp32 + eager | {ngpu} GPU(s) visible", flush=True)
     if ngpu < 2:
-        raise SystemExit(f"❌ need >=2 GPUs to test sharding, found {ngpu}")
+        raise SystemExit(f"need >=2 GPUs to test sharding, found {ngpu}")
     for i in range(ngpu):
         p = torch.cuda.get_device_properties(i)
         print(f"    GPU{i}: {p.name} {p.total_memory/2**30:.0f}GiB", flush=True)
@@ -241,7 +241,7 @@ def main():
         ok = md <= args.tol
         all_pass &= ok
         print(f"\n  {d}: max |Δ logprob| = {md:.3e}   (tol {args.tol:.0e})   "
-              f"{'✅ PASS' if ok else '❌ FAIL'}" + (f"   worst row {where}" if where is not None else ""))
+              f"{'PASS' if ok else 'FAIL'}" + (f"   worst row {where}" if where is not None else ""))
         fs, fh = floors(single[d]), floors(shard[d])
         ent = {"max_abs_logprob_diff": md, "pass": bool(ok), "n_rows": len(rows), "label": lab, "prr": {}}
         for agg in ("min", "perplexity", "sum"):
@@ -251,7 +251,7 @@ def main():
             moved = drift > 1e-6
             all_pass &= not moved
             line = (f"    msp_{agg:10} PRR  single {p_s:+.4f}   sharded {p_h:+.4f}   "
-                    f"Δ {drift:.2e} {'❌ MOVED' if moved else '✓'}")
+                    f"Δ {drift:.2e} {'MOVED' if moved else 'ok'}")
             if ref is not None and not args.limit:
                 line += f"   | cached-AR ref {ref:+.4f} (Δ {abs(p_s-ref):+.4f}, AR-vs-TF)"
             print(line)
@@ -275,7 +275,7 @@ def main():
         ok = (same_tok == n)
         all_pass &= ok
         print(f"  {d}: identical gen_token_ids {same_tok}/{n}   identical gen_text {same_txt}/{n}   "
-              f"max |Δ logprob| {lp_md:.3e}   {'✅' if ok else '❌ GREEDY DECODE DIVERGED'}")
+              f"max |Δ logprob| {lp_md:.3e}   {'ok' if ok else 'GREEDY DECODE DIVERGED'}")
         results["datasets"][d]["generate"] = {"n": n, "identical_token_ids": same_tok,
                                               "identical_text": same_txt, "max_abs_logprob_diff": lp_md}
 
@@ -297,8 +297,8 @@ def main():
 
     print("\n" + "=" * 92)
     if args.limit:
-        print("⚠️  SMOKE TEST (--limit set) — NOT the gate. Re-run without --limit before trusting this.")
-    print(f"G1 VERDICT: {'✅ PASS — sharding is numerically safe; proceed to Qwen' if all_pass else '❌ FAIL — DO NOT proceed to Qwen on this path'}")
+        print("SMOKE TEST (--limit set) — NOT the gate. Re-run without --limit before trusting this.")
+    print(f"G1 VERDICT: {'PASS — sharding is numerically safe; proceed to Qwen' if all_pass else 'FAIL — DO NOT proceed to Qwen on this path'}")
     print("=" * 92, flush=True)
     return 0 if all_pass else 1
 

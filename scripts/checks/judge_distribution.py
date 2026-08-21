@@ -1,5 +1,5 @@
 """G2 diagnostic: does our judge's graded score distribution match the Hidden Failures
-paper (Table 19)? Joe's judge deliberately emits 0 / a partial score / 1 (Appendix M), and
+paper (Table 19)? the judge deliberately emits 0 / a partial score / 1 (Appendix M), and
 Table 19 gives the per-dataset split. After labelling, ours should line up in ballpark — a
 SciQ split near 50/50 instead of ~91% correct means the judge scheme (graded vs binary) or
 the generations differ, and we catch it before it propagates into PRR.

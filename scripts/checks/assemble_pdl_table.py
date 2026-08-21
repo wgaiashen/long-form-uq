@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-# ⚠️ `results/` is gitignored and lives in the MAIN CHECKOUT only. A git worktree gets its own empty
+# `results/` is gitignored and lives in the MAIN CHECKOUT only. A git worktree gets its own empty
 # results/ dir, and resolving relative to __file__ then silently reads almost nothing -- this assembler
 # was run from a worktree once and produced a table where every arm row was blank, which reads as
 # "not measured" rather than "not found". Prefer the local dir only if it actually holds the master
@@ -42,7 +42,7 @@ OOD_RUNGS = ["SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 # canonical row order (free floors first, then supervised)
 ORDER = ["msp_sum", "perplexity", "msp_min",
          "wMSP-norm", "wMSP-shrink@2", "wMSP-shrink@10",
-         # The supervised baselines. ⚠️ A method absent from ORDER is not rendered even when ALIAS knows
+         # The supervised baselines. A method absent from ORDER is not rendered even when ALIAS knows
          # it, so BOTH lists have to carry a new method -- adding it to only one is a silent half-fix.
          "SAPLMA", "P(True)", "P(True)-unsup", "Lookback Lens",
          "armB(mean-pool)", "armA(attention)",
@@ -70,7 +70,7 @@ ALIAS = {
     "wmsp_norm": "wMSP-norm", "wmsp_shrink2": "wMSP-shrink@2", "wmsp_shrink10": "wMSP-shrink@10",
     "wmsp_blondel": None, "wmsp_seg_flat": None, "wmsp_seg_softmax": None,
     "wmsp_shrink2_blondel": None, "wmsp_shrink10_blondel": None, "wmsp": "wMSP-norm",
-    # ⭐ THE SUPERVISED BASELINES. Added 2026-08-03: probedriftlong.py has supported `--baselines
+    # THE SUPERVISED BASELINES. Added 2026-08-03: probedriftlong.py has supported `--baselines
     # ptrue,lookback` for weeks (BASE_FEATS at probedriftlong.py:84) and writes the BARE KEY as the
     # method string — but ALIAS did not carry them, and `ALIAS.get(m, "__skip__")` SILENTLY DROPS an
     # unknown method. So the report's central claim ("our method beats existing probes") had no existing
@@ -85,7 +85,7 @@ ALIAS = {
     # report uses. It is still COMPUTED (a logistic regression on pooled vectors already in memory,
     # seconds per cell) and its rows stay in the CSVs; None routes it through the EXISTING explicit-
     # suppression path, so it is dropped on purpose rather than falling out as an unknown method.
-    # ⚠️ This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
+    # This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
     # to "SAPLMA" below and above. `linear` is the author's own linear probe on the same features.
     "linear": None,
     "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",
@@ -141,7 +141,7 @@ SOURCES = [
     # -- these supersede the pre-split numbers for every cell involving expertqa/factscore/asqa, whose
     # rung composition changed when factuality became its own family.
     ("pdl_fam_*__" + SLUG + ".csv", 0, "3seed", "prr_mean"),
-    # ⚠️ DEMOTED TO PRIORITY 1 (2026-08-05). These are the PRE-family-split, PRE-NaN-fix runs of 29 July
+    # DEMOTED TO PRIORITY 1 (2026-08-05). These are the PRE-family-split, PRE-NaN-fix runs of 29 July
     # (git 4c8f102a). They were left at priority 0 alongside pdl_fam_*, so "supersedes" was achieved only by
     # being listed second and by `prio < pp` being a STRICT comparison. The outcome happened to be right —
     # 0 master cells came from these files — but it rested on list order rather than on a stated rule, and
@@ -189,7 +189,7 @@ def read_long(path, valcol):
             if not m or m.startswith("VERDICT:") or m == "method":
                 continue
             if m not in ALIAS:
-                # ⚠️ LOUD, not silent. A computed method that vanishes at assembly is invisible: the CSV
+                # LOUD, not silent. A computed method that vanishes at assembly is invisible: the CSV
                 # says it ran, the table says nothing, and nobody can tell the difference between "not
                 # measured" and "measured then dropped". This is how ptrue/lookback/linear went missing.
                 DROPPED_UNKNOWN.setdefault(m, set()).add(Path(path).name)
@@ -259,15 +259,15 @@ def main():
                  f"({len(ORDER)} methods x {len(LONG_EVALS)} evals x {len(RUNGS)} rungs).")
     miss_ev = [e for e in LONG_EVALS if not any((rg, e, "msp_min") in present for rg in RUNGS)]
     if miss_ev:
-        lines.append(f"⚠️ evals with NO base cells yet (DoC JOB 1 pending): {', '.join(miss_ev)}")
+        lines.append(f"evals with NO base cells yet (DoC JOB 1 pending): {', '.join(miss_ev)}")
     if DROPPED_UNKNOWN:
         # Surfaced in the RENDERED table, not just on stdout: a run that computed a method the assembler
         # does not know about has silently lost it, and the table must say so where it will be read.
-        lines.append("\n⚠️ **METHODS COMPUTED BUT NOT IN ALIAS — DROPPED FROM THIS TABLE.** They ran and "
+        lines.append("\n**METHODS COMPUTED BUT NOT IN ALIAS — DROPPED FROM THIS TABLE.** They ran and "
                      "are in the source CSVs; add them to ALIAS to render them:")
         lines += [f"   `{m}`  (in {', '.join(sorted(srcs))})" for m, srcs in sorted(DROPPED_UNKNOWN.items())]
     if conflicts:
-        lines.append("\n⚠️ CROSS-CHECK CONFLICTS (same-priority sources disagree >0.02 on a shared cell):")
+        lines.append("\nCROSS-CHECK CONFLICTS (same-priority sources disagree >0.02 on a shared cell):")
         lines += [f"   {c}" for c in conflicts]
     else:
         lines.append("\nCross-check: no same-priority source disagreed >0.02 on any shared cell (armA/floor overlaps agree).")
@@ -282,7 +282,7 @@ def main():
             if src.startswith(stem):
                 stale_rows[m].add(stem)
     if stale_rows:
-        lines.append("\n> ## ⚠️ STALE NUMBERS IN THIS TABLE — READ THIS BEFORE THE ROWS BELOW")
+        lines.append("\n> ## STALE NUMBERS IN THIS TABLE — READ THIS BEFORE THE ROWS BELOW")
         lines.append(">")
         lines.append("> The rows listed here were computed BEFORE a fix that changed their inputs. They are "
                      "kept rather than deleted so the table still shows what was run, but they are **not "
@@ -350,7 +350,7 @@ def main():
                  "present, so the means ARE comparable (no cross-population). Methods covering <all COMMON cells "
                  "show coverage; win-counts are paired per cell. Caption: widened cells_long, OOD rungs, 3-seed.")
     if any(not any((rg, e, "msp_min") in present for rg in RUNGS) for e in LONG_EVALS):
-        lines.append("⚠️ PRELIMINARY — the grid is incomplete (DoC JOB 1 base fills pending); COMMON will grow when they land.")
+        lines.append("PRELIMINARY — the grid is incomplete (DoC JOB 1 base fills pending); COMMON will grow when they land.")
     lines.append("\n| method (3-seed) | cover | mean PRR (COMMON) | CI (dataset boot) | > msp_min | > SAPLMA |")
     lines.append("|---|---|---|---|---|---|")
 
@@ -373,7 +373,7 @@ def main():
     core = [(m, r) for m, r in core if r is not None]
     core.sort(key=lambda t: -t[1][1])
     for m, (nc, mean, lo, hi, wmin, nmin, wsap, nsap) in core:
-        cov = f"{nc}/{len(COMMON)}" + ("" if nc == len(COMMON) else " ⚠")
+        cov = f"{nc}/{len(COMMON)}" + ("" if nc == len(COMMON) else " (partial)")
         lines.append(f"| {m}{' ' + STALE_FLAG if m in stale_rows else ''} | {cov} | {mean:+.3f} | [{lo:+.3f},{hi:+.3f}] | {wmin}/{nmin} | {wsap}/{nsap} |")
 
     # seed-1 supplementary methods: their OWN cell set, explicitly NOT comparable to the block above
@@ -401,7 +401,7 @@ def main():
     print("\n".join(lines))
     print(f"\nwrote {csv_path} and {md_path}")
     if conflicts:
-        print(f"\n⚠️ {len(conflicts)} cross-check conflicts (see above) — resolve before trusting the table.")
+        print(f"\n{len(conflicts)} cross-check conflicts (see above) — resolve before trusting the table.")
 
 
 if __name__ == "__main__":

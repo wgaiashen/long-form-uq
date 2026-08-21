@@ -20,9 +20,9 @@ cached method's scores and aborts if any are stale (e.g. a pre-relabel ptrue sco
 which is unrelated to this check. results.prr is the same function 04_eval uses, so the number
 is identical.
 
-Defaults sweep layer in {15, 16} (Joe's middle is index 15; our old default was 16) and the
-SAPLMA batch size in {1, 32} (Joe fits batch_size=1; our A&M default is 32), so one run shows
-which config matches Joe. Narrow with the flags for a quicker pass.
+Defaults sweep layer in {15, 16} (the middle is index 15; our old default was 16) and the
+SAPLMA batch size in {1, 32} (the reference implementation fits batch_size=1; our A&M default is 32), so one run shows
+which config matches the reference implementation. Narrow with the flags for a quicker pass.
 
     python scripts/checks/signal_eval_matrix.py
     python scripts/checks/signal_eval_matrix.py --datasets sciq,pubmed_qa --layers 15 --saplma-batches 1
@@ -48,8 +48,8 @@ PROBE_SCRIPT = ROOT / "scripts" / "03_probe.py"
 # the model here rather than inheriting that default.
 MODEL_DEFAULT = "meta-llama/Meta-Llama-3.1-8B"
 
-# Joe's ID targets, keyed by (train signal short, eval metric short) -> per-dataset PRR.
-# "align" = correctness_alignscore, "judge" = correctness. None where Joe gives no number.
+# the ID targets, keyed by (train signal short, eval metric short) -> per-dataset PRR.
+# "align" = correctness_alignscore, "judge" = correctness. None where the reference implementation gives no number.
 TARGETS = {
     ("align", "align"): {"sciq": 0.63, "trivia_qa": 0.74, "pubmed_qa": 0.39, "xsum": 0.32},
     ("align", "judge"): {"sciq": 0.69, "trivia_qa": 0.79, "pubmed_qa": 0.36, "xsum": 0.38},
@@ -100,7 +100,7 @@ def main():
     ap.add_argument("--datasets", default="sciq,trivia_qa,pubmed_qa,xsum")
     ap.add_argument("--layers", default="15,16")
     ap.add_argument("--saplma-batches", default="1,32",
-                    help="comma list; '1' matches Joe, '32' is our A&M default")
+                    help="comma list; '1' matches the reference implementation, '32' is our A&M default")
     ap.add_argument("--train-signals", default="correctness_alignscore,correctness")
     ap.add_argument("--eval-fields", default="correctness_alignscore,correctness")
     args = ap.parse_args()
@@ -131,12 +131,12 @@ def main():
                         target = TARGETS.get((ts, es), {}).get(dataset)
                         rows.append((dataset, layer, batch, ts, es, prr, target))
                         delta = "" if (prr is None or target is None) else f"  Δ {prr - target:+.3f}"
-                        joe = "n/a" if target is None else f"{target:.2f}"
-                        print(f"      eval={es:5s}  ours {fmt(prr)}   Joe {joe}{delta}")
+                        ref = "n/a" if target is None else f"{target:.2f}"
+                        print(f"      eval={es:5s}  ours {fmt(prr)}   reference {ref}{delta}")
 
-    # Summary table, grouped by (train, eval) row of Joe's ablation.
+    # Summary table, grouped by (train, eval) row of the ablation.
     print("\n\n================ SUMMARY (PRR, ID) ================")
-    header = f"{'train->eval':14s}{'dataset':12s}{'layer':>6}{'batch':>6}{'ours':>8}{'Joe':>7}{'Δ':>8}"
+    header = f"{'train->eval':14s}{'dataset':12s}{'layer':>6}{'batch':>6}{'ours':>8}{'ref':>7}{'Δ':>8}"
     print(header)
     print("-" * len(header))
     for ts, es in [("align", "align"), ("align", "judge"), ("judge", "judge"), ("judge", "align")]:
@@ -144,8 +144,8 @@ def main():
             if (rts, res_) != (ts, es):
                 continue
             delta = "" if (prr is None or target is None) else f"{prr - target:+.3f}"
-            joe = "n/a" if target is None else f"{target:.2f}"
-            print(f"{ts + '->' + es:14s}{d:12s}{layer:>6}{batch:>6}{fmt(prr):>8}{joe:>7}{delta:>8}")
+            ref = "n/a" if target is None else f"{target:.2f}"
+            print(f"{ts + '->' + es:14s}{d:12s}{layer:>6}{batch:>6}{fmt(prr):>8}{ref:>7}{delta:>8}")
 
     # Leave the cache in the keystone state: layer 15, default batch, trained on the judge
     # label where it exists (xsum has only the AlignScore label, so restore that instead).

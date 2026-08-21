@@ -1,7 +1,7 @@
 """Unit tests for the weighted-MSP method (src/luq/weighted_msp.py).
 
 These pin the two things that must not silently break: the soft-rank loss components (ported from
-Joe's msp_probe_uq.py) and the grounding property that `constant` mode reduces to plain MSP.
+the msp_probe_uq.py) and the grounding property that `constant` mode reduces to plain MSP.
 Pure-CPU, no cache, no GPU -- runs in milliseconds.
 """
 import sys

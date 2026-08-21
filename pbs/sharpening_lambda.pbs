@@ -9,7 +9,7 @@
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/sharpening_lambda.pbs
 #
-# ⭐ lambda = 1.5 is PRE-COMMITTED, justified only by the 2026-07-12 prediction in
+# lambda = 1.5 is PRE-COMMITTED, justified only by the 2026-07-12 prediction in
 # reports/OVERNIGHT_12jul.md:79,90. If it misses the bar that is a failure of the pre-committed value
 # even if another lambda clears it -- promoting a different one afterwards is banned by the prereg.
 #

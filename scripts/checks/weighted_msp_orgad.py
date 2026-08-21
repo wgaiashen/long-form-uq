@@ -1,7 +1,7 @@
 """Orgad exact-answer overlay for weighted-MSP: does restricting the score to answer-bearing tokens
 help, ID and OOD?
 
-Joe's overlay (his `exact_answer_overlay.py`) only DREW the answer span for eyeballing; here we USE it to
+the overlay (his `exact_answer_overlay.py`) only DREW the answer span for eyeballing; here we USE it to
 mask the weighted-MSP sum to the exact-answer tokens (the token span where the gold answer appears in the
 generation). It is a cheap, portable, task-agnostic prior on which tokens matter -- and it's short-form
 only (long-form / unlocated rows fall back to all tokens = plain weighted-MSP).

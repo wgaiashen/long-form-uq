@@ -28,7 +28,7 @@ degraded), so a repetition that only becomes visible after the cap is structural
 med_quad's 12.3% is therefore a **lower bound** on its true v1 degeneracy rate, and it is the only one of
 the four where the cap binds hard enough for this to matter.
 
-## ⚠️ REGISTERED PREDICTION AND GATE CORRECTION
+## REGISTERED PREDICTION AND GATE CORRECTION
 
 **For med_quad, "degeneracy must not rise" is the WRONG gate.** Raising the cap from 128 to ~768 removes
 a loop-truncator, so **med_quad's measured degeneracy rate may rise, and a rise would be the expected
@@ -39,7 +39,7 @@ anti-loop measure** (`no_repeat_ngram_size=3`), not one or the other. That is co
 being the only dataset that needed the anti-loop measure in v1 in the first place
 (`pbs/extract_neighbour.pbs:39-43`: the anti-loop default was 3, opt-*out* for short sets like samsum).
 
-⚠️ **This exemption applies to med_quad ONLY.** For samsum, xsum and cnn the severe rate is ≤0.72%, so
+**This exemption applies to med_quad ONLY.** For samsum, xsum and cnn the severe rate is ≤0.72%, so
 there is essentially nothing being masked by their caps, and **for them a degeneracy rise IS a genuine
 failure signal** and must be treated as one.
 
@@ -62,7 +62,7 @@ assumed.
 
 ---
 
-# ⚠️ AMENDMENT — 2026-08-02
+# AMENDMENT — 2026-08-02
 
 **Logged as a deviation, not a clarification.** Everything below changes a registered comparison
 *after* seeing data. It is recorded so the choice is auditable rather than merely correct.
@@ -86,7 +86,7 @@ rule, and **med_quad's own gold reference answers trip that same rule on 24.8% o
 detecting the indented-list formatting the references themselves use. The registered prediction was
 confirmed on the headline number by a mechanism it did not name.
 
-⚠️ **Do not quote med_quad's severe rate without this decomposition.** Report `run≥25` separately.
+**Do not quote med_quad's severe rate without this decomposition.** Report `run≥25` separately.
 
 ## A2. The real failure is FEW-SHOT CONTINUATION, which the detector cannot see
 
@@ -134,13 +134,13 @@ recorded here when it lands:
 - **B** — rate low but nonzero → use `correctness_raw`. Labels == features, zero cost, label includes
   some fabrication.
 - **C** — rate stays high → **cut the FEATURES too**, extracting hidden states over the span the judge
-  sees. ⚠️ **A and B are not escapes at a high rate**: both then produce a label computed over text
+  sees. **A and B are not escapes at a high rate**: both then produce a label computed over text
   containing a fabricated follow-up question, and `correctness_raw` inherits that problem precisely
   because raw *is* the full-text judge. Only C actually aligns the two.
 
 ---
 
-# ⚠️ AMENDMENT 2 — 2026-08-02 (later the same day)
+# AMENDMENT 2 — 2026-08-02 (later the same day)
 
 ## A5. The rep-pen arm FAILED its gate. It is not shipped.
 
@@ -156,7 +156,7 @@ of it.
 **Kept as evidence, not as data.** With the n-gram arm it forms the contrast that shows a 128-token cap
 concealed the repetition rather than preventing it.
 
-## A6. ⭐ THE DIAGNOSIS WAS WRONG, AND THAT IS WHY EVERY DECODING FIX FAILED
+## A6. THE DIAGNOSIS WAS WRONG, AND THAT IS WHY EVERY DECODING FIX FAILED
 
 Three arms, three failures: v1 truncates real answers; the n-gram arm sits exactly at the cap with 92.6%
 fabrication; rep-pen empties 30% of rows.
@@ -177,10 +177,10 @@ Simulated on the existing 768-token generations, then verified against the real 
 |---|---|---|---|---|
 | median real answer | 498 ch | — | — | **591 ch** |
 | mean real answer | 415 ch | 948 of 2673 | — | **948 ch** |
-| % empty | 0 | 0 | **30.0** ✗ | **0** |
+| % empty | 0 | 0 | **30.0** | **0** |
 | % fabricated | 47.8 | 92.6 | 56.0 | **2.0–2.3** |
-| median at the cap? | yes ✗ | yes ✗ | no | **no** |
-| true looping | 0 | 0.17% | 5/50 ✗ | **0.06%** |
+| median at the cap? | yes | yes | no | **no** |
+| true looping | 0 | 0.17% | 5/50 | **0.06%** |
 
 Char→token mapping verified on 300 real generations: **overshoot ≤1 char (one token boundary), zero
 undershoot**, so no real answer text is dropped.
@@ -191,7 +191,7 @@ Cutting at generation time means labels, logprobs and features all describe the 
 **option A applies** and med_quad's uniqueness disappears. **No feature re-extraction (option C) is
 needed.**
 
-⚠️ **The `correctness_raw` substitution registered in A3 is hereby RETRACTED.** It was needed only
+**The `correctness_raw` substitution registered in A3 is hereby RETRACTED.** It was needed only
 because v2 was going to be judged on *full* text while v1's live `correctness` is the *cut*-text judge
 label. With v2 generated-and-cut, **v1(cut) vs v2(cut) is like-for-like and the ORIGINALLY REGISTERED
 comparison stands.** Recording the retraction rather than deleting A3: the deviation was genuinely
@@ -204,7 +204,7 @@ contemplated, and the reason it became unnecessary is itself part of the record.
 - **~2% of cut generations still contain a fabricated `Question:`.** Report the data as
   low-fabrication, never as fabrication-free.
 - 71 rows fall under 40 characters after cutting.
-  ⚠️ **CORRECTED 2026-08-02 (DoC).** An earlier draft said "the same 71 as in v1", which is wrong as
+  **CORRECTED 2026-08-02 (DoC).** An earlier draft said "the same 71 as in v1", which is wrong as
   worded and would have overstated the case. Verified: **v1 RAW has ZERO rows under 40 characters**;
   it is **v1 after the SAME cut** that has 71, and those are the identical 71 (overlap 71, neither-only
   0). So the correct claim is that the short rows are a property of the *cut*, applied to either arm,
@@ -256,7 +256,7 @@ same judge (`gpt-5-mini`, verified identical on both sides — no judge mixing):
 
 Statistically clear, practically small, with substantial churn in both directions.
 
-### ⚠️ The apparent regime flip is a LENGTH ARTIFACT, not a result
+### The apparent regime flip is a LENGTH ARTIFACT, not a result
 
 On the med_quad ID cell the raw floors appear to flip the taxonomy label CONCENTRATED → SPREAD:
 
@@ -286,7 +286,7 @@ Three reasons, in order of weight:
 3. **The gain does not justify the cost.** +0.023 correctness, of which the striking floor movement is
    artifact, against regenerating a 3.3GB pertok cache and re-running two full ladders.
 
-⚠️ **HOW TO STATE THE LIMITATION HONESTLY IN THE REPORT.** Say: token budgets are fixed per dataset and
+**HOW TO STATE THE LIMITATION HONESTLY IN THE REPORT.** Say: token budgets are fixed per dataset and
 chosen for consistency with the sibling each set trains against; med_quad's is 128; the consequence is
 that med_quad generations are usually truncated (97.7% reach the cap). **Do NOT claim the budget was
 chosen to prevent degeneracy** — that would be a rationalisation invented after the fact, and v1's own

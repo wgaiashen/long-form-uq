@@ -26,7 +26,7 @@
 #
 # NEXT (after this finishes): rsync records -> RCS, judge on RCS (gpt-5-mini summ), then the
 # per-token L15 pass (also DoC 80GB, needs labels first) -- see the runbook in
-# PLAN_post_10July_meeting.md P1.8 / W4.
+# the project plan P1.8 / W4.
 
 set -uo pipefail
 

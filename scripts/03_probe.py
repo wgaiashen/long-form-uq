@@ -36,7 +36,7 @@ from luq.features import saplma  # noqa: E402
 # this p>>n regime (3584 dims, 1800 examples) the CV PRR does NOT transfer to test — every "tuned"
 # config just trades sciq for pubmed and none beats the standard default. So we keep the standard
 # regularized logistic-regression default (hparams={}) and report the train/test gap honestly. (PCA-
-# before-probe is the principled p>>n lever if a real improvement is wanted later — Joe's "Linear+PCA".)
+# before-probe is the principled p>>n lever if a real improvement is wanted later — the "Linear+PCA".)
 # Score files are named by the reported method, so 04_eval prints them directly.
 METHOD_SPEC = {
     "saplma":         ("saplma",         "mlp",    {}),                     # faithful A&M (5 ep / batch 32 / no wd / raw)
@@ -57,17 +57,17 @@ def main():
                          "same hidden states) | ptrue | lookback")
     ap.add_argument("--layer", type=int, default=None,
                     help="hidden layer index to probe (default: the middle layer). "
-                         "NOTE: index 0 = embeddings, so for Llama-3.1-8B Joe's middle "
+                         "NOTE: index 0 = embeddings, so for Llama-3.1-8B the middle "
                          "is 15 (ceil(32/2)-1); our default n_layers//2 is 16 — pass "
                          "--layer 15 to match Hidden Failures Table 14.")
     ap.add_argument("--saplma-batch", type=int, default=None,
                     help="override the SAPLMA MLP batch size (default 32). Pass 1 to match "
-                         "Joe/Table 14 (full_seq_head_saplma.py fits batch_size=1). Only "
+                         "Hidden Failures Table 14 (full_seq_head_saplma.py fits batch_size=1). Only "
                          "affects --method saplma.")
     ap.add_argument("--label-field", default="correctness",
                     help="which correctness field to TRAIN the probe on (e.g. "
                          "correctness_alignscore for AlignScore-trained, or correctness for the "
-                         "judge). Pair with 04_eval --label-field for Joe's train x eval matrix.")
+                         "judge). Pair with 04_eval --label-field for the train x eval matrix.")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag (must match the one used by 01_extract).")
     args = ap.parse_args()

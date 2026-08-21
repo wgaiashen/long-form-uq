@@ -9,7 +9,7 @@
 
 # Phase-1 keystone reproduction: Llama-3.1-8B SAPLMA vs Hidden Failures Table 14.
 # GPU feature extraction ONLY (01_extract -> generation + SAPLMA pooled features),
-# for the three keystone datasets. fp32 + eager to match Joe (he passes no
+# for the three keystone datasets. fp32 + eager to match the reference implementation (it passes no
 # torch_dtype; --attn eager). RESUMABLE: 01_extract reloads its checkpoint, so on a
 # wall-time hit just resubmit.
 #

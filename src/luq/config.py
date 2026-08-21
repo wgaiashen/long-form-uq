@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # caches are ~90GB (16GB pooled features + ~74GB of per-token states), so they cannot live beside the
 # code there. Set it in `pbs/_env.sh` per cluster, not per script.
 #
-# ⚠️ A MIS-SET CACHE ROOT MUST NOT BE SILENT. Pointing at a path that does not exist would otherwise
+# A MIS-SET CACHE ROOT MUST NOT BE SILENT. Pointing at a path that does not exist would otherwise
 # look like "no cache found", and every driver would cheerfully regenerate from scratch into a new
 # location -- or worse, split one dataset's cache across two roots. So the override must name a
 # directory that already exists, and we crash if it does not.
@@ -38,7 +38,7 @@ else:
 # Results stay WITH THE CODE on every machine: they are small, they are the precious artifact, and
 # they are what gets committed and compared. Only the big regenerable caches move.
 #
-# ⚠️ Since 2026-08-14 `<repo>/results` is a SYMLINK to `../results`, i.e. to a directory outside
+# Since 2026-08-14 `<repo>/results` is a SYMLINK to `../results`, i.e. to a directory outside
 # this repo, where results are version-controlled (they previously sat in no repository at all).
 # Nothing here changes: the path still resolves, so this constant, the ~130 per-file
 # `ROOT / "results"` idioms, the 148 PBS scripts and the 6 hardcoded absolute paths all keep working.

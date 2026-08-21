@@ -2,7 +2,6 @@
 """W1 -- THE TRAINING-FREE SHARPENING FAMILY between `perplexity` and `msp_min`.
 
 Pre-registration: prereg/W1_sharpening_axis.md  (written and committed BEFORE this file was run).
-Plan: ../PLAN_sharpening_axis.md   Results doc: ../STOCKTAKE_sharpening_axis.md
 
 WHAT THIS IS
 ------------
@@ -27,13 +26,13 @@ works and these do not, the result is about the specific weighting function rath
     power mean   M_p = (mean(nll^p))^(1/p)                p=1 -> mean, p->inf -> max
     Lehmer       sum(w*nll)/sum(w) with w = nll^beta       beta=0 -> mean, beta->inf -> max
 
-⚠️ ENDPOINT GATE (V1). Printed BEFORE any curve is readable, and the run STOPS if it fails. This is a
+ENDPOINT GATE (V1). Printed BEFORE any curve is readable, and the run STOPS if it fails. This is a
 RANKING identity, not a value identity: `msp.msp_uncertainty(lp,"min")` returns `1 - min(exp(lp))`,
 a monotone transform of `max(nll)` and NOT equal to it. PRR is rank-based so the PRRs match exactly
 while the score vectors do not. A check written as "values agree to 1e-6" would fail for the wrong
 reason. See prereg §7.
 
-⚠️ THE UNIT OF ANALYSIS IS THE DATASET, n = 8, NOT 40 cells. A training-free score never sees the
+THE UNIT OF ANALYSIS IS THE DATASET, n = 8, NOT 40 cells. A training-free score never sees the
 training pool, so its PRR is identical at all five rungs. A free-vs-free interval computed over
 "32 OOD cells" is 8 values counted four times and is roughly twice too narrow.
 
@@ -84,11 +83,11 @@ PUBLISHED = {
     "trivia_qa":     {"min": +0.747,  "ppl": +0.733},
 }
 
-# ⚠️ REGIME-AWARE REFERENCE (added 2026-08-12). PUBLISHED above is the RAW-span master. Under
+# REGIME-AWARE REFERENCE (added 2026-08-12). PUBLISHED above is the RAW-span master. Under
 # `LUQ_REGIME="med_quad=med_quad_clean"` med_quad's floors legitimately differ — that is the entire
 # point of the span correction — so the V1 gate fired a FALSE FAILURE and stopped the run with the
 # other nine datasets passing exactly.
-# ⚠️ THE GATE IS NOT WEAKENED: med_quad is still checked, against the clean-span values that TWO
+# THE GATE IS NOT WEAKENED: med_quad is still checked, against the clean-span values that TWO
 # independent code paths agree on (make_med_quad_clean_regime.py's builder printout and the shadow
 # ladder, both msp_min -0.0188 / perplexity +0.1146). Swapping the reference is not the same as
 # skipping the check — a wrong NLL convention or row population would still trip it.
@@ -125,7 +124,7 @@ OUT = ROOT / "results" / f"sharpening_family__{cache._slug(MODEL)}.csv"
 def load_light(dataset):
     """records + split + y ONLY. The family needs `token_logprobs`, nothing else.
 
-    ⚠️ expertqa / asqa / factscore live under cache/<name>_rp12/, so a hard-coded `cache/` glob would
+    expertqa / asqa / factscore live under cache/<name>_rp12/, so a hard-coded `cache/` glob would
     silently see 5 of 8. Resolution goes through Config(prompt_regime=...), exactly as attn_pool does.
     """
     cfg = Config(model_name=MODEL, dataset=dataset, ood_setting="ID",
@@ -237,10 +236,10 @@ FAMILIES = {
 # ESS/n is then CONSTANT in n (-> 2/tau at large tau), so this is a soft TOP-FRACTION rule rather
 # than a soft TOP-COUNT rule.
 #
-# ⚠️ THE GRID IS DELIBERATELY MUCH LARGER THAN ROUND 1's. Because ESS/n ~ 2/tau, reaching about one
+# THE GRID IS DELIBERATELY MUCH LARGER THAN ROUND 1's. Because ESS/n ~ 2/tau, reaching about one
 # token in a hundred needs tau ~ 200. Reusing round 1's grid (max 32) would barely move this family
 # off uniform and would MANUFACTURE a null.
-# ⚠️ THE A-PRIORI VALUE IS tau = 2, committed in the prereg before running: the rank analogue of
+# THE A-PRIORI VALUE IS tau = 2, committed in the prereg before running: the rank analogue of
 # round 1's reasoning is "the top-ranked token gets e times the weight of the median-ranked token",
 # i.e. tau * (1 - 0.5) = 1.
 # ----------------------------------------------------------------------------------------------
@@ -287,7 +286,7 @@ def score_softmax_rank(nll, tau):
 #     gamma > 0   sharpen MORE on long answers
 #     gamma < 0   sharpen LESS on long answers, i.e. cancel the sqrt(n-1) drift
 #
-# ⚠️⚠️ THIS IS EXPLORATORY, NOT A SECOND PRE-REGISTERED TEST, AND THE REASON IS MULTIPLICITY.
+# THIS IS EXPLORATORY, NOT A SECOND PRE-REGISTERED TEST, AND THE REASON IS MULTIPLICITY.
 # W1 already read this same test data at 24 grid points. Adding a 2-D grid on top compounds that. So:
 #   * NO pass/fail bar is attached to it, and no p-value from it may be quoted as a result.
 #   * It is reported as a DESIGN INPUT for W2 (which puts length into the LEARNED weighter) and as a
@@ -339,7 +338,7 @@ def one_se_pick(curves, train_ds, grid):
 def argmax_pick(curves, train_ds, grid):
     """RAW-ARGMAX leave-one-dataset-out: the parameter with the best mean on the training datasets.
 
-    ⚠️ Reported ALONGSIDE `one_se_pick`, never instead of it (prereg W4 §1.2). Round 1's 1-SE rule
+    Reported ALONGSIDE `one_se_pick`, never instead of it (prereg W4 §1.2). Round 1's 1-SE rule
     turned out to be near-vacuous at this sample size: between-dataset PRR variance is so large that
     the band covered most of the grid and the registered tie-break decided the answer, returning
     tau = inf on all 8 folds. Reporting only one of the two rules would let the CHOICE OF RULE do the
@@ -572,7 +571,7 @@ def main():
           f"{'PASS' if pval < BAR_P else 'FAIL'}")
     print(f"\n  Q1: {'YES' if passed else 'NO'}")
     if not passed and margin > BAR_MARGIN:
-        print("  ⚠️ Margin passed but the test did not. Pre-registered reading: NOT ESTABLISHED.")
+        print("  Margin passed but the test did not. Pre-registered reading: NOT ESTABLISHED.")
         print("     This is not re-described as directional support and no new threshold is invented.")
 
     # ---------------- §3.4 Q2: does best-tau order the datasets as predicted? ----------------
@@ -602,14 +601,14 @@ def main():
         b = int(np.argmax(means))
         print(f"{f2:16s}{str('inf' if not np.isfinite(g2[b]) else g2[b]):>20s}"
               f"{means[b]:>+18.4f}{means[b] - base_min.mean():>+13.4f}")
-    print("  ⚠️ softmax-tau standardises and is dimensionless; power/Lehmer act on raw NLL magnitudes")
+    print("  softmax-tau standardises and is dimensionless; power/Lehmer act on raw NLL magnitudes")
     print("     and are not. They are like-for-like on ENDPOINTS only, not on scale invariance.")
 
     # ---------------- §3.6 diagnostics: concentration, length, ZGAP, and the cnn control -------
     print("\n" + "=" * 100)
     print("DIAGNOSTICS at tau = 1")
     print("  ESS = 1/sum(w^2) is the effective number of tokens the weight actually lands on.")
-    print("  ⚠️ REGISTERED CONFOUND: the largest attainable z is bounded by about sqrt(n-1), so at a")
+    print("  REGISTERED CONFOUND: the largest attainable z is bounded by about sqrt(n-1), so at a")
     print("     FIXED tau a long answer can concentrate far more than a short one. The family is")
     print("     therefore implicitly LENGTH-dependent. 'Length is not the axis' must be checked here,")
     print("     not asserted.")
@@ -643,7 +642,7 @@ def main():
     print("  and push it toward msp_min -- the WRONG way, on the largest endpoint margin in the grid.")
     print(f"  cnn at tau=1: {a0_vals[i_cnn]:+.4f}   vs msp_min {d_cnn:+.4f}   vs perplexity {d_cnn_ppl:+.4f}")
     if passed and d_cnn_ppl > 0:
-        print("  ⚠️⚠️ Q1 PASSED **and** cnn improved against perplexity. That CONTRADICTS R1.")
+        print("  Q1 PASSED **and** cnn improved against perplexity. That CONTRADICTS R1.")
         print("     Pre-registered reading: treat as a SUSPECTED BUG and find the cause BEFORE")
         print("     reporting this as a result.")
     else:
@@ -658,10 +657,10 @@ def main():
         print("W4 Q-A -- LEAVE-ONE-DATASET-OUT IN EVERY FAMILY, UNDER BOTH SELECTION RULES")
         print("prereg: prereg/W4_lodo_families_and_rank.md §1")
         print("=" * 100)
-        print("⚠️ THIS IS A SECOND LOOK AT DATA ROUND 1 ALREADY READ. A pass is WEAKER evidence than a")
+        print("THIS IS A SECOND LOOK AT DATA ROUND 1 ALREADY READ. A pass is WEAKER evidence than a")
         print("   round-1 pass would have been and is not a claim until it replicates on a population")
         print("   this workstream has never touched (Qwen, which has not begun generating).")
-        print("⚠️ THREE families are tested, so ONE p < 0.05 among them is roughly what chance gives.")
+        print("THREE families are tested, so ONE p < 0.05 among them is roughly what chance gives.")
         print("   A pass is only interesting if BOTH selection rules agree.\n")
 
         # --- REGRESSION CHECK (prereg §1.5): the new code path must reproduce round 1's A1 exactly.
@@ -713,7 +712,7 @@ def main():
         # ------------------------------------------------------------------------------------
         # PART 2 (MECHANISM).
         #
-        # ⚠️⚠️ CORRECTION, 2026-08-09, AFTER THE FIRST RUN AND BEFORE ANY VERDICT WAS RECORDED.
+        # CORRECTION, 2026-08-09, AFTER THE FIRST RUN AND BEFORE ANY VERDICT WAS RECORDED.
         # prereg/W4 §2.5 registered the mechanism test as "rho(ESS, length) collapses toward zero".
         # THAT STATISTIC IS MIS-SPECIFIED AND CANNOT EVER PASS. For ANY length-invariant FRACTION
         # rule, ESS is proportional to n by definition, so rho(ESS, length) = 1 BY CONSTRUCTION --
@@ -726,7 +725,7 @@ def main():
         # is carried over unchanged to the corrected statistic so it is not re-tuned to pass.
         # ------------------------------------------------------------------------------------
         print("\n  PART 2 (MECHANISM) -- HALF the registered bar.")
-        print("  ⚠️ THE REGISTERED STATISTIC rho(ESS, length) IS MIS-SPECIFIED: for ANY length-")
+        print("  THE REGISTERED STATISTIC rho(ESS, length) IS MIS-SPECIFIED: for ANY length-")
         print("     invariant FRACTION rule ESS grows with n by definition, so rho = 1 is the DESIGN.")
         print("     Both are shown; the verdict is read from the CORRECTED statistic, ESS/length.")
         R1_RHO = {"asqa": 0.946, "expertqa": 0.882, "factscore": 0.847}
@@ -754,18 +753,18 @@ def main():
         print(f"\n  REGISTERED TEST, as written: worst |rho| on the three round-1 offenders "
               f"{worst3:.3f} vs threshold 0.3  -> **FAIL**")
 
-        # ⚠️⚠️ SECOND AND FINAL CORRECTION. ESS/len was the right VARIABLE but Spearman is the wrong
+        # SECOND AND FINAL CORRECTION. ESS/len was the right VARIABLE but Spearman is the wrong
         # STATISTIC: it detects a MONOTONE relationship regardless of its SIZE, so a 1% drift with
         # low noise still gives rho ~ 1.0. A rank correlation cannot measure INVARIANCE at all.
         # Invariance needs an EFFECT SIZE. Computed below and reported DESCRIPTIVELY.
         #
-        # ⚠️ THIS IS NOT A RESCUED TEST AND IS NOT REPORTED AS ONE. The registered mechanism test
+        # THIS IS NOT A RESCUED TEST AND IS NOT REPORTED AS ONE. The registered mechanism test
         # failed as written. The effect size is a post-hoc statistic and carries less weight, which
         # is exactly why it is labelled here rather than substituted silently. Nothing hinges on it:
         # the PRR half of the bar failed independently, so Q-D is a negative either way. The effect
         # size only decides the INTERPRETATION -- whether length was removed but turned out not to be
         # the binding constraint, or was never removed at all.
-        print("\n  ⚠️ DESCRIPTIVE ONLY (post-hoc, NOT a passed test): the registered statistic is a")
+        print("\n  DESCRIPTIVE ONLY (post-hoc, NOT a passed test): the registered statistic is a")
         print("     rank correlation, which is insensitive to EFFECT SIZE -- a 1% monotone drift")
         print("     still reads rho ~ 1.0. Invariance needs a magnitude. Shortest vs longest length")
         print("     quartile, within each dataset:")
@@ -794,7 +793,7 @@ def main():
               f"{np.mean(np.abs(np.log(sr))):.4f}")
         print(f"  cross-dataset ESS/len spread (max/min): rank {sp_new:.2f}x   "
               f"round-1 softmax-tau {sp_r1:.2f}x")
-        print("\n  ⚠️ REGISTERED READING. If MECHANISM passes and PRR fails, that is the MORE")
+        print("\n  REGISTERED READING. If MECHANISM passes and PRR fails, that is the MORE")
         print("  informative outcome: the length confound was real, removing it did not help, and so")
         print("  the confound was NOT what was holding the family back.")
 
@@ -802,7 +801,7 @@ def main():
     if args.length_tau:
         print("\n" + "=" * 100)
         print("W1b -- LENGTH-CONDITIONED tau:  tau(len) = tau0 * (len/%.0f)**gamma" % LEN_REF)
-        print("⚠️ EXPLORATORY. W1 already read this test data at 24 grid points, so this carries NO bar")
+        print("EXPLORATORY. W1 already read this test data at 24 grid points, so this carries NO bar")
         print("   and NO quotable p-value. It is a MECHANISM diagnostic and a design input for W2.")
         print("   Any positive needs confirming on a population this workstream has never touched.")
         print("=" * 100)

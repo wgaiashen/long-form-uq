@@ -22,12 +22,12 @@ PRR is a rank statistic over 2,000 examples and moves ~1e-4 on 1e-7 of floating-
 is therefore on the PER-EXAMPLE uncertainty vectors, per method and per seed, plus the label vector
 and the training-spec string.
 
-⚠️ THE TRAINING-SPEC STRING IS THE PREMISE, NOT A DETAIL. `meta__train` records exactly which
+THE TRAINING-SPEC STRING IS THE PREMISE, NOT A DETAIL. `meta__train` records exactly which
 sources fed the probe and at what cap. If the reduced run's `ID` spec is not character-identical to
 the master's, the two runs are not the same cell and comparing their vectors is meaningless. It is
 checked FIRST and a mismatch is fatal.
 
-⚠️ WHAT THIS CONTROL CAN AND CANNOT SEE (read before quoting a PASS)
+WHAT THIS CONTROL CAN AND CANNOT SEE (read before quoting a PASS)
 The master's per-example sidecars in `results/pdl_perex/` carry only five methods:
 `floor_sum, floor_ppl, floor_min, fair_floor, saplma`. The poolers and the wMSP variants were never
 dumped there, so they are NOT COMPARABLE and are reported as such rather than silently omitted.
@@ -195,10 +195,10 @@ def main() -> int:
         print("\n!!! nothing was compared -- this is NOT a pass", file=sys.stderr)
         return 1
 
-    print(f"\n✅ CONTROL PASSED: the reduced panel reproduces the published master exactly on "
+    print(f"\nCONTROL PASSED: the reduced panel reproduces the published master exactly on "
           f"{n_cells} unchanged-pool cells.")
     if not_run:
-        print(f"   ⚠️ PARTIAL: {len(not_run)} cell(s) have not run yet and are excluded above.")
+        print(f"   PARTIAL: {len(not_run)} cell(s) have not run yet and are excluded above.")
     return 0
 
 

@@ -12,14 +12,14 @@
 #
 #   sbatch --mem=96G slurm/qwen_wmsp_lambda.sbatch
 #
-# ⚠️ POST-HOC CROSS-MODEL TRANSFER, NOT A REGISTERED TEST. The Qwen master was already visible when
+# POST-HOC CROSS-MODEL TRANSFER, NOT A REGISTERED TEST. The Qwen master was already visible when
 # this was run. lambda is FIXED at 2.0 and 1.5 (Llama's W5 pre-committed primary) and nothing is
 # tuned on Qwen. Results land in results/wmsp_lambda_qwen__* with provenance = post-hoc-transfer and
 # stay OUTSIDE the M2 scorecard. Read the driver's docstring before quoting any number: W5's
 # registered claim FAILED on Llama as a TIE with shrink@2 (+0.0019 vs a > +0.010 bar); what
 # justifies the transfer is that the 5-arm LODO picks 1.5 on 7 of 8 folds.
 #
-# ⛔ THE CONTROL GATES EVERYTHING. The lambda = 2.0 arm must reproduce the master's wmsp_shrink2
+# THE CONTROL GATES EVERYTHING. The lambda = 2.0 arm must reproduce the master's wmsp_shrink2
 # rows on all 40 cells to 4 dp. Each cell prints its own control delta as it lands, so a drift shows
 # up on the first cell rather than after eight hours. When all 8 evals are done:
 #

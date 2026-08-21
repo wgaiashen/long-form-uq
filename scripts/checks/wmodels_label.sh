@@ -1,19 +1,19 @@
 #!/bin/bash
 # Label one W-Models replication population across the six-dataset panel.
 #
-# ⚠️ RUNS ON A LOGIN NODE ON PURPOSE. The judge calls the OpenAI API and compute nodes are not
+# RUNS ON A LOGIN NODE ON PURPOSE. The judge calls the OpenAI API and compute nodes are not
 # guaranteed a route out. This is API-bound and light on CPU, which is the one class of long-running
 # work a login node is allowed to carry.
 #
-# ⚠️ --judge gpt-5-mini IS PASSED EXPLICITLY, EVERY TIME. `_resolve_judge()` finds nothing stamped on
+# --judge gpt-5-mini IS PASSED EXPLICITLY, EVERY TIME. `_resolve_judge()` finds nothing stamped on
 # a new model slug and falls through to gpt-5 -- roughly 15x the price, and worse, a DIFFERENT
 # YARDSTICK. Never mix judges within one comparison.
 #
-# ⚠️ THE TWO REGIME DATASETS ARE NOT OPTIONAL EXTRAS. asqa and factscore were generated with
+# THE TWO REGIME DATASETS ARE NOT OPTIONAL EXTRAS. asqa and factscore were generated with
 # repetition_penalty 1.2 into their own cache namespaces; labelling them without --prompt-regime
 # reads a different (or empty) population.
 #
-# ⚠️ --out IS MANDATORY ON THE COST ESTIMATE. judge_cost_estimate.py and generation_quality.py both
+# --out IS MANDATORY ON THE COST ESTIMATE. judge_cost_estimate.py and generation_quality.py both
 # default to paths that are TRACKED FILES (results/judge_cost_estimate.csv,
 # results/generation_quality.csv). Writing them here would dirty the repo with a side effect.
 #
@@ -31,7 +31,7 @@ mkdir -p "$SCRATCH"
 
 # The key lives in the PRIVATE PARENT as a sourceable `export OPENAI_API_KEY=...` file, gitignored
 # and mode 600. Sourcing it here means an unattended overnight run does not die on a missing key.
-# ⚠️ Never echo the value, and never move this file into the public repo.
+# Never echo the value, and never move this file into the public repo.
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   KEYFILE="${LUQ_OPENAI_KEYFILE:-$(cd "$(dirname "$0")/../.." && pwd)/../.openai_key}"
   if [ -f "$KEYFILE" ]; then

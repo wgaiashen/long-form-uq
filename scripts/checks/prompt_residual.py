@@ -23,10 +23,10 @@ Three representations, one classifier:
     R2  s[1:].mean(0) - s[0]         prompt-residual mean   = THE METHOD UNDER TEST
     R3  s[1:].mean(0) - mean_train(h0)   CONSTANT anchor    = the centring control (see build_reps)
 
-⚠️ R1 IS NOT OPTIONAL. Without it, a win for R2 over R0 could simply be "dropping h0" rather than
+R1 IS NOT OPTIONAL. Without it, a win for R2 over R0 could simply be "dropping h0" rather than
 "subtracting h0". The pre-registered primary comparison is therefore R2 - R1, never R2 - R0.
 
-⚠️ R3 IS NOT OPTIONAL EITHER. Subtracting a per-example anchor also CENTRES the input, which by
+R3 IS NOT OPTIONAL EITHER. Subtracting a per-example anchor also CENTRES the input, which by
 itself can help an unstandardised linear head. R3 buys the centring without the task-relativity, so
 R2 - R3 is what separates the claimed mechanism from an optimisation artifact.
 
@@ -53,7 +53,7 @@ shape (1, d). With freeze_query=True the query stays at zeros, so every score is
 over a single real position is exactly 1.0 -- giving pooled == z into the identical Linear(d,1)
 head, optimiser, schedule, weight decay and RNG draw order.
 
-⚠️ THAT EQUIVALENCE IS NOT ASSUMED. Every cell re-derives the canonical mean-pool control the
+THAT EQUIVALENCE IS NOT ASSUMED. Every cell re-derives the canonical mean-pool control the
 ORIGINAL way (full states through train_attn) and asserts it matches the pseudo-sequence R0 on the
 PER-EXAMPLE UNCERTAINTIES (see the GATE_VEC_TOL note below for why that, and not PRR, is the right
 instrument). If it disagrees the run ABORTS: R0 is not a new measurement, so a drift there means the
@@ -117,7 +117,7 @@ def build_reps(states, tr_idx):
 
     Returns a dict of {arm_name: list of (1, d) pseudo-sequences}, ready for train_attn.
 
-    ⚠️ WHY R3 EXISTS (added 2026-08-12 after the smoke, see prereg §9 amendment).
+    WHY R3 EXISTS (added 2026-08-12 after the smoke, see prereg §9 amendment).
     R2 subtracts the example's OWN anchor, which does two things at once: it makes the
     representation task-relative (the claim), AND it removes a large offset that hidden states
     share, which on its own could just be better CONDITIONING for an unstandardised linear head
@@ -128,10 +128,10 @@ def build_reps(states, tr_idx):
         R2 ≈ R3   ->  the gain is centring/conditioning, NOT prompt-relativity
         R2 >> R3  ->  the per-example anchor carries real signal
 
-    ⚠️ The constant is computed from TRAINING ROWS ONLY. Using all rows would leak the test set
+    The constant is computed from TRAINING ROWS ONLY. Using all rows would leak the test set
     into the representation.
 
-    ⚠️ EMPTY-GENERATION GUARD. If a record has G == 0 the window is a single row (just the anchor),
+    EMPTY-GENERATION GUARD. If a record has G == 0 the window is a single row (just the anchor),
     so `s[1:]` is an EMPTY slice and numpy returns NaN with only a RuntimeWarning -- a plausible
     number in place of an absence, which would then be ranked arbitrarily by PRR. We abort instead.
     Falling back to h0 would silently turn R1/R2 into a different method.
@@ -187,7 +187,7 @@ def main():
     print(f"PROVENANCE: git_sha={prov['git_sha'][:12]} cluster={prov['cluster']} "
           f"env_hash={prov['env_hash']} carve={prov['carve']}", flush=True)
     if args.smoke:
-        print("⚠️  SMOKE TEST -- results are NOT reportable", flush=True)
+        print("SMOKE TEST -- results are NOT reportable", flush=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device} model={MODEL} layer={args.layer} seeds={seeds}", flush=True)

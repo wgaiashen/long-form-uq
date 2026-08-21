@@ -133,7 +133,7 @@ def main():
         if o:
             groups.setdefault(o, []).append(ds)
     if len(groups) > 1:
-        print("\n⚠️ THE v1 GRID SPANS MORE THAN ONE CHECKOUT. Datasets built under different ones are")
+        print("\nTHE v1 GRID SPANS MORE THAN ONE CHECKOUT. Datasets built under different ones are")
         print("   not directly comparable on anything prompt-dependent, and a regeneration of one")
         print("   compared against the other confounds the library change with whatever was intended:")
         for o, dss in sorted(groups.items()):

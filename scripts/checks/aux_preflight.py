@@ -20,13 +20,13 @@ PART B -- λ selection by held-out SOURCE DATASET (`val_split_held_out_source`).
     4. neither side is empty
   If this is wrong, every λ is selected on the wrong criterion.
 
-⚠️ WHY ALL 20 CELLS AND NOT ONE. 9 of the 20 cells have a SINGLE-dataset training pool -- every ID
+WHY ALL 20 CELLS AND NOT ONE. 9 of the 20 cells have a SINGLE-dataset training pool -- every ID
 cell and every 1ds-Diff cell by construction, plus factscore's SameTask (its family is just
 {expertqa, factscore}). Holding a source out is impossible there, so the function falls back to a
 random carve. Checking one multi-source cell would pass and say nothing about the other nine.
 Those cells are classified FALLBACK, not OK, and counted.
 
-⚠️ LIMITATION, recorded before launch rather than discovered afterwards: DOC_INSTRUCTIONS.md §5
+LIMITATION, recorded before launch rather than discovered afterwards: DOC_INSTRUCTIONS.md §5
 pre-registers that the loss should help MOST at the narrow-pool rungs (1ds-Diff, SameTask) -- which
 are exactly the cells where the new selection criterion cannot operate. Read the two claims apart:
 the auxiliary LOSS is tested on all 20 cells (`real_minus_shuffled` is valid everywhere, since the

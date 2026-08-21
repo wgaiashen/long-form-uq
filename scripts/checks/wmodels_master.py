@@ -19,7 +19,7 @@ WHAT IT REFUSES TO DO
   * It reports coverage UP FRONT, before the file is written, so a short grid cannot be mistaken for
     a complete one.
 
-⚠️ The PRR column is `prr_mean`, not `prr`. ⚠️ `fair_floor` rows carry `n_seeds = 0` -- it is a
+The PRR column is `prr_mean`, not `prr`. `fair_floor` rows carry `n_seeds = 0` -- it is a
 derived max-of-three, not a trained method, so asserting `n_seeds == 3` over all rows is wrong.
 
     python scripts/checks/wmodels_master.py --model google/gemma-2-9b
@@ -99,7 +99,7 @@ def main() -> int:
     cells, srcs, conflicts, dup_ok, quarantined = {}, [], [], 0, []
     for pat in pats:
         for p in sorted(RESULTS.glob(pat)):
-            # ⛔ DO_NOT_USE marks a QUARANTINED population -- generations that failed the §6 gate,
+            # DO_NOT_USE marks a QUARANTINED population -- generations that failed the §6 gate,
             # kept on disk as evidence, never as results. The stage wildcards can match them, so the
             # exclusion is explicit here rather than left to whoever writes the next glob.
             if "DO_NOT_USE" in p.name:
@@ -126,7 +126,7 @@ def main() -> int:
           + ("   [D6 SENSITIVITY, not the primary]" if a.panel == "eight" else ""))
     print(f"  source files ({len(srcs)}): {', '.join(srcs)}")
     if quarantined:
-        print(f"  ⛔ skipped {len(quarantined)} QUARANTINED file(s) (DO_NOT_USE): {quarantined}")
+        print(f"  skipped {len(quarantined)} QUARANTINED file(s) (DO_NOT_USE): {quarantined}")
     print()
 
     if conflicts:
@@ -151,7 +151,7 @@ def main() -> int:
     if absent:
         print(f"  expected-absent (out of scope, NOT a gap): {absent}")
     if missing:
-        print(f"  ⚠️ MISSING ({len(missing)}): {missing}")
+        print(f"  MISSING ({len(missing)}): {missing}")
     print(f"  git_sha  {sorted({r['git_sha'][:12] for r in cells.values()})}")
     print(f"  carve    {sorted({r.get('carve', '') for r in cells.values()})}")
     print(f"  methods  {sorted({m for (_, _, m) in cells})}")

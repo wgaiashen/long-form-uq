@@ -7,7 +7,7 @@
 #SBATCH --time=18:00:00
 #SBATCH --output=logs/multihead_ladder-%j.out
 
-# S6 — multi-head (Joe idea 2), SELF-CONTAINED: MH (K queries+heads) + ABLATION (1 query, K heads),
+# S6 — multi-head (design note 2), SELF-CONTAINED: MH (K queries+heads) + ABLATION (1 query, K heads),
 # both trained in-run at T=1. --defer-baseline leaves the K=1 columns EMPTY + baseline_deferred=True;
 # the MH-vs-K=1 reference is filled POST-HOC by join_arma_baseline.py from S3's arm A. So S6 needs NO
 # dependency on S3 and runs NOW on a free A100.

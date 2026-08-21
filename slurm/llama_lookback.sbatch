@@ -10,7 +10,7 @@
 # Lookback Lens features on Llama-3.1-8B (the attention lookback ratio, Chuang et al.).
 # GPU-only: 01c replays the cached token ids with the EAGER attention backend in fp32
 # (eager fp16 overflows to NaN in the softmax) and writes cache/features/...__lookback.npz.
-# Our features/lookback.py is verified ~1e-6 against Chuang's released code; Joe's luh
+# Our features/lookback.py is verified ~1e-6 against Chuang's released code; the luh
 # lookback orients the ratio the other way (1 - ours), which is PRR-identical under the
 # linear probe. Independent of the ptrue/uhead jobs (different feature file), so run in parallel.
 #

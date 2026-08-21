@@ -15,7 +15,7 @@ It answers six questions:
      OOD rungs, both with MedQuAD excluded
   6. a SAFE / CAVEAT / DO NOT CLAIM verdict per headline conclusion
 
-⚠️ Ordering is judged against SEED NOISE, not against zero. Per-eval seed sd at the OOD rungs is
+Ordering is judged against SEED NOISE, not against zero. Per-eval seed sd at the OOD rungs is
 0.034-0.056, so the macro standard error over 8 datasets is ~0.019 and over 7 is ~0.021. A reordering
 whose gap is inside that is reported as NOT a reordering — calling it one would be reading noise.
 
@@ -117,10 +117,10 @@ def main():
     A(f"\n- original order: {' > '.join(o_can)}")
     A(f"- clean order   : {' > '.join(o_sh)}")
     if o_can == o_sh:
-        A("\n✅ **No ordering change.**")
+        A("\n**No ordering change.**")
     else:
         swaps = [(i, o_can[i], o_sh[i]) for i in range(len(o_can)) if o_can[i] != o_sh[i]]
-        A(f"\n⚠️ **Ordering differs at {len(swaps)} position(s).** Gaps vs seed noise:")
+        A(f"\n**Ordering differs at {len(swaps)} position(s).** Gaps vs seed noise:")
         for _i, a, b in swaps:
             g = abs(v_can.get(a, 0) - v_can.get(b, 0))
             A(f"  - `{a}` ↔ `{b}`: original gap {g:.4f} "
@@ -145,7 +145,7 @@ def main():
     A(f"**Probability-aggregation ordering**")
     A(f"- 8 datasets: {' > '.join(o8)}")
     A(f"- 7 datasets (no MedQuAD): {' > '.join(o7)}")
-    A(f"- {'✅ SURVIVES — same ordering' if o7 == o8 else '⚠️ CHANGES without MedQuAD'}")
+    A(f"- {'SURVIVES — same ordering' if o7 == o8 else 'CHANGES without MedQuAD'}")
     A("")
     A("**wMSP-shrink@2 vs SAPLMA at the hardest OOD rungs**")
     A("| rung | population | wMSP-shrink@2 − SAPLMA |")
@@ -156,7 +156,7 @@ def main():
             w, s = macro(src, "wMSP-shrink@2", ev, [rg]), macro(src, "SAPLMA", ev, [rg])
             if w is not None and s is not None:
                 A(f"| {rg.replace('-long','')} | {lbl} | {w-s:+.4f} |")
-    A("\n⚠️ All these differences are inside the per-eval seed sd (0.034–0.056). The comparison is at "
+    A("\nAll these differences are inside the per-eval seed sd (0.034–0.056). The comparison is at "
       "best a tie in every population — it was never a positive result being reversed.")
 
     # ---- 6

@@ -24,13 +24,13 @@
 # CONFIG, pre-registered in prereg/A2_med_quad_degeneracy_gate.md:
 #   budget 128 -> 768 (gold p90 591 x ~1.3); no_repeat_ngram_size 3; NO repetition penalty; fp32+eager.
 #
-# ⚠️ EXPECTED: DEGENERACY MAY RISE, and that is not a failure. At 97.7% capped, a cap of 128 truncates
+# EXPECTED: DEGENERACY MAY RISE, and that is not a failure. At 97.7% capped, a cap of 128 truncates
 # loops before the detector's run-length threshold can see them, so med_quad's 12.3% severe is a LOWER
 # BOUND. A rise is the expected consequence of removing a loop-truncator; the response is to keep BOTH
 # the budget and the anti-loop measure. med_quad ONLY -- at <=0.7% severe nothing is masked for the
 # others and a rise there IS a failure.
 #
-# ⚠️ READ THE LENGTH DISTRIBUTION FIRST, NOT THE TRUNCATION RATE. The pilot showed the model writes to
+# READ THE LENGTH DISTRIBUTION FIRST, NOT THE TRUNCATION RATE. The pilot showed the model writes to
 # whatever cap it is given (samsum's median moved 56 -> 96 when the cap did). If med_quad's median lands
 # at or near 768, the reading is that it needs BOTH the larger budget AND general drift control, and
 # pbs/med_quad_v2_reppen.pbs (rep-pen 1.2, smoke-tests 50 rows first) is the prepared follow-up.

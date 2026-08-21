@@ -6,7 +6,7 @@ Written and committed on **2026-08-17**, before any `HAPES λ=2 + SAPLMA` ensemb
 in the project.
 
 **This is a late, supervisor-motivated experiment.** It follows the 14 August 2026 supervision meeting
-(`reference/2026-08-14_Joe_Lihu_meeting_notes_v2_with_human_eval (1).md` §8 and §15 P0 #2), where the
+(the supervision meeting notes and §15 P0 #2), where the
 best-of-both-worlds idea was raised. The registration is therefore explicit about what is and is not
 being fixed prospectively.
 
@@ -18,7 +18,7 @@ estimands, the unit of analysis, the interpretation rule, and the commitment not
 - **The ensemble hypothesis did not exist before 14 August 2026.** It came from the supervisors.
 - **HAPES was not invented for this experiment.** It is the project's existing method contribution,
   developed and published internally well before this registration
-  (`STOCKTAKE_post31July.md`, `results/analysis/WMSP_SHRINKAGE_MECHANISM.md`).
+  (the project results log, `results/analysis/WMSP_SHRINKAGE_MECHANISM.md`).
 - **The component results were NOT unseen.** SAPLMA, HAPE, HAPES λ=2, the attention pooler and the
   three floors are all fully observed on this exact population and are quoted in §1 below. They are
   the *motivation* for this registration, not evidence for it.
@@ -72,10 +72,10 @@ Therefore:
 
 | old ensemble number | status |
 |---|---|
-| `rankavg{HAPE, SAPLMA}` OOD macro **+0.201**, ID +0.503 | ⛔ **STALE.** Its HAPE leg predates the weighting fixes. Not a gate, not a target, not quotable. |
-| `rankavg{msp_min, SAPLMA}` OOD macro **+0.273**, ID +0.493 | ✅ **CONFIRMED CURRENT** — recomputed on 2026-08-17 from the canonical `results/pdl_perex/` sidecars (which reproduce the master's SAPLMA on **40/40 cells at max &#124;Δ&#124; = 0.0000**) and it returns **OOD +0.273, ID +0.492**. Not stale. |
+| `rankavg{HAPE, SAPLMA}` OOD macro **+0.201**, ID +0.503 | **STALE.** Its HAPE leg predates the weighting fixes. Not a gate, not a target, not quotable. |
+| `rankavg{msp_min, SAPLMA}` OOD macro **+0.273**, ID +0.493 | **CONFIRMED CURRENT** — recomputed on 2026-08-17 from the canonical `results/pdl_perex/` sidecars (which reproduce the master's SAPLMA on **40/40 cells at max &#124;Δ&#124; = 0.0000**) and it returns **OOD +0.273, ID +0.492**. Not stale. |
 
-### 1.2b ⚠️ That reference ensemble does NOT survive this registration's own statistics
+### 1.2b That reference ensemble does NOT survive this registration's own statistics
 
 Recomputed under the §4/§5 analysis (dataset as the unit, n = 8) rather than as a macro difference:
 
@@ -89,16 +89,16 @@ statistically supported once the dataset is the unit of analysis** — it rests 
 CI spanning zero — while its ID loss is large, consistent (0/8) and significant. Under §6 this reference
 would be classified as **no established OOD improvement, with a material ID loss**.
 
-⭐ This is recorded *before* the primary is computable, and it is the reason §4 fixes the dataset as the
+This is recorded *before* the primary is computable, and it is the reason §4 fixes the dataset as the
 unit of analysis: a macro-difference reading of these ensembles is materially more favourable than the
 paired test at n = 8. It also sets the honest prior for the primary — see §1.3.
 
-⛔ **No old ensemble number is used as a continuity gate or as a pre-registered target.** The validity
+**No old ensemble number is used as a continuity gate or as a pre-registered target.** The validity
 gate is component-level (§7).
 
 ### 1.3 Prior evidence that bears on how a result here must be read
 
-- `STOCKTAKE_sharpening_axis.md` **§9**: SAPLMA and the floor are genuinely distinct and stable — seed
+- the project results log **§9**: SAPLMA and the floor are genuinely distinct and stable — seed
   self-agreement 0.772 against cross-correlation 0.194, disattenuated 0.222. There is a real second
   signal.
 - **§8**: every oracle ceiling previously quoted is a max-over-K artefact. The per-cell
@@ -224,7 +224,7 @@ only to reweight the token evidence. Two descriptive tests:
    as the reliability ceiling and reporting the disattenuated value `r_xy / sqrt(r_xx · r_yy)`;
 2. does the {HAPES λ=2, SAPLMA} pair **gain more** from combination than {SAPLMA, attention-pool}.
 
-⚠️ Registered caveat: **lower correlation by itself is not evidence of a better method.** §1.3 already
+Registered caveat: **lower correlation by itself is not evidence of a better method.** §1.3 already
 records that distinctness is not incremental value. This is **secondary mechanism evidence and forms no
 part of the success criterion in §6.**
 
@@ -255,7 +255,7 @@ robustness as shift strengthens; that profile may be more informative than the s
 - **One primary combiner** (`rankavg`, equal weight). `zavg` may appear as a robustness footnote only,
   never as a headline, and never as an alternative from which the better is chosen.
 - **No per-cell or per-dataset selection among methods** — closed by §8 of
-  `STOCKTAKE_sharpening_axis.md` (net −0.0158, p = 0.994).
+  the project results log (net −0.0158, p = 0.994).
 - **No λ sweep, no combiner sweep, no pair sweep, no interpolator.**
 - **No new generation, extraction or GPU job.** CPU-only, from existing caches.
 
@@ -270,8 +270,8 @@ short-form context: `frac_R>0.5 = 1.000` on all four OOD rungs
 (`results/regime_R4b_hbo_validation__meta-llama_Meta-Llama-3.1-8B.csv`), where HBO collapsed to pure
 MSP.
 
-⛔ **No arbitrary cutoff (such as "90% on 3 of 4 rungs") is treated as a scientific result.**
-⛔ **No interpolator is trained without returning to the author first.**
+**No arbitrary cutoff (such as "90% on 3 of 4 rungs") is treated as a scientific result.**
+**No interpolator is trained without returning to the author first.**
 
 ---
 

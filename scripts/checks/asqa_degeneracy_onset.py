@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Characterise the `asqa` generation-validity gate FAILURE on Qwen/Qwen2.5-32B (D-pending, see
-STOCKTAKE_qwen25_32b.md). Read-only, no training, no model load.
+the project results log). Read-only, no training, no model load.
 
 WHY THIS SCRIPT, RATHER THAN A `luq.template_restart` RULE.
 `asqa` has no entry in `template_restart._RULES` -- deliberately, not an oversight. That module only

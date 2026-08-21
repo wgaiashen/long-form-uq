@@ -9,11 +9,11 @@
 #   1. whitespace-fronting  -> a leading newline, which --truncate-long then cuts to EMPTY
 #   2. assistant persona    -> trailing chatter the judge grades as the answer
 #
-# ⛔ THIS IS NOT A POPULATION. It writes NOTHING to any cache, runs in bf16 on an abundant card
+# THIS IS NOT A POPULATION. It writes NOTHING to any cache, runs in bf16 on an abundant card
 # purely because "is the first emitted token a newline?" is not dtype-sensitive, and its output may
 # never enter a results table. The real fp32 run remains the population.
 #
-# ⚠️ It generates WITHOUT truncate_at_newline and inspects the first token itself. Reproducing the
+# It generates WITHOUT truncate_at_newline and inspects the first token itself. Reproducing the
 # CAUSE (a leading newline) is more informative than the symptom (an empty string), and it also shows
 # what the untruncated answer would have been.
 

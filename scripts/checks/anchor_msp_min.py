@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """F5 -- REGULARISE WEIGHTED MSP TOWARD msp_min INSTEAD OF TOWARD perplexity.
 
-Pre-registration: prereg/F5_anchor_at_msp_min.md.  Results: ../STOCKTAKE_sharpening_axis.md §16.
+Pre-registration: prereg/F5_anchor_at_msp_min.md.  Results: the project results log
 
 WHY, IN ONE PARAGRAPH
 ---------------------
@@ -13,7 +13,7 @@ tracks how good `perplexity` is there, Spearman +0.835, p = 0.0099, stable under
 pubmed_qa and xsum the anchor is -0.174 and -0.172, i.e. shrinking imports NOISE, and those are
 exactly the two datasets where shrinkage helps least. F5 changes the anchor, not the pooling.
 
-⚠️ THE PENALTY IS IN PROBABILITY SPACE, AND THE OBVIOUS FORM IS REJECTED
+THE PENALTY IS IN PROBABILITY SPACE, AND THE OBVIOUS FORM IS REJECTED
 The naive analogue, squared error toward `w* = n * onehot(argmax nll)`, evaluates to `n - 1` at
 uniform weights, so it scales as O(n): one lambda would mean ~7x different things at pubmed_qa
 (median 32 tokens) and expertqa (214). That is the LENGTH CONFOUND that killed the tau family in
@@ -23,12 +23,12 @@ round 1 (`max z <= sqrt(n-1)`), and it is not being reintroduced. Registered for
     k       = argmax(nll) among the KEPT tokens        (the anchor)
     penalty = 1 - p[k]                                 (bounded [0,1], zero at the anchor)
 
-⚠️ THE ANCHOR IS AMONG KEPT TOKENS. `_weights_from_raw` masks specials to -inf, so an anchor on an
+THE ANCHOR IS AMONG KEPT TOKENS. `_weights_from_raw` masks specials to -inf, so an anchor on an
 excluded token could never be reached and the penalty could never reach 0. Consequence, stated
 plainly: the lambda -> inf limit is `msp_min` restricted to CONTENT tokens (§12: 0.3478 vs 0.3710 on
 pubmed_qa), not `msp_min` over all tokens. Both are reported.
 
-⚠️ WHY THE TRAINING LOOP IS COPIED. `reg(w)` in `weighted_msp.train_weighted_msp` receives only the
+WHY THE TRAINING LOOP IS COPIED. `reg(w)` in `weighted_msp.train_weighted_msp` receives only the
 weight vector, so it cannot know which token is the anchor, and `weighted_msp.py` is on the Qwen
 port's edit list. The loop below is copied VERBATIM from `train_weighted_msp` with only the penalty
 call changed, and CONTROL A proves the copy faithful.
@@ -360,7 +360,7 @@ def main():
                 rows.append((rung, X, "random", l, f"{r:.4f}", "", len(seeds), carve))
                 if args.combo and acc.get(("combo", l)):
                     rows.append((rung, X, "combo", l, f"{c:.4f}", "", len(seeds), carve))
-                # ⚠️ BUG FIXED 2026-08-09 (after the F5c grid ran): the wsonly arm was TRAINED above
+                # BUG FIXED 2026-08-09 (after the F5c grid ran): the wsonly arm was TRAINED above
                 # but never appended here, so the attribution control's PRRs were computed and then
                 # silently discarded — every __logws CSV from jobs 3632079-86 has zero wsonly rows.
                 # The verdict was unaffected (no positive combo effect survived to attribute), but a
@@ -370,10 +370,10 @@ def main():
                     rows.append((rung, X, "wsonly", l, f"{wsv:.4f}", "", len(seeds), carve))
         for k, v in f.items():
             rows.append((rung, X, "floor", k, f"{v:.4f}", "", len(seeds), carve))
-        print("   ⚠️ CONTROL D: mean p[k] must RISE with lambda. If it does not, the bounded penalty")
+        print("   CONTROL D: mean p[k] must RISE with lambda. If it does not, the bounded penalty")
         print("      is not biting and that is an optimisation failure, not a verdict on the idea.")
         if args.smoke:
-            print("\n⚠️ SMOKE -- one cell, one seed. NOT A RESULT.")
+            print("\nSMOKE -- one cell, one seed. NOT A RESULT.")
             break
 
     ev = evals[0] if len(evals) == 1 else "multi"

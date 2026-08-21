@@ -1,12 +1,12 @@
 """G1 diagnostic: resolve the PHYSICAL hidden layer each pipeline probes, so we match
-Joe's Hidden Failures "middle" by block, not by copying an index number.
+the Hidden Failures "middle" by block, not by copying an index number.
 
 HF `output_hidden_states=True` returns num_hidden_layers+1 tensors per step: index 0 is
-the embedding output, index k is the k-th decoder layer's output. Joe's code selects
+the embedding output, index k is the k-th decoder layer's output. the code selects
 `ceil(num_hidden/2)-1` and indexes that (embedding-included) tuple directly
 (luh/feature_extractors/utils.py + basic_hidden_states.py); our pipeline caches all layers
 and `03_probe.py` defaults to `n_layers//2` over the same tuple. For Llama-3.1-8B (32
-layers) Joe = index 15, ours = 16 — one slot apart. The paper's figures say "layer 16",
+layers) the reference = index 15, ours = 16 — one slot apart. The paper's figures say "layer 16",
 which is the embedding-as-layer-1 name for HF index 15. The empirical {15,16} sweep is the
 final arbiter; this script confirms the structure (and that our cached features really do
 include the embedding row at index 0).
@@ -32,16 +32,16 @@ from luq.config import Config  # noqa: E402
 def report(num_hidden, source):
     n_states = num_hidden + 1  # HF per-step tuple length, incl. embedding at index 0
     ours = n_states // 2
-    joes = math.ceil(num_hidden / 2) - 1
+    ref_layer = math.ceil(num_hidden / 2) - 1
     print(f"\n[{source}] num_hidden_layers={num_hidden}, "
           f"hidden_states length={n_states} (index 0 = embedding)")
     print(f"  ours  (n_layers//2) -> hidden_states[{ours}]")
-    print(f"  Joe   (ceil(N/2)-1) -> hidden_states[{joes}]")
-    if ours == joes:
+    print(f"  ref   (ceil(N/2)-1) -> hidden_states[{ref_layer}]")
+    if ours == ref_layer:
         print("  MATCH: same physical hidden state.")
     else:
-        print(f"  MISMATCH by {ours - joes}: pass `--layer {joes}` to 03_probe.py to match Joe "
-              f"(and sweep {joes}/{ours} to confirm against Table 14).")
+        print(f"  MISMATCH by {ours - ref_layer}: pass `--layer {ref_layer}` to 03_probe.py to match the reference implementation "
+              f"(and sweep {ref_layer}/{ours} to confirm against Table 14).")
 
 
 def main():

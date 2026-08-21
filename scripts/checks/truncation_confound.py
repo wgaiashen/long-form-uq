@@ -139,7 +139,7 @@ def main():
             print(f"   SAPLMA {sap_full:+.3f}  armA {arm_full:+.3f}   (vs msp_min bar: SAPLMA−msp_min {sap_full-mspmin_full:+.3f})", flush=True)
             if not uninformative:
                 print(f"   NOT-CAPPED: best fair = {wf_nc} {pf_nc:+.3f}  SAPLMA {sap_ncv:+.3f}  armA {arm_ncv:+.3f}", flush=True)
-                print(f"   ⭐ SAPLMA−fairfloor GAP: full {gap_full:+.3f} -> not-capped {gap_nc:+.3f}  "
+                print(f"   SAPLMA−fairfloor GAP: full {gap_full:+.3f} -> not-capped {gap_nc:+.3f}  "
                       f"(floor gained {pf_nc-pf_full:+.3f}, SAPLMA gained {sap_ncv-sap_full:+.3f})", flush=True)
                 clo, chi = boot_prr_diff(yte[nc], sap[nc], floors[wf_nc][nc])
                 print(f"      not-capped gap CI[{clo:+.3f},{chi:+.3f}] {'CLEAN (probe>fairfloor)' if clo>0 else 'NOT certified — floor catches probe'}", flush=True)

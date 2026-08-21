@@ -12,11 +12,11 @@
 # Slurm twin of pbs/wmodels_smoke.pbs, plus --chat-template support (D5: raw few-shot
 # failed the gate on 3/6 Llama-Instruct datasets on chatter -- see worklog 2026-08-19).
 #
-# ⚠️ THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,
+# THIS GATE IS UQ-PERFORMANCE-INDEPENDENT BY CONSTRUCTION. It reads degeneracy, empties,
 # invented continuations, cap behaviour and generation length. It never computes or looks at PRR.
 #
-# ⚠️ --limit takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
-# ⚠️ --prompt-regime <slug>_probe isolates every write, so a probe cache can never contaminate a
+# --limit takes the FIRST N rows by index, so the smoke set is deterministic, not sampled.
+# --prompt-regime <slug>_probe isolates every write, so a probe cache can never contaminate a
 # real one.
 #
 #   sbatch --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_PROBE=llama31i_chat_probe,LUQ_CHAT=1 \

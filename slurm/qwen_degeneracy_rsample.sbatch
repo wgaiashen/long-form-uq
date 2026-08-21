@@ -10,7 +10,7 @@
 
 # RE-MEASURE Qwen's degeneracy on a RANDOM sample, not the head slice.
 #
-# ⚠️ WHY THIS RUN EXISTS. The budget probe used `--limit 200`, which is a head slice, not a sample:
+# WHY THIS RUN EXISTS. The budget probe used `--limit 200`, which is a head slice, not a sample:
 # `01_extract` simply breaks after the first n rows. Proven on expertqa -- the first 200 rows have gold
 # p90 450 against 349 for the full 2016, and 450 sits OUTSIDE the [316,376] range of 2,000 random
 # 200-row draws. So every statistic read off that run (length, capping, AND degeneracy) is biased.
@@ -25,7 +25,7 @@
 #   expertqa 23.0% · factscore 17.0% · asqa 10.0% · med_quad 11.5% · samsum 3.5% · pubmed_qa 1.5%
 # against Llama's full-population 11.76 / 0.20 / 1.37 / 12.33 / 0.72 / 1.11.
 #
-# ⚠️ SEPARATE NAMESPACE, deliberately. This writes to `qwen14b_rsample`, NOT `qwen14b_probe`. The two
+# SEPARATE NAMESPACE, deliberately. This writes to `qwen14b_rsample`, NOT `qwen14b_probe`. The two
 # are different populations (random draw vs head slice) and must never be pooled or silently merged
 # into one table -- that is the same class of error as pooling two models.
 #

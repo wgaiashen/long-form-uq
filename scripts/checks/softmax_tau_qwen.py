@@ -2,18 +2,18 @@
 """Fixed softmax sharpening at tau = 1 on the Qwen2.5-14B grid -- a POST-HOC cross-model transfer.
 
 WHAT tau = 1 IS, AND WHERE IT COMES FROM. It is the a-priori sharpening strength W1 committed to in
-writing before the Llama run: STOCKTAKE_sharpening_axis.md records it as "A0 a priori, tau = 1
+writing before the Llama run: the project results log records it as "A0 a priori, tau = 1
 (PRIMARY) | committed in writing before the run". It is NOT an argmax over the tau grid, which
 matters -- the project has one recorded case of a grid-argmax being mistaken for a result (the
 Lehmer beta = 2 row), and this is not that.
 
-⚠️ THIS IS NOT A PRE-REGISTERED QWEN TEST, AND MUST NEVER BE REPORTED AS ONE.
+THIS IS NOT A PRE-REGISTERED QWEN TEST, AND MUST NEVER BE REPORTED AS ONE.
 The Qwen master was already visible when this was run. It is a descriptive transfer of a FIXED Llama
 value onto a second population: no parameter is searched, no per-dataset tau, no selector, no bars,
 no PASS/FAIL. The output carries provenance = post-hoc-transfer and lives OUTSIDE the M2 scorecard.
 
 For context, tau = 1's own registered claim FAILED on Llama: +0.0209 against msp_min, 6/8, p = 0.148
-(STOCKTAKE_sharpening_axis.md §3). So this transfers a value that did not work on its home
+(the project results log). So this transfers a value that did not work on its home
 population -- the opposite of a favourable-result search.
 
 WHY A SEPARATE FILE, not a --model flag on sharpening_family.py. That file is the live W-Sharpen
@@ -121,7 +121,7 @@ def main():
     print("   internal: score(tau=0) must rank as perplexity; score(tau=inf) must rank as msp_min.")
     if floors:
         print("   external: this script's msp_min / perplexity must match the ladder's floor_min /")
-        print(f"             floor_ppl in pdl_master__{slug}.csv to {GATE_EXT_TOL}. ⭐ W6 could NOT run")
+        print(f"             floor_ppl in pdl_master__{slug}.csv to {GATE_EXT_TOL}. W6 could NOT run")
         print("             this leg (no master existed then); it runs now, and it is the check that")
         print("             says this script sees the same rows the ladder did.")
     else:
@@ -154,7 +154,7 @@ def main():
     # ---------------- the curve, for the record only ----------------
     print("\n" + "=" * 100)
     print(f"THE FULL tau CURVE (RECORD ONLY -- the transfer is tau = {TAU} and only tau = {TAU}).")
-    print("⛔ Do NOT read an argmax off this table. Picking the best column on test is precisely the")
+    print("Do NOT read an argmax off this table. Picking the best column on test is precisely the")
     print("   move that made the Lehmer beta = 2 row unquotable (~1.2 hits expected by chance).")
     print("=" * 100)
     print(f"{'eval':16s}" + "".join(f"{t:>9.2f}" if np.isfinite(t) else f"{'inf':>9s}"

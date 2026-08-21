@@ -7,11 +7,11 @@
 # W-Models memory canary (G5). Runs the LONGEST real inputs through the actual extraction path and
 # reports peak GPU memory, before a full six-dataset array is submitted.
 #
-# ⚠️ THE SMOKE DOES NOT COVER THIS. `01_extract --limit 40` takes the FIRST 40 rows by index, and the
+# THE SMOKE DOES NOT COVER THIS. `01_extract --limit 40` takes the FIRST 40 rows by index, and the
 # rows that OOM are the LONGEST ones, which sit in the tail. A 40-row smoke can pass comfortably on a
 # card that the full run then dies on, hours in.
 #
-# ⚠️ "Longest" is TOKENISER-dependent, so the canary ranks with the target model's own tokeniser
+# "Longest" is TOKENISER-dependent, so the canary ranks with the target model's own tokeniser
 # rather than reusing a Llama-derived ranking.
 #
 # gpu_type is overridable because the point is to test the card the real run will actually get:

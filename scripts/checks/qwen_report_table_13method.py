@@ -161,7 +161,7 @@ def main():
     print("QWEN 13-METHOD REPORT TABLE")
     print("=" * 120)
     if not baselines_exist:
-        print("⚠️ No --baselines ptrue,lookback ladder pass found yet -- methods 12-13 will read PENDING.")
+        print("No --baselines ptrue,lookback ladder pass found yet -- methods 12-13 will read PENDING.")
     header = f"{'Method':32s}{'Signal':26s}{'Supervision':14s}{'Aggregation':38s}{'ID PRR':>9s}{'OOD PRR':>10s}  coverage"
     print(header)
     for r in rows:

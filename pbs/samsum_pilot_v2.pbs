@@ -14,7 +14,7 @@
 #   H-over   over-generation is hurting -> more room means more drift      -> scores FALL or hold FLAT
 # Pre-registered prediction: FLAT or SLIGHTLY WORSE (H-over). See prereg/A1_samsum_regeneration_pilot.md
 #
-# ⚠️ WHY TWO ARMS. The v2 recipe changes the budget AND applies repetition-penalty 1.2. Changing both at
+# WHY TWO ARMS. The v2 recipe changes the budget AND applies repetition-penalty 1.2. Changing both at
 # once confounds the hypothesis: if scores fall, the extra room and the penalty are indistinguishable as
 # causes. samsum is the cheapest of the four datasets, so this is the right place to pay for the clean
 # decomposition:

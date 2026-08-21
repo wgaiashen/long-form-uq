@@ -7,7 +7,7 @@ Unsupervised P(True) needs no training: the score is already on each record (`pt
 01g). So scoring it is just PRR over the eval's test split — CPU, seconds, no pertok cache, no probe.
 That is why adding it does not justify restarting a 20-job ladder run (author's decision 2026-08-03).
 
-⚠️ IT IS A FLOOR, SO IT IS SHIFT-INVARIANT. Like `msp_min`/`perplexity`, the score depends only on the
+IT IS A FLOOR, SO IT IS SHIFT-INVARIANT. Like `msp_min`/`perplexity`, the score depends only on the
 EVAL set, never on what was trained on. Its value is therefore identical across all 5 rungs, and it is
 emitted for each rung so the grid has no holes. That is the same convention the existing floors follow —
 it is not five independent measurements, and it should not be read as robustness to shift.
@@ -49,8 +49,8 @@ SHORT = ["sciq", "trivia_qa"]
 LONG_RUNGS = ["ID", "SameTask-long", "DiffTask-long", "LOO-long", "1ds-Diff-long"]
 XL_RUNGS = ["ID", "SameTask", "LOO", "DiffTask", "OneDatasetDiffTask"]
 
-# ⚠️ Below this, the model is not really answering yes/no at the verdict slot, so the score is measuring
-# something else. Reported, never silently dropped -- framing.md notes raw prompting can whitespace-front
+# Below this, the model is not really answering yes/no at the verdict slot, so the score is measuring
+# something else. Reported, never silently dropped -- the project framing notes notes raw prompting can whitespace-front
 # the answer, which is a property of the prompting regime rather than of the method.
 MASS_WARN = 0.60
 
@@ -61,7 +61,7 @@ SIDECAR_DIR = ROOT / "results" / "sidecar_ptrue_unsup"
 def _from_sidecar(ds, n_rows, recs):
     """Read scores from a synced sidecar CSV instead of the records.
 
-    ⚠️ THIS IS WHY THE SCORER DOES NOT NEED THE MERGE TO HAVE HAPPENED. 01g writes into the Tier-1
+    THIS IS WHY THE SCORER DOES NOT NEED THE MERGE TO HAVE HAPPENED. 01g writes into the Tier-1
     records, but merging on RCS would (a) touch the canonical files while 20 ladder jobs are reading
     them, and (b) bump the records mtime — which 04_eval.py treats as the signature of a RELABEL and
     uses to invalidate cached probes. Adding an unrelated field is not a relabel, so that would be a
@@ -141,7 +141,7 @@ def main():
         if res is None:
             print(f"  {ds:14s} SKIPPED LOUDLY: {err}")
             continue
-        warn = "  ⚠️ LOW VERDICT MASS" if res["mass_p50"] < MASS_WARN else ""
+        warn = "  LOW VERDICT MASS" if res["mass_p50"] < MASS_WARN else ""
         print(f"  {ds:14s} PRR {res['prr']:+.4f}  n={res['n']} (dropped {res['dropped']})  "
               f"label={res['field']}  verdict-mass p50={res['mass_p50']:.3f}{warn}")
         for rg in (LONG_RUNGS if ds in LONG else ["Long->Short"]):
@@ -160,7 +160,7 @@ def main():
         with open(out, "w", newline="") as fh:
             w = _csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
         print(f"\nwrote {out}")
-    print("\n⚠️ Same value repeats across rungs BY CONSTRUCTION (a floor depends only on the eval set). "
+    print("\nSame value repeats across rungs BY CONSTRUCTION (a floor depends only on the eval set). "
           "Do not read the flat row as evidence of OOD robustness.")
 
 

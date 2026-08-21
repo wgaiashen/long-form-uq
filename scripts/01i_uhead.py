@@ -1,9 +1,9 @@
 """GPU step: the UHead ARCHITECTURE-ABLATION variant (paper Table 16, `hs_middle` features).
 
 NOTE: this is NOT the Table-1 headline Uhead baseline. The paper's Table-1 Uhead uses attention +
-token-probability features and is reproduced by running Joe's actual `luh` code in
-`scripts/01j_uhead_joe.py` (see src/luq/uhead_joe.py). THIS script feeds the same
-`full_sequence_uhead` transformer head the `hs_middle` per-token hidden states, which is Joe's
+token-probability features and is reproduced by running the actual `luh` code in
+`scripts/01j_uhead_reference.py` (see src/luq/uhead_reference.py). THIS script feeds the same
+`full_sequence_uhead` transformer head the `hs_middle` per-token hidden states, which is the
 architecture-ablation setting (Table 16: same features as SAPLMA, different head). Keep it only as
 that ablation / an apples-to-apples "head architecture" comparison, not as the Uhead baseline.
 
@@ -15,11 +15,11 @@ a `uhead` scores column that 04_eval picks up next to SAPLMA / Lookback / P(True
 
 Extraction + training + scoring happen in ONE job because the per-token full-sequence states are
 large; we hold them in RAM (fp16) rather than caching ~tens of GB to disk (Tier-3: compute on
-demand, do not hoard). The frozen base means training on these cached states is identical to Joe's
+demand, do not hoard). The frozen base means training on these cached states is identical to the
 end-to-end Trainer -- see src/luq/uhead_fullseq.py for the faithfulness argument.
 
 Defaults match the SAPLMA keystone forward (fp32 + eager, layer 15), so the hidden states are the
-same ones our SAPLMA `hs_middle` features were built from -- exactly Joe's `hs_middle` setting.
+same ones our SAPLMA `hs_middle` features were built from -- exactly the `hs_middle` setting.
 
 --max-seq bounds the sequence length for the longest XSum articles (some exceed 5000 tokens): it
 keeps ALL generated tokens and the most recent context tokens, truncating the oldest context. This
@@ -43,7 +43,7 @@ _DTYPE = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
 def _features_for_record(model, tok, record, layer, max_seq):
     """Return (X, output_mask) for one record: per-token L=layer states over [prompt+gen], with the
     last position dropped (the "predicts the next token" alignment), and output_mask marking the
-    generated tokens (Joe's output_mask[1:] convention -> generated iff index >= len(prompt)-1)."""
+    generated tokens (the output_mask[1:] convention -> generated iff index >= len(prompt)-1)."""
     prompt_ids = list(record["prompt_token_ids"])
     gen_ids = list(record["gen_token_ids"])
     n_gen = len(gen_ids)
@@ -70,7 +70,7 @@ def main():
     ap.add_argument("--dataset", default="sciq")
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--variant", default="v1", choices=list(uhead_fullseq.VARIANTS),
-                    help="Joe's head config: v1 (dim768/1L/16H/6ep) or v2 (dim768/2L/4H/7ep)")
+                    help="the head config: v1 (dim768/1L/16H/6ep) or v2 (dim768/2L/4H/7ep)")
     ap.add_argument("--layer", type=int, default=15,
                     help="middle layer (ceil(N/2)-1); 15 for Llama-3.1-8B, matching hs_middle")
     ap.add_argument("--max-seq", type=int, default=2048,

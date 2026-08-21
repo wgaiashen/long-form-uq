@@ -1,6 +1,6 @@
-"""S7 — POOLING HEADS WITH DIFFERENT FIXED RECIPES (Joe's ideas 3 + 4).
+"""S7 — POOLING HEADS WITH DIFFERENT FIXED RECIPES (the ideas 3 + 4).
 
-Joe asked for several attention heads plus something to stop them converging. B.2 ran K heads sharing ONE
+The design calls for several attention heads plus something to stop them converging. B.2 ran K heads sharing ONE
 target and measured them collapsing to pairwise correlation 1.0000, so K heads only ever expressed two
 behaviours ("has a target" / "has none"). This driver runs the version that CANNOT collapse: each frozen
 head's attention IS a fixed recipe, so what makes the heads differ is not learned and no repulsion loss is
@@ -13,7 +13,7 @@ Arms per cell (all trained HERE, nothing inherited, so no cross-population compa
                                                                    reproduction gate against existing runs
   single_<recipe>    one frozen recipe, head-only training      <- each recipe alone (arm C equivalent)
   mh_diverse         3 DIFFERENT frozen recipes + 1 free head   <- THE METHOD
-  mh_same            3 copies of ONE recipe + 1 free head       <- Joe's mandatory control: isolates
+  mh_same            3 copies of ONE recipe + 1 free head       <- the mandatory control: isolates
                                                                    "more classifiers" from "different
                                                                    recipes". Same architecture, same
                                                                    parameter count, same free head.
@@ -27,7 +27,7 @@ PRE-REGISTERED (prereg/S7_multi_recipe_heads.md), thresholds fixed before runnin
             construction and ~1.0 for mh_same; if mh_diverse comes out near 1.0 the wiring is wrong.
   HANDICAP  B.2 measured multi-head 0.06-0.10 PRR BELOW single-head. Carried explicitly, not netted out.
 
-⚠️ The recipes and the control's recipe are DECLARED HERE, not chosen by looking at the results. Picking
+The recipes and the control's recipe are DECLARED HERE, not chosen by looking at the results. Picking
 the "best" recipe per dataset from the test PRR would be an oracle, which is the trap prereg/S4 named.
 
 CPU/GPU job -> qsub, NEVER the login node (it trains poolers per cell).

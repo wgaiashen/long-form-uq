@@ -12,7 +12,7 @@
 #   sbatch slurm/ptrue_lookback_midsrc.sbatch samsum
 #   sbatch slurm/ptrue_lookback_midsrc.sbatch med_quad
 #
-# ⛔ DO NOT SUBMIT until these two are regenerated (or the regeneration is called off). Both are
+# DO NOT SUBMIT until these two are regenerated (or the regeneration is called off). Both are
 # on the regeneration list, so features extracted from their CURRENT generations would be thrown
 # away. Written in advance so it is ready the moment that resolves.
 #
@@ -40,12 +40,12 @@
 #   med_quad   1800     1333     1358      0     7.6 GB   10 min    220 min   ~3.8 h    26 MB
 #   samsum     1800      176     1117      0     5.1 GB    2 min     10 min   ~0.2 h    26 MB
 #
-# ⚠️ med_quad is the surprise here. It is only 1800 rows, half of xsum's 3800, but its MEDIAN
+# med_quad is the surprise here. It is only 1800 rows, half of xsum's 3800, but its MEDIAN
 # sequence is 1333 tokens against xsum's 428 -- almost every row is long, whereas xsum is a short
 # median with a long tail. Lookback cost goes as seq^2 summed over rows, so med_quad lands at
 # ~3.8 h. Do not size it by row count.
 #
-# ⚠️ IF THESE ARE REGENERATED, THE TIMINGS ABOVE BECOME OVERESTIMATES -- BUT THE PARTITION DOES NOT
+# IF THESE ARE REGENERATED, THE TIMINGS ABOVE BECOME OVERESTIMATES -- BUT THE PARTITION DOES NOT
 # CHANGE. Regeneration would use repetition-penalty 1.2, which makes generations SHORTER, not longer
 # (samsum's median generation went 56 -> 21 in the pilot). The numbers above are measured off the
 # CURRENT v1 records, so they would be a little high. How much depends on how much of the sequence

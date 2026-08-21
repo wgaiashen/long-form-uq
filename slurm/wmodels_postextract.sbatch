@@ -11,10 +11,10 @@
 # GUARD -> 01h_pertoken. Slurm twin of pbs/wmodels_postextract.pbs.
 # (slurm/wmodels_qwen32_postextract.sbatch stays as the Qwen32-specific array.)
 #
-# ⚠️ 01e_repool IS MANDATORY, NOT OPTIONAL -- see pbs/wmodels_postextract.pbs for the full reasoning
+# 01e_repool IS MANDATORY, NOT OPTIONAL -- see pbs/wmodels_postextract.pbs for the full reasoning
 # (inline vs teacher-forced pooling differ by ~8e-3 absolute, not precision).
 #
-# ⚠️ THE LAYER IS COMPUTED, NOT TRANSCRIBED, and cross-checked against the committed registry in
+# THE LAYER IS COMPUTED, NOT TRANSCRIBED, and cross-checked against the committed registry in
 # scripts/checks/slice_caches_truncated.py.
 #
 #   sbatch --export=ALL,LUQ_MODEL=google/gemma-2-9b,LUQ_DTYPE=bf16,LUQ_DATASET=xsum \

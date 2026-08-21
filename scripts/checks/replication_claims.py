@@ -27,7 +27,7 @@ published number EXACTLY — run --gate-llama to prove it on your checkout):
     printed descriptively; the published OOD-leg wins/p were quoted on the 32 cells and are
     reproduced that way, labelled as descriptive only.
   * R4' rungs: DiffTask-long and 1ds-Diff-long (the "two hardest", as named on Llama in
-    PLAN_execution_post7Aug.md §2.4). wMSP-shrink@2 - SAPLMA per dataset, n = 8, DIRECTIONAL ONLY.
+    the project plan). wMSP-shrink@2 - SAPLMA per dataset, n = 8, DIRECTIONAL ONLY.
   * fair_floor enters NOWHERE.
 
 Usage:
@@ -67,7 +67,7 @@ CSV_DEFAULT = {
     "qwen": RES / "pdl_master__Qwen_Qwen2.5-14B.csv",
 }
 
-# The published Llama numbers (PLAN_execution_post7Aug.md §2.4 / prereg M2 §1), the gate targets.
+# The published Llama numbers (the project plan / prereg M2 §1), the gate targets.
 GATE = {
     "r1a": (0.1310, 8, 0.0078), "r1b": (0.0686, 5, 0.46),
     "r2": (0.242, 0.195, 0.0041, -0.236, 0.720),
@@ -120,14 +120,14 @@ def main():
     print("decision rule is the one-sided test at alpha = 0.05. NEVER pool populations.")
     print("=" * 100)
     if missing:
-        print(f"⛔ {len(missing)} REQUIRED CELLS MISSING — refusing to score a partial grid. First 10:")
+        print(f"{len(missing)} REQUIRED CELLS MISSING — refusing to score a partial grid. First 10:")
         for k in missing[:10]:
             print("   ", k)
         raise SystemExit(1)
     print("coverage: complete for every cell the tests read")
     if args.population == "qwen":
-        print("⚠️ expertqa on this population carries a severe length confound (length-alone PRR")
-        print("   +0.71 > every method; STOCKTAKE_qwen.md §10.2) — quote no expertqa cell without it.")
+        print("expertqa on this population carries a severe length confound (length-alone PRR")
+        print("   +0.71 > every method; the project results log) — quote no expertqa cell without it.")
 
     def ood(m, e):
         return float(np.mean([g[(nm[m], rg, e)] for rg in OOD_RUNGS]))
@@ -214,11 +214,11 @@ def main():
     # ---- the gate ----------------------------------------------------------------------------
     if args.gate_llama:
         if fails:
-            print("\n⛔ GATE FAILED — this scorer does NOT reproduce the published Llama numbers:")
+            print("\nGATE FAILED — this scorer does NOT reproduce the published Llama numbers:")
             for f in fails:
                 print("   ", f)
             raise SystemExit(1)
-        print("\n✅ GATE PASS — every published Llama number reproduces exactly. The scorer is the")
+        print("\nGATE PASS — every published Llama number reproduces exactly. The scorer is the")
         print("   test definition; point it at the Qwen master only now.")
     if args.population == "llama" and not args.gate_llama:
         print("\n(reminder: run --gate-llama to assert reproduction, not just print)")

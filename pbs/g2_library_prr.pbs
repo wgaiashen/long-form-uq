@@ -11,11 +11,11 @@
 # deterministic function of (which rows, which labels, which scores), identical row lists mean no
 # PRR can move. This job is the end-to-end confirmation of that argument, not the argument itself.
 #
-# ⚠️ LUQ_CARVE=legacy IS THE POINT. The carve-then-filter change (gate 3) is a SEPARATE, DELIBERATE
+# LUQ_CARVE=legacy IS THE POINT. The carve-then-filter change (gate 3) is a SEPARATE, DELIBERATE
 # change to expertqa + factscore. Conflating the two is how a packaging bug would hide inside a
 # legitimate revision, so gate 2 runs the OLD rule and must reproduce the OLD numbers exactly.
 #
-# ⚠️ WRITES TO NEW FILES. results/pdl_fam_*.csv are the frozen sources of the 1,664-cell master
+# WRITES TO NEW FILES. results/pdl_fam_*.csv are the frozen sources of the 1,664-cell master
 # table and are never overwritten here -- the whole point is to diff against them.
 #
 # METHOD SET = the paper set only (author's instruction 2026-08-08), not the 42-arm grid:

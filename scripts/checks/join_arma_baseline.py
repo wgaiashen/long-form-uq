@@ -43,14 +43,14 @@ def _provenance_checks(a_rows, a_name, b_rows, b_name):
         av = {r.get(col) for r in a_rows if r.get(col) not in (None, "")}
         bv = {r.get(col) for r in b_rows if r.get(col) not in (None, "")}
         if not av or not bv:
-            print(f"  ⚠️  {col}: not recorded on {'both sides' if not av and not bv else (a_name if not av else b_name)}"
+            print(f"  {col}: not recorded on {'both sides' if not av and not bv else (a_name if not av else b_name)}"
                   f" -> CANNOT verify {col} match (re-run the driver with the updated code to record it).")
             continue
         if len(av) > 1 or len(bv) > 1:
             raise SystemExit(f"ABORT: {col} is not constant within a file (a={av}, b={bv}) -- mixed runs.")
         if av != bv:
             raise SystemExit(f"ABORT: {col} MISMATCH between runs: {a_name}={av} vs {b_name}={bv}. Not joining.")
-        print(f"  ✓ {col} matches ({next(iter(av))[:12] if col == 'commit' else next(iter(av))})")
+        print(f"  {col} matches ({next(iter(av))[:12] if col == 'commit' else next(iter(av))})")
 
 
 def fill_baseline(s6_path, s3_path, out_path):
@@ -61,14 +61,14 @@ def fill_baseline(s6_path, s3_path, out_path):
     for col in ("eval", "rung"):
         se, s3e = set(_uniq(s6, col)), set(_uniq(s3, col))
         if se != s3e:
-            print(f"  ⚠️  {col} sets differ: only-in-S6={sorted(se - s3e)}  only-in-S3={sorted(s3e - se)}")
+            print(f"  {col} sets differ: only-in-S6={sorted(se - s3e)}  only-in-S3={sorted(s3e - se)}")
     # arm A lookup from S3
     armA = {(r["eval"], r["rung"]): float(r["prr_mean"]) for r in s3 if r["method"] == "armA"}
     # cell alignment: every S6 method cell (mh/ablation/floor_min) should find an arm A
     s6_cells = {(r["eval"], r["rung"]) for r in s6 if not r["method"].startswith("VERDICT")}
     unmatched = sorted(c for c in s6_cells if c not in armA)
     if unmatched:
-        print(f"  ⚠️  {len(unmatched)} S6 cells have NO arm A in S3 (reported, not dropped): {unmatched}")
+        print(f"  {len(unmatched)} S6 cells have NO arm A in S3 (reported, not dropped): {unmatched}")
     # fill k1_armA_s3 on the method rows; flip baseline_deferred to False (now joined)
     filled = 0
     for r in s6:

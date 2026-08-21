@@ -47,6 +47,6 @@ STATUS=$?
 
 echo "=== G1 exit status $STATUS at $(date) ===" >&2
 if [ "$STATUS" -ne 0 ]; then
-  echo "❌ G1 FAILED — do NOT start the Qwen extraction on this path." >&2
+  echo "G1 FAILED — do NOT start the Qwen extraction on this path." >&2
 fi
 exit $STATUS

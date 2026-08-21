@@ -66,7 +66,7 @@ its cache, so probes can be retrained without touching a GPU.
 - `pbs/`, `slurm/` — cluster job scripts (see below).
 - `data/` — a fetch instruction for the FActScore data, which is not redistributed here.
 
-### ⚠️ `results/` is deliberately not in this repository
+### `results/` is deliberately not in this repository
 
 The drivers read and write a `results/` directory at the repo root, and **a fresh clone will not
 have one**. The result tables contain unpublished numbers and are version-controlled separately.
@@ -108,7 +108,7 @@ submission wrapper and a few paths differ.
 - **RCS HPC (CX3)** — PBSPro, a larger pool (default L40S 48GB, and its A100 is a 40GB card).
   Scripts in `pbs/` (221 files).
 
-⚠️ The two directories are **not** a one-for-one mirror. They accumulated per experiment and per
+The two directories are **not** a one-for-one mirror. They accumulated per experiment and per
 cluster, so most jobs exist on one side only. Treat them as a record of what was actually
 submitted rather than as a curated interface.
 
@@ -141,7 +141,7 @@ python scripts/reproduce.py                 # all ID datasets, all methods
 python scripts/reproduce.py --dataset xsum  # one dataset
 ```
 
-⚠️ `scripts/reproduce.py` covers the **early** method set (SAPLMA, linear, P(True), Lookback on
+`scripts/reproduce.py` covers the **early** method set (SAPLMA, linear, P(True), Lookback on
 SciQ, PubMedQA and XSum) and is kept as the original end-to-end check. The full grid is produced
 by the drivers in `scripts/checks/`, principally `probedriftlong.py` (the long-form ladder) and
 `assemble_pdl_table.py` (which rolls the per-eval outputs into the master table).

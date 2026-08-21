@@ -12,7 +12,7 @@
 # second-model replication; everything downstream (features, per-token, labelling, the ladder) waits
 # on the records this produces.
 #
-# ⚠️ BUDGETS ARE LLAMA'S, UNCHANGED. Decided 2026-08-08 after the budget probe. Two datasets sit below
+# BUDGETS ARE LLAMA'S, UNCHANGED. Decided 2026-08-08 after the budget probe. Two datasets sit below
 # the pre-registered 1.0 gate -- med_quad at 0.21x and asqa at 0.96x -- and BOTH are kept anyway,
 # deliberately:
 #   * med_quad's defect is INHERITED from Llama (0.22x there), not introduced by Qwen.
@@ -21,12 +21,12 @@
 # Changing a budget on Qwen alone would make the two populations differ in budget, which is precisely
 # the confound the replication exists to avoid. Both are reported as limitations, not silently fixed.
 #
-# ⚠️ WHY a100 AND ONLY a100. fp32 is required for comparability with the Llama caches (token
+# WHY a100 AND ONLY a100. fp32 is required for comparability with the Llama caches (token
 # probabilities ARE the msp_min signal, so an fp16/bf16 cache is not comparable). fp32 Qwen-14B is
 # ~59GB of weights, which does not fit a 48GB A40 or a 24GB A30. Sharding across 2xA40 would need a
 # code change AND two GPUs per job against a 3-GPU cap -- strictly worse than queueing here.
 #
-# ⚠️ --max-new-tokens IS PASSED EXPLICITLY AND EQUALS THE TABLE VALUE. It changes nothing (budget =
+# --max-new-tokens IS PASSED EXPLICITLY AND EQUALS THE TABLE VALUE. It changes nothing (budget =
 # min(want, cap) either way), but it forces 01_extract to print the resolved BUDGET line, which is the
 # only way the log can EVIDENCE that the budget was not silently clipped to the 128 default. Trap 4.2
 # is invisible precisely when you do not ask for it to be printed.
@@ -69,10 +69,10 @@ TASKS=(
   "expertqa:384:--prompt-regime expertqa_rp12 --repetition-penalty 1.2"       # 2016 rows, longest budget
   "pubmed_qa:128:--truncate-long"                                             # 3800 rows, newline-stopped
   "xsum:56:"                                                                  # 3800 rows, ~5.6k-token sources
-  # ⚠️ med_quad has TWO independent settings that are easy to confuse. Both are pinned to v1 here.
+  # med_quad has TWO independent settings that are easy to confuse. Both are pinned to v1 here.
   #
   # (1) BUDGET 128, i.e. v1. med_quad was regenerated at cap 768 (v2), and v2 was ARCHIVED with v1
-  #     re-emerging as canonical (author's decision 2026-08-04, STOCKTAKE_post31July.md:38). v1 is
+  #     re-emerging as canonical (author's decision 2026-08-04, the project results log). v1 is
   #     hash-pinned in prereg/CANONICAL_v1_MANIFEST.sha256 and the file on disk verifies against it.
   #     So this is deliberately the CAPPED version, 97.7% capped and all, not the long one.
   #
@@ -98,7 +98,7 @@ IFS=':' read -r DS BUD EXTRA <<< "${TASKS[$SLURM_ARRAY_TASK_ID]}"
 echo "=== $DS (budget $BUD, FULL dataset) on $(hostname) at $(date) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
-# ⚠️ --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime, and that guard is right.
+# --max-new-tokens IS ONLY LEGAL ALONGSIDE A --prompt-regime, and that guard is right.
 # 01_extract:116 refuses the flag without a regime, to stop non-default-budget records being written
 # into the default namespace beside the frozen v1 records. It cannot tell that the value we pass
 # equals the table value, and it should not have to trust that. An earlier version of this script
@@ -111,7 +111,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 MNT=""
 case "$EXTRA" in *--prompt-regime*) MNT="--max-new-tokens $BUD" ;; esac
 
-# ⚠️ --dtype fp32 --attn eager passed EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model;
+# --dtype fp32 --attn eager passed EXPLICITLY. `auto` resolves to fp16 for any non-Gemma model;
 # 01_extract refuses `auto` for a non-Llama model rather than producing a quietly incomparable cache.
 # No --limit and no --sample-n: this is the whole dataset, not a subset.
 # shellcheck disable=SC2086

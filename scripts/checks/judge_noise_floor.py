@@ -5,7 +5,7 @@ score. That question is unanswerable without knowing how much the score moves wh
 and `llm_judge._gpt_response` calls at `temperature=1, top_p=1`, so the judge is stochastic and repeat
 calls on identical input disagree.
 
-⚠️ Note on what this does and does not isolate. samsum's v1 labels were ALREADY produced by
+Note on what this does and does not isolate. samsum's v1 labels were ALREADY produced by
 gpt-5-mini (every row carries `correctness_model = gpt-5-mini`), so re-judging with gpt-5-mini is NOT
 a judge-change comparison -- there is no judge change to isolate. It measures run-to-run VARIANCE of
 the same judge. Pass a different --judge to measure a genuine judge change instead; the script reports

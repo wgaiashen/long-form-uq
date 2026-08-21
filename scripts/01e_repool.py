@@ -2,16 +2,16 @@
 
 Why: our original pooling excluded the last-prompt (pre-answer) hidden state, so for
 short answers (trivia, mean 2.9 tokens) it pooled a single sub-word fragment. The fix
-(generate.py) prepends the last-prompt position to match Joe's SAPLMA masked-mean. This
+(generate.py) prepends the last-prompt position to match the SAPLMA masked-mean. This
 script applies that fix to ALREADY-EXTRACTED data: it teacher-forces a forward over the
-cached [prompt + gen] tokens (recompute_states), re-pools Joe's window, and overwrites
+cached [prompt + gen] tokens (recompute_states), re-pools the window, and overwrites
 ONLY the Tier-2 feature file. The Tier-1 records (and their gpt-5 labels) are untouched,
 so NO re-labelling is needed (generations are unchanged).
 
-Joe's averaged window, in teacher-forced indexing (state[i] = state after token i, i.e.
+the averaged window, in teacher-forced indexing (state[i] = state after token i, i.e.
 the state that PREDICTS token i+1): positions P-1 .. P+G-2, i.e. the slice [P-1:P+G-1] =
 the last-prompt state + the states predicting answer tokens gen[0..G-2]. (The final gen
-token has no predicting-state in Joe's generate()-based path, so it is dropped; we drop it
+token has no predicting-state in the generate()-based path, so it is dropped; we drop it
 too for faithfulness.) Verified against compiled_features.py + full_seq_head_saplma.py.
 
     python scripts/01e_repool.py --model meta-llama/Meta-Llama-3.1-8B --dataset trivia_qa --ood ID
@@ -92,7 +92,7 @@ def main():
         seq = p_ids + g_ids
         states = generate.recompute_states(model, tok, seq, layers)  # list[(P+G, hidden)]
         # Window = last-prompt position P-1 PLUS all G answer-token states (positions P..P+G-1),
-        # matching Joe's masked-mean. Teacher-forcing gives every position, so unlike the
+        # matching the masked-mean. Teacher-forcing gives every position, so unlike the
         # generate() path the last answer token (P+G-1) is available -- include it. slice [P-1:P+G].
         lo, hi = P - 1, P + G
         if G <= 1:

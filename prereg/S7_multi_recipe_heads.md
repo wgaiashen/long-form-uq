@@ -5,15 +5,15 @@ pre-registration without thresholds is barely one.
 
 ## What is being tested
 
-Joe's idea 3 was several attention heads with a choice made at test time; idea 4 was a diversity-forcing
+the idea 3 was several attention heads with a choice made at test time; idea 4 was a diversity-forcing
 loss to stop them converging. B.2 ran K heads sharing ONE target and measured them collapsing to pairwise
 attention correlation **1.0000**, so K heads only ever expressed two behaviours, "has a target" and "has
-none". DoC's re-run (`DOC_AUX_RERUN_STATUS.md` §8) confirms this and states that what ran was not Joe's
+none". DoC's re-run (`DOC_AUX_RERUN_STATUS.md` §8) confirms this and states that what ran was not the
 idea at all.
 
 This tests the version that **cannot collapse**: each frozen head's attention *is* a fixed recipe, so what
 makes the heads differ is not learned and no repulsion term is needed. That is **our extrapolation of
-Joe's idea, not his proposal** — his was multiple *learned* heads plus a diversity loss.
+the idea, not his proposal** — his was multiple *learned* heads plus a diversity loss.
 
 ## Arms, declared in advance
 
@@ -35,20 +35,20 @@ test PRR would be an oracle, which is the trap `prereg/S4` already named.
 **4 evals × 5 rungs = 20 cells**, 3 seeds: `pubmed_qa` (concentrated), `xsum` (no signal in the
 probabilities), `cnn_dailymail` (spread), `factscore` (factuality).
 
-⚠️ This is an **indicative 4-dataset run, NOT the full 8-dataset ProbeDriftLong grid**, and every table
+This is an **indicative 4-dataset run, NOT the full 8-dataset ProbeDriftLong grid**, and every table
 must say so in its caption. It does not satisfy the standing evaluation rule on its own.
 
 ## Decision rule, fixed in advance
 
 - **PRIMARY — carry forward** if `mh_diverse` beats `armA` on the pooled OOD rungs by **> +0.02** (the
-  measured aggregation-axis noise floor). Learned attention is the thing being improved and Joe's
+  measured aggregation-axis noise floor). Learned attention is the thing being improved and the
   condition is that the attention probe must actually improve.
 - **SECONDARY — required** for the primary to mean anything: `mh_diverse` beats `mh_same` by **> +0.02**.
   If it does not, any gain is "more classifiers", not "different recipes", and **the line closes**.
 - **DIAGNOSTIC, reported whatever happens**: head attention correlation. `mh_diverse` must be **low** by
   construction. If it comes back near 1.0 the wiring is wrong and no PRR from this run may be reported.
 
-  ⚠️ **CORRECTION, 2026-08-06, after the first smoke cell — this clause was written wrong.** It originally
+  **CORRECTION, 2026-08-06, after the first smoke cell — this clause was written wrong.** It originally
   said `mh_same` must be **≈ 1.0**. That is false for the arm as specified, and the smoke run returned
   **+0.5097**, which looked like a fault and is not one. `mh_same` is *three identical frozen recipes plus
   one free head*, so its 12 off-diagonal entries are 6 frozen-frozen pairs (exactly 1.0) and 6 frozen-free
@@ -86,8 +86,8 @@ coming back ≈ 1.0 for `mh_diverse` (wiring fault, results void).
 
 ## Constraints inherited from supervisors
 
-- **Selection must be per dataset, never per instance** (`reference/MEETING_NOTES_31July.md:86`, Lihu's
-  constraint, accepted by Joe). The primary method here is the **ensemble**, which needs no selection at
+- **Selection must be per dataset, never per instance** (the supervision meeting notes`, the
+  constraint, accepted in review). The primary method here is the **ensemble**, which needs no selection at
   all. Any best-head-per-dataset number is a **declared oracle ceiling**, never a deployable result.
 - **Idea 3's proposed selector is dead.** "Pick the head with the smallest ID→OOD entropy drop" rests on
   entropy-delta, which was rejected by its own pre-registered rule (`prereg/0.1`, `prereg/0.2`). No

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """A3/A4 — dataset-level regime table + EXPLORATORY diagnostics over the A2 rows table.
 
-⚠️ EVERY NUMBER HERE IS EXPLORATORY MECHANISM ANALYSIS on already-read test labels (the plan's
+EVERY NUMBER HERE IS EXPLORATORY MECHANISM ANALYSIS on already-read test labels (the plan's
 rule: analyses using Llama test labels are exploratory, never selection). The "best beta" column
 is a test-label argmax and is printed ORACLE/DESCRIPTIVE ONLY. n = 8 datasets: the A4.1 feature
 table is reported IN FULL, predeclared, with no significance hunting — Spearman rho is a

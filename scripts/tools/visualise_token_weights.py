@@ -108,7 +108,7 @@ METHOD_DOCS = {
     "wMSP-entropy_hinge":
         "wMSP-pairwise plus a THRESHOLDED entropy penalty (<code>+2&middot;relu(0.7&minus;H/log&nbsp;n)&sup2;</code>): "
         "unlike shrink, it is 0 while the weights stay smooth and only pushes back once the distribution gets "
-        "too peaked (normalised entropy &lt; 0.7). Joe&rsquo;s item-1 hinge &mdash; should look like wMSP-pairwise "
+        "too peaked (normalised entropy &lt; 0.7). the item-1 hinge &mdash; should look like wMSP-pairwise "
         "except where it clips a spike.",
     "wMSP-special_punct":
         "wMSP-pairwise with EOS/special tokens AND punctuation/whitespace-only pieces dropped (weight 0 "
@@ -118,12 +118,12 @@ METHOD_DOCS = {
     "wMSP-content":
         "wMSP-pairwise but the learned softmax is RESTRICTED to content tokens only &mdash; special "
         "tokens, punctuation and stop-words (negation kept) get weight 0 pre-softmax, so the weighter "
-        "cannot key on filler. The &lsquo;learnt MSP without stop-words&rsquo; variant &mdash; Joe&rsquo;s "
+        "cannot key on filler. The &lsquo;learnt MSP without stop-words&rsquo; variant &mdash; the "
         "&lsquo;exclude stop words&rsquo; idea (the <code>keep=</code> content mask).",
     "wMSP-segment":
         "wMSP but the MLP emits ONE weight per SENTENCE, broadcast to that sentence&rsquo;s tokens "
         "(segment-mean of the raw logits, then softmax over sentences) &mdash; attacks the single-token "
-        "spike degeneracy structurally. Joe&rsquo;s segment-weighting idea (<code>segment_ids=</code>).",
+        "spike degeneracy structurally. the segment-weighting idea (<code>segment_ids=</code>).",
     "uniform":
         "The mean-pool baseline: a frozen-query attention pooler, so every token gets an equal weight. "
         "The &lsquo;no weighting&rsquo; control &mdash; if a learned weighting cannot beat this, its token "
@@ -242,7 +242,7 @@ def per_token_signals(record, pos, ctx):
         if ctx.get("wm_hinge") is not None:
             signals["wMSP-entropy_hinge"] = (lambda w: (list(w), minmax(w)))(_wshow(ctx["wm_hinge"](asx)))
 
-        # 3c) NEW constrained variants (Joe #4/#7): content-restricted + one-weight-per-sentence.
+        # 3c) NEW constrained variants (design note 4/#7): content-restricted + one-weight-per-sentence.
         if ctx.get("wm_special_punct") is not None:
             pieces_sp = ctx["tok"].convert_ids_to_tokens(record["gen_token_ids"])
             keep_sp = torch.from_numpy(token_subsets.keep_mask(record["gen_token_ids"], pieces_sp, "special_punct")).to(device)
@@ -397,7 +397,7 @@ def main():
     wm_smooth3 = weighted_msp.train_weighted_msp(
         states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
         loss="pairwise", smooth_n=3)
-    # entropy_hinge: the thresholded entropy penalty (Joe #1) -- fires ONLY once the weights get too peaked
+    # entropy_hinge: the thresholded entropy penalty (design note 1) -- fires ONLY once the weights get too peaked
     # (normalised entropy < 0.7), so it should look like wMSP-pairwise while smooth and flatten only the spikes.
     wm_hinge = weighted_msp.train_weighted_msp(
         states, records, y, tr, device, weight_mode="normalised", length_normalise=True, seed=1,
@@ -414,7 +414,7 @@ def main():
     tok = load_tokenizer(cfg.model_name)
     pieces_by_pos = {i: token_pieces(tok, r["gen_token_ids"]) for i, r in enumerate(records)}
 
-    # NEW constrained-weighting variants (Joe #4/#7), trained like the keep-variants sweep. keep_mask needs
+    # NEW constrained-weighting variants (design note 4/#7), trained like the keep-variants sweep. keep_mask needs
     # the BPE pieces (convert_ids_to_tokens, glyph-prefixed), NOT the decoded token_pieces.
     content_keep_list = [token_subsets.keep_mask(r["gen_token_ids"],
                                                  tok.convert_ids_to_tokens(r["gen_token_ids"]), "content")

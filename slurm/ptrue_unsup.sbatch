@@ -8,8 +8,8 @@
 #SBATCH --output=logs/ptrue_unsup-%j.out
 
 # One GPU allocation, two jobs:
-#   1. alignscore_vs_authors.py  -- numerical check that our AlignScore matches Joe's
-#      literal scorer (<1e-3). Needs a GPU because Joe's scorer calls torch.cuda
+#   1. alignscore_vs_authors.py  -- numerical check that our AlignScore matches the
+#      literal scorer (<1e-3). Needs a GPU because the scorer calls torch.cuda
 #      unconditionally. Quick (~20 records, small roberta model).
 #   2. 01g_ptrue_unsup.py  -- unsupervised P(True) for the four datasets: append the
 #      verification question, read the model's own yes/no probability at the verdict
@@ -35,7 +35,7 @@ OOD=ID
 
 echo "=== node ==="; hostname; nvidia-smi --query-gpu=name,memory.total --format=csv,noheader; date
 
-echo; echo "########## 1. AlignScore vs Joe (numerical check) ##########"
+echo; echo "########## 1. AlignScore vs the reference implementation (numerical check) ##########"
 python scripts/checks/alignscore_vs_authors.py --model "$MODEL" --n 20
 
 echo; echo "########## 2. Unsupervised P(True) extraction ##########"

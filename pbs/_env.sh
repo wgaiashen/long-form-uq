@@ -36,7 +36,7 @@ if [ "$LUQ_CLUSTER" = doc ]; then
   : "${HF_HOME:=/vol/gpudata/gs925-msc_project/hf_cache}"
   : "${LUQ_CONDA_SH:=/vol/gpudata/gs925-msc_project/miniconda/etc/profile.d/conda.sh}"
   : "${LUQ_CONDA_ENV:=luq}"
-  # ⚠️ BIG CACHES MUST NOT LAND ON THE CEPH ALLOCATION. /vol/gpudata is CephFS with a HARD 50GB
+  # BIG CACHES MUST NOT LAND ON THE CEPH ALLOCATION. /vol/gpudata is CephFS with a HARD 50GB
   # quota (~4GB free as of 2026-08-08); /vol/bitbucket/gs925 is NFS, no quota, 7.5TB free. The Qwen
   # caches are ~90GB (16GB pooled features + ~74GB per-token states), so they go to bitbucket.
   # Verified 2026-08-08: writable, no scheduled purge, NOT backed up -- which is fine, because
@@ -62,7 +62,7 @@ else
   # FActScore assets. src/luq/factscore.py defaults to the DoC master
   # (/vol/gpudata/gs925-msc_project/factscore_data), which does not exist on RCS -- so a factscore
   # extraction here died with FileNotFoundError on prompt_entities.txt (2026-08-15).
-  # ⚠️ ENTITIES ONLY. This directory holds the 500-line prompt_entities.txt and NOT the ~4GB
+  # ENTITIES ONLY. This directory holds the 500-line prompt_entities.txt and NOT the ~4GB
   # enwiki-20230401.db, so GENERATION works on RCS but factscore LABELLING does not -- the judge
   # reads the enwiki sqlite. Label factscore on DoC, or rsync the db here first.
   : "${FACTSCORE_DIR:=$(dirname "${LUQ_REPO}")/factscore_data}"

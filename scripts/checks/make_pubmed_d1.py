@@ -1,6 +1,6 @@
 """Prep pubmed for the D1 (newline-stop) reproduction. CPU-only, no model.
 
-D1 = match Joe's generate_until=["\\n"] on long-form: cut the cached pubmed generations at
+D1 = match the generate_until=["\\n"] on long-form: cut the cached pubmed generations at
 the first newline. That changes the answer text, so this script ALSO clears the gpt-5 labels
 (02_label must re-judge the truncated text). The untruncated originals are backed up to
 *.preD1 so our own "long-form never truncated" convention is recoverable.

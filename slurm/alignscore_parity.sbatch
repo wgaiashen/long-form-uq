@@ -7,8 +7,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/alignscore_parity-%j.out
 
-# BUG-HUNT item 1 (GPU-gated): numerically confirm our vendored AlignScore scorer == Joe's
-# lm_polygraph_lite AlignScore on real cached records. Joe's scorer calls cuda.synchronize()
+# BUG-HUNT item 1 (GPU-gated): numerically confirm our vendored AlignScore scorer == the
+# lm_polygraph_lite AlignScore on real cached records. the scorer calls cuda.synchronize()
 # unconditionally, so this cannot run CPU-only; it needs a GPU. Loads only the RoBERTa-large
 # AlignScore model (NOT the base Llama), so a small GPU is plenty. Reads cached records; writes
 # NOTHING to the cache. Upgrades item 1 from "NOT-BUG by code inspection" to "verified numerically".
@@ -28,6 +28,6 @@ export NLTK_DATA=/vol/gpudata/gs925-msc_project/nltk_data
 mkdir -p "$NLTK_DATA"
 python -c "import nltk; nltk.download('punkt_tab', download_dir='$NLTK_DATA'); nltk.download('punkt', download_dir='$NLTK_DATA')"
 
-# 100 (output, gold) pairs spread across sciq/trivia/pubmed/xsum; asserts our==Joe to <1e-3.
+# 100 (output, gold) pairs spread across sciq/trivia/pubmed/xsum; asserts ours==reference to <1e-3.
 PYTHONPATH=src python scripts/checks/alignscore_vs_authors.py --n 100
 echo "alignscore_parity DONE at $(date)"

@@ -50,7 +50,7 @@ def scan(base):
         for d in DATASETS:
             if not present[d]:
                 continue
-            cells = "".join(("  ✓".ljust(11) if rg in present[d] else "  ·".ljust(11)) for rg in RUNGS)
+            cells = "".join(("  y".ljust(11) if rg in present[d] else "  ·".ljust(11)) for rg in RUNGS)
             print(f"  {d:16s}{cells}")
 
 

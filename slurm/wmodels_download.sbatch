@@ -9,12 +9,12 @@
 # GENERAL W-Models download on DoC, any model. Slurm twin of pbs/wmodels_download.pbs.
 # (slurm/wmodels_qwen32_download.sbatch stays as the Qwen32-specific job.)
 #
-# ⚠️ NO --gres=gpu HERE, AND partition DEFAULTS TO t4, NOT a40/a100. This script is
+# NO --gres=gpu HERE, AND partition DEFAULTS TO t4, NOT a40/a100. This script is
 # snapshot_download + a tokenizer load -- no CUDA at all -- so it should never wait behind a
 # GPU-bound partition. Override --partition at submit time only if t4 itself is contended; any
 # idle GPU-labelled partition works identically for this job since it does no GPU compute.
 #
-# ⚠️ HF_HOME IS OVERRIDDEN TO /vol/bitbucket, AND THAT IS THE WHOLE POINT OF THIS SCRIPT.
+# HF_HOME IS OVERRIDDEN TO /vol/bitbucket, AND THAT IS THE WHOLE POINT OF THIS SCRIPT.
 # pbs/_env.sh defaults DoC's HF_HOME to /vol/gpudata/gs925-msc_project/hf_cache, which sits inside
 # the HARD 50GB CephFS quota. /vol/bitbucket is NFS with no user quota (verified 2026-08-15).
 #

@@ -7,7 +7,7 @@ as "three clean negatives". That framing came from reading the results as a pool
 dataset they are not null — they are **null on one dataset and actively harmful on the other**, and the
 direction tracks a property of the dataset.
 
-⚠️ SCOPE, STATED BEFORE THE NUMBERS. Every Track B experiment ran on **pubmed_qa and xsum only, ID rung
+SCOPE, STATED BEFORE THE NUMBERS. Every Track B experiment ran on **pubmed_qa and xsum only, ID rung
 only, seed 1 only**. Two datasets is not a grid. In the regime taxonomy those two are CONCENTRATED and
 NOT-IN-PROBABILITIES, so **no SPREAD dataset (cnn, asqa, samsum) was ever tested** — and SPREAD is
 precisely the regime where an averaging/sharpness intervention has a mechanism. Nothing here is a
@@ -94,14 +94,14 @@ def main():
               f"mean {sum(deltas)/len(deltas):+.4f}")
         print(f"  {n_harm} of {len(deltas)} cost more than 0.01 PRR")
 
-    print("\n⭐ THE PATTERN, STATED AT THE STRENGTH THE EVIDENCE SUPPORTS:")
+    print("\nTHE PATTERN, STATED AT THE STRENGTH THE EVIDENCE SUPPORTS:")
     print("  Every intervention that moved attention AWAY from pubmed's learned configuration cost PRR")
     print("  there (worst -0.0513), while the SAME interventions did nothing measurable on xsum")
     print("  (|delta| <= 0.006 throughout). pubmed is the dataset with 0.515 punctuation mass and the")
     print("  sharpest pooling; xsum has 0.069 and was already diffuse -- there was little to move.")
     print("\n  So Track B is NOT 'three methods that do nothing'. It is 'interventions that damage a")
     print("  concentrated attention configuration, and are inert where attention is already spread'.")
-    print("\n⚠️ WHAT THIS IS NOT. n=2 datasets, 1 rung, 1 seed. The dataset property and the outcome are")
+    print("\nWHAT THIS IS NOT. n=2 datasets, 1 rung, 1 seed. The dataset property and the outcome are")
     print("  confounded -- pubmed differs from xsum in punctuation mass, sharpness, task, length and")
     print("  baseline PRR at once, and with two points those cannot be separated. The pattern is a")
     print("  HYPOTHESIS that predicts what a SPREAD dataset should do; it is not established until one")

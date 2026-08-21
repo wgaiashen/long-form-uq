@@ -93,12 +93,12 @@ def main():
     print(f"cells compared: {len(common)}  |  reproduced (should-be-exact): {reproduced}  |  "
           f"legitimately-changed: {len(changed)}  |  UNEXPECTED moves: {len(exact_fail)}")
     if exact_fail:
-        print("\n⚠️ UNEXPECTED MOVES (should-be-exact cells that changed) — investigate before trusting the run:")
+        print("\nUNEXPECTED MOVES (should-be-exact cells that changed) — investigate before trusting the run:")
         for (rung, e, m), n, w, d in sorted(exact_fail, key=lambda x: -abs(x[3])):
             print(f"    {e:14s} {rung:18s} {m:22s} {n:+.4f} -> {w:+.4f}  Δ{d:+.4f}"
                   + ("   <== CORE-5 STOP" if e in CORE5 else ""))
     if core5_stop:
-        print(f"\n🛑 STOP: {len(core5_stop)} CORE-5 cell(s) moved — that is the refactor, not the fix. "
+        print(f"\nSTOP: {len(core5_stop)} CORE-5 cell(s) moved — that is the refactor, not the fix. "
               f"Nothing from the widened run is usable until explained.")
     print("\nLEGITIMATELY-CHANGED (XL SameTask/LOO — the Task-A effect):")
     for (rung, e, m), n, w, d in sorted(changed):

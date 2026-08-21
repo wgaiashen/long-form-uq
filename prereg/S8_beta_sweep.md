@@ -40,7 +40,7 @@ raises if `--betas` omits it.
 
 ## Built-in controls
 
-1. **β = 0 must be the no-prior member of the family.** ⚠️ It is *not* expected to equal `armA` exactly:
+1. **β = 0 must be the no-prior member of the family.** It is *not* expected to equal `armA` exactly:
    `armA` is trained at a **selected** temperature (`select_temperature`), while arm D trains at T = 1.0.
    So β = 0 is "learned attention at T = 1", and both it and `armA` appear in the table. A β = 0 that
    differs *wildly* from `armA` means something other than the prior is driving arm D.

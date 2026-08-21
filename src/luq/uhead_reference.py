@@ -1,4 +1,4 @@
-"""UHead reproduction that runs JOE'S ACTUAL `luh` code (Hidden Failures, Shelmanov et al.).
+"""UHead reproduction that runs the reference `luh` code (Hidden Failures, Shelmanov et al.).
 
 Decision (2026-07-01, with the supervisor): reproduce the paper's headline Uhead baseline
 (Table 1), NOT a reimplementation. The paper's Uhead (Appendix A) is a transformer probe over
@@ -46,7 +46,7 @@ import torch.nn as nn
 
 from .uhead_fullseq import _reinitialize_weights  # his reinit rule (replicated once, reused here)
 
-JOE_REPO = Path("/vol/gpudata/gs925-msc_project/Temp_robust_UQ_probes")
+REFERENCE_REPO = Path("/vol/gpudata/gs925-msc_project/Temp_robust_UQ_probes")
 
 # His architecture_ablations.sh uhead configs (the head hyper-parameters).
 VARIANTS = {
@@ -108,8 +108,8 @@ def _stub_tensorflow():
 def build_uhead(base_model, variant: str):
     """Construct his FullSeqHead + combined uhead feature extractor for the given variant, using
     his AutoUncertaintyHead.from_config. Applies his xavier/uniform weight re-init."""
-    if str(JOE_REPO) not in sys.path:
-        sys.path.insert(0, str(JOE_REPO))
+    if str(REFERENCE_REPO) not in sys.path:
+        sys.path.insert(0, str(REFERENCE_REPO))
     _stub_tensorflow()
     from luh import AutoUncertaintyHead  # noqa: E402  (import here so the TF stub is in place)
 

@@ -1,8 +1,8 @@
-"""S6 — MULTI-HEAD attention (Joe idea 2): MH (K queries + K heads) + ABLATION (1 query + K heads) on the
+"""S6 — MULTI-HEAD attention (design note 2): MH (K queries + K heads) + ABLATION (1 query + K heads) on the
 long-form OOD rungs, vs the K=1 baseline (arm A, reused from the S3 fixed_prior_ladder CSV).
 
   MH        n_query=K, n_head=K  — K attention distributions -> K pooled -> K classifiers, ensembled
-  ABLATION  n_query=1, n_head=K  — ONE attention, K classifiers, ensembled  (Joe's mandatory control:
+  ABLATION  n_query=1, n_head=K  — ONE attention, K classifiers, ensembled  (the mandatory control:
                                    isolates "more classifier heads" from "attention diversity")
   K=1       n_query=1, n_head=1  — = arm A (reused from S3; not retrained)
 
@@ -65,7 +65,7 @@ def s3_armA_prr(eval_, rung):
 
 
 def head_diversity(pooler, states, te_idx, device, bs=64):
-    """Return (mean pairwise QUERY cosine, mean pairwise ATTENTION correlation) — Joe's 'do they converge?'.
+    """Return (mean pairwise QUERY cosine, mean pairwise ATTENTION correlation) — the 'do they converge?'.
     High = the heads collapsed to the same thing; low = diverse."""
     with torch.no_grad():
         q = pooler.q.unsqueeze(0) if pooler.q_rest is None else torch.cat([pooler.q.unsqueeze(0), pooler.q_rest], 0)

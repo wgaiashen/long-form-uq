@@ -7,15 +7,15 @@
 # W-Models: download a replication-population checkpoint into HF_HOME, then VERIFY it.
 # Generalised from pbs/download_qwen.pbs, which was hardcoded to Qwen2.5-14B.
 #
-# ⚠️ WHY A JOB AND NOT THE LOGIN NODE. These pull 16-65GB. Login nodes are for editing and qsub
+# WHY A JOB AND NOT THE LOGIN NODE. These pull 16-65GB. Login nodes are for editing and qsub
 # only; a large download is exactly the shape of work that got processes killed by RCS IT on
 # 2026-07-06.
 #
-# ⚠️ COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out the script says so
+# COMPUTE-NODE INTERNET IS NOT GUARANTEED. If this node has no route out the script says so
 # LOUDLY and exits non-zero rather than half-downloading. A partial snapshot is worse than none:
 # `from_pretrained` would then fail deep inside a later job instead of here.
 #
-# ⚠️ THE ASSERTIONS ARE THE POINT. Layer count and hidden size are what the fixed layer rule
+# THE ASSERTIONS ARE THE POINT. Layer count and hidden size are what the fixed layer rule
 # ceil(N/2)-1 and the fail-loud EXPECTED_HIDDEN_DIM registry depend on. A checkpoint that quietly
 # differs from the registered shape must stop here, not surface as a wrong-shaped cache later.
 #
@@ -52,7 +52,7 @@ LAYERS = int(os.environ["LAYERS"]); HIDDEN = int(os.environ["HIDDEN"])
 MIN_GIB = float(os.environ["MIN_GIB"])
 
 # max_workers=4: enough to saturate a cluster link, low enough not to spike RAM the way the default
-# parallel download did on the 8GB DoC jump box (implementation_notes.md §8).
+# parallel download did on the 8GB DoC jump box (the project implementation notes).
 path = snapshot_download(
     MODEL, max_workers=4,
     allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],   # weights + tokenizer, no extras

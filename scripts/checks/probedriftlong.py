@@ -1,5 +1,5 @@
 """ProbeDriftLong (W3 / H4): train EXCLUSIVELY on long-form datasets and evaluate on long-form, plus a
-long->short transfer cell. Joe's steer: the current ProbeDrift ID/LOO settings let probes lean on easy
+long->short transfer cell. the steer: the current ProbeDrift ID/LOO settings let probes lean on easy
 short-form training data (long_form_loo §J showed SAPLMA's long-form OOD collapses to the floor once
 short-form is removed). This driver removes that crutch by construction and asks: in the realistic
 long-only setting, does weighted-MSP / shrink overtake the probes, measured against the HONEST fair floor
@@ -46,10 +46,10 @@ DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # — run_key, probe/viz/perex filenames, the tokenizer, load_per_token, Config, the output CSV —
 # follows the flag with no signature changes, and a no-arg run must stay byte-identical to before
 # the port (the no-op control: re-run one Llama cell with no --model and diff against the published
-# CSV). ⚠️ Every use is path/config construction; no logic branches on the model.
+# CSV). Every use is path/config construction; no logic branches on the model.
 MODEL = DEFAULT_MODEL
 
-# ⚠️ SHIM AS OF 2026-08-08 — the long-form GRID now lives in the installed `probe_drift_long`
+# SHIM AS OF 2026-08-08 — the long-form GRID now lives in the installed `probe_drift_long`
 # library and is re-exported here under its historical names, so the ~19 modules doing
 # `import probedriftlong as pdl` and reaching for `pdl.LONG_SRC` / `pdl.cells_long` /
 # `pdl.sampled_train_idx` keep working unchanged.
@@ -58,7 +58,7 @@ MODEL = DEFAULT_MODEL
 # matches, the 42-cell grid is identical, and all 126 cell x seed row lists are BYTE-IDENTICAL.
 # Re-run it after touching either side.
 #
-# ⚠️ Importing THIS module still costs a full torch + transformers import, because the method half
+# Importing THIS module still costs a full torch + transformers import, because the method half
 # below needs them. If all you want is the grid, `import probe_drift_long` instead — it is
 # numpy-only. That is the whole reason the split exists.
 from probe_drift_long import (LONG_DATASETS as LONG, LONG_SRC, SHORT_DATASETS as SHORT,   # noqa: E402
@@ -67,14 +67,14 @@ from probe_drift_long import (LONG_DATASETS as LONG, LONG_SRC, SHORT_DATASETS as
 EVALS = LONG + SHORT
 # wMSP KEEP variants: (col name, kwargs to weighted_msp_unc)  [all length_normalise=True]
 WMSP = [("wmsp_norm", {"weight_mode": "normalised"}),
-        # per-segment (sentence) wMSP -- FIRST run under ProbeDriftLong (Joe #7; was standard-ladder
+        # per-segment (sentence) wMSP -- FIRST run under ProbeDriftLong (design note 7; was standard-ladder
         # only). `_seg_ids` is a sentinel: the loop replaces it with this cell's sentence ids.
         ("wmsp_seg_flat", {"weight_mode": "normalised", "segment_ids": "_seg_ids"}),
         ("wmsp_seg_softmax", {"weight_mode": "normalised", "segment_ids": "_seg_ids",
                               "segment_mode": "softmax"}),
-        # λ = 1.5, added 2026-08-19. SUPPLEMENTARY SENSITIVITY ONLY -- PLAN_post14Aug.md §4 permits it
+        # λ = 1.5, added 2026-08-19. SUPPLEMENTARY SENSITIVITY ONLY -- the project plan permits it
         # "only after the primary fixed-λ experiment completes, and it must not affect the primary
-        # conclusion". ⛔ The primary remains λ = 2 (`wmsp_shrink2`) against the λ = 0 control
+        # conclusion". The primary remains λ = 2 (`wmsp_shrink2`) against the λ = 0 control
         # (`wmsp_norm`). λ is NEVER selected on a replication population's test results -- reporting
         # whichever of 1.5 and 2 happens to score higher would be exactly the selection this panel
         # exists to avoid. Report the pair; do not pick a winner from it.
@@ -94,7 +94,7 @@ FLOORS = ["floor_sum", "floor_ppl", "floor_min"]
 # than re-derivations:  name -> (cached pooled feature, layer, standardize)
 # uhead is deliberately ABSENT: implemented and verified against the authors, but never carried to the
 # long-form grid, and dropped by decision on 2026-07-31 for time. Say so in the write-up.
-# ⚠️ ptrue's layer is THE PROBED MIDDLE LAYER, not a constant: 15 is Llama's ceil(32/2)-1, and the
+# ptrue's layer is THE PROBED MIDDLE LAYER, not a constant: 15 is Llama's ceil(32/2)-1, and the
 # feature cache stores only that plane (the rest are NaN), so pointing the Llama 15 at a Qwen cache
 # aborts on the NaN plane. It is resolved from --layer in main() (same ceil(N/2)-1 rule -> 23 on
 # Qwen); the default is 15, so every existing Llama invocation is untouched. lookback stays 0 by
@@ -119,7 +119,7 @@ CSV_FIELDS = ["rung", "eval", "train", "method", "prr_mean", "prr_std", "n_seeds
 def _flush_rows(out, rows, prov):
     """Write every row accumulated SO FAR, atomically.
 
-    ⚠️ WHY THIS IS CALLED PER CELL, NOT ONCE AT THE END (added 2026-08-03).
+    WHY THIS IS CALLED PER CELL, NOT ONCE AT THE END (added 2026-08-03).
     This driver used to accumulate `out_rows` in memory for the whole run and write the CSV only after
     the final cell. A 16-hour run killed at hour 15 -- by the walltime, an OOM, or a node problem --
     lost EVERYTHING, with nothing on disk to show which cells had already succeeded. That is not
@@ -310,7 +310,7 @@ def main():
                          "output lands in the --out file, never in a canonical master.")
     ap.add_argument("--sources", default=None,
                     help="comma-separated subset of LONG_SRC to use as the TRAINING-SOURCE POOL. Default "
-                         "None = all 8. ⚠️ --evals restricts TARGETS ONLY; without this flag the rungs are "
+                         "None = all 8. --evals restricts TARGETS ONLY; without this flag the rungs are "
                          "still built from the full 8-dataset pool, so a 'reduced panel' run would quietly "
                          "train on datasets it claims to have dropped. It also makes the restriction "
                          "EXPLICIT rather than an accident of which pertok caches happen to exist -- the "
@@ -402,7 +402,7 @@ def main():
               + "+".join(f"{d}:{n}" for d, n in train_spec)
               + f" (requested total {total}; cells_long grid BYPASSED)", flush=True)
         if total != XL_TOTAL:
-            print(f"  ⚠️ requested total {total} != the matched budget {XL_TOTAL} — intentional? "
+            print(f"  requested total {total} != the matched budget {XL_TOTAL} — intentional? "
                   f"the realised pool is recorded per row in the `train` column either way", flush=True)
 
     # Provenance runs AFTER the cheap argument validation above: `git status` on this tree takes a
@@ -485,7 +485,7 @@ def main():
         # changes that rung's composition on every eval (dataset_configs.py:8-10).
         LONG_SRC = [d for d in LONG_SRC if d in want]
         print(f"RESTRICTED SOURCE POOL ({len(LONG_SRC)}): {LONG_SRC}", flush=True)
-        print("  ⚠️ rung composition is defined by THIS pool, not the 8-dataset one. SameTask/DiffTask/"
+        print("  rung composition is defined by THIS pool, not the 8-dataset one. SameTask/DiffTask/"
               "LOO differ from the full grid; ID and 1ds-Diff may not. Caption tables accordingly.",
               flush=True)
     if args.label_homogeneous:
@@ -499,7 +499,7 @@ def main():
     print(f"device {device} | seeds {seeds} | evals {evals}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(MODEL)
-    # ⚠️ NON-NEGOTIABLE FOR A NON-LLAMA MODEL: register the real special-token ids, or
+    # NON-NEGOTIABLE FOR A NON-LLAMA MODEL: register the real special-token ids, or
     # weighted_msp.content_keep silently falls back to the Llama-3 `id >= 128000` range test — on
     # Qwen2.5 (specials at 151,643+) that would zero the weight of a large band of ORDINARY content
     # tokens: no crash, just a quietly different method. Guarded to non-default models only so a
@@ -559,7 +559,7 @@ def main():
                           f"{d} will be left BLANK for this method", flush=True)
                     continue
                 v_b = np.ascontiguousarray(arr[:, layer_b, :]); del arr
-                # ⚠️ THE INDEX BASE IS THE TRAP. The feature cache is indexed by ORIGINAL record position,
+                # THE INDEX BASE IS THE TRAP. The feature cache is indexed by ORIGINAL record position,
                 # but this loop has already DROPPED unlabelled rows, so every downstream index is a
                 # FILTERED position. expertqa drops 292 of 2016 rows and factscore 45 of 500, so indexing
                 # the features with a filtered index shifts those datasets by up to 292 places -- and still
@@ -736,7 +736,7 @@ def main():
                                  "prr_mean": round(mg, 4), "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
                                  "boot_p": round(p, 4), "significant": bool(sig), "n_seeds": len(seeds)})
 
-        # ⭐ CRASH SAFETY: land this cell on disk before starting the next one. Each cell costs minutes
+        # CRASH SAFETY: land this cell on disk before starting the next one. Each cell costs minutes
         # to hours, so an interruption should cost the CURRENT cell, never the whole run.
         _cell_out = Path(args.out) if args.out else (
             ROOT / "results" / f"probedriftlong{regime_tag()}__{cache._slug(MODEL)}.csv")

@@ -1,6 +1,6 @@
 """W4 — HIERARCHICAL (two-level) attention pooling over a long-form generation.
 
-The idea (Joe's "move from per-token to per-segment"): a long answer is not a flat bag of tokens, it is a
+The idea (the "move from per-token to per-segment"): a long answer is not a flat bag of tokens, it is a
 sequence of SENTENCES, each of which carries a claim. So instead of one softmax over all T tokens, do it in
 two levels:
 

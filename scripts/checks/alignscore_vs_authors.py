@@ -1,15 +1,15 @@
-"""Numerical check: our AlignScore label matches Joe's AlignScore wrapper.
+"""Numerical check: our AlignScore label matches the AlignScore wrapper.
 
-Our scorer (src/luq/labels/alignscore.py) vendors Joe's AlignScorer, so the underlying model code
+Our scorer (src/luq/labels/alignscore.py) vendors the AlignScorer, so the underlying model code
 is the same. What this check confirms is the GLUE around it: the claims/contexts direction, the
 max over multiple references (trivia aliases), and the empty-output handling, end to end on real
-cached records. We score a handful of (output, target) pairs with both our `score()` and Joe's
+cached records. We score a handful of (output, target) pairs with both our `score()` and the
 `AlignScore.__call__`, then assert they agree to < 1e-3.
 
-For Joe's side, multiple references are reduced exactly as his AggregatedMetric does for trivia:
+For the side, multiple references are reduced exactly as his AggregatedMetric does for trivia:
 score each alias on its own, then take the max.
 
-Needs a GPU: Joe's literal scorer calls torch.cuda.synchronize() unconditionally (the very call
+Needs a GPU: the literal scorer calls torch.cuda.synchronize() unconditionally (the very call
 our vendored copy guards), so it cannot instantiate on a CPU-only node. Run inside a GPU session:
 
     python scripts/checks/alignscore_vs_authors.py
@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-JOE_REPO = ROOT.parent / "Temp_robust_UQ_probes"
+REFERENCE_REPO = ROOT.parent / "Temp_robust_UQ_probes"
 sys.path.insert(0, str(ROOT / "src"))
 
 # This round is Llama-3.1-8B; Config.model_name still defaults to the old Qwen dev model.
@@ -34,7 +34,7 @@ TOL = 1e-3
 
 
 def _stub_tensorflow():
-    """Register a no-op tensorflow so Joe's package imports without TF installed.
+    """Register a no-op tensorflow so the package imports without TF installed.
 
     Importing his AlignScore pulls in lm_polygraph_lite, whose __init__ eagerly loads an
     unrelated Keras SAPLMA head (luh/heads/full_seq_head_saplma.py) that does `import tensorflow`
@@ -66,23 +66,23 @@ def _stub_tensorflow():
         sys.modules[name] = mod
 
 
-def joe_scorer():
-    """Joe's AlignScore wrapper, imported from his repo. Kept import-local so the rest of the
+def reference_scorer():
+    """the AlignScore wrapper, imported from his repo. Kept import-local so the rest of the
     file can be read without his package installed."""
-    if str(JOE_REPO) not in sys.path:
-        sys.path.insert(0, str(JOE_REPO))
+    if str(REFERENCE_REPO) not in sys.path:
+        sys.path.insert(0, str(REFERENCE_REPO))
     _stub_tensorflow()
     from utils.alignscore import AlignScore  # noqa: E402
     return AlignScore(batch_size=1)
 
 
-def joe_value(joe, record):
-    """Joe's AlignScore for one record. A list target (trivia aliases) is reduced by max, the
+def reference_value(ref, record):
+    """the AlignScore for one record. A list target (trivia aliases) is reduced by max, the
     same as his AggregatedMetric."""
     out = record["gen_text"]
     tgt = record["target"]
     golds = tgt if isinstance(tgt, list) else [tgt]
-    vals = [float(joe({"greedy_texts": [out]}, [g])[0]) for g in golds]
+    vals = [float(ref({"greedy_texts": [out]}, [g])[0]) for g in golds]
     return max(vals)
 
 
@@ -114,14 +114,14 @@ def main():
     if not pairs:
         sys.exit("no records to check")
 
-    joe = joe_scorer()
+    ref = reference_scorer()
 
-    print(f"{'dataset':12s}{'ours':>9}{'joe':>9}{'|diff|':>10}")
+    print(f"{'dataset':12s}{'ours':>9}{'ref':>9}{'|diff|':>10}")
     print("-" * 40)
     worst = 0.0
     for d, r in pairs:
         ours = our_score(r, d)
-        theirs = joe_value(joe, r)
+        theirs = reference_value(ref, r)
         if ours is None:
             print(f"{d:12s}{'None':>9}{theirs:>9.4f}   our scorer returned None")
             continue
@@ -133,9 +133,9 @@ def main():
     print("-" * 40)
     print(f"worst |diff| = {worst:.2e}  (tolerance {TOL:.0e})")
     if worst < TOL:
-        print("PASS: our AlignScore matches Joe's wrapper.")
+        print("PASS: our AlignScore matches the wrapper.")
     else:
-        sys.exit("FAIL: our AlignScore disagrees with Joe's beyond tolerance.")
+        sys.exit("FAIL: our AlignScore disagrees with the beyond tolerance.")
 
 
 if __name__ == "__main__":

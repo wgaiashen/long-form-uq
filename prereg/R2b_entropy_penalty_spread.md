@@ -5,7 +5,7 @@ the approved plan, and a corrected prediction written after seeing the result wo
 
 ---
 
-## ⚠️ The correction: the plan's reason for running this is backwards
+## The correction: the plan's reason for running this is backwards
 
 `PLAN` §R2 says to run B.3 on a SPREAD dataset because SPREAD is *"the regime never tested, and the one
 where a sharpness penalty has a mechanism."* **The second half is wrong**, and it is wrong in a way that
@@ -31,7 +31,7 @@ entropy (`results/pool_peaks_9dataset.csv`, ID rung):
 so did the R2 write-up before this check. Running cnn expecting a win would have been running the arm
 where the mechanism is weakest and reading the inevitable null as evidence about the method.
 
-## ⚠️ REGISTERED PREDICTIONS
+## REGISTERED PREDICTIONS
 
 **P1 (primary).** On cnn_dailymail, B.3 is **null**: |delta PRR| ≤ 0.01 at the selected (tau, lambda).
 
@@ -56,7 +56,7 @@ attention to act on, and only one of our datasets has it — the one where broad
 destroyed PRR.* That is a finding about **when the method can help at all**, decidable from unlabelled
 data before running, which is the shape of claim this project wants.
 
-⚠️ It does **not** test "does a sharpness penalty help SPREAD datasets" — nothing tests that, because
+It does **not** test "does a sharpness penalty help SPREAD datasets" — nothing tests that, because
 B.3 cannot act there. If we want an intervention for SPREAD, it must be one that **sharpens** broad
 attention (the opposite sign), and that is a different experiment which is **not** registered here.
 

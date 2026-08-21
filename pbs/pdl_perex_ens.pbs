@@ -20,7 +20,7 @@
 #
 # --wmsp-only wmsp_norm,wmsp_shrink2 is what keeps this affordable: the default WMSP list would also
 # train the segmented and Blondel variants per cell, which M6 does not use. HAPE (wmsp_norm) is kept
-# because M6 needs it as a reference/ablation and as a continuity check against the canonical master.
+# because M6 needs it as a reference or ablation and as a continuity check against the canonical master.
 #
 # LAMBDA IS FIXED AT 2. This is not a lambda sweep -- see prereg M6 sections 3 and 10.
 #

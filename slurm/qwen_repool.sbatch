@@ -18,7 +18,7 @@
 #
 # The pertok layer is NOT chosen here: 01e_repool dumps mid = (n_hidden_layers+1)//2, the SAME rule
 # that produced Llama's cache (33//2 = 16), which on Qwen gives 49//2 = 24. Whether the ladder wants
-# L24 (this rule) or L23 (proportional transfer of Joe's ceil(N/2)-1) is W-Qwen layer-selection
+# L24 (this rule) or L23 (proportional transfer of the ceil(N/2)-1) is W-Qwen layer-selection
 # business decided on dev on RCS; if it lands elsewhere, re-dump by re-running with the chosen layer.
 # The FEATURE cache is all-layers, so layer selection there is free either way.
 #

@@ -17,7 +17,7 @@ That is a stronger and far cheaper test than diffing PRR: PRR is a deterministic
 and the whole 1,664-cell master table is safe by construction. Running the ladder to find that
 out would cost ~24h of queue; this costs seconds.
 
-⚠️ It deliberately runs with `carve="legacy"`. The carve-then-filter change is a SEPARATE,
+It deliberately runs with `carve="legacy"`. The carve-then-filter change is a SEPARATE,
 INTENTIONAL change of the numbers on expertqa + factscore (gate 3). Conflating the two is how a
 packaging bug would hide inside a legitimate revision, so they are never tested together.
 `--report-new-carve` additionally PREVIEWS the intended change, but never gates on it.

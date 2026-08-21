@@ -3,7 +3,7 @@
   A. incumbent  learned query (control)                     — the thing that dissolves
   B. uniform    frozen query -> mean-pool (reference floor) — NOT the success bar
   C. frozen prior   attention = renormalised prior, head-only training   (ours; ≈ Idea-2 replication)
-  D. prior-init, learn away   scores = X@q + beta*log(prior), q trains    (Joe's proposal)
+  D. prior-init, learn away   scores = X@q + beta*log(prior), q trains    (the proposal)
 
 Priors (label-free, example-local): content_mass, nll (soft-Orgad is a SEPARATE RCS task, §3.6).
 
@@ -70,7 +70,7 @@ def out_path(args):
 def _flush_rows(out, rows):
     """Write everything accumulated SO FAR, atomically (temp + os.replace). CALLED PER CELL.
 
-    ⚠️ THIS DRIVER WROTE ONLY AT THE VERY END until 2026-08-05, and it is the LAST of the four ladders to
+    THIS DRIVER WROTE ONLY AT THE VERY END until 2026-08-05, and it is the LAST of the four ladders to
     be fixed -- probedriftlong, contribution_ladder and ood_onegrid all got this on 2026-08-03 after a
     16-hour run was killed at hour 15 and lost everything. On 2026-08-05 the same thing happened here:
     nine S4 top-k jobs ran ~8 hours each, hit the 8h walltime, and produced NO csv at all, because every

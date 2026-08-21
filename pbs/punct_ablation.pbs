@@ -12,7 +12,7 @@
 #   qsub pbs/punct_ablation.pbs                          # the full run
 #   qsub -v LUQ_LIMIT=200 pbs/punct_ablation.pbs         # smoke (output is stamped SMOKE, never tabled)
 #
-# ⚠️ CPU BY DESIGN, not by fallback. This was first written asking for an L40S and TWO submissions died
+# CPU BY DESIGN, not by fallback. This was first written asking for an L40S and TWO submissions died
 # in the queue on "Insufficient amount of resource: ngpus" without ever running, while the same work
 # started immediately on 16 CPU cores (job 3532455, 3 minutes). The pooler is a single attention head over
 # cached states -- there is no GPU-shaped work here, and requesting one only buys queue time. This is the

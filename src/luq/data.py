@@ -9,7 +9,7 @@ from probe_drift.dataset import Dataset as PDDataset
 
 from . import asqa, expertqa, factscore
 
-# ProbeDrift key -> the name Joe's llm_as_a_judge script expects.
+# ProbeDrift key -> the name the llm_as_a_judge script expects.
 # The judge asserts the dataset name appears in the JSONL filename, so map before use.
 JUDGE_NAME_MAP = {
     "sciq": "sciq",

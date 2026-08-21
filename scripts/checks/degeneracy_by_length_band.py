@@ -20,7 +20,7 @@ Those imply different follow-ups, which is the point: story A says keep the budg
 control (the prepared rep-pen arm); story B says the rise is unexplained and the budget change itself
 needs re-examining before any judge spend.
 
-⚠️ 128 IS THE BAND BOUNDARY BECAUSE IT WAS v1's CAP, not because it is a round number. Rows under it
+128 IS THE BAND BOUNDARY BECAUSE IT WAS v1's CAP, not because it is a round number. Rows under it
 are generations that would have finished on their own under v1; rows at or above it are the ones v1
 could not have produced. The comparison is only meaningful at that specific split point.
 
@@ -189,7 +189,7 @@ def main():
             # carries a standard error of several points, which is wide enough to swallow the
             # difference being read -- say so rather than letting the number look decisive.
             se = 100 * (short_v1 / 100 * (1 - short_v1 / 100) / n_short_v1) ** 0.5
-            print(f"  ⚠️ the v1 control band is only n={n_short_v1} (v1 was 97.7% capped), so its "
+            print(f"  the v1 control band is only n={n_short_v1} (v1 was 97.7% capped), so its "
                   f"{short_v1:.2f}% carries a standard error of ~{se:.1f} pp.")
             print("     Treat the v1-vs-v2 short-band comparison as weak evidence; the WITHIN-v2")
             print("     long-vs-short contrast above is the better-powered half of this test.")

@@ -12,13 +12,13 @@
 # 200 rows per dataset at a RAISED cap, so the model's NATURAL generation length is visible. A probe
 # run at the old cap can only ever re-measure the old cap.
 #
-# ⚠️ WHY THIS IS A GATE, NOT A FORMALITY. On Llama the capping had TWO different causes needing
+# WHY THIS IS A GATE, NOT A FORMALITY. On Llama the capping had TWO different causes needing
 # different responses, and only the gold-vs-budget ratio separates them:
 #   med_quad  ratio 0.21x, 97.7% capped -> DEFECT: the reference answer cannot fit the budget.
 #   samsum/xsum/cnn  ratio 1.22-1.65x, 28-66% capped -> the model merely OVER-GENERATES.
 # (Those four figures were re-measured on this cache on 2026-08-08 and reproduce the recorded table.)
 #
-# ⚠️ DECISION RULE, deliberately conservative because this is a REPLICATION, not an exploration:
+# DECISION RULE, deliberately conservative because this is a REPLICATION, not an exploration:
 # keep Llama's budgets unless Qwen shows a genuine defect (ratio < 1.0). Over-generation alone is NOT
 # a reason to change a budget -- it is a property of the model, which is exactly what we are measuring.
 # Changing a budget changes the generated population and weakens the cross-model comparison.
@@ -33,7 +33,7 @@
 #    independent and a failure should cost one dataset rather than all eight.
 #
 # Isolated under --prompt-regime qwen14b_probe, so it writes to cache/qwen14b_probe/ and CANNOT
-# pollute the real Qwen cache. ⚠️ Nothing from this namespace may enter a results table.
+# pollute the real Qwen cache. Nothing from this namespace may enter a results table.
 #
 #   sbatch slurm/qwen_budget_probe.sbatch
 #   # then, once all 8 array tasks are done (CPU-only, read-only):
@@ -71,10 +71,10 @@ IFS=':' read -r DS CAP EXTRA <<< "${TASKS[$SLURM_ARRAY_TASK_ID]}"
 echo "=== $DS (probe cap $CAP) on $(hostname) at $(date) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
-# ⚠️ --dtype fp32 is passed EXPLICITLY. `--dtype auto` resolves to fp16 for any non-Gemma model, and
+# --dtype fp32 is passed EXPLICITLY. `--dtype auto` resolves to fp16 for any non-Gemma model, and
 # token probabilities ARE the msp_min signal, so an auto-dtype cache is not comparable to the fp32
 # Llama caches. 01_extract refuses `auto` for a non-Llama model; do not work around that guard.
-# ⚠️ --max-new-tokens-cap MUST be raised alongside --max-new-tokens: the effective budget is
+# --max-new-tokens-cap MUST be raised alongside --max-new-tokens: the effective budget is
 # min(table_value, cap) and the cap defaults to 128, so without it the probe silently runs at 128.
 # shellcheck disable=SC2086
 python -u scripts/01_extract.py --model "$MODEL" --dataset "$DS" --ood ID \

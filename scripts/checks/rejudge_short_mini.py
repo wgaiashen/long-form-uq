@@ -6,7 +6,7 @@ cross-length arms differ in SOURCE REGIME as intended -- but a LONG+SHORT pool d
 models, against the standing "never mix judges within one comparison" rule. This quantifies how much
 that matters instead of leaving it as an unquantified caveat.
 
-⚠️ IT NEVER TOUCHES THE CANONICAL RECORDS. `02_label.py --judge-short-form` would: it rewrites
+IT NEVER TOUCHES THE CANONICAL RECORDS. `02_label.py --judge-short-form` would: it rewrites
 `correctness` with `string_match` before judging (02_label.py:236-239), which on these caches would
 DESTROY the promoted gpt-5 judge label that the canonical Long->Short cells were scored against.
 This script instead writes a SHADOW REGIME under `cache/<regime>/`, exactly the mechanism the

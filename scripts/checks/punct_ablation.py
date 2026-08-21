@@ -267,7 +267,7 @@ def main():
         w = _csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
     print(f"\nwrote {out}", flush=True)
 
-    # ⚠️ A SMOKE RUN MUST NOT PRINT A VERDICT. The first successful smoke (100 train / 100 test) printed
+    # A SMOKE RUN MUST NOT PRINT A VERDICT. The first successful smoke (100 train / 100 test) printed
     # "premise SURVIVES" from a probe fitted on 100 examples whose baseline PRR was 0.186 against a true
     # pubmed ID value of ~0.71 -- a line that READS like the answer, on data that cannot carry one. Same
     # failure family as a silent default returning a plausible number in place of an absence.
@@ -279,7 +279,7 @@ def main():
 
     # The registered reading rule, applied mechanically so the verdict is not a matter of eyeballing.
     #
-    # ⚠️ THE COMPARATOR IS `random`, NOT `baseline`. All three ablation arms remove the SAME NUMBER of
+    # THE COMPARATOR IS `random`, NOT `baseline`. All three ablation arms remove the SAME NUMBER of
     # tokens, so they share a sequence-length change the baseline does not have. Comparing an ablation arm
     # to the baseline confounds "these tokens mattered" with "the sequence got shorter" -- and the smoke
     # showed that confound is real and large (every arm, random included, scored ABOVE baseline). The

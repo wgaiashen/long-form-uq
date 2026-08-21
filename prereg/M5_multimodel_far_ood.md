@@ -49,16 +49,16 @@ evidence and are **not** counted as confirmatory replications.
 | model | layers → layer | hidden | dtype | cluster |
 |---|---|---|---|---|
 | `meta-llama/Llama-3.1-8B-Instruct` | 32 → **15** | 4096 | fp32 | RCS |
-| `google/gemma-2-9b-it` ⛔ **superseded — see D1** | 42 → **20** | **3584** | bf16 + eager | RCS |
+| `google/gemma-2-9b-it` **superseded — see D1** | 42 → **20** | **3584** | bf16 + eager | RCS |
 | `Qwen/Qwen2.5-32B` | 64 → **31** | 5120 | bf16 | DoC |
 
-⛔ **This table records what was REGISTERED, and is deliberately not rewritten.** `gemma-2-9b-it` was
+**This table records what was REGISTERED, and is deliberately not rewritten.** `gemma-2-9b-it` was
 withdrawn on 2026-08-15 and replaced by `google/gemma-2-9b` (base) — see **deviation D1 in §8** for
 the evidence and reasoning. A pre-registration is an audit trail: changes are recorded as deviations,
 never edited into the original text.
 
 Layer indices follow the fixed rule `ceil(N/2) − 1` and are **never re-selected from results**.
-⚠️ Gemma is **20**; the discarded 2026-06 Gemma-2-9B-It run used 21 under the repo's other
+Gemma is **20**; the discarded 2026-06 Gemma-2-9B-It run used 21 under the repo's other
 convention (`03_probe.py`'s `n_layers//2`). That is not a precedent and does not license a change.
 
 Layer counts and hidden sizes were read from each checkpoint's `config.json` on 2026-08-15.
@@ -80,7 +80,7 @@ Dropped: **`med_quad`**, **`expertqa`**.
 - **`med_quad`: measurement validity.** On the accepted Llama base population it shows **47.8% of
   generations carrying an invented follow-up question** that the judge nonetheless scores,
   **12.33% severe degeneracy**, and **97.7% capped**. It additionally carries the answer-span
-  sensitivity recorded in `STOCKTAKE_cleanspan.md`, including a standing DO-NOT-CLAIM on its own
+  sensitivity recorded in the project results log, including a standing DO-NOT-CLAIM on its own
   `msp_min` ranking.
 - **`expertqa`: cost and a known confound.** ~29% of the entire eight-dataset generation token load,
   plus the length/degeneracy confound in `QWEN_GENERATION_VALIDITY_AUDIT.md`.
@@ -159,9 +159,9 @@ populations are informative: they have never been used to choose the shrinkage s
 λ = 1.5 may be reported later as a **supplementary sensitivity only**, after the primary fixed-λ
 result is complete, and may not alter the primary conclusion.
 
-> 🔵 **ACTIVATED 2026-08-19 — see deviation D5.** The primary is complete on three populations, so
+> **ACTIVATED 2026-08-19 — see deviation D5.** The primary is complete on three populations, so
 > this provision is now in force and the ladders run all three of λ ∈ {0, 1.5, 2}. **The primary is
-> still λ = 2 and every recorded verdict stands on it.** ⛔ Never report the better of 1.5 and 2:
+> still λ = 2 and every recorded verdict stands on it.** Never report the better of 1.5 and 2:
 > taking the max across two λ values, per model or per rung, is the selection this panel exists to
 > avoid.
 
@@ -194,12 +194,12 @@ lands; that must not block launch and does not change any threshold in this file
 
 on the same two rungs, per population.
 
-⛔ **These are never collapsed into a synthetic `max(SAPLMA, attention)` comparator.** Which learned
+**These are never collapsed into a synthetic `max(SAPLMA, attention)` comparator.** Which learned
 baseline is stronger is itself model-dependent and must remain visible. If shrunk wMSP exceeds both,
 the report may say it is the strongest among the compared learned methods — no more.
 
-⚠️ Standing context: `wMSP-shrink@2 > SAPLMA` is a **DO-NOT-CLAIM** on the development populations
-(`CLAUDE.md`). Nothing in this registration promotes it. It is registered as **secondary and
+Standing context: `wMSP-shrink@2 > SAPLMA` is a **DO-NOT-CLAIM** on the development populations
+(the project conventions). Nothing in this registration promotes it. It is registered as **secondary and
 descriptive**.
 
 ### 5.3 Required reporting, per population and per rung
@@ -218,7 +218,7 @@ Final table, one row per population:
   three pre-specified new model populations"*. Under a one-sided sign test this is **p = 0.125**:
   **directional replication, not conventional significance.**
 - **2/3** is reported as partial replication; **1/3 or 0/3** as failure to replicate.
-- ⛔ **No attempt will be made to reach p < 0.05 by pooling the five populations.** The development
+- **No attempt will be made to reach p < 0.05 by pooling the five populations.** The development
   models are not fresh confirmatory evidence, and five deliberately chosen, partly family-related
   checkpoints are not five exchangeable samples. The all-five view is **descriptive consistency
   evidence only**: *"the same direction was observed across all five tested model populations."*
@@ -236,7 +236,7 @@ index (not sampled), under an isolated `--prompt-regime <slug>_probe` so smoke c
 real ones. Manual inspection set fixed in advance: **the first 20 records by index**.
 
 Measured with `scripts/checks/generation_quality.py --model <M> --datasets <D> --out <scratch>`.
-⚠️ `--out` is mandatory — the default path writes a tracked results file.
+`--out` is mandatory — the default path writes a tracked results file.
 
 | signal | column | raw few-shot passes if |
 |---|---|---|
@@ -313,7 +313,7 @@ prompt-regime choice.
 
 **Mechanisms, both specific to instruction tuning:**
 1. *Whitespace-fronting.* An instruct model under raw prompting emits a leading newline. `pubmed_qa`
-   generates with `--truncate-long` (Joe's `generate_until=['\n']`), so the newline truncates the
+   generates with `--truncate-long` (the `generate_until=['\n']`), so the newline truncates the
    entire answer away. The failure is total and silent — the job exits 0.
 2. *Assistant persona.* The model answers correctly, then continues ("Let me know if you'd like me to
    analyze any other text!"). The judge scores the whole saved output, so the filler is graded as if
@@ -325,7 +325,7 @@ covers template restarts and base-model pretraining artefacts, not assistant per
 design "strictly MODEL-AGNOSTIC", so adding a rule that fires on one checkpoint would be retuning on
 a finding. The native chat template was **not built** at the time of the decision.
 
-> **⚠️ AMENDMENT, same day, before any PRR.** This deviation as first written claimed §6's
+> **AMENDMENT, same day, before any PRR.** This deviation as first written claimed §6's
 > chat-template fallback "has no working code path", reasoning from `probe_drift`'s `instruct=True`
 > covering only 3 of the 6 panel datasets. **That inference was wrong.** §6 specifies the model's
 > *native* chat template, and `tok.apply_chat_template(...)` acts on the **final prompt string**, so
@@ -345,7 +345,7 @@ carried by `meta-llama/Llama-3.1-8B-Instruct`, which is unaffected. The base che
 **regime-matched to both development populations**, which are base models — so this deviation makes
 the panel more internally consistent, not less.
 
-⛔ **`gemma-2-9b-it` is WITHDRAWN.** Its partial caches are not to be scored, promoted, or reported.
+**`gemma-2-9b-it` is WITHDRAWN.** Its partial caches are not to be scored, promoted, or reported.
 It stays in the hidden-dim and layer registries only so that a stale cache fails loudly rather than
 being silently mistaken for the base population.
 
@@ -389,7 +389,7 @@ creating a new class of one.
 stated as an additional implementation difference alongside bf16, in the same sentence. It is not
 relegated to a footnote, and no claim is made that this population is backend-matched to the others.
 
-⚠️ The memory canary was **not run**. If Qwen32 OOMs anyway, that is new information and the fallback
+The memory canary was **not run**. If Qwen32 OOMs anyway, that is new information and the fallback
 is a smaller per-job scope, not a further change of precision or backend.
 
 ### D3 — `pubmed_qa` **and `xsum`** prompt provenance: Llama base is on probe_drift **v1**, every other population on **v2**. 2026-08-16, scope extended 2026-08-17.
@@ -430,7 +430,7 @@ because that cache predates the stamping.
 - Each model's records and pertok cache are aligned **to each other**, which is all `load_per_token`
   requires. Cross-model ordering differences do not touch that alignment.
 
-> **⚠️ SCOPE EXTENDED 2026-08-17 — `xsum` too, not just `pubmed_qa`.** When Gemma's xsum landed it
+> **SCOPE EXTENDED 2026-08-17 — `xsum` too, not just `pubmed_qa`.** When Gemma's xsum landed it
 > showed the same signature. Verified against the v1 bundled splits directly:
 >
 > | Llama base dataset | train prompts found in v1 | generation |
@@ -443,7 +443,7 @@ because that cache predates the stamping.
 > template was **reworded** between generations —
 > v1 *"Here's the text and **it's short one-sentence** summary."* →
 > v2 *"Here's the text and **its short** summary."* (typo fixed, "one-sentence" dropped).
-> This matches the author's account: pubmed and xsum were generated before Joe supplied v2;
+> This matches the author's account: pubmed and xsum were generated before v2 was supplied;
 > everything since is v2.
 >
 > Benign for the same reasons: `xsum` also has explicit `train`/`test` splits, so no positional carve
@@ -468,7 +468,7 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 | `pubmed_qa` | **6.0%** | HTML markup: `'<strong>Yes</strong>.'`, `'<b>Yes</b>.'` — the **answer is correct**, the formatting is web-scraped. Fires the detector's code-density branch (`{}<>`), by design |
 | `asqa` | **7.0%** | genuine web / pretraining artefacts, e.g. *"The answer to this puzzle was submitted by `<b>David</b>` and it can be found on page #2354"* |
 
-> **⚠️ SUPERSEDED — the figures above are from the first 200-400 rows. FINAL full-population numbers
+> **SUPERSEDED — the figures above are from the first 200-400 rows. FINAL full-population numbers
 > (2026-08-17, `results/wmodels_genquality__google_gemma-2-9b.csv`) differ IN BOTH DIRECTIONS:**
 >
 > | dataset | n | partial | **FINAL `pct_severe`** | vs the 5.0 gate |
@@ -485,7 +485,7 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 > pretraining artefacts" — is in fact the second-cleanest at 4.32%.** The qualitative reading of
 > *what* is flagged still holds per dataset; only the rates moved.
 >
-> **⚠️ WHAT THE FLAG MEANS IS NOT THE SAME ON ALL THREE FAILING DATASETS (added 2026-08-18, full
+> **WHAT THE FLAG MEANS IS NOT THE SAME ON ALL THREE FAILING DATASETS (added 2026-08-18, full
 > populations, `src/luq/degeneracy.py:64`).** The detector fires on three independent branches, and
 > separating them changes the reading of D2's binding condition 3:
 >
@@ -502,7 +502,7 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 > unfolding slowly steadily gradually progressing"*. It is also 20.4% `pct_degraded` and 20.6%
 > `pct_capped` against 0.2% / 5.0% for Llama base on the same dataset.
 >
-> ⛔ **Condition 4 named `asqa` as the dataset to revisit if a Gemma-specific result depended on it.
+> **Condition 4 named `asqa` as the dataset to revisit if a Gemma-specific result depended on it.
 > On the full populations `asqa` passes (4.32) and `factscore` is the genuine failure, so the
 > substance of condition 4 now attaches to `factscore`.** Flagged rather than silently rewritten: the
 > acceptance was the author's, and so is any change to its conditions.
@@ -511,7 +511,7 @@ empty (was 100%), `samsum` 9.5% chatter (was 82.2%) — but exceeds the §6 `pct
 > recorded before any PRR. It is written here rather than by editing the original text, because a
 > deviation record whose evidence is silently swapped is not a record.
 >
-> ⚠️ **Lesson carried:** the original acceptance was taken on 200-400 rows, and per-dataset rates moved
+> **Lesson carried:** the original acceptance was taken on 200-400 rows, and per-dataset rates moved
 > by up to 2.7 points once the full populations landed — enough to flip two datasets across the gate
 > in opposite directions. Acceptances on partial data must be revisited on the full population, not
 > assumed stable.
@@ -531,7 +531,7 @@ calibrated on Llama's unusually clean output, so it is a strict bar for a differ
 role in the panel is the third FAMILY, and this markup behaviour is a real property of it.
 
 **Binding conditions on this acceptance:**
-1. ⛔ **The threshold is NOT moved.** `wmodels_gate.py` continues to report `FAIL` for these
+1. **The threshold is NOT moved.** `wmodels_gate.py` continues to report `FAIL` for these
    datasets. This is an explicit, recorded override, not a re-tuned gate — so the gate never
    misreports what it measured.
 2. `pct_severe` for `gemma-2-9b` **must be reported in the results table**, not relegated to a
@@ -557,13 +557,13 @@ population is compared against another on a different method set.
 
 **What does NOT change, and this is the binding part:**
 
-1. ⛔ **The primary remains Δ_shrink = PRR(λ = 2) − PRR(λ = 0).** The registered hypothesis in §5.1 is
+1. **The primary remains Δ_shrink = PRR(λ = 2) − PRR(λ = 0).** The registered hypothesis in §5.1 is
    untouched, and every verdict already recorded stands on λ = 2.
-2. ⛔ **λ is not selected on any replication population's test results.** Reporting whichever of 1.5
+2. **λ is not selected on any replication population's test results.** Reporting whichever of 1.5
    and 2 scores higher per model, per rung or per dataset would be precisely the selection this panel
    exists to rule out, and it would silently convert three replication populations into a two-point
    grid search. **Report the pair side by side; never take the max.**
-3. ⛔ **λ = 1.5 cannot rescue a negative.** If the λ = 2 primary is weak on a population — as it is on
+3. **λ = 1.5 cannot rescue a negative.** If the λ = 2 primary is weak on a population — as it is on
    `gemma-2-9b` — a stronger λ = 1.5 number on that population is a **sensitivity observation, not a
    replication**. The recorded verdict does not move.
 4. The sensitivity is reported as its own table, never merged into the §5.3 panel row.
@@ -669,5 +669,5 @@ with `DiffTask-long` composition changing as computed.
 **Not claimable from this deviation:** that Gemma replicates §5.1 more strongly than recorded there;
 any eight-dataset macro or positive count quoted as the replication result; any med_quad-specific
 `msp_min` or `msp_sum` absolute value, which carries the standing do-not-claim from
-`STOCKTAKE_cleanspan.md`; any `expertqa` or `factscore` number quoted without its degeneration
+the project results log; any `expertqa` or `factscore` number quoted without its degeneration
 diagnostic alongside.

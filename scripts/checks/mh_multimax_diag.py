@@ -5,7 +5,7 @@ The single-head MultiMax we tested is the degenerate n_head=1 case (one token pe
 matters is the per-head VALUE projections (the head weights W_h), NOT the attention distribution -- so the §D.4
 "attention collapses to 0.999 correlation" result does NOT by itself imply the per-head argmaxes coincide.
 
-⭐ THE DECIDING NUMBER (reported before any PRR): per example, how many DISTINCT tokens do the 4 heads' argmaxes
+THE DECIDING NUMBER (reported before any PRR): per example, how many DISTINCT tokens do the 4 heads' argmaxes
 select? mean over examples (1.0 = full collapse -> eq-9 cannot work in our setting -> STOP; materially > 1.0 ->
 multi-token coverage survived -> Stage 2). Also reports per-head ATTENTION correlation on the SAME cells, so we can
 say whether attention-collapse and value-projection-collapse are the same phenomenon or different (the claim to test,
@@ -133,7 +133,7 @@ def main():
                      "frac1": round(hist[1], 3), "frac2": round(hist[2], 3), "frac3": round(hist[3], 3),
                      "frac4": round(hist[4], 3), "attn_corr": round(attn_corr, 4),
                      "armA_prr": round(prr_armA, 4), "mh_ensemble_prr": round(prr_mh, 4)})
-        print(f"  [{rung:14s} {X:13s}] ⭐ mean-distinct-argmax {mean_distinct:.3f}/4  "
+        print(f"  [{rung:14s} {X:13s}] mean-distinct-argmax {mean_distinct:.3f}/4  "
               f"(1:{hist[1]:.2f} 2:{hist[2]:.2f} 3:{hist[3]:.2f} 4:{hist[4]:.2f})  | attn-corr {attn_corr:+.3f}  "
               f"| armA {prr_armA:+.3f}  mh-ens {prr_mh:+.3f}  [pooler saved]", flush=True)
 

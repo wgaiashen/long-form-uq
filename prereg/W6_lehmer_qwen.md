@@ -1,14 +1,14 @@
 # PRE-REGISTRATION — W6: Lehmer β = 1 on the Qwen2.5-14B grid (out-of-sample)
 
-> **Status (2026-08-10):** run. Q1 fails (margin +0.0137 and 7/8 pass, Wilcoxon p = 0.195, dragged by expertqa, which carries a severe length confound on this population); Q2 replicates on 1 of 3 (cnn_dailymail, boot p = 0.0020); Q3 (secondary) p = 0.0443. Record: `STOCKTAKE_qwen.md` §11. *(Wording edited 2026-08-10, cosmetic only — registered claims, thresholds and bars are unchanged; git history is the proof.)*
+> **Status (2026-08-10):** run. Q1 fails (margin +0.0137 and 7/8 pass, Wilcoxon p = 0.195, dragged by expertqa, which carries a severe length confound on this population); Q2 replicates on 1 of 3 (cnn_dailymail, boot p = 0.0020); Q3 (secondary) p = 0.0443. Record: the project results log *(Wording edited 2026-08-10, cosmetic only — registered claims, thresholds and bars are unchanged; git history is the proof.)*
 
 **Written 2026-08-09, BEFORE any Qwen record, label or ladder number exists.** Qwen generation has
 started on DoC; no per-token logprobs have been scored against any label. Every choice below is
 derived from **Llama-3.1-8B data only**.
 
-Origin: the sharpening-axis line on Llama (project log: `PLAN_sharpening_axis.md`; Llama results
-in `STOCKTAKE_sharpening_axis.md` §7.1b–c). Runs on the **Qwen population** as defined by
-`PLAN_execution_post7Aug.md` — its splits, its carve, its judge labels — with **nothing re-selected
+Origin: the sharpening-axis line on Llama (project log: the project plan; Llama results
+in the project results log). Runs on the **Qwen population** as defined by
+the project plan — its splits, its carve, its judge labels — with **nothing re-selected
 on Qwen data**.
 
 ---
@@ -30,7 +30,7 @@ Justification, from Llama only: β = 1 is (a) the **argmax of the Llama cross-da
 (+0.233, vs +0.229 at β = 2 and +0.186 at the `msp_min` endpoint), and (b) the **modal
 leave-one-dataset-out selection** (6 of 8 folds). No Qwen information enters this choice.
 
-⚠️ **If β = 1 fails, that is a failure of the pre-committed value.** No other β is promoted
+**If β = 1 fails, that is a failure of the pre-committed value.** No other β is promoted
 afterwards; the full curve is reported for the record only.
 
 ## 3. REGISTERED CLAIMS AND BARS
@@ -67,6 +67,6 @@ content mask, so the Llama-only `id ≥ 128000` special-token rule — the known
 Test rows: the Qwen replication's own `eval_split`/carve, unmodified. Driver: `sharpening_family.py`'s
 `score_lehmer` with a `--model` pin — **fail loud on any model-agnostic glob.**
 
-⚠️ **This pre-registration is committed and pushed before any Qwen ladder runs.** It changes
+**This pre-registration is committed and pushed before any Qwen ladder runs.** It changes
 nothing in the Qwen replication plan (no new jobs, no new selection) — it only fixes, in advance, how one free
 method will be read on data that does not exist yet.

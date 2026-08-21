@@ -22,7 +22,7 @@ import os
 
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrift's faithful rung spec)
 
-# ⚠️ SHIM AS OF 2026-08-08. The shared pieces below — `label_of`, `different_label_projection`,
+# SHIM AS OF 2026-08-08. The shared pieces below — `label_of`, `different_label_projection`,
 # `eval_split`, `build_rows` — now live in the installed `probe_drift_long` library and are
 # re-exported here so the ~43 modules importing this file keep working unchanged. Their
 # signatures are preserved EXACTLY (verified: no caller passes a positional second argument to
@@ -40,19 +40,19 @@ import probe_drift_long as _pdl  # noqa: E402
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
 ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa",
        "factscore"]   # factscore added 2026-07-27 (Round-3 Task A): eval-only, but a valid TRAINING SOURCE
-# ⚠️ FACTUALITY IS ITS OWN FAMILY (author's decision 2026-08-03, resolving the "property tag deferred" /
+# FACTUALITY IS ITS OWN FAMILY (author's decision 2026-08-03, resolving the "property tag deferred" /
 # "factuality-family split is a pending decision" placeholders left in data.py:32,43,47).
 # BEFORE: expertqa, factscore AND asqa were all "long_qa", i.e. one undifferentiated QA family.
 # NOW:
 #   * expertqa + factscore -> FINE "factuality", and BROAD "factuality" sits BESIDE "qa" and "summ".
 #     They are checked against WORLD KNOWLEDGE rather than answering a supplied question, which is the
-#     factuality-vs-faithfulness axis in framing.md §1.1 -- a genuinely different task, not a subtype.
+#     factuality-vs-faithfulness axis in the project framing notes -- a genuinely different task, not a subtype.
 #   * asqa STAYS in "long_qa" (confirmed 2026-08-03). data.py:22 calls it "closed-book FACTUALITY QA",
 #     which invites the opposite grouping, so this is recorded explicitly: asqa is a QA-family eval.
 # CONSEQUENCES, so nobody has to rediscover them: expertqa's SameTask becomes {factscore} alone (was 4
 # datasets) and factscore's becomes {expertqa}; pubmed/med_quad/asqa lose both from their SameTask pools;
 # and because factuality is BROAD, it becomes a DiffTask source for the QA sets and vice versa.
-# ⚠️ Every cell involving these three moves. Results computed before this date are NOT comparable.
+# Every cell involving these three moves. Results computed before this date are NOT comparable.
 FINE = {"sciq": "short_qa", "trivia_qa": "short_qa", "pubmed_qa": "long_qa", "med_quad": "long_qa",
         "expertqa": "factuality", "asqa": "long_qa", "xsum": "summ", "samsum": "summ",
         "cnn_dailymail": "summ", "factscore": "factuality"}
@@ -106,7 +106,7 @@ _LABEL_OF = {"expertqa": _EXPERTQA_LABEL, "factscore": "factuality"}   # factsco
 #              ONLY (verified: med_quad/samsum/asqa are byte-identical either way).
 # Default stays LEGACY on purpose: flipping it would silently re-point every existing driver at a
 # different population. The switch is deliberate and per-run.
-# ⚠️ `probedriftlong` stamps this value into a `carve` column on every results row (via
+# `probedriftlong` stamps this value into a `carve` column on every results row (via
 # `_provenance()`), so a CSV it wrote is never ambiguous about which population produced it. That is
 # true of THAT driver only -- any other consumer of this module writes no such column, so do not
 # assume a stamp you have not looked for. Rows predating 2026-08-08 have no column and are `legacy`

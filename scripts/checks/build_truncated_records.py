@@ -7,7 +7,7 @@ new prompt-regime namespace. The canonical records are opened read-only and neve
 is promoted; the ladder is pointed at the new namespace via the established `LUQ_REGIME` override,
 and if the correction is rejected the whole namespace is one directory to delete.
 
-⚠️ THE TOKEN/TEXT CONSISTENCY RULE, WHICH IS THE WHOLE DIFFICULTY.
+THE TOKEN/TEXT CONSISTENCY RULE, WHICH IS THE WHOLE DIFFICULTY.
 `token_logprobs` is per generated token, so a truncated record must keep a genuine PREFIX of the
 original token ids — otherwise the logprobs no longer describe the text. Re-tokenising the clean
 string is NOT safe: BPE is not guaranteed prefix-stable, so `tok(clean).input_ids` can differ from
@@ -53,7 +53,7 @@ QWEN = "Qwen/Qwen2.5-14B"
 DATASETS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 MIN_KEEP = 2
 
-# ⚠️ WHICH CUT RULE PER DATASET, AND WHY IT IS NOT UNIFORM.
+# WHICH CUT RULE PER DATASET, AND WHY IT IS NOT UNIFORM.
 # med_quad is the one dataset whose answer-span rule was already ACCEPTED AND APPLIED: Llama's
 # canonical `correctness` IS `correctness_clean`, judged on `luq.answer_span`'s span (verified:
 # correctness == correctness_clean on 1800/1800 rows). The whole point of the Qwen med_quad work is
@@ -144,7 +144,7 @@ def main():
             nr["gen_token_ids"] = ids[:n]
             nr["token_logprobs"] = lps[:n]
             nr["gen_text"] = tok.decode(ids[:n])               # decode, never the regex slice
-            # ⚠️ DOES THE EXISTING LABEL ALREADY DESCRIBE THE CUT SPAN?
+            # DOES THE EXISTING LABEL ALREADY DESCRIBE THE CUT SPAN?
             # Normally no: the raw label was judged on text that no longer exists, so it is dropped
             # and the relabeller re-judges. But Llama's med_quad was ALREADY promoted to answer-span
             # labels in July -- its canonical `correctness` IS `correctness_clean`, judged on exactly
@@ -156,7 +156,7 @@ def main():
             if already_clean:
                 kept_label += 1
             else:
-                # ⚠️ DROP THE JUDGE'S SIBLING OUTPUTS TOO, NOT JUST THE SCORE.
+                # DROP THE JUDGE'S SIBLING OUTPUTS TOO, NOT JUST THE SCORE.
                 # expertqa/factscore rows carry `uncovered` / `coherent` /
                 # `factuality_quarantined` alongside `factuality`. Those describe the OLD text just
                 # as much as the score does. Leaving them behind made a truncated row look like a

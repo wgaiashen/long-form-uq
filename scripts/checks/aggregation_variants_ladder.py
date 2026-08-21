@@ -14,7 +14,7 @@ Variants (all on the SAME token set = the G+1 window, same as armA):
   rolling_wT    same with w = seq length -> ONE whole-sequence window == armA_s1  (LIMIT GATE, <1e-6)
   zstd_V1   z-score raw scores (x.q), softmax(z/Tz) with ONE global Tz fit on the ID cells' entropy target
   zstd_V2   z-score raw scores, per-example Tz solved so H(a')/log(n) hits the incumbent ID entropy target
-            (= Joe idea 1 / C1-revisited: sharpen OOD attention back toward ID sharpness, the untested direction)
+            (= design note 1 / C1-revisited: sharpen OOD attention back toward ID sharpness, the untested direction)
   layernorm_ctrl  standardise the POOLED vector (magnitude, not the attention distribution) -> W.pooled_ln + b
             (ablation: if V1/V2 help and this does not, the gain is the attention distribution, not generic norm)
 

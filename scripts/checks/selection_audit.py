@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 """W3 -- THE HONEST-SELECTION AUDIT: re-select the weighted-MSP lambda WITHOUT looking at test.
 
-Plan: ../PLAN_sharpening_axis.md §6.   Results doc: ../STOCKTAKE_sharpening_axis.md §5.
 
 WHY THIS EXISTS
 ---------------
-Joe, 7 August (reference/MEETING_NOTES_7Aug.md:102-120):
+Design note, 7 August:
     "Have we done that on some dev set, or have we done all the test set and picked the best one?
      ... that's probably not very science."
 and at :111 specifically: "The shrink factor (2 vs 10 vs normalised) is currently chosen on test."
@@ -15,7 +14,7 @@ because it scored highest. That is a maximum over three noisy draws and is optim
 This script re-selects it by LEAVE-ONE-DATASET-OUT and reports whatever that procedure yields --
 INCLUDING if it is worse than the +0.2287 currently quoted.
 
-⚠️ ONE CORRECTION TO THE RECEIVED STORY, verified in the sources rather than assumed. The VALUES
+ONE CORRECTION TO THE RECEIVED STORY, verified in the sources rather than assumed. The VALUES
 {2, 10} did not come from the long-form test grid at all. They came from a coarse July grid on three
 short/QA datasets (reports/OVERNIGHT_10jul.md:44, "First reasonable grid"), and a finer sweep
 (reports/OVERNIGHT_12jul.md:23-25) concluded "Sweet spot ~ shrink@1-2" and was NEVER PROPAGATED to
@@ -23,7 +22,7 @@ the long grid. So lambda = 1 and 1.5 have never been tried on long-form. That ne
 what this script does; this script re-selects honestly among the three arms that were actually
 measured on the full grid.
 
-⚠️ UNIT OF ANALYSIS. Weighted MSP is TRAINED, so unlike the free floors it is NOT rung-invariant and
+UNIT OF ANALYSIS. Weighted MSP is TRAINED, so unlike the free floors it is NOT rung-invariant and
 its cells are not pseudo-replicated. Selection is still done per DATASET (n = 8), because that is
 the level a deployment choice is made at, and the held-out unit has to be a whole dataset for the
 procedure to mean anything.
@@ -133,7 +132,7 @@ def main():
     n_agree = sum(1 for d in LONG if lodo_pick[d] == test_pick)
     print(f"  folds agreeing with the test pick: {n_agree}/8")
     if n_agree == 8:
-        print("  ⚠️ All 8 folds chose the same arm. The selection is STABLE, so the test-selected")
+        print("  All 8 folds chose the same arm. The selection is STABLE, so the test-selected")
         print("     number is optimistic by little here -- but the PROCEDURE was still not honest,")
         print("     and the stability is the reason to say so rather than a defence of the method.")
 
@@ -159,7 +158,7 @@ def main():
           f"{flips if flips else 'NONE -- the selection is stable to any single dataset'}")
     wins = {a: sum(1 for d in LONG if max(ARMS, key=lambda z: per[z][d]) == a) for a in ARMS}
     print(f"  per-dataset winners (the MEAN hides this): " + "  ".join(f"{a}={wins[a]}/8" for a in ARMS))
-    print("  ⚠️ So the headline arm wins the MEAN but is not the per-dataset winner everywhere. The")
+    print("  So the headline arm wins the MEAN but is not the per-dataset winner everywhere. The")
     print("     honest statement is 'the procedure picks the same arm', not 'the arm is best everywhere'.")
 
     # ---- is the shrink level itself a SHARPENING parameter? Tested, and reported as a NULL. ----
@@ -185,7 +184,7 @@ def main():
     print(f"  all 8:            Pearson {pear:+.3f}   Spearman {sp.statistic:+.3f}  p={sp.pvalue:.3f}")
     print(f"  drop pubmed+cnn:  Pearson {pear6:+.3f}   Spearman {sp6.statistic:+.3f}  p={sp6.pvalue:.3f}")
     print(f"  sign agreement:   {signs}/8")
-    print("  ⚠️ VERDICT: NOT ESTABLISHED. The Pearson of +0.86 on all 8 is carried entirely by the two")
+    print("  VERDICT: NOT ESTABLISHED. The Pearson of +0.86 on all 8 is carried entirely by the two")
     print("     datasets with the largest endpoint margins (pubmed_qa −0.545, cnn_dailymail +0.290);")
     print("     removing both collapses it to +0.32 / −0.03. Spearman never reaches significance at")
     print("     n = 8. samsum is a clear counterexample. Reported as suggestive-at-best, and the")
@@ -198,7 +197,7 @@ def main():
     # ---- the audit list itself: every choice made by reading test results ----
     print("\n" + "=" * 100)
     print("THE AUDIT LIST -- configuration choices made by looking at TEST results")
-    print("(file:line evidence in ../STOCKTAKE_sharpening_axis.md §5; this is the summary)")
+    print("(file:line evidence in the project results log; this is the summary)")
     print("=" * 100)
     AUDIT = [
         ("weighted-MSP lambda {norm,2,10}", "all run on every test cell, best promoted",
@@ -206,7 +205,7 @@ def main():
         ("best-of-eight wMSP verdict rows", "argmax over 8 arms on test PRR per cell "
          "(probedriftlong.py:513-514)", "asymmetry: max-of-THREE was rejected for the BASELINE"),
         ("prior-tilt beta = 0.5", "max over 6 values on test cells",
-         "already self-labelled an oracle (STOCKTAKE_post31July.md:1153)"),
+         "already self-labelled an oracle (the project results log)"),
         ("armD:top-25% prior arm", "best win-count against SAPLMA",
          "already flagged post-hoc; the registered single-k primary FAILED"),
         ("Orgad threshold tau = 0.3", "soft tier beat the hard mask on OOD test cells",
@@ -231,12 +230,12 @@ def main():
         ("attention-pooler temperature", "selected on a 20% VALIDATION slice carved from TRAIN"),
         ("auxiliary-loss lambda", "selected by holding out a whole SOURCE dataset"),
         ("entropy-penalty tau", "selected on a validation slice carved from train"),
-        ("SAPLMA / wMSP optimiser settings", "fixed a priori from Joe's recipe, never swept"),
+        ("SAPLMA / wMSP optimiser settings", "fixed a priori from the recipe, never swept"),
         ("decoding repetition_penalty", "chosen on degeneracy/relevance BEFORE labelling, not on PRR"),
     ]:
         print(f"  {a:38s}{b}")
 
-    print("\n⚠️ NOT COVERED BY THIS RUN, and it needs one: lambda = 1 and 1.5 have NEVER been tried on")
+    print("\nNOT COVERED BY THIS RUN, and it needs one: lambda = 1 and 1.5 have NEVER been tried on")
     print("   the long grid, despite the 12 July sweep concluding 'sweet spot ~ shrink@1-2'. The")
     print("   re-selection above can only choose among the three arms that were actually measured.")
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """PREFLIGHT: refuse to run a grid job whose driver disagrees with the canonical cohort.
 
-⭐ THIS IS THE FIX AT THE ORIGIN. Three defects on 2026-08-03/04 were all the same thing: a driver's
+THIS IS THE FIX AT THE ORIGIN. Three defects on 2026-08-03/04 were all the same thing: a driver's
 hard-coded dataset list was quietly smaller than the study's, and the result was a WRONG TABLE rather
 than an error. Checking the lists by hand is what already failed — twice, including once while
 explicitly "triple-checking". So this makes the disagreement a HARD FAILURE, and puts it at SUBMIT
@@ -10,7 +10,7 @@ TIME, before any compute is spent.
 Called at the top of every grid job script. Exits 1 on any mismatch, which kills the job in seconds
 instead of producing a plausible-looking table eight hours later.
 
-⚠️ WHAT IT DOES NOT DO. It cannot know that a driver SHOULD cover all ten — some scripts are correctly
+WHAT IT DOES NOT DO. It cannot know that a driver SHOULD cover all ten — some scripts are correctly
 scoped to a subset. So a driver states its intent by being listed here with its expected cohort. That
 is the point: the expectation becomes explicit and version-controlled instead of implicit in a literal.
 
@@ -52,7 +52,7 @@ def check_driver(name):
                          + (f" | MISSING {miss}" if miss else "")
                          + (f" | UNEXPECTED {extra}" if extra else ""))
         else:
-            print(f"  ✅ {name}.{attr:20s} {len(got):2d} entries  ({what})")
+            print(f"  {name}.{attr:20s} {len(got):2d} entries  ({what})")
     return fails
 
 
@@ -77,11 +77,11 @@ def check_families():
                 if same_here != same_canon:
                     fails.append(f"{name}.FINE: {ds} groups with {sorted(same_here)}, "
                                  f"canonical says {sorted(same_canon)}")
-        print(f"  ✅ {name}.FINE families agree with cohort.py")
+        print(f"  {name}.FINE families agree with cohort.py")
     return fails
 
 
-# Which POOLED feature files each driver actually opens. ⚠️ CORRECTED 2026-08-11 after this check
+# Which POOLED feature files each driver actually opens. CORRECTED 2026-08-11 after this check
 # false-positived and killed all 8 clean-span ladder jobs three minutes in. It demanded
 # saplma/ptrue_accurate/lookback for EVERY driver, but:
 #   * probedriftlong computes SAPLMA by mean-pooling the PERTOK states (`Xmean = np.stack([s.mean(0)
@@ -91,7 +91,7 @@ def check_families():
 #   * ood_onegrid genuinely does read them: it is the driver that scores linear/ptrue/lookback.
 # The shadow regime cache/med_quad_clean/ deliberately ships pertok+records WITHOUT pooled features,
 # which is correct for this ladder — so demanding them blocked a valid run.
-# ⚠️ A guard that fails a CORRECT run teaches people to bypass guards. Being accurate about what each
+# A guard that fails a CORRECT run teaches people to bypass guards. Being accurate about what each
 # driver reads matters as much as failing loud.
 FEATURES_READ = {
     "probedriftlong": [],            # pertok only, for the no --baselines invocation
@@ -126,7 +126,7 @@ def check_caches(datasets, needed=None):
         if miss:
             fails.append(f"{d}: {len(miss)} cache file(s) absent under {cd} -> {miss}")
     if not fails:
-        print(f"  ✅ caches resolve for all {len(datasets)} datasets (pertok L15 + {len(needed)} pooled)")
+        print(f"  caches resolve for all {len(datasets)} datasets (pertok L15 + {len(needed)} pooled)")
     return fails
 
 
@@ -155,13 +155,13 @@ def main():
         feats = sorted({f for n in names for f in FEATURES_READ.get(n, [])})
         fails += check_caches(sorted(need), feats)
     if fails:
-        print("\n❌ PREFLIGHT FAILED — refusing to start the job:")
+        print("\nPREFLIGHT FAILED — refusing to start the job:")
         for f in fails:
             print(f"   {f}")
         print("\nA cohort smaller than canonical produces a WRONG TABLE, not an error. Fix the driver "
               "(or register a deliberate exception) before resubmitting.")
         sys.exit(1)
-    print("\n✅ PREFLIGHT OK — cohorts and families match the canonical definition.")
+    print("\nPREFLIGHT OK — cohorts and families match the canonical definition.")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ WHY THIS EXISTS
 of INSTRUCTION TUNING, not of Gemma:
 
   1. WHITESPACE-FRONTING. An instruct model under raw few-shot prompting emits a leading newline.
-     `pubmed_qa` generates with `--truncate-long` (Joe's `generate_until=['\\n']`), so that newline
+     `pubmed_qa` generates with `--truncate-long` (the `generate_until=['\\n']`), so that newline
      truncates the entire answer away: 200/200 records came back as a bare "\\n". The job exits 0.
   2. ASSISTANT PERSONA. The model answers correctly and then keeps talking ("Let me know if you'd
      like me to analyze any other text!"). The judge scores the whole saved output, so the filler is
@@ -15,11 +15,11 @@ of INSTRUCTION TUNING, not of Gemma:
 Any other instruct checkpoint is a candidate for both. This asks the question in ~5 minutes on an
 abundant card instead of discovering it after 12 hours on a scarce one.
 
-⛔ NOT A POPULATION. Writes nothing to any cache. Its numbers may never enter a results table. It is
+NOT A POPULATION. Writes nothing to any cache. Its numbers may never enter a results table. It is
 allowed to run in bf16 on a small card even when the real population is fp32, because "is the first
 emitted token whitespace?" is not a dtype-sensitive question.
 
-⚠️ It generates WITHOUT `truncate_at_newline` on purpose and inspects the first token itself. That
+It generates WITHOUT `truncate_at_newline` on purpose and inspects the first token itself. That
 reproduces the CAUSE rather than the symptom, and it also shows what the untruncated answer would
 have been -- which tells you whether the model is broken or merely mis-delimited.
 
@@ -86,7 +86,7 @@ def main():
             notes.append(f"assistant chatter on {chat}/{n}")
         print(f"  {ds:14s} " + ("; ".join(notes) if notes else "clean on both mechanisms"),
               flush=True)
-    print("\n  ⛔ Diagnostic only. Nothing here is a population or a result.", flush=True)
+    print("\n  Diagnostic only. Nothing here is a population or a result.", flush=True)
 
 
 if __name__ == "__main__":

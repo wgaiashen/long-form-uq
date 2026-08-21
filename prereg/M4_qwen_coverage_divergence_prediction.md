@@ -67,7 +67,7 @@ Severe-degeneracy rate, `luq.degeneracy.is_severe`, ID split:
 | pubmed_qa | 1.11% | 1.50% | +0.4 pp |
 | xsum / cnn_dailymail | 0.00 / 0.03% | 0.00 / 0.00% | ~0 |
 
-⚠️ **The Qwen column is from a HEAD SLICE and is therefore biased.** `01_extract --limit` breaks after
+**The Qwen column is from a HEAD SLICE and is therefore biased.** `01_extract --limit` breaks after
 the first n rows; it is not a sample. Demonstrated on expertqa: the first 200 rows have gold p90 = 450
 against 349 for the full 2016, and 450 lies outside the [316, 376] range of 2,000 random 200-row draws.
 A random-sample re-measurement (`--sample-n`, added 2026-08-08) is running and **will replace this
@@ -107,7 +107,7 @@ both are predicted to exceed the 10 pp flag — factscore more severely than exp
 degeneracy rises from an essentially clean baseline (0.20%, i.e. an ~85× increase) whereas expertqa's
 roughly doubles from an already-high 11.76%.
 
-⚠️ Note this refines the informal expectation that expertqa is the one at risk. On the current
+Note this refines the informal expectation that expertqa is the one at risk. On the current
 evidence **factscore is predicted to trip harder.** Registered now so that ordering cannot be claimed
 after the fact.
 

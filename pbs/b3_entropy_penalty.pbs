@@ -4,7 +4,7 @@
 #PBS -N luq_b3
 #PBS -j oe
 # B.3 -- the one-sided entropy penalty. The LAST untested method item from the 31 July meeting, and the
-# last shot at Joe's condition that the attention probe must actually be improved.
+# last shot at the condition that the attention probe must actually be improved.
 #
 # PRIMARY SCREEN IS pubmed ID, and that is deliberate. pubmed is the only dataset with genuinely
 # concentrated ID attention (normalised entropy 0.61, ~half its mass on punctuation), so if a sharpness

@@ -9,7 +9,7 @@ validated `luq.degeneracy` detector, which is deliberately NOT repetition-based)
 reference length p50/p90 beside them -- because the reference length is what decides whether a budget
 is genuinely too small or whether the model is simply over-generating.
 
-⚠️ % EMPTY is the med_quad failure mode: a repetition penalty applied over a long few-shot context can
+% EMPTY is the med_quad failure mode: a repetition penalty applied over a long few-shot context can
 force immediate EOS. It produced ~35% empty generations there, and no other quality check catches it.
 
 Read-only, CPU, no GPU, no API, no £.
@@ -49,7 +49,7 @@ def gold_text(r):
 # documents the per-dataset shapes; this is the cheap population-level rate of the med_quad/QA one.
 _FABRICATED = re.compile(r"\bQuestion\s*:")
 
-# ⚠️ ADDED 2026-08-15. `_FABRICATED` only sees an invented "Question:" restart -- the BASE-model
+# ADDED 2026-08-15. `_FABRICATED` only sees an invented "Question:" restart -- the BASE-model
 # few-shot failure. It is structurally blind to the INSTRUCT-model failure: the model answers
 # correctly and then continues in its assistant persona ("Let me know if you'd like me to analyze
 # anything else!"). Measured on gemma-2-9b-it samsum: 80% of generations, with the real answer only
@@ -74,7 +74,7 @@ def chatter(text):
 def fabrication(text):
     """(has_fabricated_continuation, fraction of the text that is the REAL answer).
 
-    ⚠️ This is the metric the degeneracy detector cannot see, and it is the one that matters for
+    This is the metric the degeneracy detector cannot see, and it is the one that matters for
     labelling: the judge scores the whole saved output, so a generation that answers correctly and
     then invents an unrelated Q&A gets marked down for text the model was never asked to produce.
     Measured on med_quad: 47.8% of the old (cap 128) generations and 92.6% of the n-gram-only 768
@@ -101,7 +101,7 @@ def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
     golds = [gold_text(r) for r in recs]
     gl = [len(g.split()) for g in golds]   # words; token count needs a tokeniser
     # Gold length in TOKENS, via the `tok` hook that had been declared but never wired (2026-08-08).
-    # ⚠️ THIS IS THE COLUMN THE BUDGET DECISION NEEDS. `budget` is a token count, so budget/gold_words
+    # THIS IS THE COLUMN THE BUDGET DECISION NEEDS. `budget` is a token count, so budget/gold_words
     # is a units mismatch. The words->tokens factor is NOT a safe constant: measured on this gold with
     # the Qwen tokeniser it ranges 1.24 (samsum) to 1.45 (asqa), and using a single ~1.31 factor flips
     # asqa's verdict from 0.96x (below the gate) to 1.06x (above it) -- i.e. the approximation fails
@@ -184,7 +184,7 @@ def main():
         print(f"\ngold_tok_* measured with {args.gold_tokenizer}. ratio = budget / gold_tok_p90 (TOKENS/TOKENS).")
         print("ratio < 1.00 = DEFECT (the reference cannot fit the budget) -> gate trips, stop and report.")
         print("ratio >= 1.00 with a high %cap = the model over-generates -> NOT a reason to change the budget.")
-        print("⚠️ the ratio is meaningless where gold is not a reference GENERATION (factscore's gold is")
+        print("the ratio is meaningless where gold is not a reference GENERATION (factscore's gold is")
         print("   the entity NAME, ~7 tokens, so its ratio is not-applicable rather than 'lots of room').")
     print("\ngold_* are WORDS (tokeniser-free); gen_* are TOKENS -- do not compare the two columns directly.")
     print("%fabr   = generations that invent a follow-up 'Question:' -- the few-shot continuation the")

@@ -10,28 +10,28 @@
 # UNSUPERVISED P(True) for ONE dataset. The original Kadavath P(True): append the verification
 # question, read the model's OWN yes/no next-token probability, renormalise. No training, no labels --
 # an unsupervised baseline like MSP, and the CONTROL for our supervised P(True) probe (01b), which
-# reads the hidden state at the very same slot. framing.md calls that distinction load-bearing and we
+# reads the hidden state at the very same slot. the project framing notes calls that distinction load-bearing and we
 # have never shown it.
 #
 #   DS=cnn_dailymail sbatch slurm/ptrue_unsup_doc.sbatch
 #   DS=asqa REG=asqa_rp12 sbatch slurm/ptrue_unsup_doc.sbatch
 #
-# ⚠️ USE THE CALLER-ENV FORM ABOVE, NOT `--export=ALL,DS=...` (corrected 2026-08-04 after running all
+# USE THE CALLER-ENV FORM ABOVE, NOT `--export=ALL,DS=...` (corrected 2026-08-04 after running all
 # six on DoC). On this cluster the `--export=ALL,VAR=` form gets jobs HELD with "user env retrieval
 # failed" — the same failure we hit with LUQ_SMOKE. The comment previously documented that form, so
 # anyone following it got six held jobs and no error explaining why. Setting the variable in the
 # caller's environment and letting sbatch inherit it works and was what actually ran.
 #
-# ⚠️ ONE DATASET PER JOB, deliberately. The baseline-feature job (269813) finished with 25 SECONDS of
+# ONE DATASET PER JOB, deliberately. The baseline-feature job (269813) finished with 25 SECONDS of
 # its 8h wall left because it did six datasets in one go. 01g IS resumable (it skips records already
 # scored, unlike 01b/01c), but a per-dataset job means a walltime overrun costs one dataset, not six.
 #
-# ⚠️ a40 / 48G, NOT the a100 the lookback job needed. Verified in src/luq/generate.py: load_model
+# a40 / 48G, NOT the a100 the lookback job needed. Verified in src/luq/generate.py: load_model
 # auto-selects fp16 for anything that is not Gemma, so this is a ~16GB model, and 01g needs only the
 # next-token logits -- no output_attentions, no all-layer hidden states. Lookback needed the a100
 # because it forces fp32 AND materialises 32x32x2048^2 attention (17.2GB); none of that applies here.
 #
-# ⚠️ IT WRITES INTO THE TIER-1 RECORDS, so the results DO NOT go back as record files. The export step
+# IT WRITES INTO THE TIER-1 RECORDS, so the results DO NOT go back as record files. The export step
 # below emits a small SIDECAR CSV instead; RCS merges that into its OWN canonical records. Shipping
 # records back would overwrite the files carrying the £-paid judge labels, the ones hashed in
 # prereg/CANONICAL_v1_MANIFEST.md, and rsync guards against deletion, not against overwriting.

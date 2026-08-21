@@ -10,27 +10,27 @@
 
 # W-Models / Qwen2.5-32B on DoC. Slurm twin of pbs/wmodels_ladder.pbs.
 #
-# ⚠️ HF_HOME IS OVERRIDDEN TO /vol/bitbucket BEFORE SOURCING _env.sh. The DoC default
+# HF_HOME IS OVERRIDDEN TO /vol/bitbucket BEFORE SOURCING _env.sh. The DoC default
 # (/vol/gpudata/gs925-msc_project/hf_cache) is inside the HARD 50GB CephFS quota, which already
 # holds Qwen-14B (27.5GB) and had ~4GB free. Qwen2.5-32B is ~65GB in bf16. _env.sh assigns with
 # `:=`, so an already-exported value wins.
 #
-# ⚠️ bf16, NOT fp32. fp32 Qwen-32B is ~130GB, over any single card. Dtype is held FIXED within this
+# bf16, NOT fp32. fp32 Qwen-32B is ~130GB, over any single card. Dtype is held FIXED within this
 # population, so it never differs between the two wMSP variants being compared here -- but it is an
 # additional implementation difference when this population is read beside the fp32 ones.
 #
-# ⚠️ --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the
+# --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the
 # msp_min / wMSP signal. 01_extract's --require-explicit-dtype would refuse `auto` anyway.
 #
-# ⚠️ --sources IS NOT OPTIONAL. --evals restricts TARGETS ONLY; without --sources the rungs are
+# --sources IS NOT OPTIONAL. --evals restricts TARGETS ONLY; without --sources the rungs are
 # still built from the full 8-dataset LONG_SRC, so this "six-dataset panel" would quietly train on
 # med_quad and expertqa -- the two datasets the panel exists to drop.
 #
-# ⚠️ --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION (prereg/M5 §4), not an optimisation.
+# --wmsp-only wmsp_norm,wmsp_shrink2 IS THE PRE-REGISTRATION (prereg/M5 §4), not an optimisation.
 # lambda=0 control, lambda=2 pre-specified, both transferred unchanged. NO lambda grid and NO
 # model-specific selection runs on a replication population.
 #
-# ⚠️ --perex-dir is REQUIRED: the verification gate compares per-example vectors, not PRR (PRR moves
+# --perex-dir is REQUIRED: the verification gate compares per-example vectors, not PRR (PRR moves
 # ~1e-4 on 1e-7 round-off).
 #
 #   sbatch slurm/wmodels_qwen32_ladder.sbatch
@@ -49,7 +49,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL="Qwen/Qwen2.5-32B"
 DTYPE=bf16
-# ⚠️ SWITCHED TO sdpa 2026-08-17 (was eager) -- see wmodels_qwen32_postextract.sbatch for the full
+# SWITCHED TO sdpa 2026-08-17 (was eager) -- see wmodels_qwen32_postextract.sbatch for the full
 # reasoning (the a100 canary/array double-queue cost, the 96%-headroom xsum pass, and the panel-wide
 # verification that no method here needs raw attention weights). Record as a prereg deviation.
 ATTN=sdpa

@@ -5,7 +5,7 @@
 #PBS -j oe
 # LONG ladder, ONE eval per job (all 5 of its rungs), so the grid completes in parallel.
 #
-# ⚠️ WHY SPLIT. The single sequential job could not finish: measured on 2026-08-03, one OOD cell took
+# WHY SPLIT. The single sequential job could not finish: measured on 2026-08-03, one OOD cell took
 # >79 minutes, so 42 cells would need ~50h against a 24h walltime. Each eval is 5 cells, so a per-eval
 # job is ~50min of cache loading + 5 cells ≈ 4-8h. Loading is NOT reduced by --evals (the driver loads
 # the union of LONG_SRC and evals at probedriftlong.py:108, which is REQUIRED for the OOD rungs to have
@@ -17,7 +17,7 @@ set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
 EV="${LUQ_EVAL:?set LUQ_EVAL}"
 
-# ⭐ COHORT GATE (2026-08-04). Exits 1 in seconds if a driver disagrees with the canonical
+# COHORT GATE (2026-08-04). Exits 1 in seconds if a driver disagrees with the canonical
 # cohort. Three defects shipped because a driver's dataset list was quietly too small and the
 # result was a WRONG TABLE rather than an error. Hand-checking is what failed; this is the gate.
 python -u scripts/checks/preflight_cohort.py --driver probedriftlong || exit 1

@@ -28,10 +28,10 @@ timeout 300 python -u -c "import torch, transformers; print('imports OK | cuda',
 
 for DS in trivia_qa xsum; do
   echo "================ $DS : uhead_judge v1 (JUDGE label) ================ $(date)"
-  python -u scripts/01j_uhead_joe.py --dataset "$DS" --ood ID --model "$MODEL" \
+  python -u scripts/01j_uhead_reference.py --dataset "$DS" --ood ID --model "$MODEL" \
       --variant v1 --name uhead_judge --label-field correctness || echo "!!! v1 $DS FAILED"
   echo "================ $DS : uhead_judge v2 (JUDGE label) ================ $(date)"
-  python -u scripts/01j_uhead_joe.py --dataset "$DS" --ood ID --model "$MODEL" \
+  python -u scripts/01j_uhead_reference.py --dataset "$DS" --ood ID --model "$MODEL" \
       --variant v2 --name uhead_judge_v2 --label-field correctness || echo "!!! v2 $DS FAILED"
 done
 echo "uhead_judge_rest ALL DONE at $(date)"

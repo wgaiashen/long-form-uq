@@ -11,7 +11,7 @@ master EXACTLY (floors are exact by construction; supervised methods can carry t
 noise, so the tolerance is 1e-6, not "eyeballed"). If the cell DOES touch a cleaned dataset, no
 assertion is made -- movement there is expected, and its magnitude is reported, not gated.
 
-Mirrors the same check RCS ran for the Llama MedQuAD correction (STOCKTAKE_cleanspan.md): "0 cells
+Mirrors the same check RCS ran for the Llama MedQuAD correction (the project results log): "0 cells
 moved without [a cleaned dataset] in train or eval" is the correctness control this script proves.
 """
 import csv
@@ -88,11 +88,11 @@ def main():
     print(f"  datasets with missing old/new file:                {n_missing}")
 
     if fails:
-        print("\n⚠️  INVARIANCE VIOLATIONS -- a cell with NO cleaned dataset in train/eval moved:")
+        print("\nINVARIANCE VIOLATIONS -- a cell with NO cleaned dataset in train/eval moved:")
         for ev, rung, method, o, n, d in fails:
             print(f"  [{ev:14s}] {rung:14s} {method:14s} old={o:+.4f} new={n:+.4f} delta={d:+.4f}")
     else:
-        print("\n✅ NO INVARIANCE VIOLATIONS — every cell with zero cleaned-dataset exposure in "
+        print("\nNO INVARIANCE VIOLATIONS — every cell with zero cleaned-dataset exposure in "
               "train or eval reproduces canonical exactly.")
 
     print(f"\n{'='*100}\nMOVED CELLS (expected, cleaned dataset in train or eval), sorted by |delta|:\n{'='*100}")

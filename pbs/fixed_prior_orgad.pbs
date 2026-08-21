@@ -4,7 +4,7 @@
 #PBS -N luq_fp_orgad
 #PBS -o /rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/
 #PBS -j oe
-# S3.6 soft-Orgad (Joe's lead prior): arms A/B/C/D on the COVERED sets {pubmed,med_quad,expertqa}, ID+SameTask
+# S3.6 soft-Orgad (the lead prior): arms A/B/C/D on the COVERED sets {pubmed,med_quad,expertqa}, ID+SameTask
 # rungs (all-arms-in-run; uncovered cells SKIPPED loudly). CPU.
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME HF_HUB_OFFLINE=1
 echo "HOST $(hostname)"

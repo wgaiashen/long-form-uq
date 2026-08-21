@@ -110,7 +110,7 @@ def main():
     # reloaded per-token states must reproduce the cached SAPLMA feature's PRR. Reloading is what
     # catches a corrupt write (e.g. a dangling numpy view) that an in-memory check would miss.
     split = np.array([r["split"] for r in records])
-    # ⚠️ LABEL-AWARE (fix, 2026-08-10). When this runs before the judge labels land (the Qwen
+    # LABEL-AWARE (fix, 2026-08-10). When this runs before the judge labels land (the Qwen
     # extraction array overlapped labelling), the old code either crashed on the missing field
     # (KeyError: 'correctness') or trained on NaN and printed "PRR nan vs nan MISMATCH -- cache is
     # wrong", which reads as a corrupt cache when the cache is fine and only the LABELS are absent.

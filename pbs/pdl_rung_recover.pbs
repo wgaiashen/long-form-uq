@@ -10,13 +10,13 @@
 # disk, so only `1ds-Diff-long` is missing. Re-running the whole eval would repeat ~23h of good compute to
 # recover one rung.
 #
-# ⚠️ WRITES TO A SUFFIXED PATH, NEVER THE MAIN ONE. probedriftlong rebuilds its CSV from an in-memory list
+# WRITES TO A SUFFIXED PATH, NEVER THE MAIN ONE. probedriftlong rebuilds its CSV from an in-memory list
 # that starts EMPTY and rewrites the whole file at every cell. Pointing a single-rung run at
 # `pdl_fam_xsum__<slug>.csv` would therefore DESTROY the four completed rungs and replace them with one.
 # The suffixed name still matches the assembler's `pdl_fam_*__<slug>.csv` glob at the same priority, and it
 # fills a cell the main run never wrote, so there is no same-priority collision to resolve.
 #
-# ⚠️ 48gb (not the 40gb the main ladder used, which peaked at 24.9GB). Cheap insurance after the onegrid
+# 48gb (not the 40gb the main ladder used, which peaked at 24.9GB). Cheap insurance after the onegrid
 # jobs were found finishing within 1GB of their limit — a job killed for memory costs more than the RAM.
 #
 #   qsub -v LUQ_EVAL=xsum,LUQ_RUNGS=1ds-Diff pbs/pdl_rung_recover.pbs

@@ -1,6 +1,6 @@
 """A1 / prereg 0.1 — does the pooler's attention FLATTENING predict its PERFORMANCE DROP?
 
-Joe's explicit request (31 July): *"Is there a correlation between how much it flattens -- that delta --
+the explicit request (31 July): *"Is there a correlation between how much it flattens -- that delta --
 and how much performance drops? If so, that's a really useful signal."* It is the candidate LABEL-FREE
 switching signal for the proposed system (weighted-MSP backing off to an attention probe). If it is weak,
 the back-off gates on OUTPUT LENGTH instead and the system is not rebuilt around entropy.
@@ -102,7 +102,7 @@ def entropy_of_sidecar(path, records):
 def sidecar_path(dataset, rung, cache_dir):
     """Resolve a viz sidecar, BASE `cache/viz/` first then the regime namespace.
 
-    ⚠️ The regime-namespaced datasets (asqa/expertqa/factscore) have their records under
+    The regime-namespaced datasets (asqa/expertqa/factscore) have their records under
     `cache/<regime>/records/` but their sidecars under the BASE `cache/viz/` -- `dump_viz_attention`
     writes to `cfg.cache_dir/viz` and was evidently run without `--prompt-regime` for those three, and
     no `cache/*/viz` directory exists at all. Building the sidecar path from the namespaced cache_dir
@@ -149,7 +149,7 @@ def load_entropy_table(datasets):
             tot = info["kept"] + info["misaligned"] + info["zero_mass"]
             if info["misaligned"]:
                 frac = info["misaligned"] / max(tot, 1)
-                flag = "  ⚠️ >5% — sidecar/records may describe different generations" if frac > 0.05 else ""
+                flag = "  >5% — sidecar/records may describe different generations" if frac > 0.05 else ""
                 notes.append(f"{d}/{rung}: {info['misaligned']}/{tot} rows dropped on the G+1 "
                              f"alignment guard ({frac:.1%}){flag}")
     return out, notes
@@ -235,7 +235,7 @@ def within_across(cells):
     """P3 decomposition. `cells` = [(dataset, d_entropy, d_prr)].
 
     ACROSS = correlate the per-dataset MEANS (this is the component a per-dataset switch could actually
-    use -- the switch fires across datasets, per Lihu's constraint that selection is per dataset).
+    use -- the switch fires across datasets, per the constraint that selection is per dataset).
     WITHIN = correlate after subtracting each dataset's own mean from BOTH variables (rung ordering
     inside a dataset). A correlation that lives only in WITHIN is useless as a switching signal, which is
     precisely what P3 warns about."""
@@ -378,7 +378,7 @@ def main():
     if strong and across_ok:
         print("  STRONG and negative at BOTH levels -> entropy is a CANDIDATE gate. Per the prereg it must")
         print("  now be compared head-to-head against the LENGTH gate leave-one-dataset-out before adoption.")
-        print("  ⚠️ And it contradicts the four points already on record -> treat as a SUSPECT and re-run")
+        print("  And it contradicts the four points already on record -> treat as a SUSPECT and re-run")
         print("     the four checks the prereg lists before believing it.")
     elif strong and not across_ok:
         print("  Negative per-cell but NOT across datasets -> P3 confirmed: the correlation lives in the")
@@ -386,7 +386,7 @@ def main():
         print("  across datasets. Gate on LENGTH.")
     else:
         print("  WEAK or wrong-signed -> entropy is NOT the switching signal. Phase 3 gates on LENGTH.")
-        print("  This is a clean negative answering Joe's question, and it is a result, not a failure.")
+        print("  This is a clean negative answering the question, and it is a result, not a failure.")
 
     write_csv(args.out, rows, stamps)
     make_plot(args.plot, cells, percell, across)
@@ -404,7 +404,7 @@ def breakdown(cells, n_perm=20000, seed=0):
     it would still be a real mechanism finding: flattening would track damage once dataset identity is
     held fixed.
 
-    ⚠️ THE CONTROL IS THE POINT, not an afterthought. Twelve subgroup tests on 32 points will throw up a
+    THE CONTROL IS THE POINT, not an afterthought. Twelve subgroup tests on 32 points will throw up a
     strong-looking one by chance -- and the groups are tiny (n=8 and n=4; with n=4 there are only 4!=24
     orderings, so |rho|=1.0 carries one-sided p=1/24=0.042 and is the WEAKEST possible "significant"
     result). So we report the null distribution of the BEST-LOOKING subgroup: permute d_PRR across all 32

@@ -2,7 +2,7 @@
 
 WHAT THIS IS (in plain words)
 -----------------------------
-Lihu asked for an HTML viewer that shows, example by example, where a signal lands
+The design calls for an HTML viewer that shows, example by example, where a signal lands
 on the generated tokens, so we can *see* why a probe succeeds or fails instead of
 guessing. This script builds that viewer from data we already have on disk -- no GPU.
 

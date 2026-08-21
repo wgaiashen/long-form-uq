@@ -20,10 +20,10 @@ w_t = 1 (see `weight_mode="constant"`), so the method can only help relative to 
 the bet is that a learned weighting extracts signal plain MSP misses while staying closer to
 MSP's OOD robustness than a full hidden-state probe.
 
-This is adapted from Joe's `temp_idea_1_msp_probe` (his `MLP_NN` / `MLP` in `msp_probe_uq.py`):
+This is adapted from the `temp_idea_1_msp_probe` (his `MLP_NN` / `MLP` in `msp_probe_uq.py`):
 same 4-layer weight probe, same soft-rank training loss, same weight modes. We reimplement it
 in our own pipeline (our per-token cache + our records) rather than driving his lm-polygraph
-estimator, per Joe's "write it into your own codebase" rule.
+estimator, per the "write it into your own codebase" rule.
 
 ALIGNMENT (the classic bug this guards against)
 -----------------------------------------------
@@ -36,9 +36,9 @@ weights up 1:1 with the G NLL values. This is the same de-alignment the visualis
 TRAINING TARGET / LOSS
 ----------------------
 The target is incorrectness = 1 - correctness (soft judge label). The loss is a differentiable
-soft-rank (Spearman) MSE, ported verbatim from Joe: within each minibatch, rank the predicted
+soft-rank (Spearman) MSE, ported verbatim from the reference implementation: within each minibatch, rank the predicted
 q scores softly and match them to the true incorrectness ranks. PRR is itself a ranking metric,
-so a ranking loss is the natural objective (this is NOT torchsort -- it is Joe's hand-rolled
+so a ranking loss is the natural objective (this is NOT torchsort -- it is the hand-rolled
 sigmoid pairwise soft rank).
 """
 import numpy as np
@@ -68,7 +68,7 @@ def answer_states(state):
 def build_answer_masks(tok, records):
     """The Orgad exact-answer overlay: per-record 0/1 mask over the G generated tokens, True on the
     exact-answer span (where the gold answer appears in the generation), all-ones fallback when the
-    span is not located. This is Joe's idea (his overlay only drew it; here we USE it to restrict the
+    span is not located. This is the idea (his overlay only drew it; here we USE it to restrict the
     weighted-MSP sum). Cheap, CPU-only, no GPU/API -- it reuses our gold-substring locator
     `luq.features.orgad.locate_answer_rows`, which returns per-token-cache ROW indices over the window
     [P-1 : P+G]; since `answer_states`/`per_token_nll` drop the row-0 anchor, cache row r -> token index
@@ -94,7 +94,7 @@ def build_answer_masks(tok, records):
 
 
 # --------------------------------------------------------------------------------------
-# The learned per-token weighter + the soft-rank loss (both from Joe's msp_probe_uq.py)
+# The learned per-token weighter + the soft-rank loss (both from the msp_probe_uq.py)
 # --------------------------------------------------------------------------------------
 
 class TokenWeightMLP(nn.Module):
@@ -116,7 +116,7 @@ class TokenWeightMLP(nn.Module):
 
 def _soft_rank(q, temperature: float = 1.0):
     """Differentiable soft rank of q within the batch (higher q -> higher rank). Verbatim from
-    Joe: rank_i = 1 + sum_j sigmoid((q_i - q_j)/T), excluding j == i."""
+    reference: rank_i = 1 + sum_j sigmoid((q_i - q_j)/T), excluding j == i."""
     n = q.shape[0]
     diff = q.unsqueeze(1) - q.unsqueeze(0)          # diff[i,j] = q_i - q_j
     mask = 1.0 - torch.eye(n, device=q.device)
@@ -133,8 +133,8 @@ def _true_rank(incorrectness):
 
 
 # --- Blondel et al. 2020 differentiable soft rank (arXiv:2002.08871), the Phase-4 loss upgrade ------
-# Joe's `_soft_rank` above is a hand-rolled O(n^2) sigmoid pairwise rank. Blondel's operator is EXACT,
-# O(n log n), order-preserving, and has better-behaved gradients -- Joe pointed at it as the lever to
+# the `_soft_rank` above is a hand-rolled O(n^2) sigmoid pairwise rank. Blondel's operator is EXACT,
+# O(n log n), order-preserving, and has better-behaved gradients -- It was flagged as the lever to
 # improve the underwhelming pairwise version. It ships as torchsort.soft_rank. Imported lazily+guarded
 # so this module (and the pairwise loss) still work on a node where torchsort is not built.
 try:
@@ -182,7 +182,7 @@ def _spearman_loss(soft_r, target_rank):
 # MSP floor) is left untouched so the constant==MSP grounding test and the floor stay invariant.
 _SPECIAL_ID_MIN = 128000
 
-# ⚠️ THE >=128000 RULE IS LLAMA-3 ONLY, AND IT IS A SILENT BUG ON ANY OTHER MODEL (2026-08-08).
+# THE >=128000 RULE IS LLAMA-3 ONLY, AND IT IS A SILENT BUG ON ANY OTHER MODEL (2026-08-08).
 # Qwen2.5's vocabulary is 152,064 with its specials at 151,643+, so `id >= 128000` would classify a
 # large band of ORDINARY CONTENT TOKENS as special and zero their weight -- no crash, no warning,
 # just a quietly different method. This feeds `content_keep`, which feeds weighted MSP, which is a
@@ -192,7 +192,7 @@ _SPECIAL_ID_MIN = 128000
 # caller changes and no committed number moves. A driver running a non-Llama model calls
 # `set_special_ids(...)` once at startup.
 #
-# ⭐ VERIFIED byte-identical on Llama before this landed: scanning all 11 cached record files, the
+# VERIFIED byte-identical on Llama before this landed: scanning all 11 cached record files, the
 # ONLY id >= 128000 that ever occurs in a generation is 128001 (<|end_of_text|>, 10,384 occurrences),
 # and it IS in `all_special_ids`. So set-membership and the >= test agree on every row we have.
 _SPECIAL_IDS = None          # None => fall back to the Llama-3 reserved-range test below
@@ -246,7 +246,7 @@ def _weights_from_raw(raw, weight_mode: str, keep=None):
         if keep is None:
             return torch.softmax(raw, dim=0) * n
         n_kept = torch.clamp(keep.sum(), min=1.0)
-        # ⚠️ EVERY-TOKEN-EXCLUDED IS THE NaN CASE (found 2026-08-03 via the asqa wMSP outlier).
+        # EVERY-TOKEN-EXCLUDED IS THE NaN CASE (found 2026-08-03 via the asqa wMSP outlier).
         # If keep is all-zero, masked_fill sets EVERY position to -inf and softmax(all -inf) = NaN, so
         # the whole example scores NaN. The clamp above protects the SCALE but not the softmax. Those
         # NaNs then flowed into prr(), which used to rank them arbitrarily and return a plausible number
@@ -268,7 +268,7 @@ def _weights_from_raw(raw, weight_mode: str, keep=None):
 def _segment_mean_raw(raw, sid):
     """Replace each token's raw weight with the MEAN raw of its segment (sentence). All tokens in a
     segment then share one weight after the softmax -> "one learned weight per sentence, broadcast to its
-    tokens" (Joe #7). `sid` is a long tensor of segment ids over the G tokens. Differentiable (scatter-mean),
+    tokens" (design note 7). `sid` is a long tensor of segment ids over the G tokens. Differentiable (scatter-mean),
     so gradients still flow to the MLP. Reduces to plain per-token weighting when every token is its own
     segment, and to uniform when all tokens share one segment."""
     n_seg = int(sid.max().item()) + 1
@@ -306,7 +306,7 @@ def _segment_softmax_weights(raw, sid, keep=None):
     # path gets from _weights_from_raw's -inf masking. Default (all-ones) = every token kept.
     if keep is None:
         keep = torch.ones_like(raw)
-    # ⚠️ THE SAME EVERY-TOKEN-EXCLUDED NaN AS THE TOKEN PATH (fixed 2026-08-05). When `keep` is all-zero
+    # THE SAME EVERY-TOKEN-EXCLUDED NaN AS THE TOKEN PATH (fixed 2026-08-05). When `keep` is all-zero
     # every segment gets `counts == 0`, so the `torch.where` below sets EVERY seg_mean to -inf and
     # softmax(all -inf) = NaN. That was left unchased when the token-level case was fixed on 2026-08-03,
     # and it is why `wmsp_seg_softmax` alone came back NaN on 17 of its 42 long cells while the other
@@ -343,14 +343,14 @@ def _seq_q(raw, nll, weight_mode: str, length_normalise: bool, mask=None, smooth
     spikes). No effect on constant mode. `return_w` also returns the weight vector (for a penalty term).
     Both default to the no-op, so the existing path is unchanged."""
     if smooth_n and smooth_n > 1 and weight_mode != "constant":
-        raw = smooth_raw(raw, smooth_n, causal=smooth_causal)   # causal=Joe's literal "previous n tokens"
+        raw = smooth_raw(raw, smooth_n, causal=smooth_causal)   # causal=the literal "previous n tokens"
     if segment_ids is not None and weight_mode != "constant" and segment_mode == "softmax":
         # sentence-softmax path produces FINAL avg-1 weights directly (skip _weights_from_raw). It handles
         # `keep` itself (excludes specials from the per-sentence mean, length count, and output weight).
         w = _segment_softmax_weights(raw, segment_ids, keep=keep)
     else:
         if segment_ids is not None and weight_mode != "constant":
-            raw = _segment_mean_raw(raw, segment_ids)      # one weight per sentence, flat (Joe #7)
+            raw = _segment_mean_raw(raw, segment_ids)      # one weight per sentence, flat (design note 7)
         w = _weights_from_raw(raw, weight_mode, keep=keep)
     wn = w * nll
     if mask is not None:
@@ -380,11 +380,11 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
     incorrectness = 1 - y. Returns the trained model (unused for constant mode).
 
     `loss` selects the ranking surrogate:
-      "pairwise"  Joe's hand-rolled O(n^2) sigmoid soft-rank MSE (the original; the fallback baseline).
+      "pairwise"  the hand-rolled O(n^2) sigmoid soft-rank MSE (the original; the fallback baseline).
       "blondel"   Blondel 2020 differentiable Spearman via torchsort.soft_rank (exact, O(n log n)); the
                   Phase-4 upgrade. `blondel_eps` is torchsort's regularization_strength (start small).
 
-    Defaults follow Joe (AdamW, 5 epochs, batch 32, lr 1e-3, softmax `normalised`, length_normalise
+    Defaults follow the reference implementation (AdamW, 5 epochs, batch 32, lr 1e-3, softmax `normalised`, length_normalise
     True). NOTE: which of sum vs length-normalised is better is TASK-DEPENDENT, not a settled win either
     way -- against the judge label plain msp_sum beats perplexity on pubmed (+0.20 vs -0.17) while the two
     tie on short-form (see msp_floor.py). So length_normalise is a knob to sweep, not a fixed truth."""
@@ -398,7 +398,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
     emb = [torch.from_numpy(answer_states(states[i])).to(device) for i in tr_idx]
     nll = [torch.from_numpy(per_token_nll(records[i])).to(device) for i in tr_idx]
     msk = ([torch.from_numpy(masks[i]).to(device) for i in tr_idx] if masks is not None else None)
-    # keep-mask channel: a caller-supplied per-record subset (Joe #4: content/punct-restricted weighting)
+    # keep-mask channel: a caller-supplied per-record subset (design note 4: content/punct-restricted weighting)
     # overrides the default special-token exclusion. Aligned to `records`, indexed by tr_idx.
     if keep is not None:
         kep = [torch.from_numpy(np.asarray(keep[i], dtype=np.float32)).to(device) for i in tr_idx]
@@ -444,7 +444,7 @@ def train_weighted_msp(states, records, y, tr_idx, device, *, weight_mode="norma
             target = _true_rank(incorrect[batch])
             if loss == "blondel":
                 loss_val = _spearman_loss(_blondel_soft_rank(q, blondel_eps), target)
-            else:  # "pairwise": Joe's hand-rolled sigmoid soft-rank MSE
+            else:  # "pairwise": the hand-rolled sigmoid soft-rank MSE
                 loss_val = ((_soft_rank(q) - target) ** 2).mean()
             if penalty is not None:
                 loss_val = loss_val + reg_lambda * penalty      # P1.1a moderation toward uniform/MSP
@@ -492,7 +492,7 @@ def weighted_msp_unc(states, records, y, tr_idx, te_idx, device, *, weight_mode=
                      segment_ids=None, smooth_causal=False, segment_mode="mean"):
     """Train on tr_idx, return test-set uncertainties for te_idx. Ladder-compatible drop-in
     (same shape as attn_pool.attn_unc): higher = more uncertain. `loss` picks the ranking surrogate
-    ('pairwise' = Joe's original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
+    ('pairwise' = the original, 'blondel' = the torchsort soft-rank upgrade). `masks` (optional) is
     the Orgad exact-answer overlay: a per-record 0/1 array over the G tokens restricting the score to
     answer-bearing tokens (build with build_answer_masks).
 

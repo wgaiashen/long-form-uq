@@ -19,7 +19,7 @@ by design and none had been produced at commit time.
   was completed before this file was committed. Its inputs are exploratory mechanism evidence on
   already-read labels; nothing in it selected any parameter of the method below — the
   architecture, features, bound, and training recipe were fixed in the plan of 2026-08-10
-  (`PLAN_qwen_consolidation_aggregation_regime_adaptive_lehmer_v2.md`) before the audit ran.
+  (the project plan) before the audit ran.
 
 ## 1. Method (implementation: `src/luq/adaptive_lehmer.py`, driver
 `scripts/checks/adaptive_lehmer.py`, unit tests `tests/test_adaptive_lehmer.py` — all committed)
@@ -48,7 +48,7 @@ and cannot replace NLL-SHAPE as the headline if it happens to score better.
 NLL-shape features (order fixed): log_T, mean_nll, std_nll, max_nll, max_z, top1/top5/top10pct
 mass shares, nll_entropy_norm, max_minus_second. Standardised on training-pool stats only.
 
-Training: the canonical weighted-MSP recipe verbatim (AdamW lr 1e-3, 5 epochs, batch 32, Joe's
+Training: the canonical weighted-MSP recipe verbatim (AdamW lr 1e-3, 5 epochs, batch 32, the
 pairwise sigmoid soft-rank MSE against 1−y, batches <2 skipped, torch.manual_seed(seed)). Only
 the gate trains. No validation sweep; no hyperparameter is new.
 

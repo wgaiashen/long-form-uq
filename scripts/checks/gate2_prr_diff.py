@@ -4,7 +4,7 @@ Pairs with `pbs/g2_library_prr.pbs`. That job re-runs the ladder under LUQ_CARVE
 couple of evals, writing to `results/g2_relib_<eval>__<slug>.csv`; this reads those and compares
 every (rung, eval, method) cell against `results/pdl_fam_<eval>__<slug>.csv`.
 
-⚠️ THE BASELINE IS `pdl_fam_*`, NOT `pdl_master__*`. Both describe the same runs, but the master is
+THE BASELINE IS `pdl_fam_*`, NOT `pdl_master__*`. Both describe the same runs, but the master is
 an ASSEMBLED view whose `method` column has been RENAMED to display names -- `saplma` -> `SAPLMA`,
 `floor_min` -> `msp_min`, `attention` -> `armA(attention)`, `wmsp_shrink2` -> `wMSP-shrink@2`. The
 driver emits the raw names. Diffing raw against display makes every row look "absent from the
@@ -18,7 +18,7 @@ EXACT to the CSV's own precision (4 dp), not "close". Gate 1 already showed the 
 byte-identical, so any movement here is a real defect in the method half, not rounding — and the
 right response is to find it, not to widen a tolerance.
 
-⚠️ TWO FAILURE MODES THIS DELIBERATELY SEPARATES:
+TWO FAILURE MODES THIS DELIBERATELY SEPARATES:
   * a cell that MOVED            -> the library changed a number. Hard fail.
   * a cell that is MISSING       -> the re-run did not produce it (trimmed method set, or a cell
                                     that legitimately does not exist). Reported, never counted as
@@ -56,7 +56,7 @@ def main():
         p_new = ROOT / f"results/g2_relib_{ev}__{SLUG}.csv"
         p_base = ROOT / f"results/pdl_fam_{ev}__{SLUG}.csv"
         if not p_new.exists():
-            print(f"⚠️  {ev}: {p_new.name} not found — job not finished? SKIPPING (not a pass)")
+            print(f"{ev}: {p_new.name} not found — job not finished? SKIPPING (not a pass)")
             continue
         if not p_base.exists():
             raise SystemExit(f"missing frozen baseline {p_base.name} — nothing to diff {ev} against")

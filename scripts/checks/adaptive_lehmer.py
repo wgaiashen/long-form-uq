@@ -25,7 +25,7 @@ the memory of the per-token caches (which the gates never need). ORIGINAL->FILTE
 and the length assertions mirror probedriftlong.py's POOLED join verbatim. Hidden states and
 shape features are standardised on TRAIN-POOL stats only (the canonical standardize=True choice).
 
-TRAINING: weighted_msp's exact recipe — AdamW lr=1e-3, 5 epochs, batch 32, Joe's pairwise
+TRAINING: weighted_msp's exact recipe — AdamW lr=1e-3, 5 epochs, batch 32, the pairwise
 sigmoid soft-rank MSE against 1-y, batches < 2 skipped, torch.manual_seed(seed). No sweep.
 
 B6.4 SHUFFLE: one fixed permutation of the TRAIN rows' hidden vectors within each source

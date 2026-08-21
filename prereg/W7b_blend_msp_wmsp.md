@@ -1,6 +1,6 @@
 # PRE-REGISTRATION — W7b: per-instance length blend of msp_min ↔ wMSP-shrink@1.5
 
-> **Status (2026-08-09):** run. Null on the registered same-family pair, with both controls decisive (shuffled-length matches; constant-blend shows the residue is two-score decorrelation). Record: `STOCKTAKE_sharpening_axis.md` §19.
+> **Status (2026-08-09):** run. Null on the registered same-family pair, with both controls decisive (shuffled-length matches; constant-blend shows the residue is two-score decorrelation). Record: the project results log
 
 **Written 2026-08-09, before implementation.** Corrects W7's pairing: W7 registered and ran
 msp_min↔SAPLMA (a cross-family blend; registered null, kept as the secondary arm). The

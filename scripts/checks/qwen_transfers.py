@@ -8,13 +8,13 @@ belongs in `pdl_master__Qwen_Qwen2.5-14B.csv`, which holds the registered 600-ro
 stay exactly as scored -- so they get their own table, every row stamped
 `provenance = post-hoc-transfer`.
 
-⛔ THIS REFUSES TO EMIT wmsp_shrink1p5 UNLESS ITS OUTSIDE CONTROL PASSED. The lambda = 2.0 arm has
+THIS REFUSES TO EMIT wmsp_shrink1p5 UNLESS ITS OUTSIDE CONTROL PASSED. The lambda = 2.0 arm has
 to reproduce the master's `wmsp_shrink2` on all 40 cells to 4 dp; if it does not, the training loop
 is not the ladder's loop and lambda = 1.5 is not comparable to anything in the master. Emitting the
 number anyway -- with the failure noted somewhere else -- is exactly how an uninterpretable figure
 ends up quoted, so the gate is enforced here rather than described.
 
-⚠️ THE TWO METHODS HAVE DIFFERENT UNITS AND THE TABLE SAYS SO.
+THE TWO METHODS HAVE DIFFERENT UNITS AND THE TABLE SAYS SO.
   * `wmsp_shrink1p5` is TRAINED: 40 cells (8 evals x 5 rungs), 3 seeds each.
   * `softmax_tau1` is TRAINING-FREE and therefore RUNG-INVARIANT: 8 numbers, one per dataset. Its
     rung column reads `rung_invariant`. Repeating it across four OOD rungs for visual tidiness
@@ -78,9 +78,9 @@ def main():
     print("=" * 100)
     print(f"QWEN POST-HOC CROSS-MODEL TRANSFERS   model={args.model}")
     print("Population: ProbeDriftLong, 8 long evals, layer 23, judge gpt-5-mini, carve=legacy.")
-    print("⚠️ NOT pre-registered on this population. Both parameters are FIXED from Llama and")
+    print("NOT pre-registered on this population. Both parameters are FIXED from Llama and")
     print("   nothing was tuned on Qwen, but the Qwen master was already visible when they ran.")
-    print("   These rows sit OUTSIDE the M2 scorecard (STOCKTAKE_qwen.md §2) and never pool with it.")
+    print("   These rows sit OUTSIDE the M2 scorecard (the project results log) and never pool with it.")
     print("=" * 100)
 
     rows = []
@@ -101,7 +101,7 @@ def main():
             n_tau += 1
         print(f"\nsoftmax_tau1: {n_tau}/8 datasets  (training-free, ONE value each, rung_invariant)")
         if n_tau < 8:
-            print(f"  ⚠️ {8 - n_tau} dataset(s) absent -- named, not silently dropped: "
+            print(f"  {8 - n_tau} dataset(s) absent -- named, not silently dropped: "
                   f"{sorted(set(LONG) - {r['eval'] for r in rows})}")
     else:
         print(f"\nsoftmax_tau1: ABSENT -- no {p_tau.name}. Run softmax_tau_qwen.py.")
@@ -119,13 +119,13 @@ def main():
           f"max |delta| {max((abs(a - b) for _, _, a, b in ctl), default=float('nan')):.6f}")
     gate_ok = (len(ctl) == 40) and not fails
     if fails:
-        print(f"  ⛔ FAIL on {len(fails)} cell(s):")
+        print(f"  FAIL on {len(fails)} cell(s):")
         for rg, ev, a, b in fails[:8]:
             print(f"     {ev:16s} {rg:16s} here {a:+.4f} master {b:+.4f} d {abs(a - b):.5f}")
     elif len(ctl) < 40:
-        print(f"  🟡 PARTIAL -- {40 - len(ctl)} cells not yet produced; not a pass.")
+        print(f"  PARTIAL -- {40 - len(ctl)} cells not yet produced; not a pass.")
     else:
-        print("  ✅ PASS on all 40 cells -- this loop is the ladder's loop.")
+        print("  PASS on all 40 cells -- this loop is the ladder's loop.")
 
     n_l = 0
     if gate_ok:
@@ -144,7 +144,7 @@ def main():
             n_l += 1
         print(f"\nwmsp_shrink1p5: {n_l}/40 cells emitted")
     else:
-        print("\nwmsp_shrink1p5: ⛔ WITHHELD. The control did not pass, so these numbers are not")
+        print("\nwmsp_shrink1p5: WITHHELD. The control did not pass, so these numbers are not")
         print("   comparable to the master and are not written. This is deliberate -- a withheld")
         print("   number cannot be quoted by accident; a written one with a caveat elsewhere can.")
 

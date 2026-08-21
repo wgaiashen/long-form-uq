@@ -221,7 +221,7 @@ appropriate to fp32 accumulation over `d = 4096`. The PRR gap is still computed,
 per row** (`gate_prr_gap`), and still aborts above `1e-3`, which is two orders below the smallest
 effect this experiment could care about (`+0.010`).
 
-⚠️ **This is a threshold change made after seeing a failure, which is exactly the shape of a
+**This is a threshold change made after seeing a failure, which is exactly the shape of a
 convenient fix, so it is recorded in full rather than quietly applied.** Three things constrain it:
 the diagnosis was *measured* before the change, not argued; the replacement gate tests a **stricter
 and more direct** property (vector identity) rather than a looser one; and **no method, arm, scope,

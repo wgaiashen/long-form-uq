@@ -10,7 +10,7 @@
 # The Qwen twin of pbs/pdl_perex_ens.pbs. Same driver, same component set, same seeds; only the
 # population changes. Persists per-example vectors so every ensemble afterwards is a free CPU read.
 #
-# ⛔ PREREQUISITE: the Qwen per-token caches must be ON RCS. They are produced on DoC and this
+# PREREQUISITE: the Qwen per-token caches must be ON RCS. They are produced on DoC and this
 # population had NONE on RCS as of 2026-08-20 (zero pertok, zero features -- records only). The
 # ladder that produced results/pdl_master__Qwen_Qwen2.5-14B.csv ran WITHOUT --perex-dir, which is
 # why no sidecars exist. Eight files must arrive first, all __ID__L23.npz, ~25 GB total:
@@ -23,7 +23,7 @@
 # submitting: a truncated npz raises BadZipFile, and attn_pool.EXPECTED_HIDDEN_DIM already fails
 # loud if the hidden dim is not 5120 for this model.
 #
-# WHY LAYER 23. Joe's middle-layer rule ceil(N/2)-1 on 48 layers, the same rule the Llama grid used.
+# WHY LAYER 23. the middle-layer rule ceil(N/2)-1 on 48 layers, the same rule the Llama grid used.
 # (feature_pertok_consistency.py mentions "24" -- that is the AS-DUMPED index, exactly as Llama is
 # "15/16 as dumped". Not a conflict.)
 #

@@ -4,7 +4,7 @@
 #PBS -N luq_aux1b
 #PBS -j oe
 
-# B.1 STAGE 1b -- the two variants Joe actually named, neither of which stage 1 tested.
+# B.1 STAGE 1b -- the two named variants, neither of which stage 1 tested.
 #
 # WHY THIS RUN EXISTS. Stage 1 swept lambda over [0.2, 1.8], the paper's range, and came back null:
 # real-minus-shuffled was ~0 on all four cells and the supervision HURT pubmed by ~0.045. But two things
@@ -13,7 +13,7 @@
 #   1. THREE OF FOUR CELLS SELECTED lambda = 0.2, the SMALLEST value offered. Validation was asking for
 #      less supervision than the sweep floor, which means the optimum sits at or below it. And lambda=0
 #      was never in the grid, so validation could not express "no supervision at all".
-#   2. Joe's suggestion at the 31 July meeting was a LOW WEIGHT, ~0.1, kept on throughout -- below the
+#   2. the suggestion at the 31 July meeting was a LOW WEIGHT, ~0.1, kept on throughout -- below the
 #      paper's range and below stage 1's floor. It was never run. His other suggestion, strong at the
 #      start then removed after a few epochs, was never run either (the paper has no annealing schedule,
 #      so this variant is his, not theirs).
@@ -21,7 +21,7 @@
 # So this extends the sweep DOWNWARD and adds the schedule. If the low-weight arm is also null, the
 # negative is then a real one covering the regime that was actually proposed.
 #
-# ARM A  lambda in {0, 0.05, 0.1, 0.2}, constant       -> Joe's low-weight regime; lambda=0 lets the
+# ARM A  lambda in {0, 0.05, 0.1, 0.2}, constant       -> the low-weight regime; lambda=0 lets the
 #                                                          validation pick "none", which is the honest
 #                                                          control for a boundary selection.
 # ARM B  lambda in {0.6, 1.0, 1.8}, dropped at epoch 20 -> "strong then removed" (60 epochs total).

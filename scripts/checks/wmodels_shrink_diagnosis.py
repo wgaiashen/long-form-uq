@@ -2,7 +2,7 @@
 
 Written 2026-08-19 after gemma-2-9b replicated only weakly (macro Delta_shrink +0.056 / +0.061 vs
 Llama base's +0.088 / +0.113 on the identical reduced six-dataset grid). It tests, and mostly
-REFUTES, the obvious explanations. Every number it prints is quoted in STOCKTAKE_gemma2_9b.md, which
+REFUTES, the obvious explanations. Every number it prints is quoted in the project results log, which
 is why it is committed rather than left as scratch.
 
 THE FOUR CANDIDATE EXPLANATIONS AND WHAT THIS SCRIPT DOES TO EACH
@@ -11,14 +11,14 @@ THE FOUR CANDIDATE EXPLANATIONS AND WHAT THIS SCRIPT DOES TO EACH
   3. per-example length          -- within ONE dataset, does the gain concentrate in long outputs?
   4. cross-model rank agreement  -- does WHICH dataset benefits transfer between models?
 
-⚠️ PER-EXAMPLE TOKEN COUNTS COME FROM THE SIDECAR, NOT FROM A JOIN TO THE RECORDS.
+PER-EXAMPLE TOKEN COUNTS COME FROM THE SIDECAR, NOT FROM A JOIN TO THE RECORDS.
 `unc__floor_sum` is msp_sum = sum(NLL) and `unc__floor_ppl` is perplexity = mean(NLL), so their
 ratio is n_tokens exactly (verified to 7e-15 against the records). An earlier version joined on the
 NLL sum and failed on four of six datasets, because a model that emits the same short summary many
 times produces many records with an identical NLL sum. The ratio has no such failure mode.
 
-⚠️ PRR IS AVERAGED OVER SEEDS, never computed on a seed-averaged vector (that inflates it ~0.05).
-⚠️ Subsets smaller than 40 rows are reported as `n/a`, never as a number.
+PRR IS AVERAGED OVER SEEDS, never computed on a seed-averaged vector (that inflates it ~0.05).
+Subsets smaller than 40 rows are reported as `n/a`, never as a number.
 
     python scripts/checks/wmodels_shrink_diagnosis.py
 """
@@ -143,7 +143,7 @@ def main():
         sh = [r[0] for r in rows]; lo = [r[1] for r in rows]
         print(f"\n  SHORT half mean {st.mean(sh):+.4f} | LONG half mean {st.mean(lo):+.4f} | "
               f"long>short in {sum(1 for s,l in rows if l>s)}/{len(rows)} splits")
-        print("  ⚠️ A coin-flip split count means per-example length is NOT the mechanism, whatever the")
+        print("  A coin-flip split count means per-example length is NOT the mechanism, whatever the")
         print("     cross-DATASET correlation says -- that one is confounded with task identity.")
 
     print("\n" + "=" * 92)

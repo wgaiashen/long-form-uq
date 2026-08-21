@@ -17,7 +17,7 @@
 #
 # WALLTIME IS 72h. Nine RCS jobs died at an 8h wall on 2026-08-05; those were killed by WALLTIME, not
 # OOM -- 64G ran them for 8h with no memory trouble -- so the headroom goes into TIME, not RAM.
-# ⚠️ 72h, not 24h, because EVERY DoC partition allows 3 days (a30/a40/a100 = 3-00:00:00, long = 30 days)
+# 72h, not 24h, because EVERY DoC partition allows 3 days (a30/a40/a100 = 3-00:00:00, long = 30 days)
 # and `scontrol update TimeLimit` is DENIED once a job is RUNNING -- it only works while PENDING. So a
 # too-short wall cannot be fixed later; it can only be fixed by throwing the job away and restarting.
 # Asking for the partition maximum costs nothing here and removes that trap.
@@ -41,7 +41,7 @@ cd /vol/gpudata/gs925-msc_project/msc-project-gs925
 # One per regime of the taxonomy: pubmed concentrated, cnn spread, xsum no signal in the probabilities,
 # factscore factuality.
 #
-# ⚠️ RUN ONE EVAL PER JOB. Measured 2026-08-05: a cell costs ~2.5h (10-point lambda curve x 3 seeds x 3
+# RUN ONE EVAL PER JOB. Measured 2026-08-05: a cell costs ~2.5h (10-point lambda curve x 3 seeds x 3
 # targets), so all four evals in ONE job is ~50h against a 24h wall and truncates at roughly half the grid.
 # Split by eval -- 5 cells each, ~12.5h -- and combine the four CSVs afterwards. Nothing about the method
 # changes; this is parallelism, not a narrower run.
@@ -56,7 +56,7 @@ TAG=$(echo "$EVALS" | tr ',' '_')
 # "rank-normalised surprisal" has NO builder in prior_builders.py and is therefore NOT run. Not
 # substituted with a near-neighbour: a missing target is reported as missing.
 #
-# ⚠️ ORGAD IS RUN SEPARATELY, NOT HERE. build_soft_orgad requires EVERY source in a cell's pool to have a
+# ORGAD IS RUN SEPARATELY, NOT HERE. build_soft_orgad requires EVERY source in a cell's pool to have a
 # broad mask cache, and those exist for pubmed_qa, med_quad and expertqa ONLY. Across this grid that leaves
 # exactly ONE runnable cell -- ID/pubmed_qa, whose pool is {pubmed_qa}. Every other cell's pool pulls in
 # asqa, xsum, cnn, samsum or factscore, none of which are covered, so cnn/xsum/factscore yield NO orgad
@@ -79,7 +79,7 @@ case "$ARM" in
 esac
 
 # OUTPUT NAME -- must encode targets AND arm, not just the eval.
-# ⚠️ WHY: with the eval alone, `sbatch ... pubmed_qa orgad` and `sbatch ... pubmed_qa` both resolved to
+# WHY: with the eval alone, `sbatch ... pubmed_qa orgad` and `sbatch ... pubmed_qa` both resolved to
 # results/aux_rerun_pubmed_qa.csv, so the Orgad run would have SILENTLY OVERWRITTEN the primary run's
 # results. Caught before either job ran.
 # The default primary invocation keeps its original bare name so the four in-flight jobs stay consistent

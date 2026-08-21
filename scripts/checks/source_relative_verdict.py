@@ -6,9 +6,9 @@ No fitting, no compute, no choices.
 
     python scripts/checks/source_relative_verdict.py
 
-⚠️ UNIT OF ANALYSIS: THE DATASET, n = 8.
+UNIT OF ANALYSIS: THE DATASET, n = 8.
 
-⚠️ SCOPE IS THE MULTI-SOURCE RUNGS ONLY. Single-source pools (`ID`, `1ds-Diff-long`, and `SameTask`
+SCOPE IS THE MULTI-SOURCE RUNGS ONLY. Single-source pools (`ID`, `1ds-Diff-long`, and `SameTask`
 for the targets whose same-family pool has one member) CANNOT differ from canonical -- within-source
 ranking IS global ranking there. Those cells are excluded from scoring and used instead as an
 EXACT-INVARIANCE CONTROL. An inert cell is reported as inert, never as a zero delta: averaging in
@@ -65,7 +65,7 @@ def live_rungs(df, e):
 def package(deltas, label, lines, gate=False):
     have = [e for e in EVALS if deltas.get(e) is not None]
     if len(have) < 3:
-        lines.append(f"\n### {label}\n\n⚠️ only {len(have)}/8 datasets measured — not scored.")
+        lines.append(f"\n### {label}\n\nonly {len(have)}/8 datasets measured — not scored.")
         return None
     d = np.array([deltas[e] for e in have])
     _, p = wilcoxon(d, alternative="two-sided") if np.any(d != 0) else (None, 1.0)
@@ -80,7 +80,7 @@ def package(deltas, label, lines, gate=False):
     for e in have:
         lines.append(f"| `{e}` | {deltas[e]:+.4f} |")
     if len(have) < 8:
-        lines.append(f"\n⚠️ MISSING (not measured, not zero): {sorted(set(EVALS) - set(have))}")
+        lines.append(f"\nMISSING (not measured, not zero): {sorted(set(EVALS) - set(have))}")
     lines.append(f"\n- macro mean delta **{d.mean():+.4f}**, median {np.median(d):+.4f}, "
                  f"signs {(d > 0).sum()}/{len(d)}, exact two-sided Wilcoxon p = "
                  + (f"{p:.4f}" if p is not None else "n/a"))
@@ -127,7 +127,7 @@ def main():
         lines.append(f"| `{e}` | {', '.join(f'`{r}`' for r in lv) or '—'} | "
                      f"{', '.join(f'`{r}`' for r in inert) or '—'} |")
     lines.append("")
-    lines.append("⚠️ Inert rungs are **excluded from the scored means**, not entered as zeros. "
+    lines.append("Inert rungs are **excluded from the scored means**, not entered as zeros. "
                  "`ID` and `1ds-Diff-long` are inert by construction and are used as the "
                  "invariance control in §2.")
 
@@ -156,7 +156,7 @@ def main():
                      f"`ID` and `1ds-Diff-long` cells of {len(set(rows))} datasets: "
                      f"**{worst:.3e}**. The driver raises above 1e-6.")
     else:
-        lines.append("⚠️ **NOT MEASURED** — no invariance CSVs found.")
+        lines.append("**NOT MEASURED** — no invariance CSVs found.")
     # inert cells inside the scored files are a second, free instance of the same control
     inert_gaps = []
     for e in EVALS:
@@ -175,7 +175,7 @@ def main():
 
     # ---- the void arm ------------------------------------------------------------------------
     if "wmsp_srcrel_masked_shrink2" in present:
-        lines.append("\n## 3. ⛔ The UNSCALED `masked` arm is VOID — it became a different method")
+        lines.append("\n## 3. The UNSCALED `masked` arm is VOID — it became a different method")
         lines.append("")
         lines.append("Reported, not deleted, because the failure is itself informative.")
         lines.append("")
@@ -262,10 +262,10 @@ def main():
         lines.append(f"| `{a}` | {f(om)} | {f(rl)} | "
                      + ("—" if pd.isna(st) else f"{st:.0f}") + " |")
     lines.append("")
-    lines.append("⚠️ `wmsp_shrink2` is computed by the library, which does not expose these "
+    lines.append("`wmsp_shrink2` is computed by the library, which does not expose these "
                  "diagnostics, so its row is blank — not zero.")
     lines.append("")
-    lines.append("⚠️ `pure` takes slightly MORE optimiser steps than canonical: chunking each "
+    lines.append("`pure` takes slightly MORE optimiser steps than canonical: chunking each "
                  "source separately turns each source's final partial chunk into its own batch. "
                  "Recorded because it is a difference between the arms that is not the intervention.")
 

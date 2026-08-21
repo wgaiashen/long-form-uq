@@ -14,7 +14,7 @@ evaluation datasets — on its pre-widened population. `prereg/W5_lambda_and_nll
 records this in terms: *"It is NOT 'λ was validated on independent data', and it must never be
 written that way."*
 
-This protocol therefore answers Joe's criticism in the only way still available:
+This protocol therefore answers the criticism in the only way still available:
 
 > **A retrospective development-set configuration-selection sensitivity.**
 
@@ -58,7 +58,7 @@ Then **freeze** that λ and simply look up its already-existing ProbeDriftLong v
 changed if its long-form result is disappointing.** That commitment is the whole point of the
 exercise and is the only thing that makes it worth running.
 
-## 5. ⚠️ Mandatory disclosure — partial prior observation
+## 5. Mandatory disclosure — partial prior observation
 
 Three of the five arms **already exist** and **have already been seen** at the time of writing, as a
 by-product of the cross-length transfer experiment (`results/xlen_long2short_othershort_*.csv`,

@@ -4,7 +4,7 @@
 #PBS -N luq_R4b_hbo
 #PBS -j oe
 
-# R4b -- implement Joe's HBO from the paper and VALIDATE it before it is used as a baseline anywhere.
+# R4b -- implement the HBO from the paper and VALIDATE it before it is used as a baseline anywhere.
 # Pre-registered at prereg/R4b_hbo_reproduction.md with V1-V4 fixed BEFORE the numbers.
 #
 # Standalone by design (author's instruction): implementing HBO *as* our comparison's baseline creates a

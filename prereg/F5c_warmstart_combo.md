@@ -1,6 +1,6 @@
 # PRE-REGISTRATION — F5c: make the anchor testable everywhere, and try shrink + anchor together
 
-> **Status (2026-08-10):** run complete 8/8. The testability bar failed (same 3/8 evals bite as F5b) and the combo is a null against the incumbent — F5 closed as mechanism-only. Record: `STOCKTAKE_sharpening_axis.md` §21. *(Wording edited 2026-08-10, cosmetic only — registered claims, thresholds and bars are unchanged; git history is the proof.)*
+> **Status (2026-08-10):** run complete 8/8. The testability bar failed (same 3/8 evals bite as F5b) and the combo is a null against the incumbent — F5 closed as mechanism-only. Record: the project results log *(Wording edited 2026-08-10, cosmetic only — registered claims, thresholds and bars are unchanged; git history is the proof.)*
 
 **Written 2026-08-09, after F5b's results were seen and BEFORE F5c was implemented or run.** This is
 therefore a *sequel* registration: it inherits F5b's findings as priors and registers only what is
@@ -17,7 +17,7 @@ new. Population and controls unchanged from `F5_anchor_at_msp_min.md`.
 
 **(a) WARM-START, so every eval is actually tested.** `--pretrain-epochs N` (registered N = 2): before
 the normal 5 epochs, train the weighter on the **penalty alone**, pushing `p[k]` up before the rank
-loss enters. Deterministic, same seeds. ⚠️ Control A (the copied loop ≡ library) is computed with
+loss enters. Deterministic, same seeds. Control A (the copied loop ≡ library) is computed with
 pretrain **off**, so its exactness is untouched.
 
 **(b) THE COMBO ARM — the answer to "can this be a mean-PRR method".** `shrink@2` wins the mean

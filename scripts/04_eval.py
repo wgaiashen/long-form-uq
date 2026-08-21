@@ -22,7 +22,7 @@ def main():
     ap.add_argument("--model", default=Config.model_name)
     ap.add_argument("--label-field", default="correctness",
                     help="which correctness field to PRR against (e.g. correctness_alignscore "
-                         "for AlignScore-eval, or correctness for the judge). Lets us run Joe's "
+                         "for AlignScore-eval, or correctness for the judge). Lets us run the "
                          "train x eval matrix. The CSV always writes it into the 'correctness' column.")
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag (must match the one used by 01_extract).")
@@ -65,7 +65,7 @@ def main():
     msp_min = [msp.msp_uncertainty(r["token_logprobs"], "min") for r in records]
     msp_sum = [msp.msp_uncertainty(r["token_logprobs"], "sum") for r in records]
     # Perplexity = length-normalised MSP (mean per-token negative log-likelihood). Free from
-    # the same cached logprobs; this is lm-polygraph's `Perplexity` estimator and Joe's
+    # the same cached logprobs; this is lm-polygraph's `Perplexity` estimator and the
     # "Perplexity" baseline (see msp.py for the mean-NLL-vs-exp naming note).
     perplexity = [msp.msp_uncertainty(r["token_logprobs"], "perplexity") for r in records]
 

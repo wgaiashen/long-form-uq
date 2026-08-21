@@ -17,7 +17,7 @@ Secondary, reported SEPARATELY and never combined:
     Delta_SAPLMA    = PRR(wmsp_shrink2) - PRR(saplma)
     Delta_attention = PRR(wmsp_shrink2) - PRR(attention)
 
-⛔ These are never collapsed into a synthetic max(SAPLMA, attention) comparator. Which learned
+These are never collapsed into a synthetic max(SAPLMA, attention) comparator. Which learned
 baseline is stronger is itself model-dependent and must stay visible.
 
 WHAT IT REFUSES TO DO

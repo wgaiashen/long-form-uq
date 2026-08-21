@@ -5,7 +5,7 @@ grid is actually complete.
 Mirrors `verify_pdl_table.py` (re-parse the rendered tables independently, check every numeric cell
 against the CSV keyed on (rung, eval, method)) and adds the check that one exists at all:
 
-⭐ **THE CELL-COUNT ASSERTION.** Tonight the HBO driver silently reported **4 cells instead of 10**
+**THE CELL-COUNT ASSERTION.** Tonight the HBO driver silently reported **4 cells instead of 10**
 because a source-pool filter dropped three rungs with no warning, and the run looked successful. A
 verifier that only checks MD-vs-CSV consistency would have passed that happily — both would have been
 consistently wrong. So this exits 1 on a short grid and NAMES the missing cells.
@@ -54,11 +54,11 @@ def main():
     missing = [(rg, ev) for ev in XL_EVALS for rg in RUNGS if (rg, ev) not in present]
     print(f"CHECK 1 — coverage: {len(present)}/{TARGET_CELLS} cells")
     if missing:
-        print(f"  ❌ {len(missing)} MISSING, named:")
+        print(f"  {len(missing)} MISSING, named:")
         for rg, ev in missing:
             print(f"     {rg:20s} {ev}")
     else:
-        print("  ✅ complete grid")
+        print("  complete grid")
 
     # ---- CHECK 2: every rendered cell matches the CSV
     lines = MD_PATH.read_text().splitlines()
@@ -86,7 +86,7 @@ def main():
                     checked += 1
     print(f"CHECK 2 — rendered vs CSV: {checked} cells agree, {len(fails)} mismatched")
     for f in fails[:20]:
-        print(f"  ❌ {f[0]}/{f[1]}/{f[2]}: md={f[3]} csv={f[4]}")
+        print(f"  {f[0]}/{f[1]}/{f[2]}: md={f[3]} csv={f[4]}")
 
     # ---- CHECK 3: no method is reported on a partial cell set without that being visible
     by_method = {}
@@ -95,12 +95,12 @@ def main():
     partial = {m: len(c) for m, c in by_method.items() if len(c) < len(present)}
     print(f"CHECK 3 — methods on a PARTIAL cell set: {len(partial)}")
     for m, n in sorted(partial.items(), key=lambda t: t[1]):
-        print(f"     {m:28s} {n}/{len(present)} cells  ⚠️ never average this against a full-coverage method")
+        print(f"     {m:28s} {n}/{len(present)} cells  never average this against a full-coverage method")
 
     if fails or missing:
-        print("\n❌ VERIFY FAILED — do not report this table.")
+        print("\nVERIFY FAILED — do not report this table.")
         sys.exit(1)
-    print("\n✅ XL master table verified: complete grid, rendering matches the CSV.")
+    print("\nXL master table verified: complete grid, rendering matches the CSV.")
 
 
 if __name__ == "__main__":

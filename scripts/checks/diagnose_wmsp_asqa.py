@@ -36,5 +36,5 @@ for ds in ("asqa", "med_quad"):               # med_quad = the control (its vari
                   f"unique={uniq}/{len(u)}  std={u.std():.6g}  range=[{u.min():.4g},{u.max():.4g}]",
                   flush=True)
             if uniq <= 3:
-                print(f"      ⭐ SCORE IS (NEAR-)CONSTANT -> the PRR is an artifact; the cell should be "
+                print(f"      SCORE IS (NEAR-)CONSTANT -> the PRR is an artifact; the cell should be "
                       f"BLANK (not measured), never a number.", flush=True)

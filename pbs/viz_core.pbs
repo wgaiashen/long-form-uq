@@ -4,7 +4,7 @@
 #PBS -N luq_viz_core
 #PBS -j oe
 # Token-weight visualiser refresh for the 4 CORE datasets, so they pick up the NEW wMSP-entropy_hinge toggle
-# (Joe item-1). CPU only. Runs in parallel with viz_new.pbs. mem=64gb for the xsum/pubmed ~2GB pertok caches.
+# (design note 1). CPU only. Runs in parallel with viz_new.pbs. mem=64gb for the xsum/pubmed ~2GB pertok caches.
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"; export HF_HOME
 MODEL=meta-llama/Meta-Llama-3.1-8B

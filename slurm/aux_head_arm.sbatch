@@ -9,7 +9,7 @@
 
 # Section 3 SECONDARY: subset-of-heads supervision (K heads, only J supervised, the rest left free).
 #
-# ⚠️ SELECTION IS "arbitrary_J", NOT the paper's greedy top-J, and the CSV records it that way. The
+# SELECTION IS "arbitrary_J", NOT the paper's greedy top-J, and the CSV records it that way. The
 # paper ranks heads by supervising each individually, which presupposes heads that DIFFER: its 12 heads
 # sit inside a fine-tuned BERT and have specialised. Ours sit on a frozen Llama, are initialised
 # identically, and B.2 measured them collapsing to 0.996-1.000 correlation under a shared training

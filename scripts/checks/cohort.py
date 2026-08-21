@@ -12,7 +12,7 @@ them were quietly too small, and each produced a wrong table rather than an erro
     vanished ENTIRELY (its only same-family partner after the split IS factscore), and every LOO and
     DiffTask pool across all ten evals was built without it.
 
-⭐ THE ROOT CAUSE IS NOT ANY OF THOSE LISTS. It is that **a script's scope silently outgrew what it was
+THE ROOT CAUSE IS NOT ANY OF THOSE LISTS. It is that **a script's scope silently outgrew what it was
 written for.** `ood_onegrid` was CORRECT as a 3-eval baseline sanity check — that is what it was built
 for. It became wrong the moment it was made the XL table's only source of supervised baselines, because
 nobody re-derived its assumptions against the new job. A hard-coded cohort is fine until the script is

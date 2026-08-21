@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """W-Align -- build the comparison tables, paired statistics and rung profile from the ablation output.
 
-Results: ../STOCKTAKE_alignment.md.  Driver that produced the inputs: token_state_alignment.py.
+Results: the project results log.  Driver that produced the inputs: token_state_alignment.py.
 
-⚠️ POST-HOC SENSITIVITY ANALYSIS. These statistics are descriptive; they are NOT pre-registered
+POST-HOC SENSITIVITY ANALYSIS. These statistics are descriptive; they are NOT pre-registered
 hypothesis tests, and no alignment is selected on them.
 
 WHAT THIS READS
@@ -14,7 +14,7 @@ results/sensitivity/token_state_alignment/alignment_prr_<eval>__<slug>.csv, one 
   * CONTROL2_vs_master rows (alignment column)      <- the gate, re-asserted here
   * CONTROL3_distinctness rows                      <- the gate, re-asserted here
 
-⚠️ MEAN OVER SEEDS OF THE PER-SEED PRR -- never the PRR of a seed-averaged score. Those differ, and the
+MEAN OVER SEEDS OF THE PER-SEED PRR -- never the PRR of a seed-averaged score. Those differ, and the
 second is systematically higher because averaging cancels seed noise (measured elsewhere in this project
 at +0.050 for SAPLMA at LOO-long). The driver stores per-seed PRRs, so this file just averages them.
 
@@ -39,7 +39,7 @@ from complementary_ensemble import wilcoxon_exact, boot_ci_mean   # noqa: E402  
 SLUG = "meta-llama_Meta-Llama-3.1-8B"
 INDIR = ROOT / "results" / "sensitivity" / "token_state_alignment"
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
-# ⚠️ report / Hidden Failures rung order. LOO before SameTask. Do not silently reorder.
+# report / Hidden Failures rung order. LOO before SameTask. Do not silently reorder.
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
 OOD = RUNGS[1:]
 METHODS = ["HAPE", "HAPES"]
@@ -89,30 +89,30 @@ def main():
     print(f"\nCOVERAGE: {len(have)}/8 datasets, {n_cells}/40 dataset x rung cells, "
           f"{len(mean)}/160 method x alignment x cell combinations")
     if missing:
-        print(f"⚠️ INCOMPLETE -- {len(missing)} combinations absent. Datasets present: {have}")
+        print(f"INCOMPLETE -- {len(missing)} combinations absent. Datasets present: {have}")
         print("   A partial grid is never reported as if it were the whole one.")
     bad_seeds = {k: v for k, v in nseeds.items() if v != 3}
     if bad_seeds:
-        print(f"⚠️ {len(bad_seeds)} combinations do not have 3 seeds: "
+        print(f"{len(bad_seeds)} combinations do not have 3 seeds: "
               f"{list(bad_seeds.items())[:5]}")
 
     # ---------------------------------------------------------------- gates re-asserted
     g2_bad = [g for g in gate2 if abs(g[3]) > GATE_4DP]
     g3_bad = [g for g in gate3 if g[3] == 0.0]
     print(f"\nCONTROL 2 (post_token reproduces canonical master, bar {GATE_4DP:g}): "
-          f"{'✅ PASS' if not g2_bad else '❌ FAIL'} "
+          f"{'PASS' if not g2_bad else 'FAIL'} "
           f"({len(gate2)} checks, max |Δ| = {max((abs(g[3]) for g in gate2), default=float('nan')):.2e})")
     for g in g2_bad[:10]:
-        print(f"    ✗ {g[0]}/{g[1]}/{g[2]}: Δ {g[3]:+.2e}")
-    print(f"CONTROL 3 (arms differ): {'✅ PASS' if not g3_bad else '❌ FAIL'} ({len(gate3)} checks)")
+        print(f"    {g[0]}/{g[1]}/{g[2]}: Δ {g[3]:+.2e}")
+    print(f"CONTROL 3 (arms differ): {'PASS' if not g3_bad else 'FAIL'} ({len(gate3)} checks)")
     for g in g3_bad[:10]:
-        print(f"    ✗ {g[0]}/{g[1]}/{g[2]}: max|q_pre - q_post| = 0")
+        print(f"    {g[0]}/{g[1]}/{g[2]}: max|q_pre - q_post| = 0")
     # cross-check the recomputed means against the driver's own stated means
     dmax = max((abs(mean[k] - stated[k]) for k in mean if k in stated), default=0.0)
     print(f"seed-mean cross-check vs the driver's stated means: max |Δ| = {dmax:.2e} "
-          f"{'✅' if dmax < 1e-6 else '❌'}")
+          f"{'ok' if dmax < 1e-6 else 'FAIL'}")
     if g2_bad or g3_bad:
-        print("\n⛔ A GATE FAILED -- the pre_token numbers are not interpretable. Stopping.")
+        print("\nA GATE FAILED -- the pre_token numbers are not interpretable. Stopping.")
         return
 
     # ---------------------------------------------------------------- rung profile

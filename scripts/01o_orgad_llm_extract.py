@@ -1,6 +1,6 @@
-"""Cache the MODEL'S OWN extracted short answer per record (Joe-style Orgad, gpt-5-mini).
+"""Cache the MODEL'S OWN extracted short answer per record (Orgad, reference-style, gpt-5-mini).
 
-For each record we ask gpt-5-mini to extract the model's own short answer from its generation (Joe's
+For each record we ask gpt-5-mini to extract the model's own short answer from its generation (the
 prompt), giving a span for correct AND incorrect rows (unlike gold-string-match, which only fires when
 the answer is right). Cached to cache/orgad_llm/<key>.json (idx -> extracted string). Resumable: skips
 records already extracted, checkpoints every 25. LOGIN NODE (API); costs gpt-5-mini £. SHORT-FORM only.

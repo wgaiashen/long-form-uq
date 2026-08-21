@@ -1,4 +1,4 @@
-"""Grounding tests for S6 multi-head attention (Joe idea 2). The gating check is the LIMIT CASE: the
+"""Grounding tests for S6 multi-head attention (design note 2). The gating check is the LIMIT CASE: the
 generalisation must not change the incumbent single-head pooler (arm A), and the multi-head code path must
 reduce to a single head when its heads are made identical.
 

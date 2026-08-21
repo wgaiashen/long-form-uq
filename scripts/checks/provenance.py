@@ -46,7 +46,7 @@ def provenance(strict=True):
         raise SystemExit("provenance: TRACKED working tree is DIRTY -- refusing to stamp a git_sha that "
                          f"does not reproduce. Commit or stash first, then resubmit.\n{dirty}")
     if dirty:
-        print(f"⚠️ provenance: tracked tree is DIRTY; stamping dirty=1 so this run is identifiable later.\n"
+        print(f"provenance: tracked tree is DIRTY; stamping dirty=1 so this run is identifiable later.\n"
               f"{dirty}", flush=True)
     root = str(ROOT)
     cluster = "DoC" if root.startswith("/vol/gpudata") else ("RCS" if "/rds/" in root else socket.gethostname())

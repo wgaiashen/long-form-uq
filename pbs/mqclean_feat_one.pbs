@@ -3,7 +3,7 @@
 #PBS -j oe
 # ONE clean-span med_quad feature extraction per job, right-sized.
 #
-# ⚠️ WHY SPLIT AND WHY NOT L40S. The combined job sat unschedulable on "Insufficient amount of
+# WHY SPLIT AND WHY NOT L40S. The combined job sat unschedulable on "Insufficient amount of
 # resource" with 66/180 GPUs free — because it pinned gpu_type=L40S, which 178 running jobs are using
 # against A40's 44. Everyone pins the same card. Splitting also right-sizes: only LOOKBACK needs fp32
 # + eager (~32GB weights + 7.6GB attention ≈ 40GB, so a 48GB card); ptrue and ptrue_unsup run at the

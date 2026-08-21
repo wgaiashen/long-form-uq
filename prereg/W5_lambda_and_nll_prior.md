@@ -1,11 +1,11 @@
 # PRE-REGISTRATION — W5: λ = 1.5 from a July prediction, and NLL inside the weight logits
 
-> **Status (2026-08-09):** run 8/8. The registered λ = 1.5 claim FAILS (tie with shrink@2); the anchor-quality mechanism holds (Spearman +0.835, LOO-stable). Record: `STOCKTAKE_sharpening_axis.md` §15.
+> **Status (2026-08-09):** run 8/8. The registered λ = 1.5 claim FAILS (tie with shrink@2); the anchor-quality mechanism holds (Spearman +0.835, LOO-stable). Record: the project results log
 
 **Written 2026-08-09, BEFORE the driver was implemented and before any cell was run.**
 Population: the COMPLETE ProbeDriftLong grid, 8 long evals × 5 rungs, `meta-llama/Llama-3.1-8B`,
 legacy carve, 3 seeds. **Headline numbers are the mean over the 4 OOD rungs, n = 8 datasets.**
-Plan: `../../PLAN_sharpening_axis.md`. Results: `../../STOCKTAKE_sharpening_axis.md` §8.
+Plan: `../the project plan. Results: `../the project results log
 
 ---
 
@@ -30,7 +30,7 @@ best-at-3-of-4 statement is the accurate one and is the stronger claim.)
 
 ## 2. Q-B — λ = 1.5, PRE-COMMITTED, justified only by a prediction made on earlier data
 
-### 2.1 ⭐ THE REGISTERED VALUE AND ITS SOLE JUSTIFICATION
+### 2.1 THE REGISTERED VALUE AND ITS SOLE JUSTIFICATION
 
 **λ = 1.5**, the midpoint of the interval predicted on **2026-07-12**, a month before the widened long
 grid existed. `reports/OVERNIGHT_12jul.md:79,90`, quoted verbatim because the **date** is the entire
@@ -47,7 +47,7 @@ for λ ∈ [0.5, 3].
 That prediction names **the same two rungs** (DiffTask, 1ds-Diff) where wMSP@2 is currently the best
 method. **λ = 1 and λ = 1.5 have never been run on the long grid.**
 
-### 2.2 ⚠️ TWO CAVEATS, WRITTEN IN BEFORE THE RUN, NOT DISCOVERED AFTER
+### 2.2 TWO CAVEATS, WRITTEN IN BEFORE THE RUN, NOT DISCOVERED AFTER
 
 **(a) It is a prior prediction, not fully independent data.** The July sweep was on **pubmed**, i.e.
 the same eval dataset, on the **pre-widened** population. So the honest claim is *"λ chosen by a
@@ -55,7 +55,7 @@ prediction made on earlier data"*. It is **NOT** *"λ was validated on independe
 never be written that way.
 
 **(b) July's "clears the floor" used a floor the project has since rejected.** The 0.202 figure is
-**`msp_sum`**, which `src/luq/msp.py:47-53` records Joe rejecting as the most convenient baseline.
+**`msp_sum`**, which `src/luq/msp.py:47-53` records as the rejected most-convenient baseline.
 Against today's pre-registered bar, `msp_min` on pubmed is **0.371**, and July's 0.31–0.36 **does not
 clear it**. So July established that λ ≈ 1–2 beats *unmoderated wMSP*; it did **not** establish that
 it beats the floor.
@@ -74,7 +74,7 @@ it beats the floor.
 DiffTask and 1ds-Diff, as July predicted?), and **λ selected by leave-one-dataset-out over
 {norm, 1, 1.5, 2, 10}**, in the three-column old-beside-new style `selection_audit.py` uses.
 
-### 2.4 ⚠️ REGISTERED FAILURE READING
+### 2.4 REGISTERED FAILURE READING
 
 **If λ = 1.5 misses the bar, that is a failure of the pre-committed value — even if some other λ in
 the sweep clears it.** Promoting a different λ afterwards would be exactly the test-set selection
@@ -92,10 +92,10 @@ If λ = 1.5 passes but λ = 2 (already on the grid) passes by more, the register
 
 Track 2 sharpened the *learned* logits, `w = softmax(raw / T)`. Its `T → 0` limit concentrates on
 `argmax(raw)`, which is **not** `argmax(nll)`: measured agreement is **6–13%** against chance rates of
-1–5% (`STOCKTAKE_sharpening_axis.md` §4.3). So Track 2 never spanned wMSP ↔ `msp_min` at all, and the
+1–5% (the project results log). So Track 2 never spanned wMSP ↔ `msp_min` at all, and the
 claim that it did was withdrawn.
 
-⚠️ **The existing `armD` does not fix this either, and it is important not to conflate them.** armD
+**The existing `armD` does not fix this either, and it is important not to conflate them.** armD
 adds `β·log(prior)` to the **attention pooler's** logits (`attn_pool.py:463`) and has already been run
 at β ∈ {0, 0.25, 0.5, 1, 2, 4}. But armD pools **hidden states** — its tilt-→-∞ limit is a probe on the
 worst token's hidden state, *not* `msp_min`. Only a tilt inside **weighted MSP**, which sums NLLs,
@@ -119,11 +119,11 @@ Grids: `tau ∈ {0, 0.25, 0.5, 1, 2, 4, 8, 16, 32, inf}`, `beta ∈ {0, 0.5, 1, 
 `T = 1` and `gamma = 0` throughout — **this is a different axis from Track 2's temperature and the two
 must not be swept together**, or a win cannot be attributed.
 
-### 3.3 ⚠️ THE THREE CONTROLS, RUN BEFORE ANY CURVE IS READ
+### 3.3 THE THREE CONTROLS, RUN BEFORE ANY CURVE IS READ
 
 1. **`tau = beta = 0` reproduces plain wMSP to `< 1e-6`** on the same trained model — the identity
    Track 2 uses, which has now passed **75/75** (cell, seed) checks.
-2. **`tau, beta → ∞` reproduces `msp_min`'s PRR exactly.** ⚠️ **THIS IS THE CLAIM.** If it fails, "the
+2. **`tau, beta → ∞` reproduces `msp_min`'s PRR exactly.** **THIS IS THE CLAIM.** If it fails, "the
    family spans wMSP ↔ `msp_min`" is false and the arm is dead on arrival. This is precisely the check
    that would have caught the Track 2 error had it existed then.
 3. **`argmax(w)` vs `argmax(nll)` agreement → 100%** in the limit, against the 6–13% Track 2 measured.
@@ -135,11 +135,11 @@ Q-C has **no pre-committed parameter** — unlike Q-B, there is no prior predict
 It is therefore registered as **exploratory**: the LODO-selected tilt is reported against `msp_min`
 with the same three-part bar, and **the per-cell grid best is an ORACLE and is never a result**.
 
-⚠️ Given round 1's experience, the registered expectation is stated now: **honest selection is likely
+Given round 1's experience, the registered expectation is stated now: **honest selection is likely
 to keep only a small fraction of any oracle gain**, and the number to report is that fraction, not
 the oracle. Round 1 and Track 2 both showed the same pattern (14–41–22% as datasets were added).
 
-⚠️ **Stability is part of the report, not an afterthought.** Track 2's factor attribution flipped sign
+**Stability is part of the report, not an afterthought.** Track 2's factor attribution flipped sign
 when a single dataset was added. For any positive here, the **leave-one-out stability of the
 conclusion** is reported alongside the number.
 

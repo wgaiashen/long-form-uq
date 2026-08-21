@@ -57,7 +57,7 @@ def prr(correctness, uncertainty) -> float:
     uncertainty = np.asarray(uncertainty, dtype=float)
     n = len(correctness)
 
-    # ⚠️ A NON-FINITE SCORE MUST NOT PRODUCE A NUMBER (added 2026-08-03).
+    # A NON-FINITE SCORE MUST NOT PRODUCE A NUMBER (added 2026-08-03).
     # np.argsort puts NaN at the end and happily ranks the rest, so an ALL-NaN score vector used to
     # return the PRR of an arbitrary permutation -- a different plausible-looking value for every label
     # vector (-0.686, +0.013, -0.044 on three different inputs). That is exactly how asqa's wMSP cell
@@ -68,7 +68,7 @@ def prr(correctness, uncertainty) -> float:
     # the CSV as an EMPTY cell, which reads as "not measured". The warning is what makes it loud.
     n_bad = int((~np.isfinite(uncertainty)).sum())
     if n_bad:
-        print(f"    ⚠️ prr(): {n_bad}/{n} uncertainty values are NaN/inf -> returning NaN, NOT a number. "
+        print(f"    prr(): {n_bad}/{n} uncertainty values are NaN/inf -> returning NaN, NOT a number. "
               "The cell will be BLANK (not measured). Fix the score, do not read the blank as a result.",
               flush=True)
         return float("nan")

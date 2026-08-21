@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """EOS PROVENANCE -- is the end-of-text token a DECISION or an ARTEFACT of truncation?
 
-Results: ../STOCKTAKE_sharpening_axis.md §13.
 
 WHY THIS RUNS BEFORE ANY METHOD USES THE EOS NLL
 ------------------------------------------------
@@ -19,7 +18,7 @@ The separable fix is one extra scalar:
 The weighter still cannot concentrate on EOS, so the shortcut stays closed, while the completeness
 signal becomes available and `gamma` says directly how much it is worth. gamma ~ 0 falsifies it.
 
-⚠️ BUT THAT IS ONLY WELL-POSED IF THE EOS MEANS SOMETHING. If a generation was TRUNCATED at the token
+BUT THAT IS ONLY WELL-POSED IF THE EOS MEANS SOMETHING. If a generation was TRUNCATED at the token
 budget rather than finishing, there may be no EOS at all -- or the last token may be an artefact of
 the cut rather than a decision. med_quad v1 has a documented ~97.7% capping rate. A `gamma` fitted on
 truncated data would be measuring "was this truncated", which is a different and much less
@@ -95,7 +94,7 @@ def main():
         nll_eos = np.array(nll_eos)
         mx = float(lens.max())
 
-        # ⚠️ THREE PROVENANCES, NOT TWO. An earlier version of this script treated termination as
+        # THREE PROVENANCES, NOT TWO. An earlier version of this script treated termination as
         # binary (EOS vs budget), which mis-assigns 67% of pubmed_qa: 25.9% end in a special token,
         # 7.0% hit the budget, and the remaining two thirds were cut by the answer-span / D1 rule --
         # neither the model's decision nor the cap. A binary indicator would push all of those into
@@ -133,7 +132,7 @@ def main():
     print("                        the floor gamma has to beat to be about surprisal rather than")
     print("                        merely about completion.")
     print("  'PRR of nll_EOS'   -- the EOS surprisal itself, on the subset that has one.")
-    print("\n  ⚠️ A dataset with a high capping rate cannot separate 'the model thought it was done'")
+    print("\n  A dataset with a high capping rate cannot separate 'the model thought it was done'")
     print("     from 'we cut it off'. med_quad v1 is documented at ~97.7% capped.")
 
     outp = Path(args.out)

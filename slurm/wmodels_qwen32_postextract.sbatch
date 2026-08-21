@@ -10,20 +10,20 @@
 
 # W-Models / Qwen2.5-32B on DoC. Slurm twin of pbs/wmodels_postextract.pbs.
 #
-# ⚠️ HF_HOME IS OVERRIDDEN TO /vol/bitbucket BEFORE SOURCING _env.sh. The DoC default
+# HF_HOME IS OVERRIDDEN TO /vol/bitbucket BEFORE SOURCING _env.sh. The DoC default
 # (/vol/gpudata/gs925-msc_project/hf_cache) is inside the HARD 50GB CephFS quota, which already
 # holds Qwen-14B (27.5GB) and had ~4GB free. Qwen2.5-32B is ~65GB in bf16. _env.sh assigns with
 # `:=`, so an already-exported value wins.
 #
-# ⚠️ bf16, NOT fp32. fp32 Qwen-32B is ~130GB, over any single card. Dtype is held FIXED within this
+# bf16, NOT fp32. fp32 Qwen-32B is ~130GB, over any single card. Dtype is held FIXED within this
 # population, so it never differs between the two wMSP variants being compared here -- but it is an
 # additional implementation difference when this population is read beside the fp32 ones.
 #
-# ⚠️ --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the
+# --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the
 # msp_min / wMSP signal. 01_extract's --require-explicit-dtype would refuse `auto` anyway.
 #
 # 01e_repool -> feature/pertok consistency GUARD -> 01h_pertoken.
-# ⚠️ 01e_repool IS MANDATORY: the inline capture and the teacher-forced re-pool differ by ~8e-3 on
+# 01e_repool IS MANDATORY: the inline capture and the teacher-forced re-pool differ by ~8e-3 on
 # the residual stream, and the pertok cache is teacher-forced. The guard turns that silent gap into
 # a hard failure, so a non-zero exit stops the job BEFORE pertok is written.
 #
@@ -43,7 +43,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL="Qwen/Qwen2.5-32B"
 DTYPE=bf16
-# ⚠️ SWITCHED TO sdpa 2026-08-17 (was eager). eager materialises an n^2 attention buffer per layer,
+# SWITCHED TO sdpa 2026-08-17 (was eager). eager materialises an n^2 attention buffer per layer,
 # which made the a100 slot itself the scarce resource this population needed TWICE (once for the
 # memory canary, once for the real array), and the canary passed at only 96% headroom on xsum. sdpa
 # computes the same attention with memory-efficient kernels, never materialising that buffer, at a
@@ -84,7 +84,7 @@ echo "--- 2/3 per-token cache ---" >&2
 python -u scripts/01h_pertoken.py --model "$MODEL" --dataset "$DS" --ood ID \
     --layer "$LAYER" --dtype "$DTYPE" --attn "$ATTN" $RG || { echo "!!! pertoken failed" >&2; exit 8; }
 
-# ⚠️ ORDER FIXED 2026-08-15. The guard compares the pooled feature cache against the
+# ORDER FIXED 2026-08-15. The guard compares the pooled feature cache against the
 # TEACHER-FORCED pertok cache, so it needs BOTH. Run before 01h_pertoken it skips every
 # dataset, prints "ALL consistent" and exits 0 -- a rubber stamp, not a guard.
 # --require-checked makes a SKIP fail the job so this cannot silently regress.

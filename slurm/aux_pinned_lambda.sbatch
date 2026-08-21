@@ -9,7 +9,7 @@
 
 # PINNED-LAMBDA DIAGNOSTIC for the B.1 re-run. Single head, one target, lambda fixed rather than selected.
 #
-# ⚠️ THIS IS A DIAGNOSTIC, NOT A PROTOCOL RESULT. Lambda was pinned by us, not chosen by the method, so
+# THIS IS A DIAGNOSTIC, NOT A PROTOCOL RESULT. Lambda was pinned by us, not chosen by the method, so
 # these PRR numbers are not comparable with the protocol arm and must never be quoted as if they were.
 #
 # WHY IT EXISTS. Held-out-source selection has picked lambda=0 on 100% of DiffTask rows and ~96% of ID

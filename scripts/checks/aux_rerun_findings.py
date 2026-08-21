@@ -161,7 +161,7 @@ def main():
     rs = np.array([fnum(r, "real_minus_shuffled") for r in fired], float)
     rb = np.array([fnum(r, "real_minus_baseline") for r in fired], float)
 
-    # ⚠️ The heading must not assert the conclusion. It once read "the auxiliary loss helps only where the
+    # The heading must not assert the conclusion. It once read "the auxiliary loss helps only where the
     # pooler is already weak", which was true of n=44 and false by n=77 -- and a hard-coded heading keeps
     # asserting it while the table underneath quietly stops supporting it.
     w("## Does the size of the effect depend on how strong the baseline already was?")
@@ -202,7 +202,7 @@ def main():
     # n=44 the pooled figure was -0.382 (p=0.003) and it read as a finding; by n=77 it was -0.171 (p=0.14)
     # and the WITHIN-RUNG correlations turned out to flip sign. Pooling hid that. So the breakdown is
     # printed every time, not on request.
-    w("### ⚠️ Confound check: is this a baseline effect or a RUNG effect?")
+    w("### Confound check: is this a baseline effect or a RUNG effect?")
     w()
     rung_of = np.array([r["rung"].strip() for r in fired])
     w("| rung | n | mean baseline | corr(baseline, real−shuffled) |")
@@ -229,7 +229,7 @@ def main():
             if m.sum() >= 6:
                 signs.append(float(np.corrcoef(b[m], rs[m])[0, 1]))
         if signs and (max(signs) > 0 and min(signs) < 0):
-            w("🔴 **THE SIGN FLIPS BETWEEN RUNGS.** The pooled correlation is therefore NOT a general law "
+            w("**THE SIGN FLIPS BETWEEN RUNGS.** The pooled correlation is therefore NOT a general law "
               "about baseline strength. Report it as a pattern inside the rung where it holds, naming that "
               "rung, and say plainly that it reverses elsewhere. Do not quote the pooled figure alone.")
         w()
@@ -263,7 +263,7 @@ def main():
         bb = np.array([fnum(r, "prr_baseline") for r in by[X]], float)
         w(f"| {X} | {len(v)} | {v.mean():+.4f} | {(v > 0).sum()}/{len(v)} | {bb.mean():.2f} |")
     w()
-    w("⚠️ The `mean baseline` column averages across rungs, so an eval whose ID rung has a high baseline "
+    w("The `mean baseline` column averages across rungs, so an eval whose ID rung has a high baseline "
       "looks stronger here than it is within the rung where it actually fires. The row-level correlation "
       "above is the claim. This table is description.")
     w()
@@ -279,7 +279,7 @@ def main():
       "That is the selection rule declining the target, which the pinned-λ diagnostic exists to separate.")
     if kind == "pinned":
         w()
-        w("⚠️ **This is the PINNED-λ DIAGNOSTIC.** λ was fixed by us, not chosen by the method, so these "
+        w("**This is the PINNED-λ DIAGNOSTIC.** λ was fixed by us, not chosen by the method, so these "
           "PRR values are NOT comparable with the protocol arm and must never be quoted beside it.")
     w()
 

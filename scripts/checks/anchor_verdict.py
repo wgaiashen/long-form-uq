@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """F5b VERDICT -- does anchoring the wMSP penalty at msp_min work, and is it the ANCHOR that works?
 
-Prereg: prereg/F5_anchor_at_msp_min.md.  Results: ../STOCKTAKE_sharpening_axis.md §16.
+Prereg: prereg/F5_anchor_at_msp_min.md.  Results: the project results log
 Reads results/anchor_msp_min_<eval>__logpen__<slug>.csv (the log-penalty runs; the linear runs are
 the §16.1 stalled-optimisation record and are not read here).
 
 WHAT IS REPORTED, IN ORDER
 --------------------------
 1. JOIN CHECK: each eval's lambda=0 arm vs pdl_master's wMSP-norm, cell by cell.
-2. CONTROL D per eval: max mean p[k] reached. ⚠️ An eval where the penalty never bites (p[k] stays
+2. CONTROL D per eval: max mean p[k] reached. An eval where the penalty never bites (p[k] stays
    near 1/n) CANNOT test the anchoring idea -- it is reported as UNTESTED there, never as a null.
 3. The OOD picture per eval: best-lambda anchor arm vs lambda=0, vs the RANDOM-anchor control at the
    same lambda, vs msp_min / shrink@2 / SAPLMA.
@@ -93,7 +93,7 @@ def main():
     print(f"F5 VERDICT [{SUFFIX}] -- anchoring weighted MSP at msp_min")
     print("Population: widened cells_long, Llama-3.1-8B, 3 seeds, legacy carve.")
     print("=" * 100)
-    print(f"\nCOVERAGE: {len(present)}/8 evals." + (f"  ⚠️ MISSING, named: {missing}" if missing else ""))
+    print(f"\nCOVERAGE: {len(present)}/8 evals." + (f"  MISSING, named: {missing}" if missing else ""))
     if not present:
         raise SystemExit("no logpen CSVs yet")
 
@@ -203,7 +203,7 @@ def main():
                   f"{(w10 if w10 is not None else float('nan')):>+10.3f}")
         if combo_m:
             print(f"{'MEAN':15s}{'':8s}{np.mean(combo_m):>+11.4f}{'':6s}{np.nanmean(s15_m):>+9.4f}")
-            print("  ⚠️ combo-best is a per-eval ORACLE over lambda_a; the honest read is LODO, and")
+            print("  combo-best is a per-eval ORACLE over lambda_a; the honest read is LODO, and")
             print("     wsonly ~= combo would mean the gain is INITIALISATION, not the anchor.")
         # honest LODO for the combo, all evals
         cands = LAMBDAS[1:]
@@ -228,7 +228,7 @@ def main():
             w.writerow(r)
     print(f"\nwrote {outp}")
     if missing:
-        print(f"⚠️ PARTIAL: {len(present)}/8. Missing {missing}.")
+        print(f"PARTIAL: {len(present)}/8. Missing {missing}.")
 
 
 if __name__ == "__main__":

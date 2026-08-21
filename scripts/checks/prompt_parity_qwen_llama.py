@@ -14,7 +14,7 @@ Read-only, CPU, no API, no £.
     python scripts/checks/prompt_parity_qwen_llama.py
     python scripts/checks/prompt_parity_qwen_llama.py --model-b Qwen/Qwen2.5-14B
 
-⚠️ TWO METHOD TRAPS, both of which produced a false FAIL while writing this:
+TWO METHOD TRAPS, both of which produced a false FAIL while writing this:
 
   * KEY BY (split, idx), NEVER idx ALONE. `idx` restarts per split, so on any dataset with both a
     train and a test split (pubmed_qa, xsum, cnn_dailymail) keying on idx alone silently compares

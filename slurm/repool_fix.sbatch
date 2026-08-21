@@ -8,7 +8,7 @@
 #SBATCH --output=logs/repool_fix-%j.out
 
 # Trivia fix: re-pool SAPLMA features with the corrected pooling (last-prompt/pre-answer
-# position included, matching Joe's masked-mean). Re-pools from cached token IDs via
+# position included, matching the masked-mean). Re-pools from cached token IDs via
 # recompute_states -- NO regeneration, so the Tier-1 records and their gpt-5 labels are
 # untouched and NO re-labelling is needed. Applies to sciq + trivia_qa (short answers,
 # where the old pooling dropped the informative pre-answer state). pubmed is NOT here: its

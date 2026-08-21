@@ -14,7 +14,7 @@ So this script does the same thing twice:
      nothing it says about the new files means anything.
   2. REPORT the three new datasets through the identical path.
 
-⚠️ THE SECOND HALF IS A SANITY CHECK, NOT A RESULT. It is a single ID cell, seed-averaged, on one
+THE SECOND HALF IS A SANITY CHECK, NOT A RESULT. It is a single ID cell, seed-averaged, on one
 population -- it is not the full ProbeDriftLong grid and must never be copied into a results table.
 Its only job is to answer "do these features carry signal, and are they aligned with their labels?"
 A PRR near zero where the sibling SAPLMA cache scores well is the alignment alarm.
@@ -65,7 +65,7 @@ NEW = [("asqa", "correctness"), ("expertqa", "factuality"), ("factscore", "factu
 def load_dataset(dataset: str, label_field: str):
     """Return (cfg, key, y, split, orig, n_dropped) for the LABELLED rows only.
 
-    ⚠️ UNLABELLED-ROW HANDLING, copied from probedriftlong.py:268-275 so this harness sits on the same
+    UNLABELLED-ROW HANDLING, copied from probedriftlong.py:268-275 so this harness sits on the same
     population as the ladder. Some label fields are genuinely absent on some rows (expertqa
     `factuality` on 292/2016, factscore on 45/500) and are correctly stored as null, never as 0. The
     ladder drops those rows FIRST and only then carves the train/test split, keeping an `orig` map back

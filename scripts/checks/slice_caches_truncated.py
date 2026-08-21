@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Derive the truncated population's per-token and SAPLMA caches by SLICING, not re-extracting.
 
-⭐ WHY SLICING IS EXACT HERE, NOT AN APPROXIMATION. The model is causal: the hidden state at
+WHY SLICING IS EXACT HERE, NOT AN APPROXIMATION. The model is causal: the hidden state at
 position t is a function of positions <= t only. Truncating the END of a generation therefore
 cannot change the hidden state of any RETAINED token. The states for a prefix of the generation are
 bit-identical to the states the model would produce if it had stopped there. So
@@ -12,7 +12,7 @@ is not "close enough" — it is the same tensor. Re-running `01h_pertoken` on th
 would burn ~6 GPU-hours to recompute numbers we already hold, and would introduce nondeterminism
 (fp32 kernel reduction order) that the slice does not.
 
-⚠️ THE +1 IS THE WINDOW, AND IT IS ASSERTED, NOT ASSUMED. The per-token window is
+THE +1 IS THE WINDOW, AND IT IS ASSERTED, NOT ASSUMED. The per-token window is
 `[last_prompt_token] + gen_tokens` = G+1 rows for G generated tokens (implementation_notes §6 —
 this project has already paid once for getting it wrong). Every record is checked against its own
 `token_logprobs` length before anything is written, and a single mismatch aborts the whole dataset.
@@ -45,7 +45,7 @@ from attn_pool import PROMPT_REGIME                            # noqa: E402
 QWEN = "Qwen/Qwen2.5-14B"
 DATASETS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 # Middle layer per model, from the fixed rule ceil(n_layers/2) - 1. Never re-selected from results.
-# ⚠️ gemma-2-9b-it has 42 layers -> 20. The discarded 2026-06 Gemma run used 21, which is the OTHER
+# gemma-2-9b-it has 42 layers -> 20. The discarded 2026-06 Gemma run used 21, which is the OTHER
 # convention in this repo (03_probe.py's n_layers//2); it is not a precedent.
 LAYER = {
     "Qwen/Qwen2.5-14B": 23,                  # 48 layers
@@ -116,7 +116,7 @@ def main():
         dp.mkdir(parents=True, exist_ok=True)
         target = dp / f"{key}__L{layer}.npz"
         if n_sliced == 0:
-            # ⭐ NOTHING WAS CUT -> the truncated cache IS the canonical one. Symlink instead of
+            # NOTHING WAS CUT -> the truncated cache IS the canonical one. Symlink instead of
             # writing a multi-GB byte-for-byte duplicate (pubmed_qa alone is 4.5 GB). A symlink is
             # also self-documenting: it says "identical to v1", where a copy would merely look like
             # a separate artifact that happens to match.
@@ -152,7 +152,7 @@ def main():
         med = 100 * float(np.median(kept)) if kept else 100.0
         print(f"{d:15s}{len(out):>7d}{n_sliced:>8d}{med:>8.1f}%{mb:>10.1f}M  ok")
 
-    print("\n⚠️ The SAPLMA feature written here is a SINGLE-LAYER array (layer %d), not the "
+    print("\nThe SAPLMA feature written here is a SINGLE-LAYER array (layer %d), not the "
           "all-layer\n   cache the canonical namespace holds. Anything wanting another layer must "
           "re-extract." % layer)
 

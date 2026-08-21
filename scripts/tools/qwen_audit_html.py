@@ -14,7 +14,7 @@ articles would be a ~200 MB page no browser handles. Instead, per dataset:
 Any flagged example dropped by the cap is COUNTED AND REPORTED in the page header, because a silent
 truncation is how "we looked at everything" becomes false.
 
-⚠️ FIELDS THAT DO NOT EXIST ARE SHOWN AS ABSENT, NEVER FABRICATED. In particular there are no
+FIELDS THAT DO NOT EXIST ARE SHOWN AS ABSENT, NEVER FABRICATED. In particular there are no
 per-claim judge states, no SUPPORTED/CONTRADICTED counts and no judge rationale anywhere on disk —
 expertqa/factscore records carry only `factuality`, `uncovered`, `coherent`, `factuality_quarantined`.
 The page says so rather than leaving a blank that reads as zero.
@@ -235,7 +235,7 @@ S.forEach(s=>s.addEventListener('input',ap));ap();
     print(f"wrote {out}  ({out.stat().st_size/1e6:.1f} MB, {len(cards):,} examples)")
     for d, n, c, f, dr in stats:
         print(f"  {d:15s} records {n:>5,}  shown {c:>5,}  flagged {f:>5,}"
-              + (f"  ⚠️ {dr:,} flagged NOT shown" if dr else ""))
+              + (f"  {dr:,} flagged NOT shown" if dr else ""))
 
 
 if __name__ == "__main__":

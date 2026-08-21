@@ -1,11 +1,11 @@
 # PRE-REGISTRATION — F5: regularise weighted MSP toward `msp_min`, not toward `perplexity`
 
-> **Status (2026-08-10):** the linear penalty stalled grid-wide (an optimisation failure, §16.1); the registered −log p[k] fallback ran 8/8 (F5b): mechanism confirmed both directions with the random-anchor control, method short of the floor, penalty bites on 3/8 evals only. Continued in `F5c_warmstart_combo.md`; F5 closed as mechanism-only. Record: `STOCKTAKE_sharpening_axis.md` §16, §21.
+> **Status (2026-08-10):** the linear penalty stalled grid-wide (an optimisation failure, §16.1); the registered −log p[k] fallback ran 8/8 (F5b): mechanism confirmed both directions with the random-anchor control, method short of the floor, penalty bites on 3/8 evals only. Continued in `F5c_warmstart_combo.md`; F5 closed as mechanism-only. Record: the project results log
 
 **Written 2026-08-09, BEFORE the driver was implemented and before any cell was run.**
 Population: the complete ProbeDriftLong grid, 8 long evals × 5 rungs, `meta-llama/Llama-3.1-8B`,
 legacy carve, 3 seeds. **Headline numbers are the mean over the 4 OOD rungs, n = 8 datasets.**
-Plan: `../../PLAN_sharpening_axis.md`. Results: `../../STOCKTAKE_sharpening_axis.md` §11.
+Plan: `../the project plan. Results: `../the project results log
 
 ---
 
@@ -28,7 +28,7 @@ Every measured "how do we combine per-token signals" move on the OOD grid is wor
 | MLP vs linear head on mean-pool | +0.038 |
 | SAPLMA vs `msp_min` (family gap) | +0.056 |
 
-⭐ **And the existing regulariser is anchored on the WEAKER floor.**
+**And the existing regulariser is anchored on the WEAKER floor.**
 `weighting.py:62`, `shrink_to_uniform(w) = ((w − 1)²).mean()`, pulls the weights to 1; and
 `weighted_msp.py:522` states what `w = 1` *is*: `q = mean(nll) == msp 'perplexity'`. So wMSP is
 shrunk toward **`perplexity` (+0.1169)** when **`msp_min` (+0.1855)** is the stronger floor and is
@@ -43,7 +43,7 @@ constant). `msp_min` is a **MAX**. A mean-family method cannot inherit a max, wh
 C2 "helps where the floor is strong but never closes the gap". Re-anchoring is the one move that
 changes the limit.
 
-## 2. ⚠️ THE PENALTY IS DEFINED IN PROBABILITY SPACE, AND WHY THE OBVIOUS FORM IS WRONG
+## 2. THE PENALTY IS DEFINED IN PROBABILITY SPACE, AND WHY THE OBVIOUS FORM IS WRONG
 
 The naive analogue of the existing penalty is squared error toward `w* = n · onehot(argmax nll)`.
 **That is rejected before use.** At uniform weights it evaluates to `n − 1`, so the penalty scales
@@ -61,12 +61,12 @@ penalty  = 1 - p[k]
 
 - **Bounded [0, 1]** regardless of length, so one λ means the same thing on every dataset.
 - **Zero exactly at the anchor.**
-- ⚠️ The anchor is `argmax(nll)` **among kept tokens only**. `_weights_from_raw` masks special tokens
+- The anchor is `argmax(nll)` **among kept tokens only**. `_weights_from_raw` masks special tokens
   to `-inf` before the softmax, so an anchor on an excluded token could never be reached and the
   penalty could never reach 0.
 - Since `_weights_from_raw` returns `w = softmax(masked_raw) · n_kept`, we have `p[k] = w[k]/n_kept`.
 
-## 3. ⚠️ THREE CONTROLS, RUN BEFORE ANY λ SWEEP IS READ
+## 3. THREE CONTROLS, RUN BEFORE ANY λ SWEEP IS READ
 
 **C1 — ANCHOR ENDPOINT IDENTITY (the claim).** Forcing `w = n_kept · onehot(k)` must give a PRR
 **exactly equal to `msp_min`** on every cell. This is a scoring-side identity, independent of any
@@ -80,7 +80,7 @@ a standalone driver** with only the penalty call changed. **Run with `shrink_to_
 seed it must reproduce `train_weighted_msp` exactly.** A copied loop that has silently diverged would
 make every F5 number incomparable with the master ladder.
 
-**C3 — DOES THE PENALTY ACTUALLY BITE?** ⚠️ Registered because the bounded form has a known weakness:
+**C3 — DOES THE PENALTY ACTUALLY BITE?** Registered because the bounded form has a known weakness:
 `d(1 − p[k])/d raw ∝ p[k]`, and at initialisation `p[k] ≈ 1/n`, which is ~0.005 on `expertqa`. The
 penalty may barely act at small λ. **Report mean `p[k]` per λ per cell.** If `p[k]` does not increase
 monotonically with λ, the result is a **failure of the optimisation, not of the idea**, and must be
@@ -95,7 +95,7 @@ Primary comparison: **best LODO-selected λ under the new anchor vs `wMSP-shrink
 incumbent, on the per-dataset OOD mean, n = 8, with margin, sign count and Wilcoxon — the same
 three-part bar as W1.
 
-⚠️ **λ has NO pre-committed value.** Unlike W5, no prior prediction exists for a new penalty, so this
+**λ has NO pre-committed value.** Unlike W5, no prior prediction exists for a new penalty, so this
 arm is **exploratory** and λ is chosen by **leave-one-dataset-out**, reported as what the procedure
 achieves and never as the best. The per-cell best is an ORACLE and is never a result.
 Registered grid: `λ ∈ {0, 0.5, 1, 2, 5, 10, 20}` (the penalty is bounded, so the scale differs from
@@ -105,10 +105,10 @@ the unbounded uniform penalty's {2, 10}).
 predicts the gain should concentrate on the datasets where the floor wins far-OOD (`pubmed_qa`,
 `factscore`), which is where a `perplexity` anchor is most wrong.
 
-⚠️ **Registered failure readings.** (a) If LODO-λ under the new anchor does not beat `shrink@2`, the
+**Registered failure readings.** (a) If LODO-λ under the new anchor does not beat `shrink@2`, the
 re-anchoring did not help and that is the result — the anchor is not the binding constraint. (b) If it
 beats `shrink@2` **only** on `pubmed_qa`/`factscore`, report it as a regime-specific gain, not a
-general one. (c) ⚠️ **G3 applies:** the per-cell λ oracle over the existing three λ has net headroom
+general one. (c) **G3 applies:** the per-cell λ oracle over the existing three λ has net headroom
 **−0.0105, p = 0.986**, so per-cell λ selection is already known to be artefact. F5 must be judged on
 a **fixed or LODO-selected** λ, never per cell.
 

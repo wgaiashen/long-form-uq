@@ -33,13 +33,13 @@
 # silent change of method between the two populations, which is the comparison this whole
 # workstream exists to make. Stated out loud so the write-up can say it.
 #
-# WHY --store-layers 23. The layer is fixed by Joe's rule ceil(N/2)-1 on both models (Llama 15,
+# WHY --store-layers 23. The layer is fixed by the rule ceil(N/2)-1 on both models (Llama 15,
 # Qwen 23) and is not selected, so the other 48 layers are never read. Unstored layers are written
 # as NaN rather than dropped, so the array stays full height and a probe of the wrong layer fails
 # LOUDLY on the NaN instead of quietly returning a plausible number. Same treatment the Llama
 # long-source extraction used (slurm/ptrue_lookback_longsrc.sbatch: --store-layers 15).
 #
-# ⚠️ DOWNSTREAM PORT NEEDED BEFORE THE LADDER CAN READ THIS. scripts/checks/probedriftlong.py:90
+# DOWNSTREAM PORT NEEDED BEFORE THE LADDER CAN READ THIS. scripts/checks/probedriftlong.py:90
 # hardcodes BASE_FEATS = {"ptrue": ("ptrue_accurate", 15, True), ...} -- layer 15, the Llama layer.
 # Pointed at Qwen it would index the NaN plane and abort, which is the right failure but still a
 # failure. That file is on BOTH workstreams' collision lists, so the edit is RCS's to make and is
@@ -49,7 +49,7 @@
 # footprint, comfortably inside 48 GB. The a100s are wanted for the lookback extraction, which
 # genuinely needs them (see slurm/qwen_lookback.sbatch).
 #
-# ⛔ 01b HAS NO SKIP-IF-EXISTS AND NO RESUME. It recomputes from scratch and overwrites the output
+# 01b HAS NO SKIP-IF-EXISTS AND NO RESUME. It recomputes from scratch and overwrites the output
 # path. The guard below refuses to clobber an existing Qwen cache unless LUQ_OVERWRITE=1, and it
 # can never touch a Llama file: every path it builds is stamped Qwen_Qwen2.5-14B.
 

@@ -4,12 +4,12 @@ The method: add the AAAI-22 term to the LOSS, L = L_task + (λ/H)·Σ_i (a_i −
 TRAINED to match a target distribution and moves away smoothly when the constraint lifts. This is a
 different mechanism from the S3 prior arms, which modify the attention SCORE.
 
-⚠️ THE REPORTED QUANTITY IS (real target − SHUFFLED target), NOT (real − baseline). In the paper the
+THE REPORTED QUANTITY IS (real target − SHUFFLED target), NOT (real − baseline). In the paper the
 shuffled version performed worse than no supervision at all, so the shuffled arm is what separates "the
 target carries useful information" from "constraining the attention regularises it". Reporting the raw
 improvement would confuse the two.
 
-⚠️ HOW TO JUDGE THIS (decided in advance): on CONSISTENCY ACROSS CELLS, not on the size of the mean
+HOW TO JUDGE THIS (decided in advance): on CONSISTENCY ACROSS CELLS, not on the size of the mean
 improvement. Only the ID cells of the non-regenerating datasets are permanent — pubmed/asqa/expertqa/
 factscore keep their generations, but their SameTask/LOO/DiffTask cells all train on pools containing
 med_quad, samsum or cnn, so those move when v2 lands. "Helps on k of N cells, including the ID cells"
@@ -40,7 +40,7 @@ _FIELDS = ["rung", "eval", "seed", "target", "K", "J_supervised", "head_selectio
 # every ID cell and every 1ds-Diff cell, by construction, plus factscore's SameTask whose family is just
 # {expertqa, factscore}). 9 of the 20 cells in this run are single-source.
 #
-# ⚠️ READ THE TWO CLAIMS SEPARATELY. The auxiliary LOSS is tested on all 20 cells -- `real_minus_shuffled`
+# READ THE TWO CLAIMS SEPARATELY. The auxiliary LOSS is tested on all 20 cells -- `real_minus_shuffled`
 # is valid everywhere, because the shuffled control is run under whatever λ was chosen. The new
 # λ-SELECTION criterion is tested on only the 11 multi-source cells. A fallback row is evidence about the
 # loss, just not about the criterion, so never pool the two when reporting the criterion.
@@ -70,7 +70,7 @@ _FIELDS = ["rung", "eval", "seed", "target", "K", "J_supervised", "head_selectio
 # something if the free heads actually diverge from the supervised ones under this loss -- which B.2
 # says they may not. So the supervised x free correlation block is reported ALONGSIDE the PRR.
 #
-#   ⚠️ PRE-REGISTERED READING RULE: if head_corr_sup_free comes back at ~0.99, this arm did NOT test the
+#   PRE-REGISTERED READING RULE: if head_corr_sup_free comes back at ~0.99, this arm did NOT test the
 #   paper's claim. It re-confirmed that the heads will not diverge, and must be written up that way --
 #   NOT as "subset-of-heads does not help". Same numbers, two very different conclusions.
 #
@@ -86,7 +86,7 @@ def _out_path(args):
 def _flush_rows(out, rows):
     """Atomic per-cell write (temp + os.replace).
 
-    ⚠️ This driver ALSO wrote only at the very end until 2026-08-05. On that date nine 8-hour top-k jobs
+    This driver ALSO wrote only at the very end until 2026-08-05. On that date nine 8-hour top-k jobs
     were killed at the walltime having written nothing, because `fixed_prior_ladder` had the same defect.
     All four ladder drivers were supposedly fixed on 3 August; this one and fixed_prior_ladder were both
     missed. Checked and fixed here BEFORE the auxiliary-loss re-run rather than after losing another run.
@@ -127,7 +127,7 @@ VAL_FRAC = 0.2
 def val_split_held_out_source(tr_idx, train_rows, seed):
     """λ-selection split that holds out a WHOLE SOURCE DATASET, not a random slice.
 
-    ⚠️ THIS IS THE MOST IMPORTANT CHANGE IN THE B.1 RE-RUN. The original screen carved a random 20% of the
+    THIS IS THE MOST IMPORTANT CHANGE IN THE B.1 RE-RUN. The original screen carved a random 20% of the
     training pool, so the validation rows came from the SAME datasets as the training rows. A loss whose
     benefit is out-of-distribution robustness -- bought, as in the paper, at a small in-distribution cost --
     is invisible to that criterion: same-distribution validation sees only the cost. Selection duly chose
@@ -313,7 +313,7 @@ def main():
                                                  return_model=True, aux_target=tgt, **kwJ)
                     shuf = fit_and_score(states, y, tr_idx, te_idx, device, sd, best_T,
                                          aux_target=tgt, aux_shuffle=True, **kwJ)
-                    # ⭐ B.2 PRIMARY DIAGNOSTIC. Not PRR. The question is whether supervising a SUBSET of
+                    # B.2 PRIMARY DIAGNOSTIC. Not PRR. The question is whether supervising a SUBSET of
                     # heads prevents the collapse we already measured at 0.996-1.000. If the heads still
                     # collapse, the PRR is uninformative -- a difference between arms with identical
                     # attention is a difference in the classifier, not the aggregation.

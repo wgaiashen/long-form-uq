@@ -1,4 +1,4 @@
-"""R4b — Joe's HBO (Hybrid Back-Off), implemented from the paper and VALIDATED before use as a baseline.
+"""R4b — the HBO (Hybrid Back-Off), implemented from the paper and VALIDATED before use as a baseline.
 
 WHY THIS IS A STANDALONE STEP
 -----------------------------
@@ -21,13 +21,13 @@ Then:
      UQ_hyb = W_sv * UQ_sv + W_usv * UQ_usv
 with UQ_sv = SAPLMA (middle layer), UQ_usv = MSP, both RANK-NORMALISED before combining.
 
-⚠️ TWO PROPERTIES OF THE FORMULA, so they are not later mistaken for bugs:
+TWO PROPERTIES OF THE FORMULA, so they are not later mistaken for bugs:
   * W_sv never exceeds 0.5 (at R=0 the weights are 0.5/0.5 -- the paper's "even weighting" ID case).
     HBO never leans supervised.
   * W_sv is exactly 0 whenever R > 0.5, so HBO collapses to PURE MSP for the more-OOD half of the test
     set. That is why the paper's HBO row equals its MSP row on the far rungs.
 
-⚠️ AN AMBIGUITY IN THE PAPER, RESOLVED EXPLICITLY RATHER THAN SILENTLY
+AN AMBIGUITY IN THE PAPER, RESOLVED EXPLICITLY RATHER THAN SILENTLY
 ----------------------------------------------------------------------
 "R = r/(N+1) where N is the size of the training data" -- but the ranking pool is described as "a
 combination of the training MDs and the added test instance MD", and the training MDs come only from the
@@ -63,7 +63,7 @@ SLUG = cache._slug(MODEL)
 LAYER = 15
 SEED = 1
 SHORT = ["sciq", "trivia_qa"]          # the EVAL targets: short-form, which is where the paper validates
-# ⚠️ THE TRAINING SOURCE POOL IS NOT THE EVAL LIST. A short-form eval's DiffTask/OneDatasetDiffTask rungs
+# THE TRAINING SOURCE POOL IS NOT THE EVAL LIST. A short-form eval's DiffTask/OneDatasetDiffTask rungs
 # train on LONG-form data (sciq DiffTask <- samsum+xsum+cnn). The first version of this script passed only
 # the short-form sets as `sources`, and `cells()` silently drops any spec entry not in `sources` -- so
 # every rung except ID and LOO vanished with no warning and V3 came back "n/a". That is the standing
@@ -174,7 +174,7 @@ def main():
           + ", ".join(f"{k}:{len(v)}" for k, v in sorted(by_rung.items())))
     missing = [r for r in ("ID", "LOO", "SameTask", "DiffTask", "OneDatasetDiffTask") if r not in by_rung]
     if missing:
-        print(f"⚠️ RUNGS ABSENT FROM THIS GRID: {missing} — the validation does NOT cover them and no "
+        print(f"RUNGS ABSENT FROM THIS GRID: {missing} — the validation does NOT cover them and no "
               f"claim is made about them.")
     print(flush=True)
 
@@ -235,16 +235,16 @@ def main():
 
     vals = [v for v in (v1, v2, v3, v4) if v is not None]
     if all(vals):
-        print("\n✅ HBO VALIDATED — it reproduces the paper's reported short-form behaviour and may be "
+        print("\nHBO VALIDATED — it reproduces the paper's reported short-form behaviour and may be "
               "used as a named baseline.")
     else:
-        print("\n❌ HBO NOT VALIDATED — we have implemented something other than HBO. Per the "
+        print("\nHBO NOT VALIDATED — we have implemented something other than HBO. Per the "
               "pre-registration this is reported as a FAILURE TO REPRODUCE and is NOT re-tuned until it "
               "passes. Comparisons against it are meaningless until resolved.")
 
     # The diagnostic that decides whether the validation was vacuous.
     mean_far_frac = np.mean([r["frac_R_gt_0.5"] for r in idc]) if idc else float("nan")
-    print(f"\n⚠️ VACUITY CHECK: at the ID rung, frac(R>0.5) = {mean_far_frac:.3f}. If this is near 1.0 "
+    print(f"\nVACUITY CHECK: at the ID rung, frac(R>0.5) = {mean_far_frac:.3f}. If this is near 1.0 "
           "then HBO is pure MSP everywhere, V1-V3 pass trivially, and the validation says nothing.")
 
     out = ROOT / "results" / f"regime_R4b_hbo_validation__{SLUG}.csv"

@@ -8,7 +8,7 @@ THE MECHANICAL WORRY, TESTED NOT ASSUMED: `msp_min` is a MIN over tokens, so mor
 a lower minimum, regardless of the model being any less certain. `perplexity` is length-normalised and
 should NOT share that dependence. **That contrast is the control.**
 
-⚠️ LENGTH DEFINITION. `mean_len` in `id_entropy_vs_drop__*.csv` is **T = G+1** -- generated tokens PLUS
+LENGTH DEFINITION. `mean_len` in `id_entropy_vs_drop__*.csv` is **T = G+1** -- generated tokens PLUS
 one prompt token, because the pooling window is `[last_prompt_token] + gen_tokens`
 (`entropy_delta_vs_drop.py:89-97`). It INCLUDES a prompt token. This driver therefore recomputes
 **G = len(record["gen_token_ids"])**, generation only, identically for all 10 datasets, and prints
@@ -154,7 +154,7 @@ def prr_from_fam(method_names):
 
 def ood_value(prr, ds, method):
     """Long sets: mean over the 4 long OOD rungs. Short sets: the single Long->Short cell.
-    ⚠️ These are DIFFERENT rung constructions -- flagged in the output, not silently merged."""
+    These are DIFFERENT rung constructions -- flagged in the output, not silently merged."""
     if ds in SHORT:
         v = prr.get((ds, "Long->Short", method))
         return (v, 1) if v is not None else (None, 0)
@@ -198,7 +198,7 @@ def main():
     for r in rows:
         def f(x, w=13):
             return f"{x:+{w}.4f}" if x is not None else f"{'—':>{w}s}"
-        flag = "  ⚠️<200" if r["n"] < 200 else ""
+        flag = "  n<200" if r["n"] < 200 else ""
         print(f"{r['dataset']:14s}{r['mean_len']:10.1f}{r['median_len']:12.1f}{r['n']:12d}"
               f"{f(r['msp_min'])}{f(r['ppl'],12)}{f(r['saplma'],12)}{f(r['adv'],11)}{r['n_rungs']:>7d}{flag}")
 
@@ -248,7 +248,7 @@ def main():
         print(f"    msp_min vs advantage, controlling for length : {partial(M, A, L):+.4f}")
         print(f"    length  vs advantage, controlling for msp_min: {partial(L, A, M):+.4f}")
         if len(sub) <= 8:
-            print("    ⚠️ n<=8: point estimates only. NOT reported as significant (5 residual df).")
+            print("    n<=8: point estimates only. NOT reported as significant (5 residual df).")
         print("\n  DECISION RULE (prereg/S9): length explains the law iff BOTH")
         rho_la = abs(spearman(L, A))
         pma = abs(partial(M, A, L))
@@ -258,7 +258,7 @@ def main():
 
     complete = [r for r in rows if None not in (r["msp_min"], r["ppl"], r["saplma"])]
     block([r for r in complete if r["dataset"] in LONG], "8 LONG-FORM SETS (clean: one rung construction)")
-    block(complete, "ALL 10 ⚠️ mixes two rung constructions (long OOD mean vs Long->Short)")
+    block(complete, "ALL 10 mixes two rung constructions (long OOD mean vs Long->Short)")
 
     # ------------------------------------------------------------ within-dataset terciles
     print("\n" + "=" * 100)

@@ -1,4 +1,4 @@
-"""S7 self-test — pooling heads with DIFFERENT FIXED recipes (Joe ideas 3+4).
+"""S7 self-test — pooling heads with DIFFERENT FIXED recipes (design notes 3+4).
 
 Runs on synthetic tensors in seconds, no cache and no GPU, so it can gate the real run cheaply.
 

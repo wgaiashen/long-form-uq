@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """MASK ABLATION -- does excluding end-of-text tokens from the weight logits actually HELP wMSP?
 
-Results: ../STOCKTAKE_sharpening_axis.md §14.
 
 THE QUESTION, AND WHY IT IS OPEN
 --------------------------------
@@ -9,7 +8,7 @@ THE QUESTION, AND WHY IT IS OPEN
 (weighted_msp.py:216-219) is that ~70% of xsum/cnn generations end in EOS and the learned weighter
 otherwise concentrates its softmax mass on that content-free "I'm done" token.
 
-⚠️ BUT THAT IS AN OBSERVATION ABOUT WHERE THE ATTENTION GOES, NOT A MEASUREMENT THAT GOING THERE
+BUT THAT IS AN OBSERVATION ABOUT WHERE THE ATTENTION GOES, NOT A MEASUREMENT THAT GOING THERE
 HURTS. The mask was introduced because concentration on EOS looked wrong, never because the
 unmasked variant was run and scored worse. That is the same inference pattern that turned out to be
 wrong about punctuation (prereg/R0_punctuation_ablation.md). And §13 has since shown the completion
@@ -19,7 +18,7 @@ obviously true either.
 It also matters because the mask makes weighted MSP the ONLY method on the ladder scored on a
 different token set from the floor it is compared against (§12).
 
-⭐ ALL THREE HEADLINE VARIANTS INHERIT IT. `train_weighted_msp` / `predict_weighted_msp` default
+ALL THREE HEADLINE VARIANTS INHERIT IT. `train_weighted_msp` / `predict_weighted_msp` default
 `exclude_special=True`, and `probedriftlong.py`'s WMSP list never overrides it, so wmsp_norm,
 wmsp_shrink2 AND wmsp_shrink10 are all masked. All three are ablated here.
 
@@ -29,7 +28,7 @@ Six arms per (cell, seed): {norm, shrink@2, shrink@10} x {masked, unmasked}. Ide
 seeds, identical everything else -- the ONLY thing that varies is `exclude_special`. So a difference
 is the mask and nothing else.
 
-⚠️ NO-OP CONTROL: the MASKED arms must reproduce `pdl_master`'s wMSP-norm / shrink@2 / shrink@10 to
+NO-OP CONTROL: the MASKED arms must reproduce `pdl_master`'s wMSP-norm / shrink@2 / shrink@10 to
 4 dp. That is the same outside check Track 2 passed on 25/25 cells, and without it a difference
 between arms could be this driver rather than the mask.
 
@@ -145,12 +144,12 @@ def main():
             for mode, val in (("masked", a), ("unmasked", b)):
                 rows.append((rung, X, vname, mode, f"{val:.4f}",
                              f"{np.std(acc[(vname, mode)]):.4f}", len(acc[(vname, mode)]), carve))
-        print("   ⚠️ The MASKED column must match pdl_master's wMSP-norm/@2/@10 to 4 dp "
+        print("   The MASKED column must match pdl_master's wMSP-norm/@2/@10 to 4 dp "
               "(outside check).", flush=True)
         for k, v in fl.items():
             rows.append((rung, X, "floor", k, f"{v:.4f}", "0.0000", len(seeds), carve))
         if args.smoke:
-            print("\n⚠️ SMOKE -- one cell, one seed. NOT A RESULT.")
+            print("\nSMOKE -- one cell, one seed. NOT A RESULT.")
             break
 
     ev = evals[0] if len(evals) == 1 else "multi"

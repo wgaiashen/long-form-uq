@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """W-Align -- DOES IT MATTER WHETHER A TOKEN'S LOSS IS WEIGHTED BY h_t OR h_{t-1}?
 
-Results: ../STOCKTAKE_alignment.md.   Author's request, 2026-08-17.
+Results: the project results log.   Author's request, 2026-08-17.
 
-⚠️ THIS IS A POST-HOC SENSITIVITY ABLATION, NOT A HYPERPARAMETER SEARCH. Neither alignment will be
+THIS IS A POST-HOC SENSITIVITY ABLATION, NOT A HYPERPARAMETER SEARCH. Neither alignment will be
 selected on test performance, and the current formulation stands unless something material shows up.
 
 THE QUESTION
@@ -81,7 +81,7 @@ LAYER = 15
 # lambda = 2 is the configuration used as the main HAPES result in the canonical master and in every
 # HAPES table of results/analysis/REPORT_HANDOFF_LLAMA.md. (That handoff's §1.1 notes the finer 5-arm
 # honest-LODO incumbent is 1.5; the two differ by +0.0019 macro OOD, far inside seed noise. Recorded in
-# ../STOCKTAKE_alignment.md §4; not swept here.)
+# the project results log; not swept here.)
 ARMS = [("HAPE", "post_token", 0.0),
         ("HAPE", "pre_token", 0.0),
         ("HAPES", "post_token", 2.0),
@@ -185,7 +185,7 @@ def load_master_canonical():
     path = ROOT / "results" / f"pdl_master__meta-llama_Meta-Llama-3.1-8B.csv"
     out = {}
     if not path.exists():
-        print(f"  ⚠️ canonical master not found at {path} -- control 2 cannot run", flush=True)
+        print(f"  canonical master not found at {path} -- control 2 cannot run", flush=True)
         return out
     with open(path) as f:
         for r in _csv.DictReader(f):
@@ -253,10 +253,10 @@ def main():
     for d in sorted(sources):
         n_ex, n_tok, n_deep = control1_alignment_mapping(
             PT[d][0], PT[d][3], verbose_n=2 if d == first else 0)
-        print(f"  [{d}] ✅ {n_ex} examples / {n_tok} tokens: window == G+1, both arms == G rows, "
+        print(f"  [{d}] {n_ex} examples / {n_tok} tokens: window == G+1, both arms == G rows, "
               f"content_keep length G; {n_deep} deep element-wise checks", flush=True)
         tot_ex += n_ex; tot_tok += n_tok; tot_deep += n_deep
-    print(f"\n  ✅ CONTROL 1 PASS: {tot_ex} examples / {tot_tok} generated tokens across "
+    print(f"\n  CONTROL 1 PASS: {tot_ex} examples / {tot_tok} generated tokens across "
           f"{len(sources)} datasets, {tot_deep} deep mapping checks.")
 
     canon = load_master_canonical()
@@ -328,7 +328,7 @@ def main():
                          "prr": round(dmax, 8), "n_eval": n_eval, "carve": carve, **prov})
 
         # ------------------------------------------------------------- CONTROL 2: the outside gate
-        # ⚠️ STRICT ONLY AT THE FULL SEED COUNT. pdl_master stores the MEAN OVER 3 SEEDS, so a run with
+        # STRICT ONLY AT THE FULL SEED COUNT. pdl_master stores the MEAN OVER 3 SEEDS, so a run with
         # fewer seeds is a different estimator and cannot be held to 4 dp. Measured on the first smoke
         # (1 seed, pubmed_qa): every rung missed by 0.019-0.085 while the RECORDED per-rung seed sd for
         # wMSP-norm on that dataset is 0.035-0.106 -- i.e. every miss was within ~1.4 seed sd, exactly
@@ -348,7 +348,7 @@ def main():
             if not ok and gate_strict:
                 gate2_fail.append(f"{rung}/{X}/{method}: post_token {got:+.6f} vs master "
                                   f"{CANON_METHOD[method]} {exp:+.6f} (Δ {dv:+.2e})")
-            mark = "" if ok else (" ✗" if gate_strict else " (advisory)")
+            mark = "" if ok else (" FAIL" if gate_strict else " (advisory)")
             gate_txt.append(f"{method}:post Δ{dv:+.1e}{mark}")
             rows.append({"model": MODEL, "method": method, "alignment": "CONTROL2_vs_master",
                          "lambda": "", "dataset": X, "rung": rung, "seed": "mean",
@@ -387,25 +387,25 @@ def main():
     print("\n" + "=" * 104)
     print(f"CONTROL 2 -- post_token vs canonical master (bar: |Δ| <= {GATE_4DP:g}, i.e. 4 dp)")
     if len(seeds) < 3:
-        print(f"  ⚠️ ADVISORY ONLY -- ran {len(seeds)} seed(s); pdl_master stores the MEAN OVER 3 SEEDS,")
+        print(f"  ADVISORY ONLY -- ran {len(seeds)} seed(s); pdl_master stores the MEAN OVER 3 SEEDS,")
         print("     so these are different estimators and the 4 dp bar does not apply. The deltas are")
         print("     printed per cell above for inspection. The STRICT gate runs in the full 3-seed pass,")
         print("     and no pre_token number may be interpreted until it passes there.")
     elif gate2_fail:
-        print("  ❌ FAIL -- the post_token arm does not reproduce current behaviour, so the pre_token")
+        print("  FAIL -- the post_token arm does not reproduce current behaviour, so the pre_token")
         print("     numbers are NOT readable. Do not interpret them.")
         for f in gate2_fail[:20]:
-            print(f"    ✗ {f}")
+            print(f"    {f}")
     else:
-        print("  ✅ PASS on every cell scored")
+        print("  PASS on every cell scored")
     print(f"\nCONTROL 3 -- distinctness (max|q_pre - q_post| > 0)")
     if distinct_zero:
-        print("  ❌ FAIL -- the two arms produced IDENTICAL scores on the cells below, which means the")
+        print("  FAIL -- the two arms produced IDENTICAL scores on the cells below, which means the")
         print("     shift did not apply. An 'alignment-insensitive' verdict here would be an artefact.")
         for f in distinct_zero[:20]:
-            print(f"    ✗ {f}")
+            print(f"    {f}")
     else:
-        print("  ✅ PASS -- the arms differ on every cell scored")
+        print("  PASS -- the arms differ on every cell scored")
     print("=" * 104)
 
     out = Path(args.out) if args.out else (
@@ -418,7 +418,7 @@ def main():
         w.writeheader(); w.writerows(rows)
     print(f"\nwrote {out}  ({len(rows)} rows, {perex_written} per-example sidecars)")
     if args.smoke:
-        print("⚠️ SMOKE TEST -- this file must never enter a results table.")
+        print("SMOKE TEST -- this file must never enter a results table.")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """Cheap-bug parity check for the SAPLMA leave-one-out OOD approximation.
 
 Rules out three cheap explanations for our sciq-LOO PRR (~0.65) sitting well below
-Joe's reported ~0.86, BEFORE attributing the whole gap to "we only have 3 of his 9
+the reported ~0.86, BEFORE attributing the whole gap to "we only have 3 of his 9
 LOO training sources". Read-only with respect to the caches (loads features/records,
 draws index subsamples, trains nothing that gets written).
 
@@ -11,7 +11,7 @@ It asserts:
      the training pool (so E's held-out 'test' rows can never enter training).
   2. FINITE FEATURES: the layer-15 (L15) SAPLMA features are finite (no NaN/Inf) for
      all four sources we have Llama features for.
-  3. RECIPE PARITY: prints our train_probe_mlp recipe next to Joe's
+  3. RECIPE PARITY: prints our train_probe_mlp recipe next to the
      full_sequence_saplma head recipe (read from his repo), so hyperparameter drift
      is visible at a glance.
 
@@ -31,18 +31,18 @@ sys.path.insert(0, str(ROOT / "src"))
 from luq.config import Config                     # noqa: E402
 # Reuse the exact helpers the real OOD check uses, so this verifies THAT code path.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ood_joepools import (                          # noqa: E402
+from ood_refpools import (                          # noqa: E402
     AVAIL, EVALS, SETTINGS, LAYER, LABEL, _feats, _rows, _restrict,
 )
 
 
-# Joe's SAPLMA head recipe, read from the reference repo (grounded, not remembered):
+# the SAPLMA head recipe, read from the reference repo (grounded, not remembered):
 #   Temp_robust_UQ_probes/luh/heads/full_seq_head_saplma.py
 #     Dense(256, relu) -> Dense(128, relu) -> Dense(64, relu) -> Dense(1, sigmoid)
 #     optimizer='adam' (Keras default lr ~1e-3), loss='binary_crossentropy'
 #     model.fit(features, targets, epochs=5, batch_size=1)           # <- batch_size=1, hardcoded
 #     RAW features (no StandardScaler); target = 1 - correctness (feature_supervision.py:166)
-JOE_SAPLMA = {
+REFERENCE_SAPLMA = {
     "architecture": "Dense 256/128/64 (relu) -> 1 (sigmoid)",
     "epochs": 5,
     "batch_size": 1,
@@ -108,7 +108,7 @@ def check_finite(fe):
 
 
 def print_recipe():
-    """Print our train_probe_mlp defaults next to Joe's, so any drift is visible."""
+    """Print our train_probe_mlp defaults next to the, so any drift is visible."""
     import inspect
     from luq import probe
     sig = inspect.signature(probe.train_probe_mlp)
@@ -118,10 +118,10 @@ def print_recipe():
     print("    OURS  train_probe_mlp defaults:")
     for k, v in ours.items():
         print(f"        {k:14s} = {v}")
-    print("    NOTE: the OOD check (ood_joepools.py) passes batch_size=1 explicitly (--batch default 1),")
-    print("          which MATCHES Joe's hardcoded model.fit(batch_size=1).")
-    print("    JOE   full_sequence_saplma head:")
-    for k, v in JOE_SAPLMA.items():
+    print("    NOTE: the OOD check (ood_refpools.py) passes batch_size=1 explicitly (--batch default 1),")
+    print("          which MATCHES the hardcoded model.fit(batch_size=1).")
+    print("    REFERENCE full_sequence_saplma head:")
+    for k, v in REFERENCE_SAPLMA.items():
         print(f"        {k:14s} = {v}")
 
 

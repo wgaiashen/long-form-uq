@@ -16,7 +16,7 @@
 # repetition, and that finding is stronger with this arm beside it as the contrast than it would be as
 # the shipped dataset.
 #
-# ⚠️ SMOKE FIRST. Set LUQ_SMOKE=1 for a 50-row run into its own regime. The FIRST gate is %EMPTY <= 2%,
+# SMOKE FIRST. Set LUQ_SMOKE=1 for a 50-row run into its own regime. The FIRST gate is %EMPTY <= 2%,
 # not the length distribution: a repetition penalty applied over a LONG few-shot context penalises
 # context words a real answer legitimately repeats and can force immediate EOS. That produced ~35%
 # empty generations on med_quad historically. samsum's 0.0% empty under rep-pen does NOT transfer --

@@ -32,7 +32,7 @@ python -u scripts/checks/probedriftlong.py --seeds 1,2,3 --evals factscore \
 # (the published precision). Any mismatch is a hard failure.
 python - "$OUT" "$REF" <<'PY'
 import csv, sys
-# ⚠️ VERDICT:bestw_* rows are EXCLUDED from the hard gate (fix, 2026-08-10). They are derived
+# VERDICT:bestw_* rows are EXCLUDED from the hard gate (fix, 2026-08-10). They are derived
 # "best wMSP variant vs X" comparisons: the published run trained all 10 wMSP variants while this
 # control runs --wmsp-only wmsp_norm, so "best wMSP" ranges over different variant sets and those
 # rows differ BY CONSTRUCTION, not because a number moved. The first run of this control "failed"

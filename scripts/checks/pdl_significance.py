@@ -56,7 +56,7 @@ def _prr_vec(z, m):
     """Per-seed PRR vector for method `m`, or None if absent.
 
     `maxof3` is DERIVED here rather than stored: the per-seed max over the three MSP floors, i.e. the
-    best-of-three bar. Joe REJECTED that bar on 2026-07-24 ("gives the baseline three shots at being
+    best-of-three bar. That bar was REJECTED on 2026-07-24 ("gives the baseline three shots at being
     good"), so it is a ROBUSTNESS check and never the primary comparison -- but it has to be testable,
     and it cannot be read off the CSV because `fair_floor` in probedriftlong is hard-wired to the
     pre-registered `msp_min`, not to a max. Computing it from the stored vectors is exactly the kind of

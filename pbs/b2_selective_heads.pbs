@@ -6,7 +6,7 @@
 
 # B.2 -- selective head supervision. K=4 heads, supervise only J of them, leave the rest free.
 #
-# ⚠️ THE PRIMARY DIAGNOSTIC IS head_attn_corr, NOT PRR. We already measured the 4 heads collapsing to
+# THE PRIMARY DIAGNOSTIC IS head_attn_corr, NOT PRR. We already measured the 4 heads collapsing to
 # pairwise attention correlation 0.996-1.000, which made multi-head indistinguishable from K classifiers
 # on ONE attention pattern. The paper's fix is STRUCTURAL: supervise a MINORITY (they used 3 of 12) and
 # leave the rest free, because "supervising all of them in the same direction can potentially have

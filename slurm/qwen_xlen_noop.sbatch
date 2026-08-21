@@ -9,7 +9,7 @@
 # No-op control for the W-CrossLen Qwen replication (DOC_BRIEF_qwen_crosslength.md §6.1).
 # CPU-only: the no-op cell only exercises floors/SAPLMA/wMSP, no pooler training.
 #
-# ⚠️ RUNS AS A BATCH JOB, NOT ON THE SHELL. This machine (cloud-vm-40-244) kills
+# RUNS AS A BATCH JOB, NOT ON THE SHELL. This machine (cloud-vm-40-244) kills
 # long-running processes started directly on it -- documented in
 # slurm/qwen_api_jobs.sbatch's own header, and confirmed the hard way: a first
 # attempt to run this inline died with no output file after being silently killed.

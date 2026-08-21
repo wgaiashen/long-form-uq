@@ -1,6 +1,6 @@
-"""S2 (Joe's idea 4) — ENSEMBLE a model-side score (MSP / wMSP) with a probe (attention pooler / SAPLMA).
+"""S2 (the idea 4) — ENSEMBLE a model-side score (MSP / wMSP) with a probe (attention pooler / SAPLMA).
 
-Joe: "combine it with saplma / attention probes, as they would probably ensemble really well (they both learn
+Design note: "combine it with saplma / attention probes, as they would probably ensemble really well (they both learn
 in different ways)." NO NEW TRAINING beyond the components' own: the ensemble is a LABEL-FREE combination at
 scoring time (rank-average or z-average) of two per-example uncertainty vectors on the SAME test rows.
 
@@ -106,7 +106,7 @@ def main():
         for ps in PROBE_SIDE:
             ENS.append((f"rankavg_{ms}+{ps}", ms, ps, "rank"))
             ENS.append((f"zavg_{ms}+{ps}", ms, ps, "z"))
-    # {wMSP, MSP} -- model-side x model-side (Lihu's actual suggestion; the MODEL_SIDE x PROBE_SIDE loop above
+    # {wMSP, MSP} -- model-side x model-side (the actual suggestion; the MODEL_SIDE x PROBE_SIDE loop above
     # never pairs two model-side scores, so this ensemble had never been formed). Both components are computed
     # below (v["wmsp"], v["floor_min"]).
     if not args.skip_wmsp:
@@ -147,7 +147,7 @@ def main():
                 v["attention"] = np.asarray(attn_unc(train_attn(states, y, tr_idx, device, seed=sd, temperature=best_T),
                                                      states, te_idx, device), float)
             if not args.skip_wmsp:
-                # BUGFIX (2026-07-28): plain wmsp_norm (Joe's "wMSP"), NOT the segmented variant. The earlier
+                # BUGFIX (2026-07-28): plain wmsp_norm (the "wMSP"), NOT the segmented variant. The earlier
                 # `segment_ids=seg_cell` made this wmsp_seg_flat, which was broken (pubmed ID 0.023 vs
                 # wmsp_norm's 0.537) and produced a spurious −0.42 ensemble. weight_mode default is normalised.
                 v["wmsp"] = np.asarray(weighted_msp.weighted_msp_unc(states, records, y, tr_idx, te_idx, device,

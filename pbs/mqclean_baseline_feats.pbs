@@ -10,12 +10,12 @@
 # attention tensor is 32x32x1358^2x4B = 7.6GB on top of ~32GB fp32 weights = ~40GB, which fits the
 # 48GB L40S. (The earlier a100 requirement was driven by cnn's 2048-token sequences; not the case here.)
 #
-# ⚠️ These MUST be re-extracted rather than spliced: the verification question is appended AFTER the
+# These MUST be re-extracted rather than spliced: the verification question is appended AFTER the
 # generation, so a shorter span puts the verdict at a different position; and lookback's attention is a
 # softmax over the token set, which changes when the set changes. A prefix of the raw features would be
 # wrong, not merely truncated.
 #
-# ⚠️ --store-layers 15 for ptrue, matching every other dataset's cache (the other seven are
+# --store-layers 15 for ptrue, matching every other dataset's cache (the other seven are
 # (n,33,4096) with only L15 finite). Without it these would be non-comparable AND ~2GB.
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"

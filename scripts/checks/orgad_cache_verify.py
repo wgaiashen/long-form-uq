@@ -19,7 +19,7 @@ THREE CHECKS PER DATASET
   3. LOCATED FRACTION -- share of records where spans were actually found in the generation, from
      `build_masks(...)`'s own `located` return, plus the mean mask density.
 
-⚠️ PRE-REGISTERED THRESHOLD: located fraction < 0.50 => the dataset is treated as NOT COVERED. It is
+PRE-REGISTERED THRESHOLD: located fraction < 0.50 => the dataset is treated as NOT COVERED. It is
 reported and excluded, and any cell needing it is skipped. An effectively-uniform "Orgad" arm must never
 be run under the Orgad label.
 
@@ -87,7 +87,7 @@ def check_one(d, tok, limit):
         cfg = Config(model_name=MODEL, dataset=d, ood_setting="ID",
                      prompt_regime=PROMPT_REGIME.get(d, ""))
         recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, d, "ID"))
-        # ⚠️ SUBSAMPLE RANDOMLY, NEVER recs[:limit]. Records are not in random order, and a HEAD slice
+        # SUBSAMPLE RANDOMLY, NEVER recs[:limit]. Records are not in random order, and a HEAD slice
         # gives a biased located-fraction: on med_quad the first 200 records read 0.995 while the full
         # 1800 read 0.747 (455 empty span lists, all sitting past the head). A gate that under-reports
         # the very degradation it exists to catch is worse than no gate -- a dataset genuinely below the
@@ -127,7 +127,7 @@ def main():
     print(f"Orgad broad-mask cache: {ROOT / 'cache' / 'orgad_llm'}")
     print(f"pre-registered threshold: located fraction >= {MIN_LOCATED}")
     if args.limit:
-        print(f"⚠️  ESTIMATE ONLY: random subsample of {args.limit} records/dataset (seed 0). "
+        print(f"ESTIMATE ONLY: random subsample of {args.limit} records/dataset (seed 0). "
               f"Re-run with --limit 0 before trusting a pass/fail verdict.")
     print()
     print(f"{'dataset':<15} {'bytes':>10} {'entries':>8} {'%list':>7} {'%noans':>7} "

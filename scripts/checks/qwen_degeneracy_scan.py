@@ -12,7 +12,7 @@ SECONDARY, CLEARLY LABELLED: distinct-2 / distinct-3 / repeated-sentence, the de
 `scripts/checks/expertqa_degeneracy.py`. These are the WEAKER scan that produced the false GO. They
 are reported for continuity with the Llama numbers, never as the gate.
 
-⚠️ ONE ADDED DIAGNOSTIC, DEFINITION FIXED BEFORE ANY PER-DATASET RESULT WAS SEEN.
+ONE ADDED DIAGNOSTIC, DEFINITION FIXED BEFORE ANY PER-DATASET RESULT WAS SEEN.
 The canonical detector cannot see the failure mode found in §1's expertqa example: a fluent
 one-sentence answer followed by the model inventing a multiple-choice quiz about its own answer.
 That is neither repetition nor salad -- every existing signal passes it -- but it is exactly what
@@ -26,7 +26,7 @@ in advance, so it is written out here, in full, and was committed before the sca
         Question: | Answer: | Available choices: | (N). | Summary: | Article: | Story: |
         Abstract: | Text: | Document: | Dialogue: | Conversation: | A single-select problem |
         Is the question answered
-    ⚠️ It is REPORTED SEPARATELY and never merged into severe/degraded. It is also EXPECTED to fire
+    It is REPORTED SEPARATELY and never merged into severe/degraded. It is also EXPECTED to fire
     legitimately on some sets -- a few-shot QA continuation is the designed behaviour that
     `--truncate-long` and `--truncate-answer-span` exist to cut -- so a high rate is a prompt to
     look, not a verdict.
@@ -175,7 +175,7 @@ def main():
         w = csv.DictWriter(f, fieldnames=list(per_ex[0].keys()))
         w.writeheader(); w.writerows(per_ex)
     print(f"\nwrote {out}\nwrote {pe}  ({len(per_ex):,} rows)")
-    print("\n⚠️ READ THESE AS DIAGNOSTICS, NOT VERDICTS. The detector's thresholds were tuned on")
+    print("\nREAD THESE AS DIAGNOSTICS, NOT VERDICTS. The detector's thresholds were tuned on")
     print("   ExpertQA prose; a whitespace or code signal may be legitimate formatting on a")
     print("   summarisation or medical set, and `bleed` fires by design on few-shot continuation.")
     print("   Every triggered mode gets surfaced in the HTML for a human to look at.")

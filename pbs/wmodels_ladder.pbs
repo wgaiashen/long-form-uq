@@ -6,21 +6,21 @@
 
 # W-Models Stage-A ladder, ONE eval per job: ID + DiffTask-long + 1ds-Diff-long, 3 seeds.
 #
-# ⚠️ CPU ON PURPOSE. The driver falls back to device=cpu, and running here keeps the ladder off the
+# CPU ON PURPOSE. The driver falls back to device=cpu, and running here keeps the ladder off the
 # GPU queue that the extraction jobs are competing for. With only two wMSP arms the per-cell cost is
 # a fraction of the full eight-arm ladder that took ~97 CPU-hours across eight evals.
 #
-# ⚠️ --wmsp-only IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
+# --wmsp-only IS THE PRE-REGISTRATION, NOT AN OPTIMISATION.
 # prereg/M5_multimodel_far_ood.md §4: lambda=0 is the unregularised control and lambda=2 the
 # pre-specified regularised configuration, both transferred unchanged from the development
 # populations. NO lambda grid and NO model-specific selection runs on a replication population --
 # that is the entire reason these populations are informative.
 #
-# ⚠️ --perex-dir IS REQUIRED, not optional. The verification gate compares per-example score vectors,
+# --perex-dir IS REQUIRED, not optional. The verification gate compares per-example score vectors,
 # not PRR: PRR moves ~1e-4 on 1e-7 round-off, so an equivalence check on PRR alone would pass runs
 # that are not actually equivalent.
 #
-# ⚠️ THE CELL COUNT IS ASSERTED AFTERWARDS. probedriftlong prints "<d>: no pertok cache -> skip" and
+# THE CELL COUNT IS ASSERTED AFTERWARDS. probedriftlong prints "<d>: no pertok cache -> skip" and
 # carries on, so a missing dataset silently yields a smaller grid instead of an error. A blank cell
 # reads as "not measured" and a number reads as "measured"; those must never be confusable.
 #
@@ -44,11 +44,11 @@ RUNGS="${LUQ_RUNGS:-ID,DiffTask,1ds-Diff}"          # Stage A. Stage B adds Same
 # λ set. Default is the ORIGINAL pre-registered pair, so every existing invocation is unchanged.
 # Override to add the λ=1.5 supplementary sensitivity (prereg D5, 2026-08-19):
 #   LUQ_WMSP='wmsp_norm,wmsp_shrink1_5,wmsp_shrink2'
-# ⛔ The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
+# The PRIMARY is always λ=2 vs λ=0. Adding λ=1.5 does not change that, and the better of 1.5 and 2
 # is NEVER reported -- taking the max over two λ values is a two-point grid search on a population
 # that exists precisely because nothing has been selected on it.
 WMSP="${LUQ_WMSP:-wmsp_norm,wmsp_shrink2}"
-# ⚠️ --evals restricts TARGETS ONLY. Without --sources the rungs are still built from the full
+# --evals restricts TARGETS ONLY. Without --sources the rungs are still built from the full
 # 8-dataset LONG_SRC, so a "six-dataset panel" run would quietly train on med_quad and expertqa --
 # the two datasets this panel exists to drop. Passing it also makes the restriction explicit rather
 # than an accident of which pertok caches happen to exist on this cluster.

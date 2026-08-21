@@ -1,11 +1,11 @@
-"""Long-form correctness label: Joe's LLM-as-a-judge (GPT-5), run post-hoc.
+"""Long-form correctness label: the LLM-as-a-judge (GPT-5), run post-hoc.
 
-Ported faithfully from reference/llm_as_a_judge_scoring_prompt.py so our pipeline is
+Ported faithfully from the supervisor-supplied judge prompt script so our pipeline is
 self-contained and the judge stays fixed and reproducible (keep the model and prompt
 pinned, since a probe can learn one judge's biases). The judge scores the model
 output against the GOLD reference on a 0.0-1.0 scale, with the source as context.
 
-Two prompt variants, exactly as Joe's script:
+Two prompt variants, exactly as the script:
   * summarisation (xsum, cnn_dailymail): no in-context examples.
   * QA (everything else): four in-context examples.
 
@@ -39,7 +39,7 @@ def _get_client() -> OpenAI:
     return _client
 
 
-# ---- prompt templates (verbatim from Joe's script) ----------------------------
+# ---- prompt templates (verbatim from the script) ----------------------------
 
 def _qa_prompt(question: str, label, answer: str, caveat: str) -> str:
     return f"""
@@ -94,11 +94,11 @@ Score:
 """
 
 
-# ---- per-dataset prompt trimming (verbatim from Joe's __main__) ----------------
+# ---- per-dataset prompt trimming (verbatim from the __main__) ----------------
 
 def _extract_question(prompt: str, judge_name: str):
     """Trim the full prompt down to the question/context the judge should see, and
-    return (question, caveat). Mirrors Joe's per-dataset slicing exactly so the judge
+    return (question, caveat). Mirrors the per-dataset slicing exactly so the judge
     sees the same text he intends."""
     if judge_name == "sciq":
         prompt = prompt[: prompt.rfind("Answer:")].strip("\n").strip()
@@ -205,7 +205,7 @@ def build_prompt(record: dict, dataset: str, strip_newlines: bool = False) -> st
     map it to the judge name ("pubmed") for prompt trimming and template choice.
 
     strip_newlines: collapse all newlines out of the model answer before judging,
-    matching Joe's Hidden Failures judge input (collect_llm_judge_inputs.py:92). OFF
+    matching the Hidden Failures judge input (collect_llm_judge_inputs.py:92). OFF
     by default; turn on only to reproduce his labels faithfully.
     """
     judge_name = JUDGE_NAME_MAP[dataset]
@@ -224,7 +224,7 @@ def judge(record: dict, dataset: str, model: str = MODEL, max_retries: int = 10,
     Returns a float in [0, 1], or None if it never returned a valid number after
     max_retries. `model` defaults to the pinned GPT-5; pass a cheaper sibling
     (e.g. "gpt-5-mini") to validate it against GPT-5 in scripts/checks.
-    `strip_newlines` reproduces Joe's newline-collapsed answer (see build_prompt).
+    `strip_newlines` reproduces the newline-collapsed answer (see build_prompt).
     """
     user_prompt = build_prompt(record, dataset, strip_newlines=strip_newlines)
     for _ in range(max_retries):

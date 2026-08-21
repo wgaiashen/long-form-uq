@@ -11,7 +11,7 @@
 #
 #   sbatch slurm/qwen_lookback.sbatch pubmed_qa med_quad samsum asqa expertqa factscore
 #
-# ⛔ xsum and cnn_dailymail DO NOT BELONG HERE -- they need two cards. Use
+# xsum and cnn_dailymail DO NOT BELONG HERE -- they need two cards. Use
 # slurm/qwen_lookback_longsrc.sbatch. The allowlist below refuses them rather than letting the
 # job OOM eight hours in.
 #

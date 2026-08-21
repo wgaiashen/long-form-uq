@@ -3,7 +3,7 @@
 Reads the 10 new cells plus the canonical LONG arms (which are NOT re-run) and emits
 results/analysis/CROSS_LENGTH_RESULTS.md.
 
-⚠️ THE GATES RUN BEFORE ANY TABLE IS WRITTEN, and a failure aborts. The three that matter:
+THE GATES RUN BEFORE ANY TABLE IS WRITTEN, and a failure aborts. The three that matter:
   * realised pool  -- the `train` column must show the counts we asked for. Caps are per-source and
                       silently shrink when a source is short, so a pool label that lies is the
                       failure mode this catches.
@@ -136,14 +136,14 @@ def main():
     w("> **Population: `meta-llama/Meta-Llama-3.1-8B`, layer 15, carve legacy, 3 seeds, training "
       "budget 1,800 in every arm.** Values are 3-seed mean ±sd of PRR.")
     w(">")
-    w("> ⚠️ **Exploratory auxiliary analysis.** With one to three evaluation datasets per direction "
+    w("> **Exploratory auxiliary analysis.** With one to three evaluation datasets per direction "
       "there is **no meaningful cross-dataset significance test** — report individual effects and "
       "consistency, not a pooled p-value.")
     w(">")
-    w("> ⚠️ **Not a causal claim about response length.** The datasets differ in domain and task as "
+    w("> **Not a causal claim about response length.** The datasets differ in domain and task as "
       "well as length. This is cross-length *transfer* / a short-form supervision ablation.")
     w(">")
-    w("> ⚠️ **Llama only.** Qwen has no short-form population; that arm is costed but not run.")
+    w("> **Llama only.** Qwen has no short-form population; that arm is costed but not run.")
     w("")
     w("Gates passed before these tables were written: realised pools match the requested counts, "
       "every pool totals 1,800, and the three training-free floors are identical across every arm "
@@ -215,7 +215,7 @@ def main():
         tag = "PRIMARY" if ev == "trivia_qa" else "secondary"
         w(f"### 2.{SHORT_TARGETS.index(ev)+1} `{ev}` ({tag})")
         w("")
-        w(f"⚠️ **Test n = {n}, mean label {mean:.3f}, {pos}/{n} positive at 0.5 → "
+        w(f"**Test n = {n}, mean label {mean:.3f}, {pos}/{n} positive at 0.5 → "
           f"{(1-pos/n)*100:.1f}% error mass.** PRR ranks against that error mass.")
         w("")
         w(f"| method | ID-short | other-short (`{other}`) | LONG-trained | LONG − ID |")
@@ -402,7 +402,7 @@ def main():
           f"is immaterial at the PRR level**, so the primary numbers stand on the existing labels and "
           f"this is reported as a closed caveat rather than an open one.")
         w("")
-        w("⚠️ Scope: only arms where `trivia_qa` is the **eval** are re-scored, because that is where "
+        w("Scope: only arms where `trivia_qa` is the **eval** are re-scored, because that is where "
           "the label change moves the yardstick. In the short→long arms trivia is a training source "
           "and the eval label is untouched; at 98.6% binarised agreement, re-labelling 1.4% of "
           "training rows cannot plausibly move them.")

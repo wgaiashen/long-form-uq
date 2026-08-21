@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """MASK ABLATION VERDICT -- does excluding end-of-text from the weight logits help wMSP?
 
-Results: ../STOCKTAKE_sharpening_axis.md §14. Reads results/mask_ablation_<eval>__<slug>.csv.
+Results: the project results log Reads results/mask_ablation_<eval>__<slug>.csv.
 
 THE QUESTION. The mask was introduced because the learned weighter CONCENTRATED on EOS, never
 because concentrating there was MEASURED to hurt -- the same inference pattern that turned out wrong
 about punctuation. It also makes weighted MSP the only method on the ladder scored on a different
 token set from the floor it is compared against (§12).
 
-⚠️ OUTSIDE CHECK FIRST. The MASKED arms must reproduce pdl_master's wMSP-norm / shrink@2 / shrink@10
+OUTSIDE CHECK FIRST. The MASKED arms must reproduce pdl_master's wMSP-norm / shrink@2 / shrink@10
 to 4 dp. Without that, a masked-vs-unmasked difference could be this driver rather than the mask.
 
 Unit of analysis: the DATASET (n up to 8), OOD mean over the 4 OOD rungs. Trained methods, so cells
@@ -72,7 +72,7 @@ def main():
     print("=" * 100)
     print(f"\nCOVERAGE: {len(present)}/8 evals.")
     if missing:
-        print(f"⚠️ MISSING, named not silently averaged over: {missing}")
+        print(f"MISSING, named not silently averaged over: {missing}")
     if not present:
         raise SystemExit("no mask-ablation CSVs yet")
 
@@ -83,7 +83,7 @@ def main():
             ref = g[MASTER_NAME[v]].get(k)
             if ref is not None and abs(val - ref) > 1e-4:
                 bad += 1
-                print(f"  ⚠️ MISMATCH {v} {k}: mine {val:+.4f} vs master {ref:+.4f}")
+                print(f"  MISMATCH {v} {k}: mine {val:+.4f} vs master {ref:+.4f}")
     print(f"OUTSIDE CHECK (masked arms vs pdl_master): "
           f"{'ALL MATCH to 4dp' if bad == 0 else f'{bad} MISMATCHES -- STOP'}")
     if bad:
@@ -129,7 +129,7 @@ def main():
               f"Wilcoxon p={p:.4f}   -> {verdict}")
         rows.append((v, f"{d.mean():.4f}", int((d > 0).sum()), len(present), f"{p:.4f}", verdict))
 
-    print("\n  ⚠️ READING. A null here means the mask is COSTLESS, not that it is pointless -- it was")
+    print("\n  READING. A null here means the mask is COSTLESS, not that it is pointless -- it was")
     print("     introduced to stop the weighter degenerating into an EOS detector, and a null says")
     print("     that safeguard is free. A significant UNMASKED win would mean three headline numbers")
     print("     move AND the token-set asymmetry with the floor (§12) disappears at the same time.")
@@ -143,7 +143,7 @@ def main():
             w.writerow(r)
     print(f"\nwrote {outp}")
     if missing:
-        print(f"⚠️ PARTIAL: {len(present)}/8. Missing {missing}.")
+        print(f"PARTIAL: {len(present)}/8. Missing {missing}.")
 
 
 if __name__ == "__main__":

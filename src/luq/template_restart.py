@@ -1,6 +1,6 @@
 """FROZEN candidate answer-span boundaries for trailing next-template continuation.
 
-⚠️ READ THIS FIRST — WHAT DECIDES A BOUNDARY HERE, AND WHAT NEVER DOES.
+READ THIS FIRST — WHAT DECIDES A BOUNDARY HERE, AND WHAT NEVER DOES.
 A boundary in this module is justified by the dataset's OWN PROMPT TEMPLATE (or, where stated, by
 the suffix being an unambiguously different task), and by nothing else. It is **never** chosen or
 tuned by whether cutting there improves a PRR, a judge correlation, or any method's score. That
@@ -47,7 +47,7 @@ appear anywhere in the template:
   the boundary is defensible, but it is NOT derivable from the prompt and that weaker standing is
   recorded on every row this rule fires on.
 
-⚠️ NEITHER KIND FIXES INTRINSIC DEGENERATION. ExpertQA's severe rows mostly have no marker at all
+NEITHER KIND FIXES INTRINSIC DEGENERATION. ExpertQA's severe rows mostly have no marker at all
 (21.1% severe against 12.3% bleed) and they start clean and rot — 25% prefix is 2.1% severe, 75%
 prefix 62.4%. Cutting at a marker cannot repair text that decays continuously. Template restart and
 word-salad degeneration are different phenomena and must stay separate in any conclusion.

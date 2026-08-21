@@ -13,7 +13,7 @@
 #   secondary train trivia_qa:1800 -> evaluate sciq        (SciQ has ~94% correct labels, so it is a
 #                                                           stability check only, never the selector)
 #
-# ⚠️ NOTHING CANONICAL IS TOUCHED. --out points into results/analysis/, and --train-spec requires
+# NOTHING CANONICAL IS TOUCHED. --out points into results/analysis/, and --train-spec requires
 # --rung-name + --out, so the canonical pdl_* filenames cannot be written by this job.
 #
 # Floors + SAPLMA are deliberately NOT skipped: they must reproduce the existing xlen cell exactly,

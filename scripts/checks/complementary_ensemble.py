@@ -2,7 +2,6 @@
 """M6 -- DOES HAPES SUPPLY A COMPLEMENTARY SIGNAL TO SAPLMA?
 
 Pre-registration: prereg/M6_hapes_saplma_ensemble.md (committed before any ensemble PRR was read).
-Plan: ../PLAN_complementary_ensemble.md.  Results: ../STOCKTAKE_ensemble.md.
 
 THE QUESTION (14 August 2026 supervision meeting, P0 #2)
 --------------------------------------------------------
@@ -19,7 +18,7 @@ pbs/pdl_perex_ens.pbs runs probedriftlong.py once with --perex-dir, which persis
 unc__<method> at (n_seeds, n_te) float64 per cell under results/pdl_perex_ens/. So this script does
 no training, touches no GPU, and can be re-run for free every time a follow-up question is asked.
 
-⚠️ READS results/pdl_perex_ens/, NOT results/pdl_perex/. The filename patterns are identical; the
+READS results/pdl_perex_ens/, NOT results/pdl_perex/. The filename patterns are identical; the
 latter is the floors+SAPLMA-only population read by orthogonality_map.py / pdl_significance.py /
 length_blend_perinstance.py and must not be confused with this one.
 
@@ -36,7 +35,7 @@ WHAT IS PRE-REGISTERED, AND THEREFORE NOT DECIDED HERE
   * references = rankavg{msp_min, SAPLMA} and rankavg{HAPE, SAPLMA}, recomputed from these same
     vectors so everything is internally comparable. They never enter a winner-selection sweep.
 
-⚠️ rankavg IS TEST-COHORT DEPENDENT and that is reported, not hidden. rankdata ranks within the
+rankavg IS TEST-COHORT DEPENDENT and that is reported, not hidden. rankdata ranks within the
 vector it is given, i.e. within the cell's test cohort, so the score of response i depends on which
 other responses are in the cohort. Audited 2026-08-17 on xsum/DiffTask-long (n=2000): 2/400 random
 pairs flip order between the full cohort and a 200-example cohort, and PRR on a fixed 1000 rows moves
@@ -71,7 +70,7 @@ from orthogonality_map import self_agreement, cross_agreement, rho         # noq
 def rankavg(*us):
     """rank-average of uncertainty vectors (higher = more uncertain).
 
-    ⚠️ rankdata ranks WITHIN the vector it is given, so this is TEST-COHORT DEPENDENT -- see the
+    rankdata ranks WITHIN the vector it is given, so this is TEST-COHORT DEPENDENT -- see the
     module docstring and the measured §rankavg section below.
     """
     from scipy.stats import rankdata
@@ -93,12 +92,12 @@ def verify_combiner():
         a, b = rng.randn(500), rng.randn(500)
         assert np.allclose(rankavg(a, b), ra_ref(a, b), atol=0, rtol=0), "rankavg diverged"
         assert np.allclose(zavg(a, b), za_ref(a, b), atol=0, rtol=0), "zavg diverged"
-    print("✅ combiners are bit-identical to ensemble_ladder.rankavg / .zavg (20 random vectors)")
+    print("combiners are bit-identical to ensemble_ladder.rankavg / .zavg (20 random vectors)")
 
 DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # n = 8 datasets. This is the unit of analysis.
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
-# ⚠️ REPORT / Hidden Failures rung order. LOO comes before SameTask. Do not silently reorder.
+# REPORT / Hidden Failures rung order. LOO comes before SameTask. Do not silently reorder.
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
 OOD = RUNGS[1:]
 
@@ -106,7 +105,7 @@ OOD = RUNGS[1:]
 GATE_COMPONENTS = ["floor_min", "floor_ppl", "floor_sum", "saplma", "uniform", "attention",
                    "wmsp_norm", "wmsp_shrink2"]
 
-# ⭐ PER-CELL GATE (strengthened 2026-08-20). The earlier version compared a computed MACRO against a
+# PER-CELL GATE (strengthened 2026-08-20). The earlier version compared a computed MACRO against a
 # hardcoded table of seven Llama values at 0.02 tolerance. That is far weaker than it looked: a macro
 # can match while individual cells are wrong in cancelling directions, and the hardcoded numbers are
 # model-specific so the gate simply could not run on a second population. It now reads the master CSV
@@ -201,7 +200,7 @@ def load_cells(perex_dir, slug):
     return cells, missing
 
 
-# ⚠️⚠️ SEED HANDLING -- THE ONE THING THAT MUST NOT BE GOT WRONG HERE.
+# SEED HANDLING -- THE ONE THING THAT MUST NOT BE GOT WRONG HERE.
 #
 # There are two ways to turn 3 seeds into one PRR and they are NOT the same number:
 #   (a) mean over seeds of PRR(y, unc[s])            <- what pdl_master and the ladder report
@@ -309,14 +308,14 @@ def main():
     print("M6 -- HAPES + SAPLMA: is the combination better than SAPLMA far OOD without losing ID?")
     print(f"Population: ProbeDriftLong long grid, {len(LONG)} evals x 5 rungs, 3 seeds, {args.model}.")
     if excluded:
-        print(f"⚠️ SENSITIVITY ARM -- EXCLUDED: {excluded}. This never replaces the full-grid primary.")
+        print(f"SENSITIVITY ARM -- EXCLUDED: {excluded}. This never replaces the full-grid primary.")
     print(f"Source: {perex_dir}   (per-example sidecars; no training, no GPU)")
     print("=" * 104)
 
     cells, missing = load_cells(perex_dir, slug)
     print(f"\nCOVERAGE: {len(cells)}/40 cells")
     if missing:
-        print(f"⚠️ MISSING ({len(missing)}): {', '.join(missing)}")
+        print(f"MISSING ({len(missing)}): {', '.join(missing)}")
         print("   Reported as INCOMPLETE. A partial grid is never presented as the whole one.")
     if not cells:
         raise SystemExit(f"no sidecars under {perex_dir} -- run the component pass first")
@@ -393,15 +392,15 @@ def main():
                              "a shifted estimator, not a re-draw")
         print(f"    bias check {NAMES.get(m, m):16s} signs {pos}/{len(dvs)-pos}  binom p={bp:.4f}")
     if gate_warn:
-        print(f"\n  ⚠ {len(gate_warn)} trained-component cell(s) exceed 2x the master's 3-seed sd "
+        print(f"\n  {len(gate_warn)} trained-component cell(s) exceed 2x the master's 3-seed sd "
               "(reported, not fatal -- see continuity_device_diagnosis.py):")
         for w in gate_warn[:8]:
             print(f"    ~ {w}")
-    print(f"\n  GATE 1: {'✅ PASS' if not gate_fail else '❌ FAIL'}  "
+    print(f"\n  GATE 1: {'PASS' if not gate_fail else 'FAIL'}  "
           f"({n_cmp} per-cell comparisons, max |d| = {worst:.2e}"
           + (f" at {worst_at}" if worst_at else "") + f", tol {GATE_CELL_TOL:g})")
     for f in gate_fail[:15]:
-        print(f"    ✗ {f}")
+        print(f"    - {f}")
 
     # ---------------------------------------------------------------- GATE 2: sidecar integrity
     print("\n" + "-" * 104)
@@ -424,17 +423,17 @@ def main():
                 if not (np.isnan(sa) or abs(sa - 1.0) < 1e-9):
                     det_bad.append(f"{d}/{rg}/{m}: seed self-agreement {sa:.6f} != 1.0")
     nseeds = sorted({np.asarray(V).shape[0] for meth, _ in cells.values() for V in meth.values()})
-    print(f"  row alignment / finiteness : {'✅ PASS' if not bad else '❌ FAIL'}")
+    print(f"  row alignment / finiteness : {'PASS' if not bad else 'FAIL'}")
     for b in bad[:10]:
-        print(f"    ✗ {b}")
-    print(f"  floors deterministic       : {'✅ PASS' if not det_bad else '❌ FAIL'}")
+        print(f"    - {b}")
+    print(f"  floors deterministic       : {'PASS' if not det_bad else 'FAIL'}")
     for b in det_bad[:10]:
-        print(f"    ✗ {b}")
+        print(f"    - {b}")
     print(f"  seed counts present        : {nseeds}")
     print("  (the writer's own 1e-6 PRR self-gate already ran at write time and would have refused)")
 
     if gate_fail or bad or det_bad:
-        print("\n⛔ A GATE FAILED. Per the project convention the primary result is NOT read or")
+        print("\nA GATE FAILED. Per the project convention the primary result is NOT read or")
         print("   interpreted until the gates pass. Stopping here.")
         _write(out_path, rows)
         return
@@ -526,7 +525,7 @@ def main():
     print("PRE-REGISTERED INTERPRETATION (prereg M6 §6) -- applied to the PRIMARY ensemble only")
     print("=" * 104)
     if ood_stat is None or id_stat is None:
-        print("  ⏸ PRIMARY ensemble not computable on this population (a component is ABSENT, not zero).")
+        print("  PRIMARY ensemble not computable on this population (a component is ABSENT, not zero).")
         print("     No verdict is issued. Run pbs/pdl_perex_ens.pbs to produce HAPES λ=2 + attention.")
         _write(out_path, rows)
         return
@@ -549,15 +548,15 @@ def main():
         verdict = "PARTIAL -- OOD improvement, but not consistent enough across datasets"
     else:
         verdict = "NULL -- no established OOD improvement over SAPLMA. A valid result."
-    print(f"\n  ⭐ VERDICT: {verdict}")
+    print(f"\n  VERDICT: {verdict}")
     rows.append({"section": "verdict", "method": "PRIMARY", "value": verdict})
 
     # ---------------------------------------------------------------- complementarity (SECONDARY)
     print("\n" + "-" * 104)
     print("COMPLEMENTARITY -- SECONDARY MECHANISM EVIDENCE, NOT part of the success criterion")
     print("  A cross-correlation cannot exceed sqrt(r_xx * r_yy), so the disattenuated value is the")
-    print("  interpretable one. ⚠️ Lower correlation alone is NOT evidence of a better method:")
-    print("  §9 of STOCKTAKE_sharpening_axis already recorded that distinctness != incremental value.")
+    print("  interpretable one. Lower correlation alone is NOT evidence of a better method:")
+    print("  the project record already recorded that distinctness != incremental value.")
     print("-" * 104)
     print(f"{'pair':40s}{'self A':>9s}{'self B':>9s}{'cross':>9s}{'disatt.':>10s}   population")
     for label, a, b in [("HAPES λ=2 ~ SAPLMA", "wmsp_shrink2", "saplma"),
