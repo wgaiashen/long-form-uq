@@ -35,10 +35,11 @@ from scipy.stats import rankdata, spearmanr, wilcoxon
 sys.path.insert(0,"src"); sys.path.insert(0,"scripts/checks")
 from luq import results
 from orthogonality_map import self_agreement, cross_agreement
-D="../results/pdl_perex_ens"
+import os
+S=os.environ.get("LUQ_SLUG","meta-llama_Meta-Llama-3.1-8B")
+D=os.environ.get("LUQ_PEREX", "../results/pdl_perex_ens" if S.startswith("meta-llama") else f"../results/pdl_perex_ens_{S}")
 LONG=["pubmed_qa","med_quad","asqa","xsum","cnn_dailymail","samsum","expertqa","factscore"]
 RUNGS=["ID","LOO-long","SameTask-long","DiffTask-long","1ds-Diff-long"]; OOD=RUNGS[1:]
-S="meta-llama_Meta-Llama-3.1-8B"
 def rankavg(*us): return np.mean([rankdata(u) for u in us],axis=0)
 def prr_ps(y,V): return float(np.mean([results.prr(y,V[s]) for s in range(V.shape[0])]))
 def ens_ps(y,A,B): return float(np.mean([results.prr(y,rankavg(A[s],B[s])) for s in range(min(len(A),len(B)))]))
