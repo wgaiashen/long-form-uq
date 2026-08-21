@@ -2,7 +2,7 @@
 
 ## 0. Provenance — read this first
 
-The thresholds below were fixed in the project plan (a planning document kept outside this repo),
+The thresholds below were fixed in the project's planning notes (a planning document kept outside this repo),
 committed in `9731fea` on 2026-08-08 02:42 +0100, **before a single Qwen record existed** (Qwen
 generation began 2026-08-09). This file **transcribes them verbatim** on 2026-08-10; nothing is
 re-derived, no threshold is changed.
@@ -13,14 +13,14 @@ re-derived, no threshold is changed.
   cache, and the per-token layer-23 extraction (in progress) are complete or underway on DoC.
 - **No supervised ladder number exists.** R2, R2-desc, R3 and R4′ are fully unobserved.
 - **The training-free floors have been partially observed**: the W6 Lehmer analysis
-  (`prereg/W6_lehmer_qwen.md`, the project results log) computed and reported per-dataset
+  (`prereg/W6_lehmer_qwen.md`, the project's working notes) computed and reported per-dataset
   `msp_min` and the sharpening-family endpoints (including `perplexity`) on all 8 Qwen datasets
   before this file was written. R1a/R1b's inputs are therefore partly seen at transcription time.
   This is recorded here rather than hidden; the R1 thresholds themselves predate every Qwen
   artifact (`9731fea`), and nothing in them was adjusted after W6.
 
 **Population caption for every table** (corrected from §3's original, which said "layer selected
-on dev" — superseded on 2026-08-09 (decision recorded in the project results log); **no dev split exists**):
+on dev" — superseded on 2026-08-09 (decision recorded in the project's working notes); **no dev split exists**):
 
 > *ProbeDriftLong, 8 long evals × `cells_long`, 3 seeds, `Qwen/Qwen2.5-14B` (base), fp32 + eager,
 > judge label gpt-5-mini, layer 23 by the fixed rule `ceil(N/2) − 1` (the convention; Llama ran
@@ -28,7 +28,7 @@ on dev" — superseded on 2026-08-09 (decision recorded in the project results l
 
 **Unit of analysis is the DATASET (n = 8), not the cell**, for every test below.
 
-## 1. The claims (verbatim from the project plan, commit `9731fea`)
+## 1. The claims (verbatim from the project's planning notes, commit `9731fea`)
 
 | id | claim | Llama value | replicates iff | fails iff |
 |---|---|---|---|---|
@@ -52,7 +52,7 @@ on dev" — superseded on 2026-08-09 (decision recorded in the project results l
 - **Anti-favourable-result guard:** if **all four** replicate cleanly, treat it as a suspected
   configuration leak and re-verify that no Qwen test PRR was inspected before the layer was fixed.
 
-## 3. Configuration policy (from the project plan, unchanged)
+## 3. Configuration policy (from the project's planning notes, unchanged)
 
 - **PRIMARY (A):** transfer Llama's configuration **unchanged** — same shrink λ (2.0 / 10.0), same
   β = 1.0, same temperature-selection procedure, same pooler recipe, same SAPLMA recipe.
@@ -71,7 +71,7 @@ on dev" — superseded on 2026-08-09 (decision recorded in the project results l
 The Tier-1 paper method set on the complete grid — 8 evals × 5 `cells_long` rungs × 3 seeds
 (seeds 1, 2, 3): `msp_min`, `perplexity`, `msp_sum`, `fair_floor` (footnote only), SAPLMA,
 mean-pool control, attention pooler, `wMSP-norm`, `wMSP-shrink@2`, plus P(True) and Lookback as
-baselines (the project plan). Coverage is stated per table; a missing cell is
+baselines (the project's planning notes). Coverage is stated per table; a missing cell is
 named, never silently absent. expertqa/factscore are scored on their judge-covered subsets
 (expertqa 1603/2016, factscore 466/500 on this population) — a null label is the judge declining
 (`uncovered = 1.0`), not incomplete labelling, and captions must say so.

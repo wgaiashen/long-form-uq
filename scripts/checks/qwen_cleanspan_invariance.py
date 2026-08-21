@@ -11,7 +11,7 @@ master EXACTLY (floors are exact by construction; supervised methods can carry t
 noise, so the tolerance is 1e-6, not "eyeballed"). If the cell DOES touch a cleaned dataset, no
 assertion is made -- movement there is expected, and its magnitude is reported, not gated.
 
-Mirrors the same check RCS ran for the Llama MedQuAD correction (the project results log): "0 cells
+Mirrors the same check RCS ran for the Llama MedQuAD correction (the project's working notes): "0 cells
 moved without [a cleaned dataset] in train or eval" is the correctness control this script proves.
 """
 import csv

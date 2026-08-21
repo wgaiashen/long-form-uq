@@ -80,7 +80,7 @@ def main():
     print("Population: ProbeDriftLong, 8 long evals, layer 23, judge gpt-5-mini, carve=legacy.")
     print("NOT pre-registered on this population. Both parameters are FIXED from Llama and")
     print("   nothing was tuned on Qwen, but the Qwen master was already visible when they ran.")
-    print("   These rows sit OUTSIDE the M2 scorecard (the project results log) and never pool with it.")
+    print("   These rows sit OUTSIDE the M2 scorecard (the project's working notes) and never pool with it.")
     print("=" * 100)
 
     rows = []

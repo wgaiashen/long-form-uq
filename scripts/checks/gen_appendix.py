@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate Appendix A of the project results log: full per-cell tables for every method tried
+"""Generate Appendix A of the project's working notes: full per-cell tables for every method tried
 since 7 August, straight from the results CSVs (no hand-copied numbers).
 
 For FREE methods the per-dataset curve IS the full grid (rung-invariant, stated per table).

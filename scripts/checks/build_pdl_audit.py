@@ -10,7 +10,7 @@ Emits results/pdl_audit_matrix__<SLUG>.csv + a rendered markdown block to stdout
 deliverable; report it before running any fill job.
 
 Population is inferred from the FILE FAMILY (+ env_hash where it disambiguates), because no CSV carries a
-dedicated pool column -- verified this session:
+dedicated pool column, verified against the files:
   - base `probedriftlong_<eval>_widened[_wmsp]__` .......... WIDENED cells_long
   - `fixed_prior_ladder[_factscore]__`, `multihead_ladder__…_joined`, `ensemble_*__` (all import
     probedriftlong as pdl and use the post-Task-A widened `sampled_train_idx`) .... WIDENED cells_long

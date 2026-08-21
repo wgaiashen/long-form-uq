@@ -74,7 +74,7 @@ def main():
                     help="required acknowledgement: this tool reads the standalone RECORDS file, which is a "
                          "DIFFERENT test population from the one the drivers score on (load_per_token + "
                          "eval_split). Its floors DO NOT match the drivers (pubmed: this tool −0.210 vs driver "
-                         "+0.371 -- a sign flip). See the project record.1 / XXIV. Do NOT use these numbers to "
+                         "+0.371 -- a sign flip). Do not use these numbers to "
                          "judge any method. Only for a rough sanity sweep, and only with this flag.")
     args = ap.parse_args()
     if not args.i_understand_wrong_population:
@@ -84,7 +84,7 @@ def main():
             "−0.210 here vs +0.371 in every driver -- a sign flip), so these numbers must NEVER be used to\n"
             "judge a method (that was the PART XX bug). The authoritative floors are `luq.msp.fair_floor` as\n"
             "called inside the drivers (they pass it the eval_split records). If you only want a rough sweep\n"
-            "and understand the caveat, pass --i-understand-wrong-population. See the project record.1 / XXIV.")
+            "and understand the caveat, pass --i-understand-wrong-population.")
     files = args.csvs or (sorted(glob.glob(str(ROOT / "results" / "*.csv"))) if args.all else [])
     if not files:
         ap.error("give CSV paths or --all")

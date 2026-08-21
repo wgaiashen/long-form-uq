@@ -197,7 +197,7 @@ def main():
     # ---- the audit list itself: every choice made by reading test results ----
     print("\n" + "=" * 100)
     print("THE AUDIT LIST -- configuration choices made by looking at TEST results")
-    print("(file:line evidence in the project results log; this is the summary)")
+    print("(file:line evidence in the project's working notes; this is the summary)")
     print("=" * 100)
     AUDIT = [
         ("weighted-MSP lambda {norm,2,10}", "all run on every test cell, best promoted",
@@ -205,7 +205,7 @@ def main():
         ("best-of-eight wMSP verdict rows", "argmax over 8 arms on test PRR per cell "
          "(probedriftlong.py:513-514)", "asymmetry: max-of-THREE was rejected for the BASELINE"),
         ("prior-tilt beta = 0.5", "max over 6 values on test cells",
-         "already self-labelled an oracle (the project results log)"),
+         "already self-labelled an oracle (the project's working notes)"),
         ("armD:top-25% prior arm", "best win-count against SAPLMA",
          "already flagged post-hoc; the registered single-k primary FAILED"),
         ("Orgad threshold tau = 0.3", "soft tier beat the hard mask on OOD test cells",

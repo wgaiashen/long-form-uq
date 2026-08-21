@@ -56,9 +56,9 @@ and `q_final_norm`; then WAIT for go-ahead. If `meanpool_mlp(60ep)` is well belo
 to `--early-stop` (validation-selected epochs for the MLP-head cells; linear cells stay fixed-60ep armA/armB
 so their gates still pass) and re-clear the pubmed gate before fanning out to the other seven evals.
 
-## Update -- two implementations, and the stopping rule (after the previous DoC session's med_quad landed, before this driver's pubmed result)
+## Update -- two implementations, and the stopping rule (after the earlier med_quad run landed, before this driver's pubmed result)
 
-The previous DoC session (commit `506b470`, driver `scripts/checks/head_agg_2x2.py`) already implemented
+An earlier run (commit `506b470`, driver `scripts/checks/head_agg_2x2.py`) already implemented
 and ran the same 2x2, med_quad complete, held fan-out for the rest (now cancelled). Its reference cells
 (`meanpool_linear`/`meanpool_mlp`/`attention_linear`) reproduce the base run to ~1e-4, so it is a valid
 cross-check on those. **But its `attention_mlp` is a DIFFERENT method from this driver's** -- the two do

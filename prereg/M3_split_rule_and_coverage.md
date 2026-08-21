@@ -4,7 +4,7 @@
 every threshold and decision rule below is fixed while only the Llama numbers are known.
 
 Companion to `prereg/M2_qwen14b_replication.md` (the four replication claims) and
-the project plan (the implementation).
+the project's planning notes (the implementation).
 
 ---
 
@@ -179,7 +179,7 @@ non-replication of it carries no information.
 2. Commit the modified tracked files (the ladder refuses to run on a dirty tree).
 3. Gate 2 — re-run samsum + factscore under `LUQ_CARVE=legacy`; PRR must match exactly.
 4. Gate 3 — `LUQ_CARVE=all-rows`, re-score expertqa + factscore only; the other six must not move.
-5. Record old beside new in the project results log as a dated revision, never a silent edit.
+5. Record old beside new in the project's working notes as a dated revision, never a silent edit.
 
 Re-runs use the **paper method set only**: floors, SAPLMA, attention pooler + mean-pool control,
 `wmsp_norm` + `wmsp_shrink2` — matching the Qwen Tier 1 set so both models stay method-matched.

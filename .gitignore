@@ -19,8 +19,7 @@ logs/
 *.e[0-9]*
 
 # Transient scheduler bookkeeping written by the job-watcher shell loops: bare lists of PBS job
-# IDs, and a zero-byte "fleet launched" sentinel. Five of these were committed by accident and
-# untracked on 2026-08-14. The job IDs are long dead and document nothing reproducible.
+# IDs, and a zero-byte sentinel. The job IDs document nothing reproducible.
 .luq_*
 .seg_fleet_launched
 
@@ -33,29 +32,24 @@ logs/
 # PBS job logs (persistent by design -- see pbs/topk_prior_one_eval.pbs -- but not artifacts to track)
 logs/
 
-# A worktree's cache is a SYMLINK to the main checkout's cache, so the existing 'cache/'
-# pattern (which matches directories) never matched it and it sat untracked forever. A permanently
-# dirty 'git status' is not cosmetic here: the untracked-file sweep relies on it.
+# A worktree's cache is a symlink to the main checkout's cache, so the 'cache/' pattern above
+# (which matches directories) does not match it. The bare form below does.
 cache
 
 # `results` is a SYMLINK to ../results, i.e. to a directory outside this repository, where the
 # result files are version-controlled separately (they are not part of the published artifact).
 # The code keeps reading and writing `results/...` exactly as before, because this path still
-# resolves -- that is the entire point of the symlink, and it is why no driver, PBS script or glob
-# needed changing. Same trailing-slash trap as `cache` above: the 'results/' pattern on line 12
-# matches a DIRECTORY and does NOT match this symlink, so the bare form is required or the tree
-# reads permanently dirty and the untracked-file sweep stops working.
+# resolves, which is why no driver, PBS script or glob needed changing. Same trailing-slash trap as
+# `cache` above: the 'results/' pattern matches a DIRECTORY and does not match this symlink, so the
+# bare form is required or the tree reads permanently dirty.
 results
 
-# ---- WORKING NOTES DO NOT BELONG IN THE SUBMITTED REPO ----
-# This repo is the submitted artifact and should read as a record of what was actually RUN.
-# Cluster hand-overs, session notes and "how to find your bearings" explainers are working notes:
-# they are kept outside this repository, alongside the planning documents. Pre-registrations and
-# analysis scripts are NOT in this class -- they are part of the record and stay tracked here.
+# Day-to-day working notes: cluster hand-over briefs and orientation documents. These are kept
+# outside this repository alongside the planning documents. Pre-registrations and analysis scripts
+# are not in this class and stay tracked here.
 *_BRIEF_*.md
 DOC_BRIEF*.md
 DOC_INSTRUCTIONS.md
-AGENT_*.md
 *_HANDOVER*.md
 
 # Editor / tooling scratch directories and worktrees. A 42MB unlabelled records duplicate was found

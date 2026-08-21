@@ -91,7 +91,7 @@ SETTINGS = [("SameTask", "OOD_ONE_DATASET_SAME_TASK"),
 # beat the OOD-robust floor, do the poolers, and does the contribution beat the pooler?
 # The floor MUST be the FAIR floor = the best of the unsupervised baselines actually available, not the
 # bare `msp_sum`. Hard-coding msp_sum understates the bar whenever the length-normalised floor is stronger,
-# which is exactly the artefact that produced (and then killed) the cnn "win" -- see the project record PART VI.
+# which is exactly the artefact that produced (and then killed) the cnn "win" -- see the project's working notes PART VI.
 # Live example: on ASQA msp_sum=0.148 but perplexity=0.316, so every vs-msp_sum verdict was measured against
 # less than half the honest bar (attention_vs_floor read +0.458 SIG at ID; against the fair floor it is
 # +0.290, and at the two hardest OOD rungs EVERY supervised method is actually BELOW the floor).

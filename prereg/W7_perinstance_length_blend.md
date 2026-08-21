@@ -1,12 +1,12 @@
 # PRE-REGISTRATION — W7: the per-instance length blend (the §6 ask, run as asked)
 
-> **Status (2026-08-09):** run. The registered null: the per-instance length blend does not beat the better endpoint. Record: the project results log
+> **Status (2026-08-09):** run. The registered null: the per-instance length blend does not beat the better endpoint.
 
 **Written 2026-08-09, before the script was implemented.** Design note, 7 Aug: apply the HBO pattern
 **per test example**, with length in the slot where OOD-ness sat. §8's oracle retractions are at
 dataset/cell granularity and do NOT close this; it has never been run in this form on the canonical
 population. (The seed-1 `length-blend` in the master is the {floor, armA} version on the router
-population with a comparator later shown broken — the project results log.)
+population with a comparator later shown broken — the project's working notes.)
 
 ## The estimator (ONE parameter)
 Per test example i, z-score both uncertainty vectors within the cell (label-free), then

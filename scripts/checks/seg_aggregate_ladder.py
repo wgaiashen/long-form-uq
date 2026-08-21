@@ -178,7 +178,7 @@ def main():
                          # ITEM 5: seg_min is the aggregator the weakest-link theory predicts, and its few
                          # nominal wins sit at the hardest shift rungs. Adding its paired test so the
                          # "decomposition never significantly beats whole-response" claim covers it too,
-                         # not just the fitted seg_learned (the project record XXI.4).
+                         # not just the fitted seg_learned (the project's working notes XXI.4).
                          ("min_vs_saplma", "seg_min", "saplma"),
                          ("mean_vs_saplma", "seg_mean", "saplma"),
                          ("learned_vs_fairfloor", "seg_learned", "fair_floor")]:

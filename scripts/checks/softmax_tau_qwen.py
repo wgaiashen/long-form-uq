@@ -2,7 +2,7 @@
 """Fixed softmax sharpening at tau = 1 on the Qwen2.5-14B grid -- a POST-HOC cross-model transfer.
 
 WHAT tau = 1 IS, AND WHERE IT COMES FROM. It is the a-priori sharpening strength W1 committed to in
-writing before the Llama run: the project results log records it as "A0 a priori, tau = 1
+writing before the Llama run: the project's working notes records it as "A0 a priori, tau = 1
 (PRIMARY) | committed in writing before the run". It is NOT an argmax over the tau grid, which
 matters -- the project has one recorded case of a grid-argmax being mistaken for a result (the
 Lehmer beta = 2 row), and this is not that.
@@ -13,15 +13,15 @@ value onto a second population: no parameter is searched, no per-dataset tau, no
 no PASS/FAIL. The output carries provenance = post-hoc-transfer and lives OUTSIDE the M2 scorecard.
 
 For context, tau = 1's own registered claim FAILED on Llama: +0.0209 against msp_min, 6/8, p = 0.148
-(the project results log). So this transfers a value that did not work on its home
+(the project's working notes). So this transfers a value that did not work on its home
 population -- the opposite of a favourable-result search.
 
-WHY A SEPARATE FILE, not a --model flag on sharpening_family.py. That file is the live W-Sharpen
-driver on the other cluster; a second agent adding a flag to it is the collision the workstream
-split exists to avoid. The scorer itself is IMPORTED from it, so this is the same code path the
-prereg names rather than a re-implementation -- which the project's "verify against the original,
-not a paraphrase" rule forbids. Same pattern as lehmer_qwen.py, whose loader and bootstrap are
-imported here for the identical reason.
+Why this is a separate file rather than a --model flag on sharpening_family.py: that file was in
+active use for the Llama sharpening runs, and adding a flag to it risked disturbing them. The
+scorer itself is imported from it, so this is the same code path the pre-registration names rather
+than a re-implementation, which would break the rule that a ported method is verified against the
+original and never against a paraphrase. Same pattern as lehmer_qwen.py, whose loader and bootstrap
+are imported here for the identical reason.
 
   score(tau) = sum_t w_t * nll_t,   w = softmax(tau * z),   z = NLL standardised WITHIN the answer
                tau = 0   -> uniform weights   -> ranks identically to perplexity

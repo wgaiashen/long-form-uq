@@ -13,7 +13,7 @@ same population `results/pdl_master__Qwen_Qwen2.5-14B.csv` and the primary
   mu_C   = mean(NLL over the CONTENT-TOKEN mask, i.e. weighted_msp.content_keep -- the EXACT mask
            learned wMSP scores against, special tokens excluded)
   mu_all = mean(NLL over ALL G tokens) -- msp.msp_uncertainty(..., "perplexity"), the canonical floor
-           already published per-dataset in the project results log
+           already published per-dataset in the project's working notes
 
 Both are scored with the SAME `results.prr` used everywhere else, on the SAME eval-target test rows
 (`xl_rungs.eval_split`) every rung in the ladder tests against -- these unsupervised floors are
@@ -51,7 +51,7 @@ OOD_RUNGS = ["SameTask-long", "LOO-long", "DiffTask-long", "1ds-Diff-long"]
 
 def macro_ood_from_master(master_csv, method, ev):
     """Mean PRR over the 4 OOD rungs for one (method, eval) cell, read from the gated master --
-    the SAME numbers already published in the project results log No fitting here."""
+    the SAME numbers already published in the project's working notes. No fitting here."""
     import csv as _csv
     vals = []
     with open(master_csv) as f:

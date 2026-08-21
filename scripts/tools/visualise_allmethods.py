@@ -4,7 +4,7 @@ per-token track, on the SAME generations, so you can see by eye what each method
 
 Builds on visualise_attention.py's data path; reuses viz_common (additively extended: token_meta hover + absent
 tracks). HYPOTHESIS GENERATION ONLY -- STANDING RULE: any claim it suggests needs a full-population statistic
-before it enters the project record.
+before it enters the project's working notes.
 
 Tracks (each a per-token weight over the G generated tokens; every G+1 source has row 0 (prompt anchor) dropped):
   model-side : surprisal (per-token NLL), msp_min (ONE-HOT on the argmin-logprob token), perplexity/uniform

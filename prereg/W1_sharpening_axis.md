@@ -1,10 +1,10 @@
 # PRE-REGISTRATION — W1: the training-free sharpening family
 
-> **Status (2026-08-09):** run. The primary claim FAILED its registered bar (margin +0.0209 PASS, signs 6/8 PASS, Wilcoxon p = 0.148 FAIL — NOT ESTABLISHED); both honest selection arms collapsed to msp_min on every fold. What survives is the regime map (descriptive). Record: the project results log
+> **Status (2026-08-09):** run. The primary claim FAILED its registered bar (margin +0.0209 PASS, signs 6/8 PASS, Wilcoxon p = 0.148 FAIL — NOT ESTABLISHED); both honest selection arms collapsed to msp_min on every fold. What survives is the regime map (descriptive).
 
 **Written 2026-08-08, BEFORE the driver was implemented and before any cell was run.**
 Population: `meta-llama/Llama-3.1-8B`, the 8 long ProbeDriftLong evals, legacy carve.
-Plan: `../the project plan. Results doc: `../the project results log.
+
 
 ---
 
@@ -47,7 +47,7 @@ in this project and have come back negative.
 | # | test | source | outcome |
 |---|---|---|---|
 | P1 | best FIXED k in the hard version of this family (mean of the k lowest logprobs), cross-dataset mean | `results/topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv` | **k = 1 (= `msp_min`) is the maximum, at +0.151 over the 7 datasets covered.** Every interior k is lower; k = all gives +0.087. The per-example fractional version also peaks at the endpoint. |
-| P2 | label-free leave-one-dataset-out selection of that k | the project results log | **NULL.** Every one-feature predictor lands +0.254 to +0.258, **below always-`msp_min` +0.284.** |
+| P2 | label-free leave-one-dataset-out selection of that k | the project's working notes | **NULL.** Every one-feature predictor lands +0.254 to +0.258, **below always-`msp_min` +0.284.** |
 | P3 | `ZGAP = (mean − min)/std` predicts which regime a dataset is in | `prereg/R1_taxonomy_label_free.md`, `results/regime_R1_label_free__meta-llama_Meta-Llama-3.1-8B.csv` | **FALSIFIED.** 8/12 pairs, AUC 0.667. `cnn_dailymail`, the most spread dataset in the grid, has the **highest** ZGAP of all eight (3.93). Plain generation length separated the groups better than ZGAP did. |
 
 P3 is the most directly damaging, and it must be stated plainly: **`ZGAP` is exactly the quantity
@@ -79,7 +79,7 @@ Three consequences, all registered:
    1ds-DiffTask single-source problem does not arise.
 3. **Any free-vs-free comparison reported over "32 OOD cells" is 8 values counted four times.** Every
    interval in this workstream is computed on n = 8. This is already recorded at
-   the project results log; it is restated here because it sets the sample size for every
+   the project's working notes; it is restated here because it sets the sample size for every
    test below.
 
 ## 4. THE REGISTERED QUESTIONS, WITH THRESHOLDS FIXED NOW

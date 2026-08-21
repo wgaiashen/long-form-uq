@@ -14,9 +14,8 @@ whole score. Splitting the budget means "which token matters IN THIS SENTENCE" i
 "which SENTENCE matters", which is closer to how a long-form answer actually fails (one bad claim among
 several fine ones).
 
-GROUNDING (the reduction properties this module must satisfy — these are unit-tested in
-tests/test_hier_pool.py, following the project convention that every aggregation variant carries a numeric
-correctness check, not just a deliverable):
+GROUNDING (the reduction properties this module must satisfy). These are unit-tested in
+tests/test_hier_pool.py, so every aggregation variant carries a numeric correctness check:
 
   * ONE segment containing every token   -> level 2 is a softmax over a single item (= 1.0), so the module
                                             collapses to the FLAT attention pooler.

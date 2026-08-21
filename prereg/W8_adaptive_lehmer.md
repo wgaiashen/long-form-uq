@@ -19,7 +19,7 @@ by design and none had been produced at commit time.
   was completed before this file was committed. Its inputs are exploratory mechanism evidence on
   already-read labels; nothing in it selected any parameter of the method below — the
   architecture, features, bound, and training recipe were fixed in the plan of 2026-08-10
-  (the project plan) before the audit ran.
+  (the project's planning notes) before the audit ran.
 
 ## 1. Method (implementation: `src/luq/adaptive_lehmer.py`, driver
 `scripts/checks/adaptive_lehmer.py`, unit tests `tests/test_adaptive_lehmer.py` — all committed)

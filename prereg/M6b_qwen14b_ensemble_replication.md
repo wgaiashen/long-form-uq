@@ -13,7 +13,7 @@ This is a replication, not a method search. It inherits sections 2 to 6 and sect
 re-selected on Qwen. This document fixes only what is new: the replication verdict, the role of the
 ExpertQA sensitivity, and one directional prediction.
 
-The Qwen component results are already observed and public (the project results log, the master table).
+The Qwen component results are already observed and public (the project's working notes, the master table).
 They motivate this registration and are not evidence for it. What has never been formed on this
 population is any of the four ensembles.
 

@@ -114,7 +114,7 @@ def main():
             # standard floors, not the bare non-length-normalised `sum`. Comparing against `sum` alone
             # overstates every win -- e.g. pubmed_qa sum=+0.202 but min=+0.371, and ASQA sum=+0.148 but
             # perplexity=+0.316. That is the same artefact that produced and then killed the cnn
-            # headline (the project record). probedriftlong.py has always used all three.
+            # headline (the project's working notes). probedriftlong.py has always used all three.
             _cands = {k: np.asarray([msp.msp_uncertainty(records[i]["token_logprobs"], k)
                                      for i in te_idx], dtype=float)
                       for k in ("sum", "perplexity", "min")}

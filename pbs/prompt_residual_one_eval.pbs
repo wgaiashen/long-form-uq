@@ -8,10 +8,10 @@
 #
 #   qsub -v LUQ_EVAL=pubmed_qa pbs/prompt_residual_one_eval.pbs
 #
-# RUNS FROM A WORKTREE, NOT THE MAIN CHECKOUT. This workstream lives on the branch
-# `method-dev-residual` so it cannot collide with the cross-length work in the main checkout --
-# probedriftlong._provenance() ABORTS on a dirty tracked tree, so two agents editing one checkout
-# cannot both run. The worktree has no cache/ of its own (cache/ is gitignored), hence
+# Runs from a worktree rather than the main checkout. This line of work lives on the branch
+# `method-dev-residual` so it cannot collide with the cross-length work in the main checkout:
+# probedriftlong._provenance() aborts on a dirty tracked tree, so concurrent edits to one checkout
+# would stop either run. The worktree has no cache/ of its own (cache/ is gitignored), hence
 # LUQ_CACHE_ROOT below; luq.config RAISES if it points at a path that does not exist, so a typo
 # here fails loudly rather than silently finding zero caches.
 #

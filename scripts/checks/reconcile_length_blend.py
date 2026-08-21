@@ -12,7 +12,7 @@ is against is not a result. Every margin printed below carries its comparator.
 AND A SECOND FINDING, which is why "+0.034 vs the attention pooler" still may not be quoted. The
 router's `always_pooler` sits systematically BELOW the canonical 3-seed attention pooler on the same
 cells -- not by seed noise, but on 24 of 31 cells, which is a one-sided pattern a coin flip does not
-produce. So the +0.034 is measured against a weaker pooler than the one the project record reports, and the
+produce. So the +0.034 is measured against a weaker pooler than the one the project's working notes reports, and the
 honest margin against the canonical pooler is smaller. The cause is narrowed but NOT closed here; see
 the two surviving hypotheses printed at the end.
 
@@ -44,7 +44,7 @@ DATASETS = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", 
 
 # The project record's 32-cell OOD column, transcribed with its source so the comparison is auditable.
 RECORD_OOD = {"SAPLMA": 0.2412, "armA_attention": 0.2225, "msp_min": 0.1855}
-RECORD_SRC = "the project results log, table 'OOD mean (32)'"
+RECORD_SRC = "the project's working notes, table 'OOD mean (32)'"
 
 
 def load_router():
@@ -93,7 +93,7 @@ def main():
     print(f"  -> {'SAME POPULATION' if agree else 'MISMATCH — refuse to compare'} "
           f"(the floor is training-free, so it can only differ if the CELLS differ)")
     if not agree:
-        raise SystemExit("population mismatch: margins against the project record would be cross-population")
+        raise SystemExit("population mismatch: margins against the project's working notes would be cross-population")
 
     blend = st.mean([float(r["blend"]) for r in rt.values()])
     pooler = st.mean([float(r["always_pooler"]) for r in rt.values()])
@@ -129,7 +129,7 @@ def main():
     if p < 0.05:
         print("  This is ONE-SIDED, so it is not seed-to-seed noise: averaging three seeds instead of")
         print("  one changes the variance, not the expectation, and would land ~50/50. The router is")
-        print("  scoring a systematically WEAKER pooler than the project record reports.")
+        print("  scoring a systematically WEAKER pooler than the project's working notes reports.")
     print("\n  Two surviving hypotheses, neither yet ruled out:")
     print("   (a) TOKEN WINDOW. router_pdl.cell_vectors pools over `states_full[rp]`, the full window,")
     print("       while the trained pooler pools under a MASK. If the two token sets differ the attention")

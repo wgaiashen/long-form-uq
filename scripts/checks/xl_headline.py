@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """The XL grid's headline numbers, computed the SAME way as the Long grid's, so the two are comparable.
 
-Mirrors the analysis written into the project results log for ProbeDriftLong:
+Mirrors the analysis written into the project's working notes for ProbeDriftLong:
   * ID mean and OOD mean per method, with the cell count behind each.
   * The comparison against BOTH bars — `msp_min` (pre-registered, the agreed bar) and the strongest
     free floor chosen PER DATASET. On the Long grid these disagree about whether training beats free at

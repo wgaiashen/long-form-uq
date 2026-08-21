@@ -191,7 +191,7 @@ def main():
     print("  'gross headroom' is real_oracle - always_best_single: what has been quoted.")
     print("  'NET headroom'   is real_oracle - shuffled_oracle:    what is actually attributable")
     print("                   to genuine per-unit signal rather than to taking a max over K.")
-    print("  Anything with NET <= +0.005 is RETRACTED from the project record and the deck.")
+    print("  Anything with NET <= +0.005 is RETRACTED from the project's working notes and the deck.")
     if net_lam <= 0.005:
         print("\n  G3 VERDICT: the per-cell LAMBDA headroom does NOT clear its shuffled baseline.")
         print("     F4 (pool-aware shrinkage) is DEAD BEFORE W5 LANDS -- there is no real per-cell")

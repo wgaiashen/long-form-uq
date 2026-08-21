@@ -5,7 +5,7 @@ pre-registration without thresholds is barely one.
 
 ## What is being tested
 
-the idea 3 was several attention heads with a choice made at test time; idea 4 was a diversity-forcing
+Idea 3 was several attention heads with a choice made at test time. Idea 4 was a diversity-forcing
 loss to stop them converging. B.2 ran K heads sharing ONE target and measured them collapsing to pairwise
 attention correlation **1.0000**, so K heads only ever expressed two behaviours, "has a target" and "has
 none". DoC's re-run (`DOC_AUX_RERUN_STATUS.md` §8) confirms this and states that what ran was not the
@@ -86,8 +86,7 @@ coming back ≈ 1.0 for `mh_diverse` (wiring fault, results void).
 
 ## Constraints inherited from supervisors
 
-- **Selection must be per dataset, never per instance** (the supervision meeting notes`, the
-  constraint, accepted in review). The primary method here is the **ensemble**, which needs no selection at
+- **Selection must be per dataset, never per instance**, a constraint agreed in supervision. The primary method here is the **ensemble**, which needs no selection at
   all. Any best-head-per-dataset number is a **declared oracle ceiling**, never a deployable result.
 - **Idea 3's proposed selector is dead.** "Pick the head with the smallest ID→OOD entropy drop" rests on
   entropy-delta, which was rejected by its own pre-registered rule (`prereg/0.1`, `prereg/0.2`). No

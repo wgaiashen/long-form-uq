@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W-Align -- DOES IT MATTER WHETHER A TOKEN'S LOSS IS WEIGHTED BY h_t OR h_{t-1}?
 
-Results: the project results log.   Author's request, 2026-08-17.
+Author's request, 2026-08-17.
 
 THIS IS A POST-HOC SENSITIVITY ABLATION, NOT A HYPERPARAMETER SEARCH. Neither alignment will be
 selected on test performance, and the current formulation stands unless something material shows up.
@@ -81,7 +81,7 @@ LAYER = 15
 # lambda = 2 is the configuration used as the main HAPES result in the canonical master and in every
 # HAPES table of results/analysis/REPORT_HANDOFF_LLAMA.md. (That handoff's §1.1 notes the finer 5-arm
 # honest-LODO incumbent is 1.5; the two differ by +0.0019 macro OOD, far inside seed noise. Recorded in
-# the project results log; not swept here.)
+# the project's working notes; not swept here.)
 ARMS = [("HAPE", "post_token", 0.0),
         ("HAPE", "pre_token", 0.0),
         ("HAPES", "post_token", 2.0),

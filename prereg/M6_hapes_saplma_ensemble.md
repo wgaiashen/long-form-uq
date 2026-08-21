@@ -18,7 +18,7 @@ estimands, the unit of analysis, the interpretation rule, and the commitment not
 - **The ensemble hypothesis did not exist before 14 August 2026.** It came from the supervisors.
 - **HAPES was not invented for this experiment.** It is the project's existing method contribution,
   developed and published internally well before this registration
-  (the project results log, `results/analysis/WMSP_SHRINKAGE_MECHANISM.md`).
+  (the project's working notes, `results/analysis/WMSP_SHRINKAGE_MECHANISM.md`).
 - **The component results were NOT unseen.** SAPLMA, HAPE, HAPES λ=2, the attention pooler and the
   three floors are all fully observed on this exact population and are quoted in §1 below. They are
   the *motivation* for this registration, not evidence for it.
@@ -98,7 +98,7 @@ gate is component-level (§7).
 
 ### 1.3 Prior evidence that bears on how a result here must be read
 
-- the project results log **§9**: SAPLMA and the floor are genuinely distinct and stable — seed
+- the project's working notes **§9**: SAPLMA and the floor are genuinely distinct and stable — seed
   self-agreement 0.772 against cross-correlation 0.194, disattenuated 0.222. There is a real second
   signal.
 - **§8**: every oracle ceiling previously quoted is a max-over-K artefact. The per-cell
@@ -255,7 +255,7 @@ robustness as shift strengthens; that profile may be more informative than the s
 - **One primary combiner** (`rankavg`, equal weight). `zavg` may appear as a robustness footnote only,
   never as a headline, and never as an alternative from which the better is chosen.
 - **No per-cell or per-dataset selection among methods** — closed by §8 of
-  the project results log (net −0.0158, p = 0.994).
+  the project's working notes (net −0.0158, p = 0.994).
 - **No λ sweep, no combiner sweep, no pair sweep, no interpolator.**
 - **No new generation, extraction or GPU job.** CPU-only, from existing caches.
 

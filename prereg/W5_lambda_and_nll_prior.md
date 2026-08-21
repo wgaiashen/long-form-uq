@@ -1,11 +1,11 @@
 # PRE-REGISTRATION — W5: λ = 1.5 from a July prediction, and NLL inside the weight logits
 
-> **Status (2026-08-09):** run 8/8. The registered λ = 1.5 claim FAILS (tie with shrink@2); the anchor-quality mechanism holds (Spearman +0.835, LOO-stable). Record: the project results log
+> **Status (2026-08-09):** run 8/8. The registered λ = 1.5 claim FAILS (tie with shrink@2); the anchor-quality mechanism holds (Spearman +0.835, LOO-stable).
 
 **Written 2026-08-09, BEFORE the driver was implemented and before any cell was run.**
 Population: the COMPLETE ProbeDriftLong grid, 8 long evals × 5 rungs, `meta-llama/Llama-3.1-8B`,
 legacy carve, 3 seeds. **Headline numbers are the mean over the 4 OOD rungs, n = 8 datasets.**
-Plan: `../the project plan. Results: `../the project results log
+
 
 ---
 
@@ -92,7 +92,7 @@ If λ = 1.5 passes but λ = 2 (already on the grid) passes by more, the register
 
 Track 2 sharpened the *learned* logits, `w = softmax(raw / T)`. Its `T → 0` limit concentrates on
 `argmax(raw)`, which is **not** `argmax(nll)`: measured agreement is **6–13%** against chance rates of
-1–5% (the project results log). So Track 2 never spanned wMSP ↔ `msp_min` at all, and the
+1–5% (the project's working notes). So Track 2 never spanned wMSP ↔ `msp_min` at all, and the
 claim that it did was withdrawn.
 
 **The existing `armD` does not fix this either, and it is important not to conflate them.** armD

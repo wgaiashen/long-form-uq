@@ -80,7 +80,7 @@ Dropped: **`med_quad`**, **`expertqa`**.
 - **`med_quad`: measurement validity.** On the accepted Llama base population it shows **47.8% of
   generations carrying an invented follow-up question** that the judge nonetheless scores,
   **12.33% severe degeneracy**, and **97.7% capped**. It additionally carries the answer-span
-  sensitivity recorded in the project results log, including a standing DO-NOT-CLAIM on its own
+  sensitivity recorded in the project's working notes, including a standing DO-NOT-CLAIM on its own
   `msp_min` ranking.
 - **`expertqa`: cost and a known confound.** ~29% of the entire eight-dataset generation token load,
   plus the length/degeneracy confound in `QWEN_GENERATION_VALIDITY_AUDIT.md`.
@@ -198,8 +198,8 @@ on the same two rungs, per population.
 baseline is stronger is itself model-dependent and must remain visible. If shrunk wMSP exceeds both,
 the report may say it is the strongest among the compared learned methods — no more.
 
-Standing context: `wMSP-shrink@2 > SAPLMA` is a **DO-NOT-CLAIM** on the development populations
-(the project conventions). Nothing in this registration promotes it. It is registered as **secondary and
+Standing context: `wMSP-shrink@2 > SAPLMA` is a **DO-NOT-CLAIM** on the development populations,
+because the margin there sits inside seed noise. Nothing in this registration promotes it. It is registered as **secondary and
 descriptive**.
 
 ### 5.3 Required reporting, per population and per rung
@@ -372,8 +372,8 @@ existed to measure.
 applies to this population:
 1. **Gemma-2 soft-capping** — only the eager path applies the cap. Gemma-specific; Qwen2.5 has no
    soft-capping.
-2. **Attention-weight extraction** for Lookback Lens / uhead, which SDPA does not return. **This
-   panel runs neither method** (§4: floors, SAPLMA, attention pooler, wmsp_norm, wmsp_shrink2).
+2. **Attention-weight extraction** for Lookback Lens, which SDPA does not return. **This
+   panel does not run that method** (§4: floors, SAPLMA, attention pooler, wmsp_norm, wmsp_shrink2).
 
 The remaining reason is consistency with the canonical runs, which is an implementation argument
 rather than a correctness one. SDPA and eager compute the **same mathematics**; they differ at
@@ -669,5 +669,5 @@ with `DiffTask-long` composition changing as computed.
 **Not claimable from this deviation:** that Gemma replicates §5.1 more strongly than recorded there;
 any eight-dataset macro or positive count quoted as the replication result; any med_quad-specific
 `msp_min` or `msp_sum` absolute value, which carries the standing do-not-claim from
-the project results log; any `expertqa` or `factscore` number quoted without its degeneration
+the project's working notes; any `expertqa` or `factscore` number quoted without its degeneration
 diagnostic alongside.

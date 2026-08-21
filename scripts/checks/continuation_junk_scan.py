@@ -6,7 +6,7 @@ carry "Here's the text/dialogue and its short summary…" continuations, expertq
 multiple-choice "Available choices" artifact. This script (a) counts marker rates in gen_text for
 both populations, (b) for the affected cells compares judge label and generation length on
 junk-bearing vs clean rows. Findings recorded in results/analysis/QWEN_REPLICATION_VERDICT.md
-(caveat block) and the project record: rates are strongly model-asymmetric (samsum 37.5% Qwen vs
+(caveat block) and the project's working notes: rates are strongly model-asymmetric (samsum 37.5% Qwen vs
 7.1% Llama; the MC artifact is Qwen-only; med_quad's next-Question leak is LLAMA-heavier at 47%),
 labels are NOT depressed on junk rows (completion correlate), lengths are cap-inflated.
 answer_span has no cut rules for samsum/cnn/expertqa/factscore — flagged, not silently "fixed".

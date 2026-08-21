@@ -24,7 +24,7 @@ THE T -> 0 LIMIT IS **NOT** msp_min, AND IS NEVER REPORTED AS msp_min.
 is a LEARNED WEAKEST-LINK, which is its own object. What W1 and W2 share is the FORM
 `q = sum_t w_t * nll_t` with one sharpening parameter, NOT a single continuous path that literally
 passes through msp_min. The control for this is computed below: the per-example agreement rate
-between argmax(raw) and argmax(nll). See prereg discussion in the project plan
+between argmax(raw) and argmax(nll). See prereg discussion in the project's planning notes
 
 TWO VARIANTS, AND WHY THE CHEAP ONE COMES FIRST
 -----------------------------------------------

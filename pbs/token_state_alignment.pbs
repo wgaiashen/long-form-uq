@@ -6,7 +6,7 @@
 #PBS -j oe
 
 # W-Align -- post_token (l_t <-> h_t, current) vs pre_token (l_t <-> h_(t-1)) alignment of token losses
-# to hidden states, on HAPE (lambda 0) and HAPES (lambda 2). Results: the project results log.
+# to hidden states, on HAPE (lambda 0) and HAPES (lambda 2).
 #
 # POST-HOC SENSITIVITY ABLATION. lambda is FIXED, not swept, and no alignment will be selected on test
 # performance.

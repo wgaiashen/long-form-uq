@@ -34,7 +34,7 @@ th{{background:#f5f5f5}} code{{background:#f3f3f3;padding:1px 4px}} .note{{color
 <h1>All-methods token overlays</h1>
 <p class="note">One HTML per dataset: the same generations with every weighting method as a toggleable per-token
 track. <b>Hypothesis generation only</b> &mdash; any claim these suggest needs a full-population statistic before
-it enters the project record. Examples are the pooler <b>test set</b>, stratified 4-way (correct/incorrect &times;
+it enters the project's working notes. Examples are the pooler <b>test set</b>, stratified 4-way (correct/incorrect &times;
 confident/uncertain by the msp_min-floor percentile, fixed seed). Every G+1 track has row&nbsp;0 (prompt anchor)
 dropped; alignment asserted per example.</p>
 <table><tr><th>dataset</th><th>family / taxonomy</th><th>examples</th><th>tracks</th></tr>

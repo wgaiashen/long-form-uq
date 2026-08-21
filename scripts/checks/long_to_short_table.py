@@ -4,7 +4,7 @@ THE GAP THIS CLOSES. The ProbeDriftLong grid is **42 cells per method**: 8 long 
 `sciq` and `trivia_qa` at the `Long->Short` rung (2). `assemble_pdl_table.py` hardcodes
 `LONG_EVALS` (8 long sets) and `RUNGS` (5 long rungs), so those 2 cells are excluded from BOTH the tables
 and the coverage denominator -- the master reports "1664/1680" and reads as near-complete while a whole
-rung is missing. Recorded as a known gap in the project record on 2026-08-05 and not closed until now.
+rung is missing. Recorded as a known gap in the project's working notes on 2026-08-05 and not closed until now.
 
 WHY IT MATTERS: transferring a probe trained on long-form generation to a SHORT-form test set is the
 setting singled out in review, and it is the rationale offered for weighted-MSP as the base component of the
@@ -30,7 +30,7 @@ RUNG = "Long->Short"
 # script excluded only msp_min and so reported a floor variant as the best "supervised" method.
 FLOORS = {"floor_min", "floor_sum", "floor_ppl", "fair_floor"}
 
-# Same spelled-out names the project record uses; a code name in a table is unreadable.
+# Same spelled-out names the project's working notes uses; a code name in a table is unreadable.
 PRETTY = {
     "floor_min": "msp_min (floor)", "floor_sum": "msp_sum (floor)", "floor_ppl": "perplexity (floor)",
     "fair_floor": "max-of-three (footnote only)",

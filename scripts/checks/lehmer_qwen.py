@@ -5,11 +5,11 @@ Pre-registration: prereg/W6_lehmer_qwen.md, written and committed 2026-08-09 BEF
 record was labelled. beta = 1 is fixed there from Llama data only (argmax of the Llama cross-dataset
 mean, and the modal leave-one-dataset-out selection, 6 of 8 folds). Nothing is selected here.
 
-WHY THIS IS A SEPARATE FILE, not a --model flag on sharpening_family.py. That file is the live
-W-Sharpen driver and is being edited on the other cluster; a second agent adding a flag to it is the
-collision the workstream split exists to avoid. The scoring function itself is IMPORTED from it, so
-this is the same code path the prereg names, not a re-implementation (a re-implementation is exactly
-what the project's "verify against the original, not a paraphrase" rule forbids).
+Why this is a separate file rather than a --model flag on sharpening_family.py: that file was in
+active use for the Llama sharpening runs, and adding a flag to it risked disturbing them. The
+scoring function itself is imported from it, so this is the same code path the pre-registration
+names rather than a re-implementation, which would break the rule that a ported method is verified
+against the original and never against a paraphrase.
 
 WHAT IT COMPUTES
 
@@ -88,8 +88,8 @@ JUDGE_SIBLINGS = ("uncovered", "coherent")    # written by the dedicated expertq
 MAX_UNJUDGED_FRAC = 0.01                      # >1% never seen by the judge = still labelling
 
 # Llama's beta = 1 and beta = inf (= msp_min) PRR per dataset, for Q3's pooled arm ONLY.
-# Source: the project results log appendix A1 (sharpening_family__meta-llama_...__round2.csv).
-# Transcribed at the 3-dp the project record publishes -- Q3 is secondary and reported alongside Q1,
+# Source: the project's working notes appendix A1 (sharpening_family__meta-llama_...__round2.csv).
+# Transcribed at the 3-dp the project's working notes publishes -- Q3 is secondary and reported alongside Q1,
 # never instead of it, so 3-dp is adequate; the sign of every difference is unambiguous at 3-dp.
 LLAMA_A1 = {           # dataset: (lehmer beta=1, msp_min)
     "pubmed_qa":     (+0.365, +0.371),
@@ -334,7 +334,7 @@ def main():
     p_stat, p_p = wilcoxon(pooled, alternative="two-sided")
     print("\n" + "=" * 100)
     print("Q3 -- SECONDARY, pooled n = 16 (8 Llama + 8 Qwen). Reported ALONGSIDE Q1, never instead.")
-    print("   Llama half transcribed from the project results log appendix A1 at 3 dp.")
+    print("   Llama half transcribed from the project's working notes appendix A1 at 3 dp.")
     print("=" * 100)
     print(f"  Llama mean diff {llama_diffs.mean():+.4f} ({int((llama_diffs > 0).sum())}/8)   "
           f"Qwen mean diff {margin:+.4f} ({signs}/8)")

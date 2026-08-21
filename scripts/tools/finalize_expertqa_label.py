@@ -1,6 +1,6 @@
 """Overnight finalizer for the ExpertQA labelling run: WAIT for the detached labeller to finish
 (or detect it stalled), then write a human-readable summary to results/expertqa/label_summary.txt
-so the results are there in the morning regardless of session teardowns.
+so the results are there in the morning regardless of whether the shell that started it survives.
 
 Deliberately does NOT relaunch the labeller (a second writer could corrupt the paid labels). If the
 labeller dies before 2016, it writes a PARTIAL/STALLED summary and stops; resume is a manual one-liner.

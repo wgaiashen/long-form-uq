@@ -433,8 +433,8 @@ def main():
     print("  (the writer's own 1e-6 PRR self-gate already ran at write time and would have refused)")
 
     if gate_fail or bad or det_bad:
-        print("\nA GATE FAILED. Per the project convention the primary result is NOT read or")
-        print("   interpreted until the gates pass. Stopping here.")
+        print("\nA GATE FAILED. The primary result is not read or interpreted until the")
+        print("   gates pass. Stopping here.")
         _write(out_path, rows)
         return
 
@@ -556,7 +556,7 @@ def main():
     print("COMPLEMENTARITY -- SECONDARY MECHANISM EVIDENCE, NOT part of the success criterion")
     print("  A cross-correlation cannot exceed sqrt(r_xx * r_yy), so the disattenuated value is the")
     print("  interpretable one. Lower correlation alone is NOT evidence of a better method:")
-    print("  the project record already recorded that distinctness != incremental value.")
+    print("  the project's working notes already recorded that distinctness != incremental value.")
     print("-" * 104)
     print(f"{'pair':40s}{'self A':>9s}{'self B':>9s}{'cross':>9s}{'disatt.':>10s}   population")
     for label, a, b in [("HAPES λ=2 ~ SAPLMA", "wmsp_shrink2", "saplma"),

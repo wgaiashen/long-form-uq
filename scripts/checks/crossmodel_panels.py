@@ -6,7 +6,7 @@ Two jobs, both descriptive (no verdicts here -- the verdicts live in replication
   1. PANELS: per model, per method, the mean PRR over the 8 long evals at each rung plus the
      macro OOD mean (mean of the 4 OOD rung-means). Leave-one-dataset-out (LODO) sensitivity
      for the deltas the replication memo quotes, because Qwen expertqa carries a severe length
-     confound (the project results log paragraph 10.2) and no Qwen aggregate should be quoted without
+     confound (the project's working notes paragraph 10.2) and no Qwen aggregate should be quoted without
      showing what happens when expertqa is dropped.
   2. LEHMER: the per-dataset finite-beta curves from the two populations' existing CSVs
      (Llama: sharpening_family __round2, the quoted source; Qwen: lehmer_qwen). The

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """MASK ABLATION VERDICT -- does excluding end-of-text from the weight logits help wMSP?
 
-Results: the project results log Reads results/mask_ablation_<eval>__<slug>.csv.
+Reads results/mask_ablation_<eval>__<slug>.csv.
 
 THE QUESTION. The mask was introduced because the learned weighter CONCENTRATED on EOS, never
 because concentrating there was MEASURED to hurt -- the same inference pattern that turned out wrong

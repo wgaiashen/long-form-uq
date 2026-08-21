@@ -6,7 +6,7 @@ THE SINGLE SOURCE TO READ. Re-run this after any new run lands; never hand-edit 
 Schema: workstream, method, param, rung, eval, prr, n_seeds, mode, source_csv
   * FREE methods are rung-invariant: emitted ONCE with rung=ALL-RUNGS-FREE (do not multiply by 4).
   * mode distinguishes arms/controls (anchor/random/wsonly/combo, masked/unmasked, blend/shufL/const).
-Verdicts, bars and tiering live in the project results log, not here.
+Verdicts, bars and tiering live in the project's working notes, not here.
 
     python scripts/checks/build_sharpening_master.py
 """

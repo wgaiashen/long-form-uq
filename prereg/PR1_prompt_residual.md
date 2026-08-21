@@ -64,8 +64,7 @@ position is exactly 1.0, giving `pooled == z` into the same head with the same R
 weight exactly 1.0 at length 1; frozen-query attention exactly uniform over real tokens at full
 length; and trained-model agreement between `train_attn(full states)` and
 `train_attn(pseudo-sequence of s.mean(0))` of **1.19e-07** on held-out logits, 1.49e-08 on head
-weights. Verification script retained in the session scratchpad; the same identity is re-asserted
-per cell at runtime (§5).
+weights. The same identity is re-asserted per cell at runtime (§5).
 
 Nothing else changes. Same layer, same cells, same sampled training rows, same seeds, same eval
 split, same PRR harness.

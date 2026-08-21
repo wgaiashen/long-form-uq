@@ -7,7 +7,7 @@ WHERE lambda = 1.5 COMES FROM, STATED PRECISELY. It is Llama's W5 pre-committed 
 
 DO NOT DESCRIBE IT AS "THE STRONGEST SHRINK SETTING ON LLAMA" WITHOUT THE OTHER HALF:
   * W5's REGISTERED CLAIM FAILED. lambda = 1.5 vs the incumbent shrink@2 was +0.0019 against a
-    > +0.010 bar, signs 6/8 (the project results log). That is a TIE, not a win.
+    > +0.010 bar, signs 6/8 (the project's working notes). That is a TIE, not a win.
   * What justifies transferring it is the honest-selection result: it IS the best fixed value on
     the Llama cross-dataset mean (+0.2306), and the 5-arm leave-one-dataset-out selection picks it
     on 7 of 8 folds, which is why §18 re-baselined the incumbent to shrink@1.5. LODO is label-free
@@ -15,7 +15,7 @@ DO NOT DESCRIBE IT AS "THE STRONGEST SHRINK SETTING ON LLAMA" WITHOUT THE OTHER 
 
 THIS IS NOT A PRE-REGISTERED QWEN TEST. The Qwen master was already visible when it was run.
 No parameter is tuned on Qwen: lambda is fixed at 1.5 and 2.0 and nothing else is tried. Output
-carries provenance = post-hoc-transfer and sits OUTSIDE the M2 scorecard (the project results log).
+carries provenance = post-hoc-transfer and sits OUTSIDE the M2 scorecard (the project's working notes).
 
 WHY A SEPARATE FILE, WITH ZERO SHARED-FILE EDITS. Adding a `wmsp_shrink1p5` entry to
 `probedriftlong.py`'s WMSP list would touch a file on BOTH workstreams' collision lists, obliging

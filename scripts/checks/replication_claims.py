@@ -2,7 +2,7 @@
 """THE R-claim scorer — one script, two populations (M2: prereg/M2_qwen14b_replication.md).
 
 Scores R1a / R1b / R2 / R2-desc / R3 / R4' from a pdl master CSV. Written 2026-08-10 because the
-Llama numbers quoted in the prereg were produced in a working session with no committed script, and
+Llama numbers quoted in the pre-registration were produced with no committed script, and
 re-deriving the tests from prose on a second model risks running a subtly different test per model
 and calling the difference a replication result. This file IS the test definition now.
 
@@ -27,7 +27,7 @@ published number EXACTLY — run --gate-llama to prove it on your checkout):
     printed descriptively; the published OOD-leg wins/p were quoted on the 32 cells and are
     reproduced that way, labelled as descriptive only.
   * R4' rungs: DiffTask-long and 1ds-Diff-long (the "two hardest", as named on Llama in
-    the project plan). wMSP-shrink@2 - SAPLMA per dataset, n = 8, DIRECTIONAL ONLY.
+    the project's planning notes). wMSP-shrink@2 - SAPLMA per dataset, n = 8, DIRECTIONAL ONLY.
   * fair_floor enters NOWHERE.
 
 Usage:
@@ -67,7 +67,7 @@ CSV_DEFAULT = {
     "qwen": RES / "pdl_master__Qwen_Qwen2.5-14B.csv",
 }
 
-# The published Llama numbers (the project plan / prereg M2 §1), the gate targets.
+# The published Llama numbers (the project's planning notes / prereg M2 §1), the gate targets.
 GATE = {
     "r1a": (0.1310, 8, 0.0078), "r1b": (0.0686, 5, 0.46),
     "r2": (0.242, 0.195, 0.0041, -0.236, 0.720),
@@ -127,7 +127,7 @@ def main():
     print("coverage: complete for every cell the tests read")
     if args.population == "qwen":
         print("expertqa on this population carries a severe length confound (length-alone PRR")
-        print("   +0.71 > every method; the project results log) — quote no expertqa cell without it.")
+        print("   +0.71 > every method; the project's working notes) — quote no expertqa cell without it.")
 
     def ood(m, e):
         return float(np.mean([g[(nm[m], rg, e)] for rg in OOD_RUNGS]))

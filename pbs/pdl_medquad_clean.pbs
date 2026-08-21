@@ -3,8 +3,8 @@
 #PBS -l walltime=24:00:00
 #PBS -N luq_mqclean
 #PBS -j oe
-# med_quad CLEAN-SPAN shadow ladder, ONE eval per job (2026-08-11 sensitivity; plan in the
-# kept outside this repo). Same shape as pdl_one_eval.pbs with three deliberate differences:
+# med_quad CLEAN-SPAN shadow ladder, ONE eval per job (2026-08-11 sensitivity). Same shape as
+# pdl_one_eval.pbs with three deliberate differences:
 #   1. LUQ_REGIME points med_quad at the shadow root cache/med_quad_clean/ (built by
 #      scripts/checks/make_med_quad_clean_regime.py) — every med_quad read (records, logprobs,
 #      per-token states, train AND eval side) resolves there; all other datasets stay canonical.

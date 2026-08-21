@@ -1,8 +1,7 @@
 """Per-dataset generation-quality report: the v1-vs-v2 gate table, from the record cache only.
 
-Plan item A.3. The 97.7 / 65.9 / 30.0 / 28.4 capping figures were produced by an ad-hoc in-session
-analysis with no committed script, so v1-vs-v2 could only ever be a retelling rather than a diff. This
-is that script.
+The 97.7 / 65.9 / 30.0 / 28.4 capping figures were originally produced by an ad-hoc analysis with no
+committed script, so v1-vs-v2 could only ever be a retelling rather than a diff. This is that script.
 
 Emits, per dataset: budget, generation length p50/p90, % capped, % severe / % degraded (via the
 validated `luq.degeneracy` detector, which is deliberately NOT repetition-based), % EMPTY, and the gold

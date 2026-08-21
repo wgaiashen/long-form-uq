@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """F5b VERDICT -- does anchoring the wMSP penalty at msp_min work, and is it the ANCHOR that works?
 
-Prereg: prereg/F5_anchor_at_msp_min.md.  Results: the project results log
+Prereg: prereg/F5_anchor_at_msp_min.md.
 Reads results/anchor_msp_min_<eval>__logpen__<slug>.csv (the log-penalty runs; the linear runs are
 the §16.1 stalled-optimisation record and are not read here).
 

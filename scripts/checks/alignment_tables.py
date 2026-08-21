@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """W-Align -- build the comparison tables, paired statistics and rung profile from the ablation output.
 
-Results: the project results log.  Driver that produced the inputs: token_state_alignment.py.
+Driver that produced the inputs: token_state_alignment.py.
 
 POST-HOC SENSITIVITY ANALYSIS. These statistics are descriptive; they are NOT pre-registered
 hypothesis tests, and no alignment is selected on them.

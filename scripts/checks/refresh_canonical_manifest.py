@@ -8,7 +8,7 @@ The manifest exists because "unchanged" once rested on an mtime, and mtime lies.
 
 But that makes any INTENDED change to the records a problem. Merging the unsupervised-P(True) sidecars,
 for example, adds three fields to six of the ten files — entirely additive, judge labels untouched — and
-afterwards six checksums fail. A future session running `sha256sum -c` sees six failures and cannot tell
+afterwards six checksums fail. Anyone later running `sha256sum -c` sees six failures and cannot tell
 a deliberate additive merge from actual corruption. Silently regenerating the hashes is worse: it erases
 the very evidence the manifest was created to preserve.
 

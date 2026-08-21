@@ -44,7 +44,7 @@ def main():
                     action="store_false", help=argparse.SUPPRESS)
     ap.add_argument("--attn", default="auto", choices=["auto", "eager", "sdpa"],
                     help="attention backend. auto = load_model's default (eager for "
-                         "Gemma, HF default otherwise). Use eager to match the runs.")
+                         "Gemma, HF default otherwise). Use eager to match the cached runs.")
     ap.add_argument("--truncate-long", action="store_true",
                     help="ALSO truncate long-form generations at the first newline (D1). "
                          "Matches the generate_until=['\\n'] for every dataset; off by "

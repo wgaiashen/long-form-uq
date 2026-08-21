@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """F5 -- REGULARISE WEIGHTED MSP TOWARD msp_min INSTEAD OF TOWARD perplexity.
 
-Pre-registration: prereg/F5_anchor_at_msp_min.md.  Results: the project results log
+Pre-registration: prereg/F5_anchor_at_msp_min.md.
 
 WHY, IN ONE PARAGRAPH
 ---------------------
