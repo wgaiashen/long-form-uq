@@ -11,6 +11,7 @@ Alignment (verified): len(token_logprobs)+1 == len(pool_w) (G+1 window, row-0 = 
 pooler's gen-token pick is argmax(pool_w[1:]) and the floor's pick is argmin(token_logprobs).
 """
 import sys, csv as _csv
+import os
 from pathlib import Path
 import numpy as np
 
@@ -27,8 +28,8 @@ SLUG = "meta-llama_Meta-Llama-3.1-8B"
 DATASETS = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail",
             "med_quad", "samsum", "expertqa", "asqa"]
 VIZ = ROOT / "cache" / "viz"
-SWEEP_CSV = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/"
-                 "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv")
+EPHEM = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral"))) / "luq_overnight_results"
+SWEEP_CSV = EPHEM / "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv"
 
 # OOD (floor, pooler) PRR per dataset -- from the length_router --ood extract (3494057; verified in §D.3).
 # always-floor = msp_min OOD, always-pool = attention pooler OOD.
@@ -180,7 +181,7 @@ def main():
     out3 = stat3()
     stat4()
     # persist STAT1 + STAT3 to a small CSV
-    outp = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/four_stats_1_3__" + SLUG + ".csv")
+    outp = EPHEM / ("four_stats_1_3__" + SLUG + ".csv")
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)
         w.writerow(["stat", "dataset", "field", "value"])

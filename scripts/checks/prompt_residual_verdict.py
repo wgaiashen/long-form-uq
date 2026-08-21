@@ -21,8 +21,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 
 ROOT = Path(__file__).resolve().parents[2]
-IN_DIR = Path("/rds/general/user/gs925/home/gs925-msc_project/msc-project-gs925/"
-              "results/method_dev/prompt_residual")
+IN_DIR = ROOT / "results" / "method_dev" / "prompt_residual"
 OUT_MD = IN_DIR / "PROMPT_RESIDUAL_VERDICT.md"
 
 EVALS = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]

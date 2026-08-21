@@ -12,6 +12,7 @@ disagreement, router's per-dataset gain over always-pooler) -- the direct test o
 No GPU (CPU probe training over cached pertok). No sampling.
 """
 import sys, csv as _csv
+import os
 from pathlib import Path
 import numpy as np
 
@@ -153,7 +154,7 @@ def main():
     for a, m in enumerate(METHODS):
         print(f"{m:14s}" + "".join(f"{MM[a, b]:>+11.2f}" for b in range(5)))
 
-    outp = Path("/rds/general/ephemeral/user/gs925/ephemeral/luq_overnight_results/stat2_agreement__" + MODEL_SLUG + ".csv")
+    outp = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral"))) / "luq_overnight_results" / ("stat2_agreement__" + MODEL_SLUG + ".csv")
     with open(outp, "w", newline="") as fh:
         w = _csv.writer(fh)
         w.writerow(["dataset", "n_te", "mean_disagree", "router_gain"] + [f"prr_{m}" for m in METHODS]
