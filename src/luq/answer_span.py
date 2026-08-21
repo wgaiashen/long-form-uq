@@ -111,6 +111,13 @@ def _min_ignore_none(*vals):
 
 
 # xsum trailing-junk markers
+# med_quad v2 markers (see `answer_span(version=2)`). Same boundary as v1 -- the start of a fresh
+# few-shot "Question:/Answer:" block after the answer -- with the colon allowed to carry surrounding
+# whitespace, which is how gemma-2-9b writes it ("\nQuestion : ..."). Deliberately NOT broadened in
+# any other way: no leading-whitespace tolerance on the newline, no new markers, no other dataset.
+_MQ_QUESTION_V2 = r"\nQuestion\s*:"
+_MQ_ANSWER_V2 = r"\nAnswer\s*:"
+
 _XSUM_PHRASES = ("I'm not sure", "What is the main idea", "###")
 _XSUM_BULLET = r"(?m)^\s*[•\-\*]\s"                    # a line starting with a bullet
 _XSUM_USER = r"[Uu]ser\d+"                             # forum-style 'user123'
@@ -175,10 +182,29 @@ def _verbatim_overlap(gen, ref):
 
 # ---- the main function -----------------------------------------------------------------
 
-def answer_span(text, dataset, context=None):
-    """See module docstring. Returns (clean_text, cut_char, reason)."""
+def answer_span(text, dataset, context=None, version=1):
+    """See module docstring. Returns (clean_text, cut_char, reason).
+
+    `version` selects the med_quad marker set and NOTHING else. It exists because the v1 markers
+    are literal strings (`"\\nQuestion:"`), and a model that writes `"\\nQuestion :"` walks straight
+    past them: on google/gemma-2-9b the literal matches 1.83% of rows against an actual restart rate
+    of 18.78%, so the rule fires, returns almost nothing, and exits 0. That is the silent-default
+    failure this module warns about, occurring inside the module.
+
+      version=1  the frozen historical rule. Byte-identical behaviour, and the default, so every
+                 existing caller and every artifact built before 2026-08-21 is untouched.
+      version=2  identical except the `Question:` / `Answer:` markers tolerate whitespace around the
+                 colon. No other dataset and no other marker changes.
+
+    v2 is a strict refinement on the Llama med_quad population, measured before it was written:
+    855 -> 862 cuts, 7 rows newly cut, 3 cut EARLIER (v1 cut at the `\\nAnswer:` inside the
+    fabricated block and kept the invented question stem; v2 cuts at the `Question :` opening it),
+    and 0 rows un-cut. The retained span is identical on 1790 of 1800 rows.
+    """
     if not text:
         return text, 0, "empty"
+    if version not in (1, 2):
+        raise ValueError(f"answer_span: unknown version {version!r}; expected 1 or 2")
 
     reasons = {}                                   # rule label -> char offset (candidates)
 
@@ -189,9 +215,15 @@ def answer_span(text, dataset, context=None):
 
     # (b) dataset-specific markers
     if dataset == "med_quad":
+        if version == 1:
+            q_pos, a_pos = text.find("\nQuestion:"), text.find("\nAnswer:")
+        else:
+            q_pos, a_pos = _first_regex(text, _MQ_QUESTION_V2), _first_regex(text, _MQ_ANSWER_V2)
+            q_pos = -1 if q_pos is None else q_pos
+            a_pos = -1 if a_pos is None else a_pos
         cand = {
-            "\\nQuestion:": text.find("\nQuestion:"),
-            "\\nAnswer:": text.find("\nAnswer:"),
+            "\\nQuestion:": q_pos,
+            "\\nAnswer:": a_pos,
             "2nd-Question:": _nth_occurrence(text, "Question:", 2),
             "\\nA.": text.find("\nA. "),
             "which-of-the-following": text.lower().find("which of the following"),
