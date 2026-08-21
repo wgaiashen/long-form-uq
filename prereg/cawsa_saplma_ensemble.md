@@ -2,7 +2,7 @@
 
 ## 0. Provenance and honest chronology — read this first
 
-Written and committed on **2026-08-17**, before any `HAPES λ=2 + SAPLMA` ensemble PRR exists anywhere
+Written and committed on **2026-08-17**, before any `CAWSA λ=2 + SAPLMA` ensemble PRR exists anywhere
 in the project.
 
 **This is a late, supervisor-motivated experiment.** It follows the 14 August 2026 supervision meeting
@@ -16,14 +16,14 @@ estimands, the unit of analysis, the interpretation rule, and the commitment not
 **What is NOT claimed:**
 
 - **The ensemble hypothesis did not exist before 14 August 2026.** It came from the supervisors.
-- **HAPES was not invented for this experiment.** It is the project's existing method contribution,
+- **CAWSA was not invented for this experiment.** It is the project's existing method contribution,
   developed and published internally well before this registration
   (the project's working notes, `results/analysis/WMSP_SHRINKAGE_MECHANISM.md`).
-- **The component results were NOT unseen.** SAPLMA, HAPE, HAPES λ=2, the attention pooler and the
+- **The component results were NOT unseen.** SAPLMA, unconstrained activation weighting, CAWSA λ=2, the attention pooler and the
   three floors are all fully observed on this exact population and are quoted in §1 below. They are
   the *motivation* for this registration, not evidence for it.
 - **Two ensembles have already been run on this grid** and are also quoted in §1, one of which is
-  stale (§1.2). What has **never** been formed is `HAPES λ=2 + SAPLMA`, which is the subject here.
+  stale (§1.2). What has **never** been formed is `CAWSA λ=2 + SAPLMA`, which is the subject here.
 
 **Population caption for every table produced under this registration:**
 
@@ -48,8 +48,8 @@ Macro over the 8 datasets. Rung order is the report / Hidden Failures convention
 | `msp_min` | +0.186 | +0.186 | +0.186 | +0.186 | +0.186 | +0.186 |
 | **SAPLMA** | **+0.587** | +0.237 | +0.316 | +0.203 | +0.209 | +0.241 |
 | attention-pool (armA) | +0.623 | +0.256 | +0.265 | +0.182 | +0.186 | +0.222 |
-| HAPE (`wmsp_norm`) | +0.450 | +0.158 | +0.146 | +0.128 | +0.125 | +0.139 |
-| **HAPES λ=2** (`wmsp_shrink2`) | +0.521 | +0.240 | +0.238 | +0.205 | +0.232 | +0.229 |
+| unconstrained activation weighting (`wmsp_norm`) | +0.450 | +0.158 | +0.146 | +0.128 | +0.125 | +0.139 |
+| **CAWSA λ=2** (`wmsp_shrink2`) | +0.521 | +0.240 | +0.238 | +0.205 | +0.232 | +0.229 |
 
 ### 1.2 Ensembles already run, and their audited status
 
@@ -60,9 +60,9 @@ canonical master, whose rows come from `pdl_fam_*` files, so the comparison is n
 | component in the old artefact | agreement with canonical master, 40 cells |
 |---|---|
 | `saplma`, `floor_min`, `floor_ppl`, `floor_sum` | **max &#124;Δ&#124; = 0.0000** on every cell |
-| `wmsp` (HAPE) | **13/40 cells differ**; max &#124;Δ&#124; = **0.5206**; mean &#124;Δ&#124; = 0.0342 |
+| `wmsp` (unconstrained activation weighting) | **13/40 cells differ**; max &#124;Δ&#124; = **0.5206**; mean &#124;Δ&#124; = 0.0342 |
 
-The HAPE disagreement spans 8 evals and 4 rungs, and 12 of the 13 differences have the old value
+The unconstrained activation weighting disagreement spans 8 evals and 4 rungs, and 12 of the 13 differences have the old value
 *lower*. Cause: `src/luq/weighted_msp.py` received weighting corrections **after** the artefact was
 written — `056f50b` (2026-08-03, "Fix NaN wMSP weights on asqa and make PRR refuse to score NaN") and
 `a792e6e` (2026-08-05, segment-softmax all-excluded NaN). Worst cell ID/asqa: **−0.044 old vs +0.477
@@ -72,7 +72,7 @@ Therefore:
 
 | old ensemble number | status |
 |---|---|
-| `rankavg{HAPE, SAPLMA}` OOD macro **+0.201**, ID +0.503 | **STALE.** Its HAPE leg predates the weighting fixes. Not a gate, not a target, not quotable. |
+| `rankavg{unconstrained activation weighting, SAPLMA}` OOD macro **+0.201**, ID +0.503 | **STALE.** Its unconstrained activation weighting leg predates the weighting fixes. Not a gate, not a target, not quotable. |
 | `rankavg{msp_min, SAPLMA}` OOD macro **+0.273**, ID +0.493 | **CONFIRMED CURRENT** — recomputed on 2026-08-17 from the canonical `results/pdl_perex/` sidecars (which reproduce the master's SAPLMA on **40/40 cells at max &#124;Δ&#124; = 0.0000**) and it returns **OOD +0.273, ID +0.492**. Not stale. |
 
 ### 1.2b That reference ensemble does NOT survive this registration's own statistics
@@ -114,17 +114,18 @@ gate is component-level (§7).
 
 | report-facing name | implementation key |
 |---|---|
-| **HAPE** | `wmsp_norm` |
-| **HAPES λ=2** | `wmsp_shrink2` |
+| **unconstrained activation weighting** | `wmsp_norm` |
+| **CAWSA (λ = 2)** | `wmsp_shrink2` |
 
-On first mention in prose: *HAPES (λ = 2, implementation key `wmsp_shrink2`)*. Historical files and
-implementation keys are **not** renamed.
+On first mention in prose: *CAWSA (λ = 2, implementation key `wmsp_shrink2`)*. Implementation keys and
+committed result files are **not** renamed. This registration was written while the method was called
+CAWSA; the name was settled as CAWSA for the write-up, and the prose here uses the settled name.
 
 ---
 
 ## 3. The primary ensemble, fixed
 
-**`rankavg{HAPES λ=2, SAPLMA}`** — equal weighting, one fixed combiner, on the population in §0.
+**`rankavg{CAWSA λ=2, SAPLMA}`** — equal weighting, one fixed combiner, on the population in §0.
 
 **λ = 2 is fixed and transferred, not selected.** λ ∈ {1, 1.5, 10, …} will **not** be tried and the
 best ensemble picked. This is not a λ-selection exercise.
@@ -153,7 +154,7 @@ run under this registration.**
 
 For each of the 8 datasets:
 
-1. average PRR across its four OOD rungs for `rankavg{HAPES λ=2, SAPLMA}`;
+1. average PRR across its four OOD rungs for `rankavg{CAWSA λ=2, SAPLMA}`;
 2. average PRR across the same four rungs for SAPLMA;
 3. delta = ensemble − SAPLMA.
 
@@ -170,7 +171,7 @@ For each of the 8 datasets:
 
 ## 5. Primary estimand B — ID cost
 
-On the 8 ID cells, delta = `rankavg{HAPES λ=2, SAPLMA}` − SAPLMA. Reported: macro mean, median, sign
+On the 8 ID cells, delta = `rankavg{CAWSA λ=2, SAPLMA}` − SAPLMA. Reported: macro mean, median, sign
 count, bootstrap 95% CI.
 
 ### 5.1 The ID reference scale, derived from measured variability
@@ -202,7 +203,7 @@ target.
 
 ## 7. Validity gates, checked before the primary result is read or interpreted
 
-1. **Component continuity.** HAPE, HAPES λ=2, SAPLMA, attention-pool, mean-pool and the three floors
+1. **Component continuity.** unconstrained activation weighting, CAWSA λ=2, SAPLMA, attention-pool, mean-pool and the three floors
    from the new pass must reproduce their canonical `pdl_master` values within seed tolerance. This
    replaces any gate based on an old ensemble number.
 2. **Sidecar integrity.** Same evaluation rows; equal vector lengths; 3 seeds where applicable;
@@ -217,12 +218,12 @@ target.
 ## 8. Control ensemble — secondary mechanism evidence
 
 **`rankavg{SAPLMA, attention-pool}`.** SAPLMA and attention pooling are both predominantly *learned
-hidden-state* signals, whereas HAPES keeps **token NLL as the scored quantity** and uses activations
+hidden-state* signals, whereas CAWSA keeps **token NLL as the scored quantity** and uses activations
 only to reweight the token evidence. Two descriptive tests:
 
-1. is {HAPES λ=2, SAPLMA} **less correlated** than {SAPLMA, attention-pool}, using seed self-agreement
+1. is {CAWSA λ=2, SAPLMA} **less correlated** than {SAPLMA, attention-pool}, using seed self-agreement
    as the reliability ceiling and reporting the disattenuated value `r_xy / sqrt(r_xx · r_yy)`;
-2. does the {HAPES λ=2, SAPLMA} pair **gain more** from combination than {SAPLMA, attention-pool}.
+2. does the {CAWSA λ=2, SAPLMA} pair **gain more** from combination than {SAPLMA, attention-pool}.
 
 Registered caveat: **lower correlation by itself is not evidence of a better method.** §1.3 already
 records that distinctness is not incremental value. This is **secondary mechanism evidence and forms no
@@ -231,7 +232,7 @@ part of the success criterion in §6.**
 ### 8.1 References / ablations
 
 Recomputed from the **same new per-example vectors**, so that everything is internally comparable:
-`rankavg{msp_min, SAPLMA}` and `rankavg{HAPE, SAPLMA}`. These are references, **never** entered into a
+`rankavg{msp_min, SAPLMA}` and `rankavg{unconstrained activation weighting, SAPLMA}`. These are references, **never** entered into a
 winner-selection sweep. If they happen to reproduce the old numbers in §1.2, that is noted as a
 reassuring finding after the fact, not as a gate.
 
@@ -239,13 +240,13 @@ reassuring finding after the fact, not as a gate.
 
 ## 9. Rung profile
 
-A compact rung-level table, plus a report-quality figure, for SAPLMA · HAPES λ=2 ·
-HAPES λ=2 + SAPLMA · SAPLMA + attention, in the report / Hidden Failures rung order:
+A compact rung-level table, plus a report-quality figure, for SAPLMA · CAWSA λ=2 ·
+CAWSA λ=2 + SAPLMA · SAPLMA + attention, in the report / Hidden Failures rung order:
 
 > **ID → LOO → SameTask → DiffTask → 1ds-Diff**
 
 LOO and SameTask are **not** silently reordered. The scientific question this addresses is whether the
-combination retains more of SAPLMA's performance close to ID while inheriting some of HAPES's
+combination retains more of SAPLMA's performance close to ID while inheriting some of CAWSA's
 robustness as shift strengthens; that profile may be more informative than the single OOD macro.
 
 ---
@@ -277,12 +278,12 @@ MSP.
 
 ## 12. Report implications, fixed in advance
 
-The dissertation narrative is **not** altered by this registration. **HAPES remains the principal
+The dissertation narrative is **not** altered by this registration. **CAWSA remains the principal
 method contribution.**
 
-- If positive: *HAPES provides a complementary probability-grounded signal that can improve a
+- If positive: *CAWSA provides a complementary probability-grounded signal that can improve a
   conventional hidden-state estimator under distribution shift.* The ensemble **strengthens** the case
-  for HAPES rather than replacing it as the thesis contribution.
+  for CAWSA rather than replacing it as the thesis contribution.
 - If null: *different rung-level robustness profiles do not automatically imply useful score-level
   complementarity under simple ensembling.*
 
@@ -298,8 +299,7 @@ Recorded here as they occur, numbered, with the date and the reason.
 the **reference** ensemble `rankavg{msp_min, SAPLMA}` numbers now recorded in §1.2 and §1.2b. Disclosed
 because the chronology matters:
 
-- the **primary** ensemble `HAPES λ=2 + SAPLMA` was **not computable** on that population — HAPE, HAPES
-  λ=2 and the attention pooler are absent from those sidecars — and no primary or control number has
+- the **primary** ensemble `CAWSA λ=2 + SAPLMA` was **not computable** on that population — unconstrained activation weighting, CAWSA λ=2 and the attention pooler are absent from those sidecars — and no primary or control number has
   been observed by anyone at the time of writing;
 - the reference's headline value (+0.273) was already public in the project before this registration,
   from the 2026-07-29 artefact; what §1.2b adds is its **paired n = 8 statistics**, which had never been
@@ -326,9 +326,15 @@ updated when `macro()` gained its `need` argument. It aborted **before** writing
 magnitude. No result changed. Recorded because the outputs were observed before the file was written, and
 the chronology should not have to be reconstructed later.
 
-**D4 — outcome recorded (2026-08-18).** Primary `rankavg{HAPES λ=2, SAPLMA}`: OOD macro **+0.0343**,
+**D4 — outcome recorded (2026-08-18).** Primary `rankavg{CAWSA λ=2, SAPLMA}`: OOD macro **+0.0343**,
 **7/8** datasets, CI **[−0.0092, +0.0765]**, exact Wilcoxon **p = 0.1484**; ID macro **+0.0079**, CI
-**[−0.0130, +0.0304]**. Under §6 the OOD leg is **not established**, so the verdict is **NULL**. §12's
-null wording applies. The ensemble is **not** promoted to a headline method; HAPES remains the principal
-method contribution.
+**[−0.0130, +0.0304]**. Under §6 the OOD leg is **not established**: the gain is positive and
+consistent in direction, but it does not clear the pre-registered significance bar at n = 8. The
+ensemble is **not** promoted to a headline method, and CAWSA remains the principal method contribution.
+
+> **Wording clarified 2026-08-21.** This outcome was first recorded as "the verdict is NULL", using
+> §6's verdict category. That label reads as "no effect", which is not what was measured: the OOD gain
+> is +0.0343 on 7 of 8 datasets and the combination beats both of its components on all five rungs.
+> The numbers, the decision rule and the non-promotion are unchanged. Only the label is stated
+> precisely, as "not established under the pre-registered bar".
 

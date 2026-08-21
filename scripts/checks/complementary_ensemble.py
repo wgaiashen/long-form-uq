@@ -547,7 +547,7 @@ def main():
     elif ood_improved:
         verdict = "PARTIAL -- OOD improvement, but not consistent enough across datasets"
     else:
-        verdict = "NULL -- no established OOD improvement over SAPLMA. A valid result."
+        verdict = "NOT ESTABLISHED -- OOD improvement does not clear the pre-registered bar. A valid result."
     print(f"\n  VERDICT: {verdict}")
     rows.append({"section": "verdict", "method": "PRIMARY", "value": verdict})
 

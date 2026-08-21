@@ -60,11 +60,11 @@ models on 2026-08-20 and the Llama result re-verified under it with every publis
 - C, non-replication: the combination adds no useful signal, or behaves like the hidden-state control.
 
 The Llama outcome this is measured against: OOD +0.0343, 7/8 datasets, CI [-0.0092, +0.0765], p = 0.148,
-which was a null under M6 section 6; ID +0.0079, no material loss; control OOD +0.0086; disattenuated
+which did not clear the bar in the ensemble registration section 6; ID +0.0079, no material loss; control OOD +0.0086; disattenuated
 correlation 0.519 for CAWSA against SAPLMA, and 0.801 for SAPLMA against attention.
 
-Llama's own primary was a null, so replication here means reproducing the pattern, not reproducing a
-significant effect. A Qwen null of the same shape is category A or B, not C.
+Llama's own primary did not clear its bar, so replication here means reproducing the pattern, not
+reproducing a significant effect. A Qwen result of the same shape is category A or B, not C.
 
 ## 4. ExpertQA sensitivity, and a directional prediction
 
@@ -90,7 +90,7 @@ failed prediction, not reinterpreted.
 
 The complementarity bonus, defined as ensemble PRR minus the mean of the component PRRs and equal to
 zero for an ensemble that merely interpolates, and the observation that the gain tracks CAWSA's own
-per-dataset strength (Llama Spearman +0.952), were both found post-hoc on Llama after its null. They
+per-dataset strength (Llama Spearman +0.952), were both found post-hoc on Llama after that result. They
 are reported here as exploratory replication checks. Their p-values are not the primary test, and at
 n = 8 any 8/8 result yields exactly p = 0.0078, the floor of the exact test.
 

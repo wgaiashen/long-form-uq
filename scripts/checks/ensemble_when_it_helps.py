@@ -3,7 +3,7 @@
 
 
 EXPLORATORY, NOT PRE-REGISTERED. Run at the author's request AFTER the M6 verdict. It explains that
-result; it does not revise it. The registered verdict stays NULL.
+result; it does not revise it. The registered outcome stands: not established under the bar.
 
 TWO QUESTIONS
 -------------

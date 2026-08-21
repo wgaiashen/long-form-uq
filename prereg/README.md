@@ -16,6 +16,12 @@ provenance for a set of result rows that were written before provenance stamping
 The `Recorded outcome` column quotes the file's own status line where it has one. A dash means the
 file does not carry a one-line status, not that the experiment was not run: read the file.
 
+Read those outcomes precisely, because "failed its bar" covers three different things here and they
+are not interchangeable. One registration fails because the setting it pre-committed to **tied** with
+the incumbent rather than beating it. Several fail because the effect is positive and consistent in
+direction but **short of significance** at n = 8 datasets. Others record a genuine **absence of
+effect**, and those say so in those words. Only the third kind is a null in the ordinary sense.
+
 | Registration | What it registered | Recorded outcome |
 |---|---|---|
 | [`adaptive_lehmer_aggregation.md`](adaptive_lehmer_aggregation.md) | per-response adaptive Lehmer aggregation | — |
