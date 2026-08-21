@@ -1,0 +1,69 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_cv2_ladder
+#PBS -j oe
+
+# The Llama-3.1-8B ProbeDriftLong ladder on the MedQuAD clean-v2 population. CPU only, exactly like
+# the canonical Llama master (pbs/pdl_*.pbs request no GPU).
+#
+# ONLY THE STRUCTURALLY AFFECTED CELLS ARE RECOMPUTED. Of the 40 cells, 19 either evaluate on
+# MedQuAD or draw MedQuAD into their training pool; the other 21 touch it nowhere. Those 21 are
+# INHERITED from the canonical master after their inputs are proved identical -- refitting them
+# would introduce a fresh stochastic probe draw purely to reproduce a cell whose inputs did not
+# change, adding noise to the one comparison that is supposed to be exact. So this script takes an
+# explicit rung list per eval and never runs the full grid.
+#
+# The affected rungs were derived from cells_long(LONG_SRC, LONG_SRC), not typed by hand:
+#   med_quad       ID, LOO-long, SameTask-long, DiffTask-long, 1ds-Diff-long   (eval target: 5)
+#   pubmed_qa      LOO-long, SameTask-long
+#   asqa           LOO-long, SameTask-long
+#   xsum           DiffTask-long, LOO-long
+#   cnn_dailymail  DiffTask-long, LOO-long
+#   samsum         DiffTask-long, LOO-long
+#   expertqa       DiffTask-long, LOO-long
+#   factscore      DiffTask-long, LOO-long
+#
+# LUQ_REGIME IS WHAT MAKES THIS THE CLEAN-V2 POPULATION, and it names med_quad ONLY. Every other
+# dataset resolves to its canonical cache root, which is what lets the 21 control cells be inherited
+# rather than recomputed. attn_pool prints the active override at startup, so a clean-v2 number can
+# never later be mistaken for a canonical one.
+#
+# Output goes to results/cleanv2/. The canonical probedriftlong__*.csv and pdl_master are never
+# touched. Per-example sidecars are written so the CAWSA+SAPLMA ensemble can be recomputed later
+# without retraining anything.
+#
+#   qsub -v LUQ_EVAL=med_quad,LUQ_RUNGS=ID,LOO-long,... pbs/cleanv2_ladder.pbs
+#   (qsub -v splits on commas, so LUQ_RUNGS is passed with '+' and translated below.)
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE="${LUQ_CARVE:-legacy}"
+
+EV="${LUQ_EVAL:?set LUQ_EVAL}"
+RUNGS_RAW="${LUQ_RUNGS:?set LUQ_RUNGS (use + between rungs, not commas)}"
+RUNGS="${RUNGS_RAW//+/,}"
+
+# THE ONE FLAG THAT DEFINES THIS POPULATION.
+export LUQ_REGIME="med_quad=cleanv2"
+
+mkdir -p logs results/cleanv2 results/cleanv2/perex
+LIVE="logs/cleanv2_ladder__${EV}__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "=== clean-v2 ladder === eval=$EV rungs=$RUNGS host=$(hostname) at $(date)"
+echo "    LUQ_REGIME=$LUQ_REGIME"
+
+python -u scripts/checks/probedriftlong.py \
+    --model meta-llama/Meta-Llama-3.1-8B \
+    --layer 15 \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --rungs "$RUNGS" \
+    --perex-dir results/cleanv2/perex \
+    --out "results/cleanv2/probedriftlong_cleanv2_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
+STATUS=$?
+
+echo "=== clean-v2 ladder $EV done status=$STATUS at $(date) ==="
+exit $STATUS
