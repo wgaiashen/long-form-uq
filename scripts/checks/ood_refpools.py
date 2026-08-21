@@ -2,8 +2,8 @@
 
 We drive `probe_drift.ood_settings.get_training_spec(eval, setting)` — the SAME function the
 `run_polygraph.py` uses (via `load_datasets_via_probe_drift(..., seed=1)`) — so the training pool is
-his: LEAVE_ONE_OUT = the other 9 datasets at 200 each; DIFF_TASK (QA eval) = samsum+xsum+cnn at 600
-each. We keep his per-source CAP and restrict to the sources we have Llama features for
+Reference: LEAVE_ONE_OUT = the other 9 datasets at 200 each; DIFF_TASK (QA eval) = samsum+xsum+cnn at 600
+each. We keep that per-source CAP and restrict to the sources we have Llama features for
 ({sciq, trivia_qa, pubmed_qa, xsum}); omitted sources are logged. This is a SUBSET of ProbeDrift-light,
 NOT a reproduction — see the note below on why cell-by-cell reproduction is impossible from a subset.
 
@@ -13,9 +13,9 @@ SAPLMA = the A&M MLP on the mean-pooled middle-layer (L15) hidden state, judge-l
 WHY SEED-AVERAGED (not the single seed=1): with only 3-of-9 LOO sources the pool is small, and the
 OOD PRR is dominated by WHICH 200-example subsample gets drawn (measured: subsample-only std ~0.043 vs
 training-only std ~0.014 on pubmed-LOO). the seed=1 draw is stable-but-arbitrary; restricting the
-sources changes the RNG draw path, so his exact subsample — and thus his exact cell value — cannot be
+sources changes the RNG draw path, so the reference subsample, and thus its exact cell value, cannot be
 reproduced from a subset EVEN IN PRINCIPLE. So we report a seed-averaged mean±std range, not a single
-cell claimed to match his.
+cell claimed to match it.
 
 ID-diagonal GATE (mirrors 05_transfer): load the cached ID probe, score its eval features, assert the
 uncertainties equal the cached 04_eval scores (allclose). Fail loudly if not.
@@ -144,7 +144,7 @@ def main():
         w.writeheader(); w.writerows(out_rows)
     print(f"\nwrote {out}")
     print("NOTE: OOD cells are a SUBSET of the pools (fewer sources) and seed-AVERAGED — NOT a "
-          "cell-by-cell reproduction of his numbers (impossible from a restricted pool; see docstring).")
+          "cell-by-cell reproduction of the reference numbers (impossible from a restricted pool; see docstring).")
 
 
 def _diagnose(fe, cache_dir, model, E, batch, seeds):

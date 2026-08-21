@@ -8,8 +8,9 @@ unlike the OpenAI judge it costs NOTHING per call -- it just needs a GPU.
 We score the MODEL OUTPUT against the GOLD reference, matching the direction exactly
 (`Temp_robust_UQ_probes/utils/alignscore.py:67-70`): `scorer.score(claims=gold,
 contexts=output)`, evaluation_mode "nli_sp". The scorer machinery is vendored verbatim in
-`_alignscore_utils.py` (from his `lm_polygraph_lite/.../alignscore_utils.py`, itself adapted
-from yuh-zha/AlignScore). Verify against his code with scripts/checks/alignscore_vs_authors.py.
+`_alignscore_utils.py` (from the reference `lm_polygraph_lite/.../alignscore_utils.py`, itself
+adapted from yuh-zha/AlignScore). Verify against the authors' code with
+scripts/checks/alignscore_vs_authors.py.
 
 Returns a float in [0, 1] (higher = output better supported by the gold), or None on error.
 For multi-reference golds (e.g. trivia_qa alias lists) we take the MAX over references, the

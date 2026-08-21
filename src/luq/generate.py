@@ -179,7 +179,7 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     pooled = []
     for layer in range(n_layers):
         # Average the last-prompt (pre-answer) position PLUS the generated-token states,
-        # matching the SAPLMA masked-mean: his output_mask aligns so the averaged window
+        # matching the SAPLMA masked-mean: the reference output_mask aligns so the averaged window
         # starts at the last prompt position (the state that PREDICTS the first answer
         # token). That pre-answer state encodes the whole question and DOMINATES for short
         # answers -- excluding it (our earlier bug) meant a 2-token answer like "friday"

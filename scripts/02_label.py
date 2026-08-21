@@ -181,7 +181,7 @@ def main():
                     help="Collapse all newlines out of the model answer before judging, "
                          "matching the Hidden Failures judge input "
                          "(collect_llm_judge_inputs.py:92). Use ONLY for faithful "
-                         "reproduction of his labels (e.g. the Llama keystone).")
+                         "reproduction of those labels (e.g. the Llama keystone).")
     ap.add_argument("--promote-judge", action="store_true",
                     help="STANDARDISE this short-form dataset onto the judge label: copy the "
                          "already-computed `correctness_judge` into the canonical `correctness` "

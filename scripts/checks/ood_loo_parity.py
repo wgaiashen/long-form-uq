@@ -1,7 +1,7 @@
 """Cheap-bug parity check for the SAPLMA leave-one-out OOD approximation.
 
 Rules out three cheap explanations for our sciq-LOO PRR (~0.65) sitting well below
-the reported ~0.86, BEFORE attributing the whole gap to "we only have 3 of his 9
+the reported ~0.86, BEFORE attributing the whole gap to "we only have 3 of the 9
 LOO training sources". Read-only with respect to the caches (loads features/records,
 draws index subsamples, trains nothing that gets written).
 
@@ -12,7 +12,7 @@ It asserts:
   2. FINITE FEATURES: the layer-15 (L15) SAPLMA features are finite (no NaN/Inf) for
      all four sources we have Llama features for.
   3. RECIPE PARITY: prints our train_probe_mlp recipe next to the
-     full_sequence_saplma head recipe (read from his repo), so hyperparameter drift
+     full_sequence_saplma head recipe (read from the reference repository), so hyperparameter drift
      is visible at a glance.
 
 Run:

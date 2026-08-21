@@ -1,6 +1,6 @@
 """Training-signal x eval-metric matrix for the SAPLMA baseline (ID setting).
 
-Reproduces Joe Stacey's "Hidden Failures" training-signal ablation: train the SAPLMA probe on
+Reproduces the "Hidden Failures" (Stacey et al.) training-signal ablation: train the SAPLMA probe on
 one label, score it against another. Each cell here is
 
     train the probe on  <train signal>  ->  evaluate PRR against  <eval metric>

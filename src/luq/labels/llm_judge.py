@@ -206,7 +206,7 @@ def build_prompt(record: dict, dataset: str, strip_newlines: bool = False) -> st
 
     strip_newlines: collapse all newlines out of the model answer before judging,
     matching the Hidden Failures judge input (collect_llm_judge_inputs.py:92). OFF
-    by default; turn on only to reproduce his labels faithfully.
+    by default; turn on only to reproduce those labels faithfully.
     """
     judge_name = JUDGE_NAME_MAP[dataset]
     question, caveat = _extract_question(record["prompt"], judge_name)

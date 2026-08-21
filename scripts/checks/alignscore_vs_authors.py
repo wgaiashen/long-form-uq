@@ -6,7 +6,7 @@ max over multiple references (trivia aliases), and the empty-output handling, en
 cached records. We score a handful of (output, target) pairs with both our `score()` and the
 `AlignScore.__call__`, then assert they agree to < 1e-3.
 
-For the side, multiple references are reduced exactly as his AggregatedMetric does for trivia:
+Multiple references are reduced exactly as the reference AggregatedMetric does for trivia:
 score each alias on its own, then take the max.
 
 Needs a GPU: the literal scorer calls torch.cuda.synchronize() unconditionally (the very call
@@ -68,8 +68,8 @@ def _stub_tensorflow():
 
 
 def reference_scorer():
-    """the AlignScore wrapper, imported from his repo. Kept import-local so the rest of the
-    file can be read without his package installed."""
+    """The AlignScore wrapper, imported from the reference repository. Kept import-local so the
+    rest of the file can be read without that package installed."""
     if str(REFERENCE_REPO) not in sys.path:
         sys.path.insert(0, str(REFERENCE_REPO))
     _stub_tensorflow()
@@ -79,7 +79,7 @@ def reference_scorer():
 
 def reference_value(ref, record):
     """the AlignScore for one record. A list target (trivia aliases) is reduced by max, the
-    same as his AggregatedMetric."""
+    same as the reference AggregatedMetric."""
     out = record["gen_text"]
     tgt = record["target"]
     golds = tgt if isinstance(tgt, list) else [tgt]
