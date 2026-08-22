@@ -101,9 +101,9 @@ for ds in ["med_quad", "expertqa"]:
     cfg = Config(model_name=MODEL, dataset=ds, ood_setting="ID",
                  prompt_regime=REGIME.get(ds, ""))
     try:
-        recs = cache.load_records(cfg)
+        recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, ds, "ID"))
     except Exception as e:
-        print(f"{ds:16s} {'-':>6s} {'-':>7s}  could not load: {e}")
+        print(f"{ds:16s} {'-':>6s} {'-':>7s} {'NOT FOUND':>9s}  ({type(e).__name__})")
         continue
     f = FIELD.get(ds, "correctness")
     n = len(recs)
