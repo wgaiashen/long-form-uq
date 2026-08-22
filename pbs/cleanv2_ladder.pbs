@@ -48,6 +48,7 @@ RUNGS="${RUNGS_RAW//+/,}"
 # names and strips '-long' itself when filtering (probedriftlong.py:609). Passing the tag verbatim
 # is rejected. Normalise here so either form works and the mismatch cannot recur.
 RUNGS="${RUNGS//-long/}"
+BASELINES="${LUQ_BASELINES:-ptrue,lookback}"
 
 # THE ONE FLAG THAT DEFINES THIS POPULATION.
 export LUQ_REGIME="med_quad=cleanv2"
@@ -57,8 +58,16 @@ LIVE="logs/cleanv2_ladder__${EV}__${PBS_JOBID%%.*}.log"
 exec > >(tee -a "$LIVE") 2>&1
 echo "live log: $LIVE"
 echo "=== clean-v2 ladder === eval=$EV rungs=$RUNGS host=$(hostname) at $(date)"
-echo "    LUQ_REGIME=$LUQ_REGIME"
+echo "    LUQ_REGIME=$LUQ_REGIME   baselines=$BASELINES"
 
+# WHICH BASELINES: set by LUQ_BASELINES, default both.
+# `ptrue` needs cache/cleanv2/features/..__ptrue_accurate.npz and `lookback` needs ..__lookback.npz.
+# When the Lookback extraction cannot be placed on a GPU, pass LUQ_BASELINES=ptrue to close the
+# P(True) half of the gap now rather than idling; the run then carries 18 of the 19 methods and
+# `lookback` stays the single outstanding one. Naming both when a feature is absent is NOT harmless:
+# probedriftlong leaves those cells blank and says so, but a blank reads as "not measured", which is
+# exactly what it is -- so state the intent in the flag rather than relying on the skip.
+#
 # --baselines IS REQUIRED FOR PARITY, and is off by default.
 # The canonical per-eval sources (results/pdl_fam_<eval>__<slug>.csv) carry `ptrue` and `lookback`
 # rows, which the assembler maps to the master's `P(True)` and `Lookback Lens`. A clean-v2 run
@@ -72,7 +81,7 @@ python -u scripts/checks/probedriftlong.py \
     --seeds 1,2,3 \
     --evals "$EV" \
     --rungs "$RUNGS" \
-    --baselines ptrue,lookback \
+    --baselines "$BASELINES" \
     --perex-dir results/cleanv2/perex \
     --out "results/cleanv2/probedriftlong_cleanv2_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
 STATUS=$?
