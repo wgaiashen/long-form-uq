@@ -1,34 +1,41 @@
 #!/usr/bin/env python
-"""Assemble the clean-v2 Llama master and run gates A and C.
+"""Assemble the clean-v2 Llama per-eval result set and run gates A and C.
 
-WHAT THIS BUILDS. The clean-v2 master is 40 cells made of two provably different things:
+WHAT THIS BUILDS. 40 cells made of two provably different things:
 
   * 19 cells RECOMPUTED, because MedQuAD is either their evaluation target or one of their training
-    sources. Those come from results/cleanv2/probedriftlong_cleanv2_<eval>__<slug>.csv.
-  * 21 cells INHERITED verbatim from the canonical master, because MedQuAD appears nowhere in them.
+    sources -- from results/cleanv2/probedriftlong_cleanv2_<eval>__<slug>.csv.
+  * 21 cells INHERITED verbatim, because MedQuAD appears nowhere in them.
 
-WHY THE 21 ARE INHERITED AND NOT RE-RUN. Their inputs are identical, so a re-run can only differ by
-the stochastic draw of a probe fit. Refitting them would add noise to precisely the comparison that
-is supposed to be exact, and would then invite the question "did this cell move?" about a cell that
-by construction cannot have moved. Inheriting is the stronger claim, and it is only made after the
-identity check below passes.
+WHERE THE INHERITED CELLS COME FROM, AND WHY NOT THE MASTER. They are taken from
+`results/pdl_fam_<eval>__<slug>.csv`, the canonical per-eval output of this same driver -- NOT from
+`results/pdl_master__<slug>.csv`. The master is an ASSEMBLED table: assemble_pdl_table.py merges a
+dozen source globs, maps raw driver keys onto display names, dedupes by priority and cross-checks
+overlaps. Mixing raw clean-v2 rows (`wmsp_shrink2`) with assembled master rows (`wMSP-shrink@2`)
+would produce a file carrying two naming conventions for one method, and would also drag in arms
+from experiments this correction never reran (multi-head, top-k, ensembles, the router). Inheriting
+from the per-eval source keeps one convention, one driver and one schema.
 
-GATE A -- identity before inheritance. For every candidate inherited cell this asserts:
-  * MedQuAD is not the eval target and not in the training pool (structural, from cells_long);
-  * every dataset the cell touches resolves, under LUQ_REGIME=med_quad=cleanv2, to the SAME cache
-    path the canonical run used -- i.e. nothing silently points at a cleanv2 directory;
-  * that path's file content hash is unchanged.
-Any failure is a STOP. It is never repaired by recomputing the cell.
+Rendering to display names is a SEPARATE later step: point assemble_pdl_table.py at these outputs.
 
-GATE C -- training-pool audit. For every recomputed learned cell it prints the eval target, the
-rung, the source datasets, the number of MedQuAD rows drawn, and the exact feature and label
-namespace MedQuAD resolved to, so a silent fallback to the raw population is visible rather than
-inferred.
+TWO ASYMMETRIES THIS PRINTS RATHER THAN HIDES.
+  * `wmsp_shrink1_5` exists in the clean-v2 runs but not in the canonical per-eval sources, because
+    the lambda = 1.5 arm was added after they were produced. It will therefore be present on the 19
+    recomputed cells and absent on the 21 inherited ones.
+  * `ptrue` / `lookback` come from --baselines. If a clean-v2 run was made without that flag its
+    cells will lack them while the inherited cells have them. Both are reported as coverage gaps.
+
+GATE A -- identity before inheritance: MedQuAD absent structurally, every dataset the cell touches
+resolving to the SAME cache path the canonical run used (never a cleanv2 path), and that path's
+content hash recorded. Any failure is a STOP, never repaired by recomputing the cell.
+
+GATE C -- training-pool audit: eval target, rung, sources, MedQuAD row count, and the exact feature
+and label namespace MedQuAD resolved to, so a silent fallback to raw is visible.
 
 This script does not interpret any PRR. It moves rows and checks provenance.
 
-    python scripts/checks/cleanv2_assemble_and_gate.py            # gates only, no write
-    python scripts/checks/cleanv2_assemble_and_gate.py --write    # also write the clean-v2 master
+    python scripts/checks/cleanv2_assemble_and_gate.py            # gates + coverage, no write
+    python scripts/checks/cleanv2_assemble_and_gate.py --write    # also write the clean-v2 set
 """
 import argparse
 import hashlib
@@ -132,38 +139,61 @@ def gate_c(affected):
 
 def assemble(affected, control, write):
     print("\n" + "=" * 96)
-    print("ASSEMBLE the clean-v2 master")
+    print("ASSEMBLE the clean-v2 per-eval result set")
     print("=" * 96)
-    canon = pd.read_csv(CANON)
     parts, missing = [], []
     for rung, X, _ in affected:
         f = OUTDIR / f"probedriftlong_cleanv2_{X}__{SLUG}.csv"
         if not f.exists():
-            missing.append((rung, X)); continue
+            missing.append(("recomputed", rung, X)); continue
         d = pd.read_csv(f)
         d = d[(d["eval"] == X) & (d["rung"] == rung)]
         if d.empty:
-            missing.append((rung, X)); continue
+            missing.append(("recomputed", rung, X)); continue
         d = d.copy(); d["provenance"] = "recomputed_cleanv2"
         parts.append(d)
+    # The canonical per-eval sources are a GLOB, not one file per eval: some cells were filled by a
+    # later per-rung job, e.g. xsum/1ds-Diff-long lives in pdl_fam_xsum_1ds-Diff__<slug>.csv rather
+    # than pdl_fam_xsum__<slug>.csv. Assuming one file per eval silently loses those cells, so
+    # gather every pdl_fam_* source and select the matching (eval, rung).
+    fam = []
+    for f in sorted((ROOT / "results").glob(f"pdl_fam_*__{SLUG}.csv")):
+        if "ptrueunsup" in f.name:
+            continue                       # a single-method side file, joined separately
+        d = pd.read_csv(f)
+        if {"eval", "rung", "method"} <= set(d.columns):
+            d = d.copy(); d["_src"] = f.name
+            fam.append(d)
+    fam = pd.concat(fam, ignore_index=True) if fam else pd.DataFrame()
     inh = []
     for rung, X, _ in control:
-        d = canon[(canon["eval"] == X) & (canon["rung"] == rung)].copy()
-        if d.empty:
-            missing.append((rung, X, "canonical")); continue
+        d = fam[(fam["eval"] == X) & (fam["rung"] == rung)] if len(fam) else fam
+        if len(d) == 0:
+            missing.append(("inherited", rung, X)); continue
+        # a method appearing in two sources must agree; disagreement is flagged, never averaged
+        dup = d[d.duplicated("method", keep=False)]
+        for meth, g in dup.groupby("method"):
+            if g["prr_mean"].nunique() > 1:
+                print(f"     DISAGREEMENT {X}/{rung}/{meth} across {sorted(set(g['_src']))} -- not averaged")
+        d = d.drop_duplicates("method", keep="first").drop(columns=["_src"]).copy()
         d["provenance"] = "inherited_unchanged"
         inh.append(d)
     print(f"  recomputed cells found : {len(parts)}/{len(affected)}")
-    print(f"  inherited cells found  : {len(inh)}/{len(control)}")
+    print(f"  inherited  cells found : {len(inh)}/{len(control)}   (source: results/pdl_fam_<eval>__<slug>.csv)")
     if missing:
-        print(f"  MISSING: {missing}")
-        print("  -> the master is NOT written while any cell is missing; a partial master would read"
-              "\n     as a complete one, which is the failure this project bans.")
+        for m in missing[:12]:
+            print(f"     MISSING {m}")
+        print("  -> NOT writing while any cell is missing: a partial file reads as a complete one.")
         return False
     master = pd.concat(parts + inh, ignore_index=True)
+    rec = set(pd.concat(parts)["method"]); ihm = set(pd.concat(inh)["method"])
+    if rec - ihm:
+        print(f"  NOTE methods only on the 19 recomputed cells : {sorted(rec - ihm)}")
+    if ihm - rec:
+        print(f"  NOTE methods only on the 21 inherited cells  : {sorted(ihm - rec)}")
     print(f"  assembled {len(master)} rows over {master.groupby(['eval','rung']).ngroups} cells")
     if write:
-        out = OUTDIR / f"pdl_master_cleanv2__{SLUG}.csv"
+        out = OUTDIR / f"pdl_cleanv2_alleval__{SLUG}.csv"
         master.to_csv(out, index=False)
         print(f"  wrote {out}")
     else:
