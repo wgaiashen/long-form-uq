@@ -177,7 +177,14 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
         for meth, g in dup.groupby("method"):
             if g["prr_mean"].nunique() > 1:
                 print(f"     DISAGREEMENT {X}/{rung}/{meth} across {sorted(set(g['_src']))} -- not averaged")
-        d = d.drop_duplicates("method", keep="first").drop(columns=["_src"]).copy()
+        # PREFER A MEASURED VALUE OVER A BLANK. Some methods were filled by a later per-method job:
+        # asqa/ID/wmsp_seg_softmax is NaN in pdl_fam_asqa but 0.3618 in pdl_fam_asqa_segsm. Taking
+        # whichever row happened to come first shipped the NaN, turning "measured" into "not
+        # measured" -- the exact confusion this project bans. Sort non-null first, then dedupe.
+        d = (d.assign(_isnull=d["prr_mean"].isna())
+               .sort_values("_isnull", kind="stable")
+               .drop_duplicates("method", keep="first")
+               .drop(columns=["_src", "_isnull"]).copy())
         d["provenance"] = "inherited_unchanged"
         inh.append(d)
     print(f"  recomputed cells found : {len(parts)}/{len(affected)}")
