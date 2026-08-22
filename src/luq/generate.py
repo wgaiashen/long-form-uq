@@ -72,12 +72,37 @@ def load_model(name: str, attn_implementation: str | None = None,
     return model, tok
 
 
+# Turn-end tokens for chat-formatted generation, keyed by the family that uses them. A base
+# checkpoint's tokenizer often DEFINES these (it ships the special-token vocab) without its
+# generation_config treating them as a stop condition, since that config targets plain completion.
+_CHAT_EOS_CANDIDATES = ("<|im_end|>", "<|eot_id|>", "<end_of_turn>")
+
+
+def _chat_eos_ids(tok):
+    """Resolve whichever _CHAT_EOS_CANDIDATES tokens this tokenizer actually has.
+
+    Found empirically on Qwen2.5-32B (2026-08-21): tok.eos_token_id is <|endoftext|> (151643),
+    but apply_chat_template's turn boundary is <|im_end|> (151645) -- a different token the base
+    generation_config never learned to stop on. Without it, chat-template generation runs straight
+    past its own turn boundary and hallucinates the next user turn to fill the rest of the token
+    budget (up to 37.5% of generations on the two 256-token datasets, invisible to the existing
+    degeneracy detectors -- none of them pattern-match on an invented '<|im_start|>user' turn).
+    """
+    ids = []
+    for t in _CHAT_EOS_CANDIDATES:
+        i = tok.convert_tokens_to_ids(t)
+        if i is not None and i != tok.unk_token_id and i not in ids:
+            ids.append(i)
+    return ids
+
+
 @torch.no_grad()
 def generate(model, tok, prompt: str, max_new_tokens: int,
              truncate_at_newline: bool = False,
              repetition_penalty: float | None = None,
              no_repeat_ngram_size: int | None = None,
-             truncate_answer_span: str | None = None):
+             truncate_answer_span: str | None = None,
+             chat_template: bool = False):
     """Generate one response; return (record, pooled_all_layers).
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
@@ -95,6 +120,12 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     its no-op defaults 1.0 / 0). Needed only for open-ended prompts where the base model has
     no natural stop and loops to the token budget (ExpertQA: the Stage-2 scan found 73% capped,
     ~half repetition-degenerate). Greedy decoding is unchanged; these only forbid the loop.
+
+    chat_template: OPT-IN, default OFF so every existing frozen run is unaffected. Set True when
+    `prompt` was built via tok.apply_chat_template -- adds this tokenizer's chat turn-end token(s)
+    (see _chat_eos_ids) to the stop condition, on top of tok.eos_token_id. Without it, generation
+    only stops on the base completion EOS and can run past the chat turn boundary into a
+    hallucinated next turn (see _chat_eos_ids docstring).
     """
     # 1. Tokenise. prompt_len marks where the response begins: generate() returns
     #    prompt + response as one sequence, and we only ever cache the response part.
@@ -113,6 +144,9 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
         return_dict_in_generate=True,
         pad_token_id=tok.eos_token_id,
     )
+    if chat_template:
+        eos_ids = [tok.eos_token_id] + [i for i in _chat_eos_ids(tok) if i != tok.eos_token_id]
+        gen_kwargs["eos_token_id"] = eos_ids
     if repetition_penalty is not None:
         gen_kwargs["repetition_penalty"] = repetition_penalty
     if no_repeat_ngram_size is not None:

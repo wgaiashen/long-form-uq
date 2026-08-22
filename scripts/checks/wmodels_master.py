@@ -24,6 +24,9 @@ derived max-of-three, not a trained method, so asserting `n_seeds == 3` over all
 
     python scripts/checks/wmodels_master.py --model google/gemma-2-9b
     python scripts/checks/wmodels_master.py --model google/gemma-2-9b --strict
+    python scripts/checks/wmodels_master.py --model meta-llama/Llama-3.1-8B-Instruct --tag chat
+        # picks up wmodels_stageA_chat__meta-llama_Llama-3.1-8B-Instruct__*.csv (the chat-template
+        # regeneration, prereg M5 §6) and writes wmodels_master_chat__meta-llama_Llama-3.1-8B-Instruct.csv
     python scripts/checks/wmodels_master.py --model google/gemma-2-9b --prefix wmodels_stage  # λ∈{0,2}
 """
 import argparse
@@ -67,6 +70,15 @@ def main() -> int:
     ap.add_argument("--lam3-only", action="store_true",
                     help="take only the λ∈{0,1.5,2} re-run (the superset). Recommended: its overlap "
                          "with the earlier run is bit-identical, proven by wmodels_lambda_control.py.")
+    ap.add_argument("--tag", default="",
+                    help="extra filename tag inserted right after the stage letter, e.g. 'chat' picks "
+                         "up wmodels_stageA_chat__<slug>__*.csv -- the chat-template regeneration "
+                         "(meta-llama/Llama-3.1-8B-Instruct's raw-few-shot run failed the §6 gate; "
+                         "Qwen2.5-32B's own raw-few-shot population was quarantined the same way, "
+                         "prereg M5). Use the SAME tag for both once Qwen2.5-32B's chat-regime ladder "
+                         "lands, so this one flag covers either population. Empty (default) = the "
+                         "original naming, byte-for-byte unchanged, so every existing invocation "
+                         "(gemma, any raw-few-shot population) is unaffected.")
     ap.add_argument("--out", default=None)
     ap.add_argument("--strict", action="store_true",
                     help="exit 1 unless every in-scope cell is present")
@@ -92,9 +104,10 @@ def main() -> int:
               f"    Suggested: --out results/wmodels_master8__{slug}.csv", file=sys.stderr)
         return 2
 
-    pats = [f"{a.prefix}A_lam3__{slug}__*.csv", f"{a.prefix}B_lam3__{slug}__*.csv"]
+    tag = f"_{a.tag}" if a.tag else ""
+    pats = [f"{a.prefix}A{tag}_lam3__{slug}__*.csv", f"{a.prefix}B{tag}_lam3__{slug}__*.csv"]
     if not a.lam3_only:
-        pats += [f"{a.prefix}A__{slug}__*.csv", f"{a.prefix}B__{slug}__*.csv"]
+        pats += [f"{a.prefix}A{tag}__{slug}__*.csv", f"{a.prefix}B{tag}__{slug}__*.csv"]
 
     cells, srcs, conflicts, dup_ok, quarantined = {}, [], [], 0, []
     for pat in pats:
@@ -162,7 +175,7 @@ def main() -> int:
                 RUNGS.index(rung) if rung in RUNGS else 99,
                 METHOD_ORDER.index(meth) if meth in METHOD_ORDER else 99, meth)
 
-    out = Path(a.out) if a.out else RESULTS / f"wmodels_master__{slug}.csv"
+    out = Path(a.out) if a.out else RESULTS / f"wmodels_master{tag}__{slug}.csv"
     with open(out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=OUT_COLS, extrasaction="ignore")
         w.writeheader()

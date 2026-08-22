@@ -251,7 +251,8 @@ def main():
                                                truncate_at_newline=truncate,
                                                truncate_answer_span=(cfg.dataset if args.truncate_answer_span else None),
                                                repetition_penalty=args.repetition_penalty,
-                                               no_repeat_ngram_size=args.no_repeat_ngram_size)
+                                               no_repeat_ngram_size=args.no_repeat_ngram_size,
+                                               chat_template=args.chat_template)
             record |= {"idx": idx, "split": split, "target": target}
             records.append(record)
             pooled_list.append(pooled.numpy())  # float32 array, (n_layers, hidden)
