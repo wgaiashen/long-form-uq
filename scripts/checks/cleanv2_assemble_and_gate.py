@@ -167,6 +167,28 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
             d = d.copy(); d["_src"] = f.name
             fam.append(d)
     fam = pd.concat(fam, ignore_index=True) if fam else pd.DataFrame()
+
+    # LAMBDA = 1.5 FOR THE INHERITED CELLS.
+    # The lambda = 1.5 arm postdates the pdl_fam sources, so those cells have no `wmsp_shrink1_5`
+    # row and the assembled file would carry the method on 19 cells and not the other 21. The values
+    # DO exist: results/sharpening_lambda_<eval>__<slug>.csv holds kind='lambda', param='lam1.5' on
+    # the complete 40-cell grid at 3 seeds. That source is the raw population, which is exactly right
+    # here -- these 21 cells touch med_quad nowhere, so raw and clean-v2 are the same population for
+    # them, the same reason every other method is inherited rather than recomputed.
+    # VERIFIED SAME QUANTITY, not assumed: the lambda = 0 arm ('norm' there, 'wmsp_norm' here) agrees
+    # on all 40 cells at max |d| = 4.8e-05, a rounding difference only -- pdl_fam stores 4 dp while
+    # sharpening_lambda keeps full precision.
+    lam = []
+    for f in sorted((ROOT / "results").glob(f"sharpening_lambda_*__{SLUG}.csv")):
+        if "verdict" in f.name:
+            continue
+        d = pd.read_csv(f)
+        if "kind" not in d.columns or "param" not in d.columns:
+            continue
+        d = d[(d["kind"] == "lambda") & (d["param"].astype(str) == "lam1.5")]
+        if len(d):
+            lam.append(d)
+    lam = pd.concat(lam, ignore_index=True) if lam else pd.DataFrame()
     inh = []
     for rung, X, _ in control:
         d = fam[(fam["eval"] == X) & (fam["rung"] == rung)] if len(fam) else fam
@@ -186,6 +208,17 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
                .drop_duplicates("method", keep="first")
                .drop(columns=["_src", "_isnull"]).copy())
         d["provenance"] = "inherited_unchanged"
+        if "wmsp_shrink1_5" not in set(d["method"]) and len(lam):
+            L = lam[(lam["eval"] == X) & (lam["rung"] == rung)]
+            if len(L):
+                row = d.iloc[[0]].copy()
+                row["method"] = "wmsp_shrink1_5"
+                row["prr_mean"] = float(L["prr"].iloc[0])
+                if "prr_std" in row.columns:
+                    row["prr_std"] = float(L["prr_std"].iloc[0]) if "prr_std" in L.columns else float("nan")
+                row["n_seeds"] = int(L["n_seeds"].iloc[0]) if "n_seeds" in L.columns else 3
+                row["provenance"] = "inherited_lambda_source"
+                d = pd.concat([d, row], ignore_index=True)
         inh.append(d)
     print(f"  recomputed cells found : {len(parts)}/{len(affected)}")
     print(f"  inherited  cells found : {len(inh)}/{len(control)}   (source: results/pdl_fam_<eval>__<slug>.csv)")
