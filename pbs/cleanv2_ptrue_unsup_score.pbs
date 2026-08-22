@@ -1,0 +1,43 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb
+#PBS -l walltime=6:00:00
+#PBS -N luq_cv2_ptunsup
+#PBS -j oe
+
+# Training-free P(True) on the MedQuAD clean-v2 population.
+#
+# WHY THIS IS A SEPARATE JOB. `ptrue_unsup` is not one of probedriftlong's methods and not one of its
+# --baselines; canonically it comes from scripts/checks/score_ptrue_unsup.py, which writes
+# results/pdl_fam_ptrueunsup__<slug>.csv and is picked up by the master assembler as `P(True)-unsup`.
+# Reproducing the clean-v2 master therefore needs this run as well as the ladder.
+#
+# It reads the `ptrue_unsup` scalar already stored on each record -- written into the clean-v2
+# namespace by pbs/cleanv2_ptrue.pbs -- so it is CPU-only and loads no model.
+#
+# It honours LUQ_REGIME through the same PROMPT_REGIME mechanism every other driver uses, so the one
+# line below is what makes this the clean-v2 population rather than the canonical one.
+#
+#   qsub pbs/cleanv2_ptrue_unsup_score.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE="${LUQ_CARVE:-legacy}"
+export LUQ_REGIME="med_quad=cleanv2"
+
+mkdir -p logs results/cleanv2
+LIVE="logs/cleanv2_ptrue_unsup__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "=== clean-v2 training-free P(True) === host=$(hostname) at $(date)"
+echo "    LUQ_REGIME=$LUQ_REGIME"
+
+# --out-dir is what keeps the canonical results/pdl_fam_ptrueunsup__<slug>.csv untouched. Without
+# it the script writes that exact path, and a LUQ_REGIME run would overwrite a canonical artifact.
+python -u scripts/checks/score_ptrue_unsup.py \
+    --model meta-llama/Meta-Llama-3.1-8B \
+    --out-dir results/cleanv2
+STATUS=$?
+
+echo "=== clean-v2 training-free P(True) done status=$STATUS at $(date) ==="
+exit $STATUS

@@ -59,12 +59,20 @@ echo "live log: $LIVE"
 echo "=== clean-v2 ladder === eval=$EV rungs=$RUNGS host=$(hostname) at $(date)"
 echo "    LUQ_REGIME=$LUQ_REGIME"
 
+# --baselines IS REQUIRED FOR PARITY, and is off by default.
+# The canonical per-eval sources (results/pdl_fam_<eval>__<slug>.csv) carry `ptrue` and `lookback`
+# rows, which the assembler maps to the master's `P(True)` and `Lookback Lens`. A clean-v2 run
+# without this flag silently produces a NARROWER method set than the cells it will sit beside, and
+# the resulting master would be ragged: 19 recomputed cells missing two methods that all 21
+# inherited cells have. Both features exist in the cleanv2 namespace (jobs 3888506 and 3888832).
+# A dataset lacking the cached feature is skipped LOUDLY and left blank, never zero.
 python -u scripts/checks/probedriftlong.py \
     --model meta-llama/Meta-Llama-3.1-8B \
     --layer 15 \
     --seeds 1,2,3 \
     --evals "$EV" \
     --rungs "$RUNGS" \
+    --baselines ptrue,lookback \
     --perex-dir results/cleanv2/perex \
     --out "results/cleanv2/probedriftlong_cleanv2_${EV}__meta-llama_Meta-Llama-3.1-8B.csv"
 STATUS=$?

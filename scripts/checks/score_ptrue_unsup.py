@@ -19,6 +19,7 @@ the rows merge into both master tables with no assembler change beyond the ALIAS
 """
 import argparse
 import csv as _csv
+import pathlib
 import sys
 from pathlib import Path
 
@@ -125,6 +126,12 @@ def score_one(ds):
 def main():
     global MODEL, SLUG
     ap = argparse.ArgumentParser()
+    ap.add_argument("--out-dir", default=None,
+                    help="directory for the two output CSVs. Default None = results/, i.e. the "
+                         "CANONICAL filenames. Pass a subdirectory (e.g. results/cleanv2) when "
+                         "scoring an alternative population: without it a LUQ_REGIME run would "
+                         "silently overwrite the canonical pdl_fam_ptrueunsup file, which is the "
+                         "one artifact this script must never touch.")
     ap.add_argument("--model", default=MODEL_DEFAULT,
                     help="EXPLICIT model pin. Default is the original string, so a no-args "
                          "invocation stays byte-identical to before.")
@@ -155,8 +162,10 @@ def main():
 
     if not rows_long:
         sys.exit("nothing scored — refusing to write empty files.")
+    outdir = pathlib.Path(args.out_dir) if args.out_dir else (ROOT / "results")
+    outdir.mkdir(parents=True, exist_ok=True)
     for rows, stem in ((rows_long, "pdl_fam_ptrueunsup"), (rows_xl, "xlcontrib_fam_ptrueunsup")):
-        out = ROOT / "results" / f"{stem}__{SLUG}.csv"
+        out = outdir / f"{stem}__{SLUG}.csv"
         with open(out, "w", newline="") as fh:
             w = _csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
         print(f"\nwrote {out}")
