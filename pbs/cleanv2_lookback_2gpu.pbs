@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=12:00:00
+#PBS -N luq_cv2_lookback2
+#PBS -j oe
+
+# Lookback Lens features for the Llama MedQuAD clean-v2 population.
+#
+# WHY THIS CANNOT BE SLICED. The cached Lookback feature is (n, 1, 1024): the per-token
+# context-vs-new attention ratios have already been mean-pooled away, so there is no token axis left
+# to truncate. Recovering the retained span means recomputing the ratios, which means the attention
+# weights, which means a forward pass.
+#
+# SIZING, NOT COPIED FROM THE CANONICAL JOB. 01c_lookback forces the eager backend (SDPA returns no
+# attention weights) and float32 (eager attention in fp16 overflows to NaN in the softmax), and the
+# forward holds every block's attention at once. For Llama-3.1-8B that is 32 layers x 32 heads, and
+# med_quad runs ~1204 prompt + 128 generated tokens, so the attention buffer is about 7.3 GB on top
+# of ~32 GB of fp32 weights. The canonical run used DoC's 80 GB A100; RCS has no 80 GB card, so this
+# asks for a 48 GB L40S, which the arithmetic says fits with room to spare. If it OOMs, the fallback
+# is --device-map auto across two cards, NOT a dtype change: fp16 would silently produce NaN
+# attention and a plausible-looking feature.
+#
+# THIS IS THAT FALLBACK, TAKEN FOR AVAILABILITY RATHER THAN FOR MEMORY. The single-card version sat
+# queued for fifteen hours: the only L40S nodes with free cards were offline or down, so the request
+# could never be placed, while three RTX6000 nodes stood completely free. Two 24 GB RTX6000 cards
+# give 48 GB, the same budget the single L40S was asked for, and the measured requirement on this
+# population is 39.6 GB -- 32 GB of fp32 weights plus 7.6 GB of attention at the longest sequence,
+# which is 1358 tokens. That leaves 8.4 GB of headroom.
+#
+# SHARDING CHANGES NO NUMBER. Only the placement of the weights differs; max_seq, the dtype and the
+# ratio are untouched, so these are the features one large card would have produced. --max-memory is
+# passed rather than --device-map auto alone because accelerate fills GPU 0 first and can silently
+# put everything on one card; with the split named, 01c_lookback asserts it happened instead of
+# assuming it.
+#
+# TWO PASSES. rawcheck first (a byte-identical copy of the canonical raw records) so its output can
+# be checked against the canonical feature cache; only then is the cleanv2 pass trustworthy. Flags
+# are exactly the canonical ones (slurm/llama_lookback.sbatch) plus --prompt-regime. Nothing is
+# written into the canonical namespace.
+#
+#   qsub pbs/cleanv2_lookback_2gpu.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+mkdir -p logs
+LIVE="logs/cleanv2_lookback2__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+DS="med_quad"
+echo "=== clean-v2 Lookback === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+STATUS=0
+for RG in cleanv2_rawcheck cleanv2; do
+  echo; echo "################ pass: $RG ################ $(date)"
+  python -u scripts/01c_lookback.py --dataset "$DS" --ood ID --model "$MODEL" \
+      --prompt-regime "$RG" \
+      --device-map auto --max-memory 0=22GiB,1=22GiB || { echo "!!! lookback FAILED ($RG)"; STATUS=1; }
+done
+
+echo; echo "=== clean-v2 Lookback done status=$STATUS at $(date) ==="
+echo "NEXT: gate E -- compare cache/cleanv2_rawcheck/features/..__lookback.npz against the"
+echo "      canonical cache/features/..__lookback.npz before trusting the cleanv2 pass."
+exit $STATUS
