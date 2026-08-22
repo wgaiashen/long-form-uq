@@ -42,7 +42,12 @@ echo "=== clean-v2 Lookback === host=$(hostname) at $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
 STATUS=0
-for RG in cleanv2_rawcheck cleanv2; do
+# WHICH PASSES TO RUN, same switch as the two-card variant. The equivalence pass is the one that
+# needs repeating on its own: it fails reproducibly at row 1361 of the RAW population on two
+# separate runs, while the clean-v2 pass completed all 1800 rows on the very same node and cards.
+# That pattern points at a particular raw record rather than at the hardware, so the retry is worth
+# making on a different architecture before drawing any conclusion.
+for RG in ${LUQ_PASSES:-cleanv2_rawcheck cleanv2}; do
   echo; echo "################ pass: $RG ################ $(date)"
   python -u scripts/01c_lookback.py --dataset "$DS" --ood ID --model "$MODEL" \
       --prompt-regime "$RG" || { echo "!!! lookback FAILED ($RG)"; STATUS=1; }
