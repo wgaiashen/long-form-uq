@@ -44,6 +44,10 @@ export LUQ_CARVE="${LUQ_CARVE:-legacy}"
 EV="${LUQ_EVAL:?set LUQ_EVAL}"
 RUNGS_RAW="${LUQ_RUNGS:?set LUQ_RUNGS (use + between rungs, not commas)}"
 RUNGS="${RUNGS_RAW//+/,}"
+# cells_long() emits tags like 'LOO-long', but probedriftlong's --rungs validates against the BASE
+# names and strips '-long' itself when filtering (probedriftlong.py:609). Passing the tag verbatim
+# is rejected. Normalise here so either form works and the mismatch cannot recur.
+RUNGS="${RUNGS//-long/}"
 
 # THE ONE FLAG THAT DEFINES THIS POPULATION.
 export LUQ_REGIME="med_quad=cleanv2"
