@@ -55,7 +55,14 @@ echo "=== clean-v2 Lookback === host=$(hostname) at $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
 STATUS=0
-for RG in cleanv2_rawcheck cleanv2; do
+# WHICH PASSES TO RUN. Both by default, rawcheck first. LUQ_PASSES exists because the two are
+# independent and one can fail on its own: a transient CUDA fault killed the rawcheck pass at
+# 1360/1800 while the clean-v2 pass then completed on a fresh context. Features are written only at
+# the end of a pass, so a fault leaves nothing behind and that pass has to be repeated by itself
+# rather than repeating both.
+#   LUQ_PASSES=cleanv2_rawcheck  -- just the equivalence pass
+#   LUQ_PASSES=cleanv2           -- just the population that feeds the ladder
+for RG in ${LUQ_PASSES:-cleanv2_rawcheck cleanv2}; do
   echo; echo "################ pass: $RG ################ $(date)"
   python -u scripts/01c_lookback.py --dataset "$DS" --ood ID --model "$MODEL" \
       --prompt-regime "$RG" \
