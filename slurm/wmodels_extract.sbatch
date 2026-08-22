@@ -25,7 +25,16 @@
 # --dtype AND --attn PASSED EXPLICITLY. `auto` resolves to fp16 and token logprobs ARE the msp_min
 # and wMSP signal.
 #
+# med_quad / expertqa are OUTSIDE the primary six-dataset panel and IN SCOPE ONLY for the D6
+# eight-dataset sensitivity (prereg/multimodel_far_ood_panel.md §D6). Added here 2026-08-22 so the
+# Llama-3.1-8B-Instruct and Qwen2.5-32B D6 extensions can run on DoC the same way gemma-2-9b's did
+# on RCS via pbs/wmodels_extract.pbs. expertqa is borderline against the default 12h walltime --
+# override with --time=24:00:00 at submit time (do not raise the script default; every other
+# dataset's job would then request GPU time it does not need).
+#
 #   sbatch --export=ALL,LUQ_MODEL=meta-llama/Llama-3.1-8B-Instruct,LUQ_DTYPE=fp32,LUQ_DATASET=xsum \
+#          slurm/wmodels_extract.sbatch
+#   sbatch --time=24:00:00 --export=ALL,LUQ_MODEL=...,LUQ_DTYPE=fp32,LUQ_DATASET=expertqa,LUQ_CHAT=1 \
 #          slurm/wmodels_extract.sbatch
 
 set -uo pipefail
@@ -55,10 +64,19 @@ case "$DS" in
   asqa)          BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 948
   samsum)        BUD=56;  PENALTY="" ;;                    # 1800
   factscore)     BUD=256; PENALTY="--repetition-penalty 1.2" ;;   # 500
-  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2). med_quad and expertqa are"; \
-     echo "!!! deliberately dropped; anything else is a typo." >&2; exit 3 ;;
+  # --- outside the primary six-dataset panel; IN SCOPE ONLY for the D6 eight-dataset sensitivity.
+  # Specs transcribed verbatim from pbs/wmodels_extract.pbs (the RCS twin already used for gemma-2-9b's
+  # D6 generation), so both clusters run the identical D6 spec. Under --chat-template these still keep
+  # their own decoding flags (no-repeat-ngram / repetition-penalty); only --prompt-regime is overridden
+  # to the chat namespace, same override rule as the six-dataset panel below.
+  med_quad)      BUD=128; PENALTY=""; EXTRA_NGRAM="--no-repeat-ngram-size 3" ;;            # 1800 rows
+  expertqa)      BUD=384; PENALTY="--repetition-penalty 1.2"; NONCHAT_REGIME="expertqa_rp12" ;;  # 2016 rows
+  *) echo "!!! '$DS' is not in the six-dataset panel (the multi-model panel registration §2), and is not one of the"; \
+     echo "!!! two datasets the D6 sensitivity adds (med_quad, expertqa). Anything else is a typo." >&2; exit 3 ;;
 esac
 TRUNC="${TRUNC:-}"
+EXTRA_NGRAM="${EXTRA_NGRAM:-}"
+NONCHAT_REGIME="${NONCHAT_REGIME:-}"
 
 if [ -n "$CHAT" ]; then
   REGIME="$CHAT_REGIME"
@@ -66,10 +84,12 @@ elif [ "$DS" = "asqa" ]; then
   REGIME="asqa_rp12"
 elif [ "$DS" = "factscore" ]; then
   REGIME="factscore_rp12"
+elif [ -n "$NONCHAT_REGIME" ]; then
+  REGIME="$NONCHAT_REGIME"
 else
   REGIME=""
 fi
-EXTRA="$PENALTY $TRUNC $CHAT"
+EXTRA="$PENALTY $TRUNC $EXTRA_NGRAM $CHAT"
 [ -n "$REGIME" ] && EXTRA="--prompt-regime $REGIME $EXTRA"
 
 # --max-new-tokens is only legal alongside a --prompt-regime (01_extract:116).
