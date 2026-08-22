@@ -40,6 +40,7 @@ This script does not interpret any PRR. It moves rows and checks provenance.
 import argparse
 import hashlib
 import os
+import pathlib
 import sys
 from pathlib import Path
 
@@ -137,13 +138,14 @@ def gate_c(affected):
     return not bad
 
 
-def assemble(affected, control, write):
+def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleval"):
+    src_dir = pathlib.Path(in_dir) if in_dir else OUTDIR
     print("\n" + "=" * 96)
     print("ASSEMBLE the clean-v2 per-eval result set")
     print("=" * 96)
     parts, missing = [], []
     for rung, X, _ in affected:
-        f = OUTDIR / f"probedriftlong_cleanv2_{X}__{SLUG}.csv"
+        f = src_dir / f"probedriftlong_cleanv2_{X}__{SLUG}.csv"
         if not f.exists():
             missing.append(("recomputed", rung, X)); continue
         d = pd.read_csv(f)
@@ -193,7 +195,7 @@ def assemble(affected, control, write):
         print(f"  NOTE methods only on the 21 inherited cells  : {sorted(ihm - rec)}")
     print(f"  assembled {len(master)} rows over {master.groupby(['eval','rung']).ngroups} cells")
     if write:
-        out = OUTDIR / f"pdl_cleanv2_alleval__{SLUG}.csv"
+        out = OUTDIR / f"{out_name}__{SLUG}.csv"
         master.to_csv(out, index=False)
         print(f"  wrote {out}")
     else:
@@ -204,6 +206,14 @@ def assemble(affected, control, write):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--in-dir", default=None,
+                    help="directory holding the per-eval clean-v2 CSVs. Default results/cleanv2. "
+                         "Point it at results/cleanv2/_firstpass_noBaselines to assemble from the "
+                         "immutable backup while a later pass is still writing the live files -- "
+                         "reading a CSV mid-write is how a half-populated cell becomes a number.")
+    ap.add_argument("--out-name", default="pdl_cleanv2_alleval",
+                    help="stem for the assembled file, so a partial-method assembly cannot be "
+                         "mistaken for the final one.")
     args = ap.parse_args()
     affected, control = split_cells()
     print(f"cells: {len(affected)} affected (recompute), {len(control)} control (inherit), "
@@ -212,7 +222,7 @@ def main():
     c = gate_c(affected)
     if not (a and c):
         sys.exit("\nSTOP: a gate failed; nothing assembled.")
-    assemble(affected, control, args.write)
+    assemble(affected, control, args.write, args.in_dir, args.out_name)
 
 
 if __name__ == "__main__":
