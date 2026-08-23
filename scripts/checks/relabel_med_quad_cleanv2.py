@@ -44,7 +44,7 @@ from luq import cache                                    # noqa: E402
 from luq.config import Config                            # noqa: E402
 from luq.labels import llm_judge                         # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 DATASET = "med_quad"
 REGIME = "cleanv2"
 JUDGE = "gpt-5-mini"          # the judge the inherited labels were produced with; never mix judges
@@ -53,13 +53,18 @@ SAVE_EVERY = 5
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="the generating model whose clean-v2 records are relabelled")
     ap.add_argument("--expect", type=int, default=10,
-                    help="rows expected to need judging; a mismatch aborts before any spend")
+                    help="rows expected to need judging; a mismatch aborts before any spend. This is "
+                         "the builder's reported relabel count, which differs per model")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    MODEL = args.model
 
     cfg = Config(model_name=MODEL, dataset=DATASET, ood_setting="ID", prompt_regime=REGIME)
     key = cache.run_key(MODEL, DATASET, "ID")
+    print(f"model {MODEL}")
     recs = cache.load_records(cfg.cache_dir, key)
     print(f"loaded {len(recs)} clean-v2 records from {cfg.cache_dir}")
 
