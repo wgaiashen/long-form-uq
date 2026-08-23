@@ -58,8 +58,34 @@ from attn_pool import PROMPT_REGIME                              # noqa: E402
 from probe_drift_long.ood_settings import cells_long             # noqa: E402
 from probe_drift_long.dataset_configs import LONG_SRC            # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
+# PER-MODEL SOURCE LAYOUT. The two populations were produced by different drivers and so use
+# different filenames; hardcoding one model's pattern would make the other silently assemble nothing,
+# which reads as "no affected cells" rather than as an error. `lambda_fill` says whether the
+# lambda = 1.5 arm has to be recovered from the sharpening sweep: on Llama it postdates the canonical
+# per-eval files, while the eight-dataset ladder computes it directly and needs no fill.
+PROFILES = {
+    "meta-llama/Meta-Llama-3.1-8B": {
+        "layer": 15,
+        "recomputed": "probedriftlong_cleanv2_{eval}__{slug}.csv",
+        "inherited_glob": "pdl_fam_*__{slug}.csv",
+        "inherited_skip": ("ptrueunsup",),
+        "lambda_fill": True,
+        "out_default": "pdl_cleanv2_alleval",
+    },
+    "google/gemma-2-9b": {
+        "layer": 20,
+        "recomputed": "wmodels_sens8_cleanv2__{slug}__{eval}.csv",
+        "inherited_glob": "wmodels_sens8__{slug}__*.csv",
+        "inherited_skip": ("master",),
+        "lambda_fill": False,
+        "out_default": "wmodels_sens8_cleanv2_master",
+    },
+}
+
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
+MODEL = DEFAULT_MODEL
 SLUG = cache._slug(MODEL)
+PROF = PROFILES[MODEL]
 CANON = ROOT / "results" / f"pdl_master__{SLUG}.csv"
 OUTDIR = ROOT / "results" / "cleanv2"
 LAYER = 15
@@ -145,7 +171,7 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
     print("=" * 96)
     parts, missing = [], []
     for rung, X, _ in affected:
-        f = src_dir / f"probedriftlong_cleanv2_{X}__{SLUG}.csv"
+        f = src_dir / PROF["recomputed"].format(eval=X, slug=SLUG)
         if not f.exists():
             missing.append(("recomputed", rung, X)); continue
         d = pd.read_csv(f)
@@ -159,9 +185,9 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
     # than pdl_fam_xsum__<slug>.csv. Assuming one file per eval silently loses those cells, so
     # gather every pdl_fam_* source and select the matching (eval, rung).
     fam = []
-    for f in sorted((ROOT / "results").glob(f"pdl_fam_*__{SLUG}.csv")):
-        if "ptrueunsup" in f.name:
-            continue                       # a single-method side file, joined separately
+    for f in sorted((ROOT / "results").glob(PROF["inherited_glob"].format(slug=SLUG))):
+        if any(s in f.name for s in PROF["inherited_skip"]):
+            continue                       # a single-method side file, or an assembled master
         d = pd.read_csv(f)
         if {"eval", "rung", "method"} <= set(d.columns):
             d = d.copy(); d["_src"] = f.name
@@ -179,7 +205,8 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
     # on all 40 cells at max |d| = 4.8e-05, a rounding difference only -- pdl_fam stores 4 dp while
     # sharpening_lambda keeps full precision.
     lam = []
-    for f in sorted((ROOT / "results").glob(f"sharpening_lambda_*__{SLUG}.csv")):
+    for f in (sorted((ROOT / "results").glob(f"sharpening_lambda_*__{SLUG}.csv"))
+              if PROF["lambda_fill"] else []):
         if "verdict" in f.name:
             continue
         d = pd.read_csv(f)
@@ -244,6 +271,7 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
 
 
 def main():
+    global MODEL, SLUG, PROF, CANON, LAYER
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--in-dir", default=None,
@@ -251,10 +279,22 @@ def main():
                          "Point it at results/cleanv2/_firstpass_noBaselines to assemble from the "
                          "immutable backup while a later pass is still writing the live files -- "
                          "reading a CSV mid-write is how a half-populated cell becomes a number.")
-    ap.add_argument("--out-name", default="pdl_cleanv2_alleval",
+    ap.add_argument("--out-name", default=None,
                     help="stem for the assembled file, so a partial-method assembly cannot be "
-                         "mistaken for the final one.")
+                         "mistaken for the final one. Defaults to the model's profile.")
+    ap.add_argument("--model", default=DEFAULT_MODEL, choices=sorted(PROFILES),
+                    help="which population to assemble; selects the source-file layout")
     args = ap.parse_args()
+
+    # Rebind the module-level constants the helpers read, so one --model switches every path at once
+    # rather than leaving some functions on the default model.
+    MODEL = args.model
+    SLUG = cache._slug(MODEL)
+    PROF = PROFILES[MODEL]
+    LAYER = PROF["layer"]
+    CANON = ROOT / "results" / f"pdl_master__{SLUG}.csv"
+    out_name = args.out_name or PROF["out_default"]
+    print(f"model {MODEL}   layer {LAYER}")
     affected, control = split_cells()
     print(f"cells: {len(affected)} affected (recompute), {len(control)} control (inherit), "
           f"{len(affected) + len(control)} total")
@@ -262,7 +302,7 @@ def main():
     c = gate_c(affected)
     if not (a and c):
         sys.exit("\nSTOP: a gate failed; nothing assembled.")
-    assemble(affected, control, args.write, args.in_dir, args.out_name)
+    assemble(affected, control, args.write, args.in_dir, out_name)
 
 
 if __name__ == "__main__":

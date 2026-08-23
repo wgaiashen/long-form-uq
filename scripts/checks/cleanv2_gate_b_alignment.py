@@ -33,6 +33,7 @@ here and the field must agree with it.
 
     python scripts/checks/cleanv2_gate_b_alignment.py
 """
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -48,10 +49,12 @@ from luq import cache                                              # noqa: E402
 sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 from build_truncated_records import keep_n_tokens, MIN_KEEP        # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
-SLUG = cache._slug(MODEL)
+DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 DATASET = "med_quad"
-LAYER = 15
+# The layer is the model's own middle layer, ceil(n_layers/2)-1, which is 15 on Llama-3.1-8B and 20
+# on gemma-2-9b. It is resolved per model rather than typed so the gate cannot silently read a cache
+# at the wrong depth, which would compare two different things and still print a pass.
+DEFAULT_LAYER = {"meta-llama/Meta-Llama-3.1-8B": 15, "google/gemma-2-9b": 20}
 
 
 def cut_char(text, prompt, version):
@@ -68,7 +71,19 @@ def span_of(text, prompt, version):
     return (text if rsn == "no-cut" else txt).rstrip()
 
 
-def main():
+def main():   # noqa: C901
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--layer", type=int, default=None,
+                    help="omit to use the model's own middle layer")
+    args = ap.parse_args()
+    MODEL = args.model
+    SLUG = cache._slug(MODEL)
+    LAYER = args.layer if args.layer is not None else DEFAULT_LAYER.get(MODEL)
+    if LAYER is None:
+        sys.exit(f"no default layer known for {MODEL}; pass --layer")
+    print(f"model {MODEL}   layer {LAYER}")
+
     canon = [json.loads(l) for l in
              open(ROOT / "cache" / "records" / f"{SLUG}__{DATASET}__ID.jsonl")]
     cv = [json.loads(l) for l in
@@ -85,14 +100,28 @@ def main():
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(MODEL)
 
+    # Does this population carry a separate clean-span label? Llama does (correctness_clean, written
+    # when MedQuAD was promoted in July); gemma does not, because it was labelled on the raw text.
+    labels_were_clean = any("correctness_clean" in r for r in cv)
+    print(f"canonical labels were already answer-span clean: {labels_were_clean}")
+
     fail = {k: [] for k in
             ("text", "decode", "untouched", "tok_prefix", "lp_prefix", "lp_len", "state_window",
              "label_span_field", "label_stale")}
     n_cut = 0
 
     for i, (a, b) in enumerate(zip(canon, cv)):
-        changed = (span_of(a["gen_text"], a.get("prompt"), 2)
-                   != span_of(a["gen_text"], a.get("prompt"), 1))   # -> label must be re-judged
+        # WHICH ROWS SHOULD CARRY A FRESH LABEL depends on what the model's labels were judged on,
+        # and getting this wrong in either direction hides the exact defect the gate exists to catch.
+        # Where the canonical labels were ALREADY answer-span clean (Llama, promoted in July), only a
+        # row whose span moved between v1 and v2 needs re-judging, and the rest legitimately carry
+        # over. Where they were judged on the RAW generation (gemma), every cut row's label describes
+        # text that no longer exists, so every cut row must have been re-judged.
+        if labels_were_clean:
+            changed = (span_of(a["gen_text"], a.get("prompt"), 2)
+                       != span_of(a["gen_text"], a.get("prompt"), 1))
+        else:
+            changed = len(b["gen_token_ids"]) < len(a["gen_token_ids"])
         cut = len(b["gen_token_ids"]) < len(a["gen_token_ids"])
         n_cut += bool(cut)
         g = len(b["gen_token_ids"])
@@ -145,7 +174,8 @@ def main():
         expect = "cleanv2" if changed else "cleanv2-inherited"
         if span_field != expect:
             fail["label_span_field"].append(i)
-        if not changed and b.get("correctness") != b.get("correctness_clean"):
+        # Only meaningful where a separate clean-span label exists to compare against.
+        if labels_were_clean and not changed and b.get("correctness") != b.get("correctness_clean"):
             fail["label_stale"].append(i)
 
     print(f"rows {len(cv)}   cut {n_cut}   uncut {len(cv) - n_cut}   layer {LAYER}\n")
@@ -158,7 +188,7 @@ def main():
         "lp_prefix": "token_logprobs are not a canonical prefix",
         "state_window": "pertok row is not the G+1 window",
         "label_span_field": "label_span disagrees with the recomputed span-equality test",
-        "label_stale": "span unchanged but correctness != correctness_clean",
+        "label_stale": "span unchanged but correctness != correctness_clean (clean-label models only)",
     }
     ok = True
     for k, msg in labels.items():
