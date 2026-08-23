@@ -23,6 +23,23 @@ the feature. Either is a STOP.
 
     python scripts/checks/cleanv2_feature_span_attribution.py --feature ptrue_accurate
     python scripts/checks/cleanv2_feature_span_attribution.py --feature lookback --layer 0
+
+WHEN THE RAW PASS CANNOT BE PRODUCED: --baseline canonical.
+The raw pass is not always obtainable. For lookback it fails reproducibly at row 1361 of the raw
+population -- twice, at the identical row, while the clean-v2 pass completed all 1800 rows on the
+same node and cards -- and the 48 GB card that would avoid the two-card path has been unplaceable
+for days because the only nodes holding free ones are offline.
+
+The fallback compares against the CANONICAL feature cache instead, and it still says something real,
+because on a row clean-v2 did not truncate the input is byte-identical to canonical:
+
+    rows whose span did NOT change  ->  the feature must MATCH canonical (see the tolerance below)
+    rows whose span DID change      ->  the feature must differ
+
+It is weaker in exactly one way, and the weakness is not about this correction: canonical was
+extracted on different hardware, so equality is up to device arithmetic rather than bitwise. The
+comparison is therefore reported as cosine similarity per row, the same way the P(True) device
+finding was, and bitwise equality is NOT asserted on the unchanged rows.
 """
 import argparse
 import json
@@ -51,13 +68,24 @@ def load_feats(ns, feature):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--feature", required=True, help="ptrue_accurate | lookback")
+    ap.add_argument("--baseline", default="rawcheck", choices=("rawcheck", "canonical"),
+                    help="what to compare clean-v2 against. 'rawcheck' (default) is the same-job raw "
+                         "pass and permits a bitwise claim. 'canonical' is the fallback when that "
+                         "pass cannot be produced; it compares by cosine because the canonical cache "
+                         "was extracted on other hardware.")
     ap.add_argument("--layer", type=int, default=None,
                     help="plane to compare; default 15 for ptrue_accurate, 0 for lookback "
                          "(matching BASE_FEATS in probedriftlong)")
     args = ap.parse_args()
     layer = args.layer if args.layer is not None else (0 if args.feature == "lookback" else 15)
 
-    raw, praw = load_feats("cleanv2_rawcheck", args.feature)
+    if args.baseline == "canonical":
+        praw = ROOT / "cache" / "features" / f"{SLUG}__{DATASET}__ID__{args.feature}.npz"
+        if not praw.exists():
+            sys.exit(f"missing canonical feature cache: {praw}")
+        raw = np.load(praw)["feats"]
+    else:
+        raw, praw = load_feats("cleanv2_rawcheck", args.feature)
     cv, pcv = load_feats("cleanv2", args.feature)
     print(f"raw pass  : {praw}  {raw.shape}")
     print(f"clean-v2  : {pcv}  {cv.shape}")
@@ -74,6 +102,29 @@ def main():
 
     a, b = raw[:, layer, :], cv[:, layer, :]
     d = np.abs(a - b).max(1)
+
+    if args.baseline == "canonical":
+        # Cosine, not bitwise: the baseline came off different hardware. The question is whether the
+        # unchanged rows are the SAME VECTOR to within device arithmetic, and the changed rows are not.
+        def cos(x, y):
+            nx = np.linalg.norm(x, axis=1); ny = np.linalg.norm(y, axis=1)
+            ok = (nx > 0) & (ny > 0)
+            out = np.zeros(len(x))
+            out[ok] = (x[ok] * y[ok]).sum(1) / (nx[ok] * ny[ok])
+            return out
+        c = cos(a, b)
+        print(f"\n  rows {len(cut)}   cut {int(cut.sum())}   uncut {int((~cut).sum())}   layer {layer}")
+        print(f"  UNCUT rows, cosine vs canonical : min {c[~cut].min():.6f}  "
+              f"mean {c[~cut].mean():.6f}  below 0.999: {int((c[~cut] < 0.999).sum())}")
+        print(f"  CUT   rows, cosine vs canonical : min {c[cut].min():.6f}  "
+              f"median {np.median(c[cut]):.6f}  identical: {int((d[cut] == 0).sum())}")
+        ok = (int((c[~cut] < 0.999).sum()) == 0) and (int((d[cut] == 0).sum()) == 0)
+        print(f"\n  GATE E ({args.feature}, canonical baseline): "
+              + ("PASS -- unchanged rows reproduce canonical to device tolerance and every "
+                 "truncated row moved" if ok else "**FAIL -- STOP**"))
+        print("  NOTE weaker than the same-job form: equality is to device tolerance, not bitwise.")
+        sys.exit(0 if ok else 1)
+
     n_uncut_moved = int((d[~cut] != 0).sum())
     n_cut_static = int((d[cut] == 0).sum())
 
