@@ -248,7 +248,8 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
                 d = pd.concat([d, row], ignore_index=True)
         inh.append(d)
     print(f"  recomputed cells found : {len(parts)}/{len(affected)}")
-    print(f"  inherited  cells found : {len(inh)}/{len(control)}   (source: results/pdl_fam_<eval>__<slug>.csv)")
+    print(f"  inherited  cells found : {len(inh)}/{len(control)}   "
+          f"(source: results/{PROF['inherited_glob'].format(slug=SLUG)})")
     if missing:
         for m in missing[:12]:
             print(f"     MISSING {m}")
