@@ -1,0 +1,59 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_fuse_gemma
+#PBS -j oe
+
+# Source-calibrated fusion of the learned token weighting and the hidden-state probe.
+# Registered in prereg/M10_source_calibrated_cawsa_saplma_fusion.md and its amendment 1, both
+# committed before any fusion number existed.
+#
+# WHAT IS BEING TESTED. The existing fixed 50:50 rank ensemble ranks each response against the whole
+# evaluation cohort, so it cannot score one response on its own. This maps each component score
+# through an empirical distribution function built only from the SOURCE rows the two models were
+# fitted on, then averages the two percentiles with a fixed, unsearched weight. The result is
+# target-independent: one response's score does not depend on any other target example.
+#
+# CPU ONLY. Every input already exists. The two models are retrained per cell and seed because
+# neither is cached, but no forward pass through the language model is involved.
+#
+# STAGE 1 IS A BENCHMARK AND A GATE. One eval at full width, which is the only way gate E can fire:
+# the retrained scores are compared ROW BY ROW against the frozen vectors, and the job stops if they
+# differ. A reduced-width smoke cannot test that, because the frozen vectors were made at full width.
+# Its walltime also tells us whether the full grid is affordable before it is launched.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL. Without it med_quad resolves to the uncorrected namespace and
+# the fusion would sit on a different population from the frozen vectors it is calibrated against.
+#
+#   qsub pbs/fusion_gemma.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/fusion_gemma__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+MODEL="google/gemma-2-9b"
+LAYER=20
+export LUQ_REGIME="med_quad=cleanv2"
+
+echo "=== source-calibrated fusion, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ STAGE 1: benchmark and row-level fidelity gate ################ $(date)"
+python -u scripts/checks/source_calibrated_fusion.py --model "$MODEL" --layer "$LAYER" \
+    --evals pubmed_qa --rungs ID,1ds-Diff --seeds 1,2,3 \
+    --out results/hybrids/STAGE1_fusion__gemma.csv \
+    || { echo "!!! stage 1 FAILED -- see whether gate E was the cause before changing anything"; exit 3; }
+
+echo; echo "################ STAGE 2: full 40-cell grid ################ $(date)"
+python -u scripts/checks/source_calibrated_fusion.py --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 --out results/hybrids/pdl_fusion__google_gemma-2-9b.csv \
+    || { echo "!!! full grid FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="
