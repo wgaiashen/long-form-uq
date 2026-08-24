@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_chbo_gemma
+#PBS -j oe
+
+# Replace the probability branch of the published hybrid back-off with the frozen learned token
+# weighting, on the corrected-span population. Registered in prereg/M8_cawsa_hbo_substitution.md
+# before any number was computed.
+#
+# CPU ONLY. Every input already exists: the per-token hidden states at the selected layer, the token
+# log-probabilities in the records, and the master's own per-example score vectors. The distance fit
+# and scoring are the whole cost; the back-off itself is under a second per cell.
+#
+# STAGE 1 runs two cells at FULL dimension. Its purpose is the identity checks in section 6 of the
+# registration, which cannot fire in a reduced-dimension smoke run: on the most shifted rung the
+# supervised weight is zero for every example, and the modified estimator must then equal the rank of
+# the learned weighting exactly. The driver aborts rather than reporting a number if it does not.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL. Without it med_quad resolves to the uncorrected namespace and
+# the run silently measures a different population from the master it is compared against.
+#
+#   qsub pbs/cawsa_hbo_gemma.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/cawsa_hbo_gemma__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="google/gemma-2-9b"
+LAYER=20
+export LUQ_REGIME="med_quad=cleanv2"
+
+echo "=== probability-branch substitution in the hybrid back-off, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED -- refusing to run"; exit 2; }
+
+echo; echo "################ STAGE 1: identity checks at full dimension ################ $(date)"
+python -u scripts/checks/cawsa_hbo.py --model "$MODEL" --layer "$LAYER" \
+    --evals pubmed_qa --rungs ID,1ds-Diff --seeds 1,2,3 \
+    --out results/hybrids/STAGE1_cawsa_hbo__gemma.csv \
+    || { echo "!!! stage 1 FAILED -- an identity check did not hold"; exit 3; }
+
+echo; echo "################ STAGE 2: full 40-cell grid ################ $(date)"
+python -u scripts/checks/cawsa_hbo.py --model "$MODEL" --layer "$LAYER" --seeds 1,2,3 \
+    || { echo "!!! full grid FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="

@@ -1,0 +1,66 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_mdhyb_qwen
+#PBS -j oe
+
+# The published distance and hybrid baselines on the corrected-span Qwen population.
+#
+# CPU ONLY. Every input is already on this cluster: the per-token hidden states at layer 23 in the
+# namespaces named by the regime override below, and the token log-probabilities in the records. No
+# GPU is involved. This matters twice over here, because the model is too large to run in single
+# precision on any card this cluster has, so a job that needed a forward pass could not run at all.
+#
+# WHAT THIS RUN CANNOT DO, AND WHY. The other two populations take the probe and the frozen learned
+# weighting from the per-example vectors the canonical ladder itself wrote, which makes the
+# comparison use the master's own scores rather than a reproduction of them. Those vectors were
+# produced on the other cluster for this population and have not been transferred, so here the probe
+# is refitted from the same cache with the same helper and the same seeds. That is a reproduction,
+# and it is gated against the master afterwards rather than being taken from it. The methods that
+# require the frozen learned weighting per example are therefore NOT part of this run.
+#
+# MEMORY. The corrected-span per-token caches for the eight datasets total about 25 GB compressed, a
+# third more than the smaller model, whose run peaked at 29.5 GB resident. Scaling that by the cache
+# size and the wider hidden state puts the peak near 45 GB, so 96 GB leaves clear headroom. It is also
+# the request that schedules: a 120 GB job routes to a queue whose nodes cannot place it.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL. Four datasets were corrected for this population, not one, and
+# without the override every one of them resolves to an uncorrected namespace. The value below is the
+# frozen override recorded in the population manifest; asqa reaches its namespace through the base
+# map and is deliberately absent from this list.
+#
+#   qsub pbs/md_hybrids_qwen.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/md_hybrids_qwen__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="Qwen/Qwen2.5-14B"
+LAYER=23
+export LUQ_REGIME="samsum=trunc_v1,med_quad=trunc_v1,expertqa=expertqa_rp12_trunc_v1,factscore=factscore_rp12_trunc_v1"
+
+echo "=== distance and hybrid baselines, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED -- refusing to run"; exit 2; }
+
+echo; echo "################ STAGE 1: two-cell benchmark ################ $(date)"
+# pubmed_qa carries no generation-validity caveat for this population, unlike expertqa and factscore.
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
+    --evals pubmed_qa --rungs DiffTask,1ds-Diff --seeds 1,2,3 --benchmark \
+    --out results/hybrids/BENCHMARK_md_hybrids__Qwen_Qwen2.5-14B.csv \
+    || { echo "!!! benchmark FAILED"; exit 3; }
+
+echo; echo "################ STAGE 2: full 40-cell grid ################ $(date)"
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 --benchmark \
+    --out results/hybrids/pdl_hybrids__Qwen_Qwen2.5-14B.csv \
+    || { echo "!!! full grid FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="
