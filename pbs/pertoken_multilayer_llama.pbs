@@ -1,0 +1,71 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=48:00:00
+#PBS -N luq_ptmulti_llama
+#PBS -j oe
+
+# Per-token hidden states at the ten additional layers of the frozen layer-sensitivity set.
+# Registered in prereg/M9_layer_distance_sensitivity.md before any result existed.
+#
+# THE FROZEN SET is range(0, 32, 3) = 0 3 6 9 12 15 18 21 24 27 30. Layer 15 is ALREADY CACHED and is
+# deliberately absent from the list below: the extractor refuses to overwrite an existing layer, and
+# the canonical middle-layer caches are the input to every published result in this project.
+#
+# WHY CHUNKED. One teacher-forced forward computes every layer, so extracting several at once costs
+# one forward rather than several. But the extractor holds each layer's states in memory until the
+# whole dataset is done, and ten layers of the largest dataset would be roughly 70 GB resident. Three
+# chunks keeps the peak near 32 GB while still paying for only three forwards per dataset instead of
+# ten. The chunk boundaries are a memory decision and have no effect on the values written.
+#
+# DISK. Ten layers over eight datasets is about 192 GB, against roughly 654 GB free. These caches are
+# deleted once the per-layer distances have been computed from them; they are regenerable and are not
+# an artifact anyone needs to keep.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL. Without it med_quad resolves to the uncorrected namespace and
+# the sensitivity would silently sit on a different population from the grid it is compared against.
+#
+#   qsub pbs/pertoken_multilayer_llama.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/pertoken_multilayer_llama__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+export LUQ_REGIME="med_quad=cleanv2"
+
+# Chunked purely for memory, see the header. Layer 15 is excluded because it already exists.
+CHUNKS=("0,3,6,9" "12,18,21,24" "27,30")
+
+echo "=== multi-layer per-token extraction, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo "(no nvidia-smi)"
+df -h /rds/general/user/gs925/home | tail -1
+
+for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; do
+  case "$DS" in
+    med_quad)  REGIME="cleanv2" ;;
+    asqa)      REGIME="asqa_rp12" ;;
+    expertqa)  REGIME="expertqa_rp12" ;;
+    factscore) REGIME="factscore_rp12" ;;
+    *)         REGIME="" ;;
+  esac
+  case "$DS" in
+    expertqa|factscore) LABEL="factuality" ;;
+    *)                  LABEL="correctness" ;;
+  esac
+  for CH in "${CHUNKS[@]}"; do
+    echo; echo "---- $DS  layers $CH  (regime='${REGIME:-canonical}', label=$LABEL) at $(date) ----"
+    python -u scripts/01p_pertoken_multi.py --model "$MODEL" --dataset "$DS" --ood ID \
+        --layers "$CH" --prompt-regime "$REGIME" --dtype fp32 --attn eager \
+        || { echo "!!! extraction FAILED for $DS layers $CH"; exit 3; }
+  done
+  echo "---- $DS done at $(date); free space now:"; df -h /rds/general/user/gs925/home | tail -1
+done
+
+echo; echo "=== done at $(date) ==="
