@@ -1,0 +1,59 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_mdhyb_llama
+#PBS -j oe
+
+# The published distance and hybrid baselines on the corrected-span Llama population.
+#
+# CPU ONLY, deliberately. Everything here is read from caches that already exist: per-token hidden
+# states at the middle layer, the token log-probabilities in the records, and the master's own
+# per-example probe vectors. No GPU is involved, which matters because the GPU queue is currently
+# several hundred jobs deep and this work does not need one.
+#
+# STAGE 1 IS A BENCHMARK, NOT A RESULT. Two cells run first with timings and peak memory reported, so
+# the cost of the full grid is measured rather than guessed. Its output goes to a scratch filename.
+# Stage 2 then runs the full 40-cell grid.
+#
+# MEMORY. The smoke run peaked at 16.7 GB just holding the per-token states for a six-source cell, and
+# the covariance work adds a centred copy of the token matrix on top. 96 GB leaves clear headroom; if
+# this is ever tightened, watch the reported peak rather than guessing.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL. Without it med_quad resolves to the uncorrected namespace and
+# the run silently measures a different population from the master it is compared against.
+#
+#   qsub pbs/md_hybrids_llama.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/md_hybrids_llama__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+LAYER=15
+export LUQ_REGIME="med_quad=cleanv2"
+
+echo "=== distance and hybrid baselines, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED -- refusing to run"; exit 2; }
+
+echo; echo "################ STAGE 1: two-cell benchmark ################ $(date)"
+# pubmed_qa is chosen because it carries no generation-validity caveat, unlike expertqa and factscore.
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
+    --evals pubmed_qa --rungs DiffTask,1ds-Diff --seeds 1,2,3 --benchmark \
+    --out results/hybrids/BENCHMARK_md_hybrids__meta-llama_Meta-Llama-3.1-8B.csv \
+    || { echo "!!! benchmark FAILED"; exit 3; }
+
+echo; echo "################ STAGE 2: full 40-cell grid ################ $(date)"
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 --benchmark \
+    --out results/hybrids/pdl_hybrids__meta-llama_Meta-Llama-3.1-8B.csv \
+    || { echo "!!! full grid FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="

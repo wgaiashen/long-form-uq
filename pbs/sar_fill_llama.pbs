@@ -1,0 +1,57 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=08:00:00
+#PBS -N luq_sar_fill
+#PBS -j oe
+
+# Fill the four missing SAR relevance caches so the like-for-like comparison covers all eight
+# long-form datasets on this model instead of six.
+#
+# WHICH VARIANT, AND WHY. Two variants exist in the cache: with the question or source prepended to
+# the cross-encoder pair, which is faithful to the reference implementation, and an answer-only
+# ablation stored under a "__noprepend" suffix. The comparison being built is against the PUBLISHED
+# method, so the faithful variant is what is generated here. Sentence granularity is the long-form
+# adaptation already used by the four datasets that are present, so this matches them.
+#
+# WHAT IS DELIBERATELY NOT RUN HERE. med_quad also needs recomputing, because its retained answer span
+# changed under the corrected-span protocol. It is left out because the output filename is built from
+# the model, dataset and granularity only, with no cache-namespace component, so a corrected-span run
+# would overwrite the existing uncorrected cache in place. That needs a namespace-aware output path
+# first. The other four have no existing cache and no such collision.
+#
+# One job rather than four, to spend a single slot: the GPU queue was several hundred jobs deep when
+# this was submitted.
+#
+#   qsub pbs/sar_fill_llama.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+mkdir -p logs
+LIVE="logs/sar_fill_llama__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+echo "=== SAR relevance fill, $MODEL === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+STATUS=0
+# dataset:regime. For this model the repetition-penalty namespaces ARE the corrected-span population
+# for these three sets: the manifest records zero rows cut for asqa, expertqa and factscore.
+for spec in "cnn_dailymail:" "asqa:asqa_rp12" "factscore:factscore_rp12" "expertqa:expertqa_rp12"; do
+  DS="${spec%%:*}"; RG="${spec#*:}"
+  OUT="cache/sar/meta-llama_Meta-Llama-3.1-8B__${DS}__ID__sentence.npz"
+  if [ -f "$OUT" ]; then
+    echo "=== $DS: cache already present at $OUT -- SKIPPED, not overwritten"
+    continue
+  fi
+  echo; echo "################ $DS (regime '${RG:-canonical}') ################ $(date)"
+  python -u scripts/01s_sar_relevance.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --granularity sentence --prompt-regime "$RG" \
+      || { echo "!!! SAR FAILED for $DS"; STATUS=1; }
+done
+
+echo; echo "=== SAR fill done status=$STATUS at $(date) ==="
+exit $STATUS

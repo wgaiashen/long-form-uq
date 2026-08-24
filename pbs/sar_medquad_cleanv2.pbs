@@ -1,0 +1,71 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=48gb:ngpus=1:gpu_type=RTX6000
+#PBS -l walltime=04:00:00
+#PBS -N luq_sar_mq_cv2
+#PBS -j oe
+
+# SAR relevance for med_quad on the CORRECTED-SPAN population.
+#
+# WHY THIS IS SEPARATE, AND WHY IT IS FIDDLY. med_quad is the only dataset of the eight whose retained
+# answer span changed under the correction: 862 of 1800 rows differ. Every other dataset is unchanged,
+# so their existing relevance caches are already the corrected-span ones. The existing med_quad cache
+# was built in July, six weeks before the corrected span existed, so it describes the uncorrected
+# generation and cannot go in the same table as the other seven.
+#
+# The extraction script builds its output filename from model, dataset and granularity only, with no
+# component naming the cache namespace, so running it on the corrected population would overwrite the
+# uncorrected cache in place. Rather than edit that script while other jobs are queued, this job moves
+# the existing file aside, runs the extraction, files the new output under an explicit name, and puts
+# the original back. Both populations therefore survive, under names that say which is which.
+#
+#   qsub pbs/sar_medquad_cleanv2.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+
+mkdir -p logs
+LIVE="logs/sar_medquad_cleanv2__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+BASE="cache/sar/${SLUG}__med_quad__ID__sentence"
+RAW="${BASE}.npz"
+PARK="${BASE}__uncorrected_span.npz"
+OUT="${BASE}__cleanv2.npz"
+
+echo "=== SAR med_quad, corrected span === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+if [ -f "$OUT" ]; then
+  echo "$OUT already exists -- nothing to do."; exit 0
+fi
+if [ ! -f "$RAW" ]; then
+  echo "!!! expected the uncorrected cache at $RAW and it is missing. Refusing to guess."; exit 2
+fi
+
+# Preserve the uncorrected cache under a name that states what it is, before anything can overwrite it.
+cp -p "$RAW" "$PARK" || { echo "!!! could not preserve $RAW"; exit 3; }
+echo "uncorrected cache preserved as $PARK"
+mv "$RAW" "${RAW}.inflight" || { echo "!!! could not move $RAW aside"; exit 4; }
+
+STATUS=0
+python -u scripts/01s_sar_relevance.py --model "meta-llama/Meta-Llama-3.1-8B" \
+    --dataset med_quad --ood ID --granularity sentence --prompt-regime cleanv2 \
+    || { echo "!!! SAR extraction FAILED"; STATUS=1; }
+
+if [ $STATUS -eq 0 ] && [ -f "$RAW" ]; then
+  mv "$RAW" "$OUT"
+  echo "corrected-span relevance written to $OUT"
+else
+  echo "!!! no new cache produced"; STATUS=1
+fi
+# Restore the uncorrected cache to its original filename either way, so a failure here cannot leave
+# the tree missing an artifact that other scripts still resolve by that name.
+mv "${RAW}.inflight" "$RAW" || { echo "!!! COULD NOT RESTORE $RAW -- it is still at ${RAW}.inflight"; STATUS=1; }
+echo "uncorrected cache restored to $RAW"
+
+ls -la cache/sar/${SLUG}__med_quad__ID__sentence*
+echo; echo "=== done status=$STATUS at $(date) ==="
+exit $STATUS
