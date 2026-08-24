@@ -1,0 +1,69 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_pxclean_qwen
+#PBS -j oe
+
+# Per-example score vectors for Qwen2.5-14B on the CORRECTED-SPAN population.
+#
+# WHY THIS IS NEEDED. The probability-branch substitution takes the probe and the frozen learned
+# weighting from the vectors the canonical ladder itself wrote, so that the comparison uses the
+# master's own scores rather than a reproduction of them. Those vectors exist for the other two
+# populations and, for this one, do not exist anywhere: the ladder that produced the corrected-span
+# Qwen master ran without the per-example dump flag. Checked rather than assumed -- the only Qwen
+# per-example directory that exists holds the UNCORRECTED population (its unsupervised floors match
+# the uncorrected master to 5e-5 and the corrected one not at all), it is version-controlled so both
+# clusters hold the identical copy, and no corrected variant appears anywhere in the history.
+#
+# THE REGIME OVERRIDE IS NOT OPTIONAL, AND IT IS LONGER HERE THAN FOR THE OTHER MODELS. Four datasets
+# were corrected for this population, not one. Without the override every one of them resolves to an
+# uncorrected namespace and this job would silently rebuild exactly the wrong thing again.
+#
+# WHY carve=legacy. Every row of the corrected master carries carve=legacy, so the continuity gate
+# can only pass if this pass uses the same carve rule.
+#
+# ONE EVAL AT A TIME, ON PURPOSE. The first one is a probe: its output is certified against the
+# corrected master before the remaining seven are submitted. The uncorrected component pass does not
+# reproduce its own master on the learned weighting (max difference 0.039, against 5e-5 for the
+# floors), and if that recurs here the substituted score would not be the frozen score the report
+# quotes, in which case this line stops rather than producing a number.
+#
+# CPU ONLY. The model is far too large to run in single precision on any card this cluster has, but
+# nothing here needs a forward pass: the per-token caches are already present.
+#
+#   qsub -v LUQ_EVAL=pubmed_qa pbs/perex_clean_qwen.pbs        # probe first, then certify
+#   for E in med_quad asqa xsum cnn_dailymail samsum expertqa factscore; do \
+#     qsub -v LUQ_EVAL=$E pbs/perex_clean_qwen.pbs; done
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/perex_clean__Qwen_Qwen2.5-14B
+LIVE="logs/perex_clean_qwen__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export LUQ_CARVE="${LUQ_CARVE:-legacy}"
+export LUQ_REGIME="samsum=trunc_v1,med_quad=trunc_v1,expertqa=expertqa_rp12_trunc_v1,factscore=factscore_rp12_trunc_v1"
+
+EV="${LUQ_EVAL:?set LUQ_EVAL, e.g. qsub -v LUQ_EVAL=pubmed_qa pbs/perex_clean_qwen.pbs}"
+MODEL="Qwen/Qwen2.5-14B"
+LAYER=23
+
+echo "=== corrected-span per-example pass: eval=$EV layer=$LAYER carve=$LUQ_CARVE ==="
+echo "host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+free -g | head -2
+
+python -u scripts/checks/probedriftlong.py \
+    --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 \
+    --evals "$EV" \
+    --wmsp-only wmsp_norm,wmsp_shrink2 \
+    --perex-dir results/perex_clean__Qwen_Qwen2.5-14B \
+    --out "results/pdl_perexclean_${EV}__Qwen_Qwen2.5-14B.csv" \
+    || { echo "!!! pass FAILED for $EV"; exit 3; }
+
+echo "=== eval=$EV finished at $(date) ==="
