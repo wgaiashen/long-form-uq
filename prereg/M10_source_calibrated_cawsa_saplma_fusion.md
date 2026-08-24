@@ -156,3 +156,61 @@ The sentence this experiment is allowed to license, and only if the evidence sup
 
 The experiment decides whether that may be said. The rules above are not to be weakened to make it
 true.
+
+---
+
+## AMENDMENT 1 — 2026-08-24, before any fusion score existed
+
+Recorded as an appended amendment rather than an edit to the body above, so the chronology stays
+legible. Two wording corrections and one **tightening** of a gate. Nothing here loosens a rule, and no
+fusion number had been computed when it was written.
+
+### A1.1 How the prior ensemble result is described
+
+Section 0 point 1 says the earlier rank ensemble "established *complementarity*". That overstates it.
+The gains are **directional and replicated across two populations**, not statistically established:
+the per-dataset evidence was weak on both. Throughout this registration and every report-facing
+sentence derived from it, the correct phrasing is:
+
+> the earlier rank ensemble provides **replicated evidence of complementarity**
+
+It must not be written as though complementarity were an established finding.
+
+### A1.2 What the new estimator may be called
+
+The property this experiment tests, and the only one it can license, is **target independence**: the
+score for one response does not depend on any other target example. Gates A and B test exactly that.
+
+- Use **target-independent** or **deployment-compatible**.
+- Do **not** use *production-ready*. That would assert latency, robustness and monitoring evidence
+  this project does not have and does not collect.
+- The earlier estimator is described as **target-cohort-dependent**, not merely "not deployable" —
+  naming the actual dependency is more informative than naming its absence.
+
+### A1.3 Gate E is strengthened, and supersedes the version in section 5
+
+Section 5's gate E asked that recomputed target scores "match the sidecar". That is too weak, because
+two different score vectors can produce the same prediction-rejection ratio. The gate is now:
+
+> **Row-level raw-score fidelity.** For the same cell, the same seed and the same **row ids**, the
+> retrained raw learned-weighting and probe vectors are compared **element by element** against the
+> frozen corrected-span sidecar vectors. Reported per cell and seed: **maximum and mean absolute
+> difference**, and **ranking agreement** (Spearman correlation and the fraction of discordant pairs).
+
+Agreement of prediction-rejection ratio is **not** accepted as evidence for this gate, in place of it,
+or as a fallback when the row-level comparison is inconvenient.
+
+**On failure: stop and report.** Do not widen the tolerance to fit the observed difference, do not
+substitute an approximate agreement, and do not argue that the source-side scores are unaffected. A
+retrained model that does not reproduce the frozen model row for row **is not the frozen model**, so
+the source reference distribution it produces is not the frozen model's reference distribution either,
+and the whole estimator would be built on something other than the scores the report quotes.
+
+### A1.4 The percentile-spread diagnostics are descriptive only
+
+Section 2 requires the realised spread of each method's target percentiles to be reported, because a
+fixed 0.5/0.5 on the percentile scale is equal weighting only if the two spreads are comparable.
+
+To remove any ambiguity: **those diagnostics explain the result and may not change it.** They are not
+grounds for adjusting the weights, the calibration transform, or the reference population, either
+before or after seeing the fusion scores.
