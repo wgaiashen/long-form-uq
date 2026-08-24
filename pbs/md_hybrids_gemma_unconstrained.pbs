@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_mdfix_gemma
+#PBS -j oe
+
+# Re-run of the distance and hybrid baselines after the supervised aggregation was corrected to the
+# regression the reference actually constructs.
+#
+# WHAT CHANGED AND WHY. The reference builds its aggregator in run_polygraph.py:360-380, which passes
+# positive=False and remove_corr=True. An earlier version of this driver read the class defaults in
+# average_token_mahalanobis_distance.py instead, and used a positivity-constrained ridge with no
+# dimension reduction. On a single cached layer the constraint clips an unhelpful coefficient to zero
+# and the prediction becomes a constant, which is what produced the degenerate cells in the earlier
+# run. This is a correction of fidelity to the released code, not a change of method chosen for
+# performance. Section L of the implementation audit records it in full.
+#
+# THE EARLIER OUTPUT IS NOT OVERWRITTEN. It stays at pdl_hybrids__google_gemma-2-9b.csv for provenance; this
+# run writes a separate file, so no row is ever ambiguous about which supersedes which.
+#
+# WHAT MUST NOT MOVE. Only the regression changed, so msp, saplma, md_mean_mid and hbo must come back
+# identical to the earlier run. That invariance is the control on the fix: a correction that moves
+# them is a correction in the wrong place. Checked after this job, not inside it.
+#
+# CPU ONLY. Every input already exists.
+#
+#   qsub pbs/md_hybrids_gemma_unconstrained.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/md_hybrids_gemma_unconstrained__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+MODEL="google/gemma-2-9b"
+LAYER=20
+export LUQ_REGIME="med_quad=cleanv2"
+
+echo "=== corrected supervised aggregation, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED -- refusing to run"; exit 2; }
+
+echo; echo "################ full 40-cell grid, corrected regression ################ $(date)"
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
+    --seeds 1,2,3 --benchmark \
+    --out results/hybrids/pdl_hybrids_unconstrained__google_gemma-2-9b.csv \
+    || { echo "!!! full grid FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="

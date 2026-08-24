@@ -44,8 +44,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
+from sklearn.decomposition import PCA                                           # noqa: E402
 from sklearn.linear_model import Ridge                                          # noqa: E402
 from sklearn.model_selection import train_test_split                            # noqa: E402
+
+# The reference builds its supervised aggregator in run_polygraph.py:360-380, NOT from the class
+# defaults in average_token_mahalanobis_distance.py. That call site passes `remove_corr=True` and
+# `positive=False`, so the published aggregation is a ten-component reduction of the layer-wise
+# distance matrix followed by an UNCONSTRAINED ridge. An earlier version of this file read the class
+# defaults instead and used `Ridge(positive=True)` with no reduction; see section L of the
+# implementation audit for what that cost.
+N_COMPONENTS = 10
 
 from luq import cache, msp as msp_mod, results                                  # noqa: E402
 from luq import mahalanobis as MD                                               # noqa: E402
@@ -334,16 +343,29 @@ def main():
                 if extra_dev is not None:
                     Xd = np.hstack([Xd, np.nan_to_num(extra_dev)])
                     Xt = np.hstack([Xt, np.nan_to_num(extra_test)])
-                r = Ridge(positive=True).fit(Xd, target)
+                # The reduction is FITTED on the development half and only applied to the evaluation
+                # rows, matching the reference, which calls fit_transform on the dev matrix and
+                # transform on the evaluation matrix. It needs at least as many features as
+                # components: with one cached layer there is one distance column (plus at most two
+                # more for the probability-augmented variants), so it cannot run here at all. That
+                # omission is precisely what makes the single-layer versions adaptations rather than
+                # reproductions -- there is nothing to combine across layers.
+                if Xd.shape[1] >= N_COMPONENTS:
+                    pca = PCA(n_components=N_COMPONENTS).fit(Xd)
+                    Xd, Xt = pca.transform(Xd), pca.transform(Xt)
+                # Unconstrained, as the reference's call site specifies. A positivity constraint on a
+                # single feature clips an unhelpful coefficient to zero and turns the prediction into
+                # a constant, which is what produced the degeneracy recorded before this correction.
+                r = Ridge(positive=False).fit(Xd, target)
                 return r.predict(Xt), r.predict(Xd), r
 
             # --- the raw distance, reported as a diagnostic -------------------------------------
             # This is the quantity the published wrapper is built on, before the supervised
-            # aggregation is applied. It is reported because the wrapper can collapse: with one layer
-            # its ridge has a single feature under a positivity constraint, so if distance is
-            # anti-correlated with error the coefficient is clipped to zero and the score becomes
-            # constant. Without this row a collapse would be indistinguishable from "the distance
-            # carries no signal", and those are different claims.
+            # aggregation is applied. It is reported because it separates two claims that would
+            # otherwise be indistinguishable: "the distance itself carries no signal" and "the
+            # aggregation on top of it did something unhelpful". With one cached layer the
+            # aggregation cannot combine anything, so the raw distance is the more informative of
+            # the two rows.
             v["md_mean_mid"] = test_md
 
             # --- supervised aggregation of distances (middle-layer adaptation) -------------------
@@ -408,10 +430,11 @@ def main():
             # for this reason; an all-equal score is the same failure in a different coat. np.argsort
             # breaks ties by position, so a constant vector is ranked in row order and the function
             # returns whatever that arbitrary permutation happens to score -- a plausible-looking
-            # value with no method behind it. The single-layer ridge makes this reachable: under its
-            # positivity constraint the coefficient can be clipped to zero, and the prediction is then
-            # the intercept for every row. Recorded as blank plus an explicit degeneracy flag, so the
-            # cell reads as "no discriminative signal" rather than as a measurement.
+            # value with no method behind it. Recorded as blank plus an explicit degeneracy flag, so
+            # the cell reads as "no discriminative signal" rather than as a measurement. The guard is
+            # kept even though the unconstrained ridge makes a flat prediction far less likely than
+            # the positivity-constrained one it replaced: a guard that only fires on the bug you
+            # already fixed is worth nothing.
             for m, vec in v.items():
                 vec = np.asarray(vec, float)
                 if np.isfinite(vec).all() and float(np.ptp(vec)) == 0.0:
