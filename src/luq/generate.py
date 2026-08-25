@@ -102,7 +102,8 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
              repetition_penalty: float | None = None,
              no_repeat_ngram_size: int | None = None,
              truncate_answer_span: str | None = None,
-             chat_template: bool = False):
+             chat_template: bool = False,
+             stop_strings: list[str] | None = None):
     """Generate one response; return (record, pooled_all_layers).
 
     record: dict with prompt, prompt_token_ids, gen_token_ids, gen_text, token_logprobs.
@@ -126,6 +127,14 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
     (see _chat_eos_ids) to the stop condition, on top of tok.eos_token_id. Without it, generation
     only stops on the base completion EOS and can run past the chat turn boundary into a
     hallucinated next turn (see _chat_eos_ids docstring).
+
+    stop_strings: OPT-IN, default OFF. Literal substrings that halt generation the moment the
+    DECODED text contains one of them (HF's native stop_strings + tokenizer= mechanism). Needed
+    alongside chat_template: _chat_eos_ids only stops generation when the model actually EMITS
+    the real turn-end token. On Qwen2.5-32B under --chat-template the model sometimes instead
+    spells out a hallucinated next chat turn as ordinary text (e.g. "_user\nWrite an article
+    about...\nAssistant:\n...") that never emits that token, so eos_token_id never fires. This
+    is a genuine generation-time stop (saves compute), not a post-hoc trim.
     """
     # 1. Tokenise. prompt_len marks where the response begins: generate() returns
     #    prompt + response as one sequence, and we only ever cache the response part.
@@ -151,6 +160,9 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
         gen_kwargs["repetition_penalty"] = repetition_penalty
     if no_repeat_ngram_size is not None:
         gen_kwargs["no_repeat_ngram_size"] = no_repeat_ngram_size
+    if stop_strings:
+        gen_kwargs["stop_strings"] = stop_strings
+        gen_kwargs["tokenizer"] = tok
     out = model.generate(**inputs, **gen_kwargs)
 
     # 3. Slice off the response. n_gen is often < max_new_tokens (generation stops
@@ -161,6 +173,24 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
             if "\n" in tok.decode([tid]):
                 gen_ids = gen_ids[: max(i, 1)]  # keep at least one token
                 break
+    if stop_strings:
+        # HF's stop_strings halts generation once the DECODED text contains a match, but the match
+        # itself (and anything generated in the same decode step past it) can still be in gen_ids --
+        # trim it off here so the cached record never carries the leaked turn text. Binary search on
+        # the decoded prefix mirrors the truncate_answer_span technique below.
+        full = tok.decode(gen_ids, skip_special_tokens=True)
+        hits = [full.find(s) for s in stop_strings]
+        hits = [h for h in hits if h != -1]
+        if hits:
+            cut_char = min(hits)
+            lo, hi = 1, len(gen_ids)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if len(tok.decode(gen_ids[:mid], skip_special_tokens=True)) >= cut_char:
+                    hi = mid
+                else:
+                    lo = mid + 1
+            gen_ids = gen_ids[: max(lo, 1)]
     if truncate_answer_span:
         # Long-form sibling of truncate_at_newline. Base Llama is not instruction-tuned: under a
         # few-shot prompt it finishes the answer and then CONTINUES THE FORMAT, writing a fresh

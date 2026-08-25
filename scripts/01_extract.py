@@ -98,6 +98,14 @@ def main():
                          "assistant-persona chatter (the multi-model panel registration §6). apply_chat_template acts on the "
                          "FINAL prompt string, so this is dataset-agnostic including custom loaders. "
                          "MUST be paired with a fresh --prompt-regime, same reason as --max-new-tokens.")
+    ap.add_argument("--stop-strings", default=None,
+                    help="OPT-IN: comma-separated literal substrings that halt generation the moment "
+                         "the decoded text contains one (HF's native stop_strings mechanism). Needed "
+                         "alongside --chat-template on models that leak a hallucinated next chat turn "
+                         "as ordinary text without ever emitting the real turn-end token, so "
+                         "eos_token_id never fires. Pass \\n for a literal newline inside one substring "
+                         "(unescaped after splitting on commas). MUST be paired with a fresh "
+                         "--prompt-regime, same reason as --chat-template.")
     args = ap.parse_args()
 
     # Validate the argument combination BEFORE anything expensive: loading fp32 Qwen-14B is ~59GB and
@@ -129,6 +137,12 @@ def main():
         raise SystemExit("--chat-template changes the generations, so it MUST be paired with a fresh "
                          "--prompt-regime; refusing to write chat-template records into the default "
                          "cache namespace alongside the frozen raw-few-shot records.")
+    stop_strings = ([s.replace("\\n", "\n") for s in args.stop_strings.split(",") if s]
+                    if args.stop_strings else None)
+    if stop_strings and not args.prompt_regime:
+        raise SystemExit("--stop-strings changes the generations, so it MUST be paired with a fresh "
+                         "--prompt-regime; refusing to write trimmed records into the default cache "
+                         "namespace alongside the untrimmed ones.")
         if args.max_new_tokens > cfg.max_new_tokens_cap:
             raise SystemExit(f"--max-new-tokens {args.max_new_tokens} exceeds the safety ceiling "
                              f"--max-new-tokens-cap {cfg.max_new_tokens_cap} and would be silently "
@@ -252,7 +266,8 @@ def main():
                                                truncate_answer_span=(cfg.dataset if args.truncate_answer_span else None),
                                                repetition_penalty=args.repetition_penalty,
                                                no_repeat_ngram_size=args.no_repeat_ngram_size,
-                                               chat_template=args.chat_template)
+                                               chat_template=args.chat_template,
+                                               stop_strings=stop_strings)
             record |= {"idx": idx, "split": split, "target": target}
             records.append(record)
             pooled_list.append(pooled.numpy())  # float32 array, (n_layers, hidden)

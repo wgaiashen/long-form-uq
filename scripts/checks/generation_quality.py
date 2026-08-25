@@ -70,6 +70,26 @@ def chatter(text):
     return True, m.start() / max(len(text), 1)
 
 
+# ADDED 2026-08-25. Under --chat-template, _chat_eos_ids only stops generation when the model
+# actually EMITS the real turn-end token. On Qwen2.5-32B the model sometimes instead spells out a
+# hallucinated next chat turn as ordinary DECODED TEXT that never triggers that stop condition, e.g.
+# "_user\nWrite an article about...\nAssistant:\n...". _FABRICATED is structurally blind to this: it
+# requires an invented "Question:" restart, which this failure mode does not produce. Verified via
+# direct text inspection (no false positives across dozens of spot-checks) and a negative control
+# against Llama-3.1-8B-Instruct on identical datasets/settings (0.0% leak, its one borderline hit was
+# real code containing "_userRepository"). Measured true rates on Qwen2.5-32B before the fix: asqa
+# 62.0%, factscore 49.2%, expertqa 69.1% -- all missed by the old detector alone.
+_TURN_LEAK = re.compile(r"_user|_assistant|\n\nsystem\n|\nsystem\n")
+
+
+def turn_leak(text):
+    """(has_turn_leak, fraction of the text that precedes it)."""
+    m = _TURN_LEAK.search(text or "")
+    if not m:
+        return False, 1.0
+    return True, m.start() / max(len(text), 1)
+
+
 def fabrication(text):
     """(has_fabricated_continuation, fraction of the text that is the REAL answer).
 
@@ -119,11 +139,16 @@ def report(dataset, regime, budget_override, tok=None, model=DEFAULT_MODEL):
     cht = [chatter(t) for t in texts]
     has_cht = np.array([c[0] for c in cht])
     cht_frac = np.array([c[1] for c in cht])
+    leak = [turn_leak(t) for t in texts]
+    has_leak = np.array([l[0] for l in leak])
+    leak_frac = np.array([l[1] for l in leak])
     return {"dataset": dataset, "regime": cfg.prompt_regime or "(v1 default)", "n": len(recs),
             "pct_fabricated": round(100 * float(has_fab.mean()), 1),
             "mean_answer_frac": round(float(answer_frac.mean()), 3),
             "pct_chatter": round(100 * float(has_cht.mean()), 1),
             "mean_prechatter_frac": round(float(cht_frac.mean()), 3),
+            "pct_turn_leak": round(100 * float(has_leak.mean()), 1),
+            "mean_preleak_frac": round(float(leak_frac.mean()), 3),
             "budget": int(budget),
             "gen_p50": float(np.percentile(glen, 50)), "gen_p90": float(np.percentile(glen, 90)),
             "pct_capped": round(100 * float(capped.mean()), 1),
@@ -165,14 +190,15 @@ def main():
         raise SystemExit("no datasets could be reported")
 
     hdr = f"{'dataset':<14} {'regime':<12} {'n':>5} {'bud':>5} {'g50':>5} {'g90':>5} " \
-          f"{'%cap':>6} {'%empty':>7} {'%sev':>6} {'%deg':>6} {'%fabr':>7} {'ansfrac':>8} " \
+          f"{'%cap':>6} {'%empty':>7} {'%sev':>6} {'%deg':>6} {'%fabr':>7} {'%leak':>6} {'ansfrac':>8} " \
           f"{'gold50':>7} {'gold90':>7}" \
           + ("  |{:>7} {:>7} {:>7}".format('gtok50', 'gtok90', 'ratio') if tok is not None else "")
     print("\n" + hdr); print("-" * len(hdr))
     for r in rows:
         print(f"{r['dataset']:<14} {r['regime']:<12} {r['n']:>5} {r['budget']:>5} {r['gen_p50']:>5.0f} "
               f"{r['gen_p90']:>5.0f} {r['pct_capped']:>6.1f} {r['pct_empty']:>7.2f} {r['pct_severe']:>6.2f} "
-              f"{r['pct_degraded']:>6.2f} {r['pct_fabricated']:>7.1f} {r['mean_answer_frac']:>8.3f} "
+              f"{r['pct_degraded']:>6.2f} {r['pct_fabricated']:>7.1f} {r['pct_turn_leak']:>6.1f} "
+              f"{r['mean_answer_frac']:>8.3f} "
               f"{r['gold_words_p50']:>7.0f} {r['gold_words_p90']:>7.0f}"
               # The gate columns, printed ONLY when a tokeniser was supplied, so default output is
               # unchanged. ratio = budget / gold_tok_p90, both TOKENS.
@@ -188,6 +214,9 @@ def main():
     print("\ngold_* are WORDS (tokeniser-free); gen_* are TOKENS -- do not compare the two columns directly.")
     print("%fabr   = generations that invent a follow-up 'Question:' -- the few-shot continuation the")
     print("         degeneracy detector CANNOT see, and the one the judge is scored over.")
+    print("%leak   = generations that hallucinate a next chat turn WITHOUT restating 'Question:' (e.g.")
+    print("         '_user\\nWrite an article about...\\nAssistant:\\n...') -- %fabr is structurally blind")
+    print("         to this; see pct_turn_leak / mean_preleak_frac in the CSV for the per-row detail.")
     print("ansfrac = mean fraction of the text that is the REAL answer (1.000 = no fabrication).")
 
     out = Path(args.out) if args.out else ROOT / "results" / "generation_quality.csv"
