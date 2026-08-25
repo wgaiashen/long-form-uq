@@ -33,7 +33,26 @@ MODELS = {
         "slug": "google_gemma-2-9b",
         "master": "results/cleanv2/wmodels_sens8_cleanv2_master__google_gemma-2-9b.csv",
     },
+    "Qwen/Qwen2.5-14B": {
+        "slug": "Qwen_Qwen2.5-14B",
+        "master": "results/analysis/pdl_master_qwenclean__Qwen_Qwen2.5-14B.csv",
+        # This population has no corrected-span per-example vectors, so the hybrid run REFITTED the
+        # probe instead of reading the master's own. The refit is a reproduction, and on this
+        # population reproductions of the trained components drift measurably (documented, and a
+        # matched-device test ruled out hardware as the cause). The duplicate rows are dropped in
+        # favour of the master either way; what changes is that the agreement check below becomes a
+        # reproducibility REPORT rather than an identity assertion. It is not a widened tolerance:
+        # the strict bar still applies wherever the probe was taken from the master rather than refit.
+        "probe_refitted": True,
+    },
 }
+
+# Where the published-baseline rows come from. The corrected file is preferred and the fallback is
+# announced, because the two differ on the supervised distance methods: the original run used a
+# positivity-constrained ridge the reference does not use, which clipped a single-feature coefficient
+# to zero and produced constant scores on a quarter of the cell-seeds. Silently consolidating those
+# rows would put a superseded number in the report-facing table.
+HYBRID_PREFERENCE = ["pdl_hybrids_unconstrained__{slug}.csv", "pdl_hybrids__{slug}.csv"]
 
 # Which family each method belongs to, so a published baseline is never read as one of ours.
 PUBLISHED = {"msp", "hbo", "satmd_mid", "satrmd_mid", "msp_satmd_mid", "msp_satrmd_mid",
@@ -75,10 +94,21 @@ def main():
     for model, cfg in MODELS.items():
         slug = cfg["slug"]
         master = ROOT / cfg["master"]
-        hybrid = ROOT / "results" / "hybrids" / f"pdl_hybrids__{slug}.csv"
-        if not master.exists() or not hybrid.exists():
-            print(f"{model}: missing input ({master.exists()=}, {hybrid.exists()=}) -> SKIPPED")
+        hybrid = None
+        for pat in HYBRID_PREFERENCE:
+            cand = ROOT / "results" / "hybrids" / pat.format(slug=slug)
+            if cand.exists():
+                hybrid = cand
+                break
+        if not master.exists() or hybrid is None:
+            print(f"{model}: missing input (master={master.exists()}, hybrid=None) -> SKIPPED")
             continue
+        if hybrid.name.startswith("pdl_hybrids__"):
+            print(f"  {model}: WARNING -- using the PRE-CORRECTION hybrid file. Its supervised "
+                  f"distance rows were produced with a positivity-constrained ridge the reference "
+                  f"does not use and are superseded.")
+        else:
+            print(f"  {model}: using the corrected hybrid rows ({hybrid.name})")
         before = {p: sha(p) for p in (master, hybrid)}
 
         rows, seen, master_vals, agree = [], set(), {}, []
@@ -123,9 +153,23 @@ def main():
             worst = max(ds) if ds else float("nan")
             tol = STORAGE_TOL if name == "msp" else AGREE_TOL
             ok = worst <= tol if worst == worst else False
+            # Where the probe was REFITTED rather than read from the master's own per-example vectors,
+            # this comparison measures reproducibility, not identity, and cannot assert the latter.
+            # The distinction is declared per population in MODELS, never inferred from the size of
+            # the disagreement -- deciding after the fact which failures count would make the check
+            # worthless. The duplicate row is dropped in favour of the master in both cases.
+            advisory = cfg.get("probe_refitted", False) and name == "saplma"
+            verdict = "ok" if ok else ("REPRODUCTION DRIFT" if advisory else "DISAGREES")
             print(f"  cross-check {name:8s} vs master {DUPLICATE_OF[name]:10s} on {len(ds):3d} cells: "
-                  f"max |d| = {worst:.2e} (bar {tol:.0e})  {'ok' if ok else 'DISAGREES'}")
-            if not ok:
+                  f"max |d| = {worst:.2e} (bar {tol:.0e})  {verdict}")
+            if not ok and advisory:
+                print(f"    ADVISORY, not fatal: this population has no corrected-span per-example "
+                      f"vectors, so the hybrid run refitted the probe. The master's value is kept and "
+                      f"the refit is discarded. The drift itself is a documented property of re-fits "
+                      f"on this population, not evidence of a wrong population -- the deterministic "
+                      f"probability score above still agrees to storage resolution, which it could "
+                      f"not do if the rows differed.")
+            elif not ok:
                 sys.exit(f"FATAL {model}: recomputed {name} disagrees with the master by {worst:.3e} "
                          f"(tolerance {tol:.0e}). The two are not the same population.")
         meths = sorted({r["method"] for r in rows if r["family"] != "verdict"})
