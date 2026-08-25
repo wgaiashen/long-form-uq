@@ -1,0 +1,73 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_chbo_qwen
+#PBS -j oe
+
+# Replace the probability branch of the published hybrid back-off with the frozen learned token
+# weighting, on the corrected-span Qwen population. Registered in
+# prereg/M8_cawsa_hbo_substitution.md before any number was computed.
+#
+# PRECONDITION, AND IT IS NOT OPTIONAL. This population's per-example score vectors must be present
+# AND certified. They are produced on the other cluster, because a regeneration here does not
+# reproduce the corrected-span master on the learned weighting. Before submitting:
+#
+#   python scripts/checks/certify_clean_perex.py --model Qwen/Qwen2.5-14B \
+#       --master results/analysis/pdl_master_qwenclean__Qwen_Qwen2.5-14B.csv
+#
+# That must print CERTIFICATION: PASS. If it does not, this job must not be submitted: the substituted
+# branch would not be the frozen score the report quotes, which the registration forbids. The driver
+# will refuse to start if the directory is absent, but it cannot tell a certified directory from an
+# uncertified one, so the check is the operator's responsibility.
+#
+# WHY THIS RUNS HERE AT ALL, when the fusion cannot. The back-off READS the frozen vectors and computes
+# its distance gate itself, and the distance is deterministic: a covariance and a quadratic form, no
+# fitting. So it does not need to reproduce a trained model and is indifferent to where the sidecars
+# were made. The fusion retrains, and its row-level fidelity gate therefore ties it to the cluster that
+# produced the sidecars.
+#
+# CPU ONLY. This model is far too large to run in single precision on any card this cluster has, but
+# nothing here needs a forward pass.
+#
+# THE REGIME OVERRIDE IS LONGER HERE THAN FOR THE OTHER MODELS: four datasets were corrected for this
+# population, not one.
+#
+#   qsub pbs/cawsa_hbo_qwen.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/cawsa_hbo_qwen__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+MODEL="Qwen/Qwen2.5-14B"
+LAYER=23
+export LUQ_REGIME="samsum=trunc_v1,med_quad=trunc_v1,expertqa=expertqa_rp12_trunc_v1,factscore=factscore_rp12_trunc_v1"
+
+echo "=== probability-branch substitution, $MODEL === host=$(hostname) at $(date)"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+echo; echo "################ certification of the per-example population ################"
+python -u scripts/checks/certify_clean_perex.py --model "$MODEL" \
+    --master results/analysis/pdl_master_qwenclean__Qwen_Qwen2.5-14B.csv \
+    || { echo "!!! population NOT certified -- refusing to run the substitution against it"; exit 2; }
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED"; exit 3; }
+
+echo; echo "################ STAGE 1: identity checks at full dimension ################ $(date)"
+python -u scripts/checks/cawsa_hbo.py --model "$MODEL" --layer "$LAYER" \
+    --evals pubmed_qa --rungs ID,1ds-Diff --seeds 1,2,3 \
+    --out results/hybrids/STAGE1_cawsa_hbo__qwen.csv \
+    || { echo "!!! stage 1 FAILED -- an identity check did not hold"; exit 4; }
+
+echo; echo "################ STAGE 2: full 40-cell grid ################ $(date)"
+python -u scripts/checks/cawsa_hbo.py --model "$MODEL" --layer "$LAYER" --seeds 1,2,3 \
+    || { echo "!!! full grid FAILED"; exit 5; }
+
+echo; echo "=== done at $(date) ==="
