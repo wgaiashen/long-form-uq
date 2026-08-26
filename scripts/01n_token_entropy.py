@@ -57,7 +57,25 @@ def main():
     ap.add_argument("--tol", type=float, default=2e-2,
                     help="absolute tolerance for the chosen-token logprob agreement gate")
     ap.add_argument("--limit", type=int, default=0, help="debug only: stop after N records")
+    ap.add_argument("--device-map", default="cuda",
+                    help="passed to from_pretrained. 'cuda' (default) = one GPU, unchanged. "
+                         "'auto' shards the weights across the visible GPUs, which is how a model "
+                         "too large for one card is run on several smaller ones. Use with "
+                         "--max-memory.")
+    ap.add_argument("--max-memory", default="",
+                    help="force a real split, e.g. '0=20GiB,1=20GiB'. accelerate fills GPU 0 first, "
+                         "so --device-map auto on its own can silently place every layer on one "
+                         "card; when this is set the split is asserted after loading rather than "
+                         "assumed.")
     args = ap.parse_args()
+    # Sharding the weights across several cards changes where the weights live and nothing else.
+    # The dtype, the sequence handling and the values computed are identical to a single-card run.
+    max_memory = None
+    if args.max_memory:
+        max_memory = {}
+        for item in args.max_memory.split(","):
+            k, v = item.split("=")
+            max_memory[int(k.strip())] = v.strip()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
                  prompt_regime=args.prompt_regime)
@@ -68,8 +86,19 @@ def main():
 
     dtype = None if args.dtype == "auto" else _DTYPE[args.dtype]
     attn = None if args.attn == "auto" else args.attn
-    model, tok = generate.load_model(cfg.model_name, attn_implementation=attn, dtype=dtype)
+    model, tok = generate.load_model(cfg.model_name, attn_implementation=attn, dtype=dtype,
+                                     device_map=args.device_map, max_memory=max_memory)
     model.eval()
+    # Prove the shard actually happened. A silent single-card placement would run out of memory part
+    # way through the dataset, after hours of work, rather than here.
+    if args.device_map == "auto":
+        placed = getattr(model, "hf_device_map", {})
+        n_dev = len({v for v in placed.values() if isinstance(v, int)})
+        print(f"device map: {n_dev} GPU(s) hold weights", flush=True)
+        if max_memory is not None and n_dev < 2:
+            sys.exit("--max-memory asked for a split but every layer landed on one device; "
+                     "the memory ceiling was too high or only one GPU is visible.")
+
 
     ents, idxs, worst, n_cmp = [], [], 0.0, 0
     todo = records[:args.limit] if args.limit else records
