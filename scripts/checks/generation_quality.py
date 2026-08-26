@@ -79,15 +79,41 @@ def chatter(text):
 # against Llama-3.1-8B-Instruct on identical datasets/settings (0.0% leak, its one borderline hit was
 # real code containing "_userRepository"). Measured true rates on Qwen2.5-32B before the fix: asqa
 # 62.0%, factscore 49.2%, expertqa 69.1% -- all missed by the old detector alone.
-_TURN_LEAK = re.compile(r"_user|_assistant|\n\nsystem\n|\nsystem\n")
+#
+# WIDENED 2026-08-25 (same day, after the --stop-strings fix below). The first version above was
+# case-sensitive and matched only the exact substrings "_user"/"_assistant"/"\nsystem\n", tuned to the
+# leak shapes seen in the UNFIXED population. Applying --stop-strings cut the leak rate hugely but did
+# not eliminate it, and the residual leaks come out in role-name spellings the narrow pattern cannot
+# see: capitalised ("_User"), "#"-prefixed with a space ("# user", "# assistant", "# system"),
+# colon-terminated ("User:"), and glued onto the preceding word with no separator (".user\n",
+# "assistant.user"). Checked by direct inspection of the 150-row smoke caches: this widened pattern
+# found 2/150 (asqa), 9/150 (factscore) and 7/150 (expertqa) genuine leaks that the version above
+# reported as 0.0% on all three -- every flagged row was confirmed a real leak by eye, no false
+# positives found. Requiring a colon or newline immediately after the role word (with only whitespace
+# between) is what keeps ordinary prose safe (e.g. "as a user" or "the operating system" never matches
+# because no colon/newline follows).
+#
+# ROUND 2 CORRECTION (2026-08-26). The widened pattern above still read 0.0% on 2/150 genuine
+# expertqa leaks: the model echoes the literal SYSTEM PROMPT instead of a role marker, e.g.
+# "...marriage licenses.\nYou are a helpful assistant." -- " assistant." has a space before and a
+# period after, matching neither the stop_strings list (_assistant / # assistant / .assistant, none
+# of which fit "helpful assistant.") nor the regex's colon-or-newline requirement. Added as a second,
+# independent pattern rather than loosening the role-word one (loosening the colon/newline
+# requirement to admit ". " would reopen the false-positive risk on ordinary prose ending in "system."
+# or "human." mid-sentence, which the round-2 verification specifically ruled out).
+_TURN_LEAK = re.compile(r"(?:^|[\n#_.,;:!?\s])(user|assistant|system|human)\s*[:\n]", re.IGNORECASE)
+_SYSTEM_PROMPT_ECHO = re.compile(r"you are a helpful assistant", re.IGNORECASE)
 
 
 def turn_leak(text):
     """(has_turn_leak, fraction of the text that precedes it)."""
-    m = _TURN_LEAK.search(text or "")
-    if not m:
+    text = text or ""
+    m = _TURN_LEAK.search(text)
+    m2 = _SYSTEM_PROMPT_ECHO.search(text)
+    starts = [x.start() for x in (m, m2) if x is not None]
+    if not starts:
         return False, 1.0
-    return True, m.start() / max(len(text), 1)
+    return True, min(starts) / max(len(text), 1)
 
 
 def fabrication(text):
