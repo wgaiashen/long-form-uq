@@ -1,0 +1,58 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=72:00:00
+#PBS -N luq_ptmulti2
+#PBS -j oe
+
+# Multi-layer per-token extraction on two 24 GB cards, for the seven datasets whose sources are short
+# enough to fit. The eighth is left to the single-card job, which asks for a 48 GB card.
+#
+# WHY THIS EXISTS. It is an availability route, not a different experiment. The single-card version
+# pins a 48 GB card, and at the time of writing every such card visible to this queue is either
+# allocated or on an offline node. Two 24 GB cards give the same 48 GB budget.
+#
+# WHICH CARDS ARE ACTUALLY REACHABLE, measured rather than assumed. Node availability must be read
+# together with each node's Qlist: several nodes with many idle cards serve a different queue
+# entirely and can never run this job, and at least one reports state = free while its comment says
+# communication with it is closed. Counting free cards without checking Qlist overstates what is
+# reachable by an order of magnitude. Two free cards on one reachable node is what this request is
+# sized against.
+#
+# WHY SEVEN DATASETS AND NOT EIGHT. This extraction runs the eager attention backend, which
+# materialises the full attention matrix for one layer at a time. Measured longest sequence and the
+# resulting matrix, at 32 heads in fp32:
+#
+#   asqa 302 (0.01 GiB)      factscore 276 (0.01)     expertqa 549 (0.04)
+#   pubmed_qa 1072 (0.14)    samsum 1117 (0.15)       med_quad 1358 (0.22)
+#   cnn_dailymail 2467 (0.73)                         xsum 5866 (4.10)
+#
+# With the weights split across two cards, about 16 GB sits on each and roughly 8 GB is left free per
+# card. Seven datasets need under 0.8 GiB and are comfortable. The eighth needs 4.10 GiB for the
+# scores alone, and the softmax intermediate can approach the same again, which is too close to the
+# headroom to risk a multi-hour job on. It is excluded here by name rather than left to fail.
+#
+# SHARDING CHANGES NO VALUE. Only the placement of the weights differs. The dtype, the sequence
+# handling, the layers requested and the arithmetic are identical to a single-card run, and the
+# driver asserts after loading that the split actually happened rather than assuming it. Note that
+# device_map places layers in sequence rather than running them in parallel, so two cards do not make
+# this faster; they buy memory headroom.
+#
+# ONE DEVIATION TO RECORD. This is a different GPU architecture from the card that produced the
+# already-cached middle layer, and kernel selection can differ between architectures. The precedent
+# in this project is a relevance cache recomputed on a different card, which agreed with the original
+# to a maximum of 1.9e-6 and a median of 1.8e-8. That is floating-point noise rather than a change of
+# method, but the layer sensitivity compares ten new layers against a middle layer cached elsewhere,
+# so the mixed provenance belongs in its write-up.
+#
+# COMPOSES WITH THE SINGLE-CARD JOB. Both wrappers share a body that skips any layer already on disk,
+# so whichever runs first, the other continues from what is left rather than aborting.
+#
+#   qsub pbs/pertoken_multilayer_llama_2gpu.pbs
+
+# Two ceilings of 17 GiB give 34 GiB for 32 GiB of weights and leave the rest of each card for
+# activations. The driver exits if this does not produce a genuine split across devices.
+export LUQ_PT_DATASETS="asqa factscore expertqa pubmed_qa samsum med_quad cnn_dailymail"
+export LUQ_PT_DEVMAP="auto"
+export LUQ_PT_MAXMEM="0=17GiB,1=17GiB"
+
+source "$PBS_O_WORKDIR/pbs/_pertoken_multilayer_body.sh"

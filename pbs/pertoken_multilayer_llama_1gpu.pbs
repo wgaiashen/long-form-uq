@@ -1,0 +1,26 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=72:00:00
+#PBS -N luq_ptmulti1
+#PBS -j oe
+
+# Multi-layer per-token extraction on one 48 GB card, all eight datasets.
+#
+# This supersedes pertoken_multilayer_llama.pbs, which is otherwise identical but aborts on the first
+# layer that already exists. That made it unusable alongside any partial run: the two-card job covers
+# seven datasets, so a later single-card job would have found completed layers and exited rather than
+# doing the work that was left. The shared body skips what is already cached, so this now continues
+# from wherever the other job stopped, and the dataset that needs the larger card is the one it will
+# usually be left with.
+#
+# SIZING. The eager attention backend materialises the full attention matrix for one layer at a time.
+# The longest source here is 5,866 tokens, which is 4.10 GiB of attention scores at 32 heads in fp32,
+# on top of about 32 GiB of fp32 weights. That fits a 48 GB card and does not fit a 24 GB one.
+#
+#   qsub pbs/pertoken_multilayer_llama_1gpu.pbs
+
+export LUQ_PT_DATASETS="xsum pubmed_qa cnn_dailymail samsum med_quad asqa expertqa factscore"
+export LUQ_PT_DEVMAP="cuda"
+export LUQ_PT_MAXMEM=""
+
+source "$PBS_O_WORKDIR/pbs/_pertoken_multilayer_body.sh"
