@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=24:00:00
+#PBS -N luq_ptmulti2c
+#PBS -j oe
+
+# Retry of the one dataset the seven-dataset two-card job did not finish.
+#
+# WHAT HAPPENED. That job completed six of seven datasets in nine hours on two RTX6000 cards, sixty
+# layer files in total, then failed on the seventh with
+#
+#   torch.AcceleratorError: CUDA error: unspecified launch failure
+#
+# raised inside the language-model head projection. This is not an out-of-memory condition, which
+# raises a different and specific exception, and it is not a shape or configuration problem: the same
+# code had just processed six datasets on the same cards, including one whose sequences are only half
+# again shorter than this one.
+#
+# WHY THE RETRY IS WORTH MAKING EITHER WAY. The same error signature has now appeared in a second,
+# unrelated workload on this card type: the attention-feature equivalence pass failed with it twice,
+# at the same row both times, and a job pinned to a 48 GB card is still queued specifically to test
+# whether that failure follows the hardware or the data. Both occurrences hit the longest-sequence
+# dataset of their run. If this retry succeeds, the failure is intermittent and the sensible reading
+# is a transient fault. If it fails again at a similar point, the failure is reproducible on this
+# card type for long sequences, which is a direct answer to the question the queued job was going to
+# spend a 48 GB allocation on. Recording that reasoning here because the result is only useful if the
+# prediction is written down before the run.
+#
+# NOTHING ELSE CHANGES. Same commit, same layers, same regime resolution, same dtype and attention
+# backend, same per-device ceilings. Only the dataset list differs, and the shared body still skips
+# any layer already on disk, so this cannot disturb the sixty files already written.
+#
+# THE OTHER MISSING DATASET IS NOT HERE. Its sources reach 5,866 tokens, needing 4.10 GiB of eager
+# attention against roughly 8 GiB of headroom per card, and it remains the single-card job's work.
+#
+#   qsub pbs/pertoken_multilayer_llama_2gpu_cnn.pbs
+
+export LUQ_PT_DATASETS="cnn_dailymail"
+export LUQ_PT_DEVMAP="auto"
+export LUQ_PT_MAXMEM="0=17GiB,1=17GiB"
+
+source "$PBS_O_WORKDIR/pbs/_pertoken_multilayer_body.sh"
