@@ -249,7 +249,8 @@ def generate(model, tok, prompt: str, max_new_tokens: int,
 
 
 @torch.no_grad()
-def recompute_states(model, tok, token_ids, layers, want_attentions: bool = False):
+def recompute_states(model, tok, token_ids, layers, want_attentions: bool = False,
+                     logits_to_keep=None):
     """Teacher-forced forward over a saved token sequence; return per-token states.
 
     Use this when you need a representation you did NOT cache: raw per-token states
@@ -264,10 +265,25 @@ def recompute_states(model, tok, token_ids, layers, want_attentions: bool = Fals
     Unlike the generation-time structure, a teacher-forced pass yields the state of
     EVERY position at once, including the last token, because here we feed the full
     sequence in as input rather than building it one token at a time.
+
+    logits_to_keep: OPT-IN, and the default of None reproduces the previous behaviour
+    exactly. Nothing here reads out.logits -- only hidden states and attentions -- yet
+    the wrapped model still projects EVERY position to the full vocabulary, which for
+    Llama-3.1 is 128,256 entries, i.e. about 0.5 MB per position, so a 2,500-token
+    sequence allocates roughly 1.2 GB purely to be discarded. Passing 1 computes that
+    projection at a single position instead. Hidden states are unaffected because the
+    head is a leaf: it consumes the final hidden state and nothing downstream feeds
+    back into the layers this function returns. That is an argument, not a measurement,
+    so it is checked rather than trusted -- see scripts/checks/logits_to_keep_equiv.py,
+    which asserts bit equality across both settings before any cache is built this way.
     """
     # [None] adds the batch dimension: (seq_len,) -> (1, seq_len).
     ids = torch.tensor(token_ids)[None].to(model.device)
-    out = model(ids, output_hidden_states=True, output_attentions=want_attentions)
+    # Build kwargs so that the default path is the IDENTICAL call it has always been:
+    # when logits_to_keep is None the argument is not passed at all, rather than passed
+    # with a value that happens to mean the same thing.
+    extra = {} if logits_to_keep is None else {"logits_to_keep": logits_to_keep}
+    out = model(ids, output_hidden_states=True, output_attentions=want_attentions, **extra)
 
     # out.hidden_states is a tuple over layers (0 = embedding layer), each
     # (1, seq_len, hidden). Drop the batch dim and move off the GPU.

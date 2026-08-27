@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=01:00:00
+#PBS -N luq_ltkgate
+#PBS -j oe
+
+# Gate for the optional vocabulary-projection skip in the teacher-forced pass. Writes nothing into
+# any cache; it loads the model, runs a few cached records both ways and compares the returned
+# tensors elementwise, requiring exact equality.
+#
+# The records chosen are the LONGEST in the dataset that the two-card extraction could not finish.
+# Length is what makes the projection expensive, so it is both where the saving is and where a
+# difference would be most likely to appear if the reasoning behind the change were wrong.
+#
+# Two cards, matching the extraction it is meant to unblock. If the projection is the reason that
+# extraction fails, the run WITHOUT the skip may fail here too, on the longest records, which is
+# itself the diagnosis rather than a broken check.
+#
+#   qsub pbs/logits_to_keep_equiv.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+
+mkdir -p logs
+LIVE="logs/logits_to_keep_equiv__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || true
+
+python -u scripts/checks/logits_to_keep_equiv.py \
+    --dataset cnn_dailymail --layers 0,3,15,30 --n 6 --longest \
+    --dtype fp32 --attn eager \
+    --device-map auto --max-memory "0=17GiB,1=17GiB"
+STATUS=$?
+echo "=== gate exit status $STATUS at $(date) ==="
+exit $STATUS
