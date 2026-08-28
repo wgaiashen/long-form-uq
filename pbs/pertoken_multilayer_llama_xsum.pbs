@@ -1,0 +1,33 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb:ngpus=4:gpu_type=RTX6000
+#PBS -l walltime=24:00:00
+#PBS -N luq_ptxsum
+#PBS -j oe
+
+# The last dataset of the layer sensitivity, on four cards.
+#
+# WHAT HAPPENED ON THREE. Seven of the eight datasets completed there, including the one that had
+# defeated two earlier attempts. The eighth ended with a clean out-of-memory error rather than a
+# launch fault: a 3.67 GiB request against 3.52 GiB free, while the allocator held 3.73 GiB reserved
+# but unallocated. So it was fragmentation on top of a genuinely tight budget, not a wrong approach.
+#
+# TWO CHANGES, BOTH SMALL. A fourth card takes the weights from about 10.7 GiB per card to about
+# 8 GiB, and the allocator is now asked for expandable segments so reserved blocks are reused rather
+# than stranded. That second setting was already used by the entropy jobs after an earlier
+# fragmentation failure and should have been here from the start.
+#
+# THIS DATASET IS THE EXPENSIVE ONE. Its sources reach 5,866 tokens, whose eager attention matrix is
+# 4.10 GiB at 32 heads in fp32, against roughly 0.7 GiB for the next largest. That is why it is the
+# only one left and why it gets the wider allocation.
+#
+# THE SEVEN COMPLETED DATASETS ARE SAFE. The shared body skips any layer already on disk, so this
+# job touches nothing but the missing files.
+#
+#   qsub pbs/pertoken_multilayer_llama_xsum.pbs
+
+export LUQ_PT_DATASETS="xsum"
+export LUQ_PT_DEVMAP="auto"
+export LUQ_PT_MAXMEM="0=9GiB,1=9GiB,2=9GiB,3=9GiB"
+export LUQ_PT_SKIPHEAD=1
+
+source "$PBS_O_WORKDIR/pbs/_pertoken_multilayer_body.sh"

@@ -41,6 +41,10 @@ echo "live log: $LIVE"
 
 export HF_HOME
 export HF_HUB_OFFLINE=1
+# Fragmentation, not capacity, ended one attempt at the longest dataset: the allocator held 3.73 GiB
+# reserved but unallocated while a 3.67 GiB request failed against 3.52 GiB free. Expandable segments
+# let those reserved blocks be reused instead of stranded.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MODEL="meta-llama/Meta-Llama-3.1-8B"
 export LUQ_REGIME="med_quad=cleanv2"
 
