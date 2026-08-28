@@ -1,0 +1,48 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=02:00:00
+#PBS -N luq_m9gate
+#PBS -j oe
+
+# Acceptance gate 1 of the layer sensitivity, registered in prereg/M9_layer_distance_sensitivity.md
+# section 4. It writes nothing. If it fails, the pre-registration says the experiment stops and the
+# failure is reported instead of a result.
+#
+# It recomputes layer 15 through the same call path the ten new layers went through and compares
+# against the layer-15 cache already on disk. Two datasets are checked rather than one: the corrected
+# span dataset, because its namespace resolution is the thing most easily got wrong, and the dataset
+# whose sources are longest, because that is where numerical differences between GPU generations
+# would be largest.
+#
+# THE SETTINGS MUST MATCH THE EXTRACTION or the comparison is between two different things: float32,
+# the eager attention backend, and the same single-position vocabulary projection.
+#
+#   qsub pbs/m9_extraction_gate.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+mkdir -p logs
+LIVE="logs/m9_extraction_gate__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+STATUS=0
+MM="0=17GiB,1=17GiB"
+
+echo; echo "################ corrected-span dataset ################"
+python -u scripts/checks/m9_extraction_gate.py --dataset med_quad --prompt-regime cleanv2 \
+    --n 40 --dtype fp32 --attn eager --skip-lm-head \
+    --device-map auto --max-memory "$MM" || STATUS=1
+
+echo; echo "################ longest-source dataset ################"
+python -u scripts/checks/m9_extraction_gate.py --dataset xsum --prompt-regime "" \
+    --n 20 --dtype fp32 --attn eager --skip-lm-head \
+    --device-map auto --max-memory "$MM" || STATUS=1
+
+echo; echo "=== extraction gate exit status $STATUS at $(date) ==="
+exit $STATUS

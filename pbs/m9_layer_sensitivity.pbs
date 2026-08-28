@@ -1,0 +1,74 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=72:00:00
+#PBS -N luq_m9sens
+#PBS -j oe
+
+# The downstream layer sensitivity, both passes. Registered in
+# prereg/M9_layer_distance_sensitivity.md. CPU only: every input already exists.
+#
+# DO NOT RUN THIS BEFORE THE EXTRACTION GATE PASSES. The pre-registration makes that gate a
+# precondition, not a formality: if the multi-layer extractor does not reproduce the single layer it
+# can be checked against, it cannot be trusted on the ten that have nothing to check against.
+#
+# PASS ONE reduces each layer to one scalar distance per example, because eleven layers of per-token
+# states cannot be held at once: a single layer of this population is about 19 GB. Eleven scan files
+# are a few megabytes. It is resumable, so a walltime overrun continues rather than restarting.
+#
+# PASS TWO fits the published regression across those distances: a ten-component reduction of the
+# layer-distance matrix fitted on the development half and only transformed at evaluation, then an
+# unconstrained ridge. Eleven layers were chosen partly so that ten components is defined.
+#
+# GATE 2 IS THE LAST STEP, and it is the one that proves the two experiments differ only in the layer
+# set: the same downstream code restricted to layer 15 alone must reproduce the corrected
+# single-layer rows, degeneracy decisions included.
+#
+# EVERY ROW THIS PRODUCES IS A LAYER SENSITIVITY. The published methods aggregate every layer; this
+# aggregates a frozen subset of eleven. No row here reproduces a published number.
+#
+#   qsub pbs/m9_layer_sensitivity.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/hybrids
+LIVE="logs/m9_layer_sensitivity__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+echo "working tree clean: $(test -z "$(git status --porcelain --untracked-files=no)" && echo yes || echo NO)"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+export LUQ_REGIME="med_quad=cleanv2"
+LAYERS="0,3,6,9,12,15,18,21,24,27,30"
+SCAN="results/hybrids/mdscan__meta-llama_Meta-Llama-3.1-8B"
+
+echo "=== layer sensitivity === host=$(hostname) at $(date)"
+echo "frozen layer set: $LAYERS"
+
+STATUS=0
+echo; echo "################ PASS ONE: per-layer distances ################"
+for L in 0 3 6 9 12 15 18 21 24 27 30; do
+  n=$(ls ${SCAN}/L${L}__*.npz 2>/dev/null | wc -l)
+  if [ "$n" -ge 40 ]; then echo "---- layer $L already scanned ($n cell files), skipping"; continue; fi
+  echo; echo "---- layer $L at $(date) ----"
+  python -u scripts/checks/md_layer_scan.py --model "$MODEL" --layer "$L" --seeds 1,2,3 \
+      || { echo "!!! scan FAILED for layer $L"; STATUS=1; break; }
+done
+
+if [ "$STATUS" != "0" ]; then echo "=== pass one incomplete, not attempting pass two ==="; exit 3; fi
+
+echo; echo "################ PASS TWO: the regression across layers ################ $(date)"
+python -u scripts/checks/md_multilayer.py --model "$MODEL" --layers "$LAYERS" --tag 11layer \
+    --out results/hybrids/pdl_m9_11layer__meta-llama_Meta-Llama-3.1-8B.csv \
+    || { echo "!!! multilayer FAILED"; exit 4; }
+
+echo; echo "################ GATE 2: layer 15 alone must reproduce the single-layer rows ############"
+python -u scripts/checks/md_multilayer.py --model "$MODEL" --layers 15 --tag 1layer \
+    --out results/hybrids/pdl_m9_1layer_control__meta-llama_Meta-Llama-3.1-8B.csv \
+    || { echo "!!! layer-15 control FAILED"; exit 5; }
+echo "Compare the control against the corrected single-layer rows in"
+echo "  results/hybrids/pdl_hybrids_unconstrained__meta-llama_Meta-Llama-3.1-8B.csv"
+echo "That comparison is gate 2 and is made explicitly, not assumed from this job exiting zero."
+
+echo; echo "=== done at $(date) ==="
