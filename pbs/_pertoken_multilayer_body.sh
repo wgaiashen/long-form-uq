@@ -28,6 +28,8 @@
 #   LUQ_PT_DATASETS  space-separated dataset list
 #   LUQ_PT_DEVMAP    "cuda" for one card, "auto" to shard
 #   LUQ_PT_MAXMEM    per-device ceilings when sharding, e.g. "0=17GiB,1=17GiB"; empty for one card
+#   LUQ_PT_SKIPHEAD  1 to compute the unread vocabulary projection at one position instead of all;
+#                    unset or 0 keeps the original call path
 
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
@@ -71,6 +73,9 @@ PYEOF
 
 DEV_ARGS=(--device-map "$LUQ_PT_DEVMAP")
 if [ -n "$LUQ_PT_MAXMEM" ]; then DEV_ARGS+=(--max-memory "$LUQ_PT_MAXMEM"); fi
+# Opt-in, and off unless a wrapper asks for it, so the sixty files already written and any future
+# single-card run stay on exactly the call path that produced them.
+if [ "${LUQ_PT_SKIPHEAD:-0}" = "1" ]; then DEV_ARGS+=(--skip-lm-head); fi
 
 for DS in $LUQ_PT_DATASETS; do
   case "$DS" in

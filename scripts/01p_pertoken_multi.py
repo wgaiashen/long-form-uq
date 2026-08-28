@@ -58,6 +58,12 @@ def main():
     ap.add_argument("--overwrite", action="store_true",
                     help="permit replacing a layer file that already exists. Off by default: the "
                          "canonical middle-layer caches are the input to every published result here")
+    ap.add_argument("--skip-lm-head", action="store_true",
+                    help="compute the vocabulary projection at one position instead of all of them. "
+                         "This script never reads it, and scripts/checks/logits_to_keep_equiv.py "
+                         "verified the returned hidden states are bit-identical either way "
+                         "(max|d| = 0.000000e+00 over the longest records of the largest dataset), "
+                         "so this only removes about 0.5 MB per position of discarded allocation.")
     ap.add_argument("--device-map", default="cuda",
                     help="passed to from_pretrained. 'cuda' (default) = one GPU, unchanged. "
                          "'auto' shards the weights across the visible GPUs, which is how a model "
@@ -130,7 +136,8 @@ def main():
         p_ids = list(r["prompt_token_ids"])
         g_ids = list(r["gen_token_ids"])
         P, G = len(p_ids), len(g_ids)
-        states = generate.recompute_states(model, tok, p_ids + g_ids, layers)
+        states = generate.recompute_states(model, tok, p_ids + g_ids, layers,
+                                          logits_to_keep=1 if args.skip_lm_head else None)
         lo, hi = P - 1, P + G          # last prompt position + every generated position, as 01h does
         for k, L in enumerate(layers):
             # .copy() is essential: tensor.numpy() shares memory with the torch tensor, which is

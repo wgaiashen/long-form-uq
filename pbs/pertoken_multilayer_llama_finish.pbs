@@ -1,0 +1,45 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=3:gpu_type=RTX6000
+#PBS -l walltime=48:00:00
+#PBS -N luq_ptfinish
+#PBS -j oe
+
+# The two datasets the layer-sensitivity extraction has not produced, on three 24 GB cards.
+#
+# WHAT IS ALREADY DONE. Sixty layer files across six datasets, verified: every file loads, the stored
+# window is the expected length on every record, row indices are byte-identical to the middle layer
+# already in the cache, and the corrected-span dataset resolved to the corrected namespace. The
+# shared body skips any layer already on disk, so this job CANNOT disturb those files. It will find
+# the two datasets below empty and everything else complete.
+#
+# WHAT CHANGED SINCE THE FAILED ATTEMPTS. Both earlier runs died with
+# "CUDA error: unspecified launch failure" inside the projection to the 128,256-entry vocabulary, a
+# quantity this extraction never reads. That projection is now computed at a single position instead
+# of at every one, which removes roughly 0.5 MB per position of allocation that was discarded anyway.
+#
+# THE EQUIVALENCE IS MEASURED, NOT ARGUED. scripts/checks/logits_to_keep_equiv.py compared the
+# returned hidden states with and without the change on the six longest records of the larger of
+# these two datasets, at four layers spanning the model, and required exact equality rather than a
+# tolerance: max|d| = 0.000000e+00 across all twenty-four tensor comparisons, zero differing.
+#
+# AN HONEST LIMIT ON WHAT THAT PROVES. The equivalence check is not evidence that the change fixes
+# the fault. In that same run the unmodified path processed records of 2,467 tokens, the longest in
+# the dataset, on two cards without failing, while the extraction failed among records whose longest
+# is 2,084. Sequence length alone therefore does not explain the failure, and this run is the test of
+# whether removing the discarded allocation avoids it. If it fails again the branch stops here and is
+# reported as not completed, rather than retried a third time.
+#
+# WHY THREE CARDS. The second dataset reaches 5,866 tokens, whose eager attention matrix is 4.10 GiB
+# at 32 heads in fp32. Three cards hold the 32 GB of weights at under 11 GB each and leave roughly
+# 13 GB free per card, so that matrix is comfortable rather than marginal. Two cards would leave
+# about 8 GB and make it tight. Three free cards were available on four separate reachable nodes when
+# this was written, so the wider request does not cost placement.
+#
+#   qsub pbs/pertoken_multilayer_llama_finish.pbs
+
+export LUQ_PT_DATASETS="cnn_dailymail xsum"
+export LUQ_PT_DEVMAP="auto"
+export LUQ_PT_MAXMEM="0=12GiB,1=12GiB,2=12GiB"
+export LUQ_PT_SKIPHEAD=1
+
+source "$PBS_O_WORKDIR/pbs/_pertoken_multilayer_body.sh"
