@@ -57,6 +57,13 @@ def main():
     ap.add_argument("--tol", type=float, default=2e-2,
                     help="absolute tolerance for the chosen-token logprob agreement gate")
     ap.add_argument("--limit", type=int, default=0, help="debug only: stop after N records")
+    ap.add_argument("--slim-logits", action="store_true",
+                    help="ask the model for logits at only the last G+1 positions instead of all "
+                         "P+G of them. Those last G+1 positions ARE the window this script uses, so "
+                         "the entropy definition is untouched and every value is the same; what "
+                         "changes is that the projection is not computed for the P-1 prompt "
+                         "positions whose logits are sliced away and discarded. On a 5,866-token "
+                         "source with a 56-token generation that is 29 MB instead of 3.0 GB.")
     ap.add_argument("--device-map", default="cuda",
                     help="passed to from_pretrained. 'cuda' (default) = one GPU, unchanged. "
                          "'auto' shards the weights across the visible GPUs, which is how a model "
@@ -114,8 +121,15 @@ def main():
             continue
         with torch.no_grad():
             ids = torch.tensor(p_ids + g_ids)[None].to(model.device)
-            logits = model(ids).logits[0]                    # (P+G, vocab)
-            win = logits[P - 1:P + G - 1].float()            # the positions that PREDICT the G gen tokens
+            if args.slim_logits:
+                # The last G+1 positions of a length-(P+G) sequence are exactly P-1 .. P+G-1, so the
+                # first G of them are P-1 .. P+G-2: the same positions the full-logits path slices
+                # out below. Nothing is approximated and no position is dropped from the window.
+                logits = model(ids, logits_to_keep=G + 1).logits[0]   # (G+1, vocab)
+                win = logits[:G].float()
+            else:
+                logits = model(ids).logits[0]                # (P+G, vocab)
+                win = logits[P - 1:P + G - 1].float()        # the positions that PREDICT the G gen tokens
             logp = torch.log_softmax(win, dim=-1)            # (G, vocab)
             H = -(logp.exp() * logp).sum(-1)                 # (G,) full-distribution entropy
             chosen = logp[torch.arange(G), torch.tensor(g_ids, device=logp.device)]
@@ -145,6 +159,15 @@ def main():
         sys.exit(f"FATAL: chosen-token log-probabilities disagree by {worst:.6f} > {args.tol}. The "
                  f"entropy window is not aligned with the cached generation. Nothing written.")
     print("WINDOW GATE: PASS")
+    # Report the measured peak rather than the arithmetic. The point of --slim-logits is a memory
+    # claim, and a claim about memory that is never measured is exactly the kind of thing this
+    # project does not accept elsewhere.
+    if torch.cuda.is_available():
+        for d in range(torch.cuda.device_count()):
+            peak = torch.cuda.max_memory_allocated(d) / 2 ** 30
+            resv = torch.cuda.max_memory_reserved(d) / 2 ** 30
+            print(f"PEAK MEMORY device {d}: allocated {peak:.2f} GiB, reserved {resv:.2f} GiB "
+                  f"(slim_logits={args.slim_logits})")
 
     out_dir = Path(cfg.cache_dir) / "entropy"
     out_dir.mkdir(parents=True, exist_ok=True)
