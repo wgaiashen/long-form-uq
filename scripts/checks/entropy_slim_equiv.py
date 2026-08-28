@@ -56,6 +56,18 @@ def main():
     ap.add_argument("--ood", default="ID")
     ap.add_argument("--prompt-regime", default="")
     ap.add_argument("--n", type=int, default=8)
+    ap.add_argument("--max-len", type=int, default=0,
+                    help="only use records up to this total length. The equivalence arm needs "
+                         "records BOTH paths can run, and on a 24 GB card the full-logits path "
+                         "cannot reach the longest sources: it holds the whole "
+                         "sequence-by-vocabulary matrix at the same time as the attention matrix. "
+                         "Capping the length is what makes the comparison possible at all, and the "
+                         "records it excludes are covered by --slim-only below.")
+    ap.add_argument("--slim-only", action="store_true",
+                    help="run ONLY the suffix path, make no comparison, and report peak memory. "
+                         "This is the capability arm: it demonstrates the suffix path handles the "
+                         "records the full-logits path cannot, which is the entire operational "
+                         "point and cannot be shown by a comparison that requires both to fit.")
     ap.add_argument("--longest", action="store_true",
                     help="take the longest records, where the saving is largest and where the "
                          "full-logits path is closest to not fitting")
@@ -78,9 +90,16 @@ def main():
     records = cache.load_records(cfg.cache_dir, key)
 
     usable = [r for r in records if len(r["gen_token_ids"]) > 0]
+    if args.max_len:
+        usable = [r for r in usable
+                  if len(r["prompt_token_ids"]) + len(r["gen_token_ids"]) <= args.max_len]
     if args.longest:
         usable.sort(key=lambda r: -(len(r["prompt_token_ids"]) + len(r["gen_token_ids"])))
     picked = usable[:args.n]
+    if not picked:
+        sys.exit("no records match the filters; nothing to compare")
+    lens = [len(r["prompt_token_ids"]) + len(r["gen_token_ids"]) for r in picked]
+    print(f"record lengths selected: min {min(lens)}, max {max(lens)}")
 
     model, tok = generate.load_model(cfg.model_name, attn_implementation=args.attn,
                                      dtype=_DTYPE[args.dtype],
@@ -102,7 +121,9 @@ def main():
 
     peaks = {}
     worst_H, worst_lp, n_bad = 0.0, 0.0, 0
-    for slim in (False, True):
+    arms = (True,) if args.slim_only else (False, True)
+    base = None
+    for slim in arms:
         if torch.cuda.is_available():
             for d in range(torch.cuda.device_count()):
                 torch.cuda.reset_peak_memory_stats(d)
@@ -113,7 +134,7 @@ def main():
                        for d in range(torch.cuda.device_count())] if torch.cuda.is_available() else []
         if not slim:
             base = res
-        else:
+        elif base is not None:
             for r, (Hb, cb), (Hs, cs) in zip(picked, base, res):
                 n = len(r["gen_token_ids"])
                 if Hb.shape != Hs.shape:
@@ -135,6 +156,10 @@ def main():
         if peaks[slim]:
             print(f"PEAK allocated, {tag:<14}: "
                   + ", ".join(f"dev{d} {p:.2f} GiB" for d, p in enumerate(peaks[slim])))
+    if args.slim_only:
+        print("CAPABILITY ARM: the suffix path completed these records; no comparison was made "
+              "because the full-logits path cannot run them here. That is the finding.")
+        return 0
     if n_bad == 0 and worst_H == 0.0 and worst_lp == 0.0:
         print("PASS: entropies are BIT-IDENTICAL. The suffix path may be used for production.")
         return 0
