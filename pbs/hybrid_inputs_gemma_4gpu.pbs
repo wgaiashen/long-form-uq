@@ -8,6 +8,15 @@
 # 48 GB card. Replaces the single-card version, which has been queued since 24 August while no 48 GB
 # card has come free.
 #
+# TWO PARAMETERS THAT ARE NOT FREE CHOICES, and were wrong in the first version of this file.
+# The layer is 20, not the value used for the other model, and the dtype is bfloat16, not float32.
+# Gemma-2 soft-caps its logits and attention scores, so every artifact for this model was produced in
+# bfloat16 and anything else changes the hidden states. Running it in float32 does not crash; it
+# silently produces log-probabilities that disagree with the cached generation by about 0.1, which is
+# five times the driver's own alignment tolerance, and that is exactly what the first attempt did on
+# all three datasets it reached. The layer error would have been worse in a quieter way: it would have
+# written a background at the wrong layer, and only the downstream layer check would have caught it.
+#
 # THE UNMODIFIED COMPUTATION. This deliberately does NOT use the suffix-only logits path that was
 # added and gated alongside it. That gate FAILED: restricting the projection to the scored window
 # changes the entropy by up to 2.3e-05 on one model and 8.2e-06 on the other, because the saving
@@ -45,8 +54,11 @@ echo "live log: $LIVE"
 echo "commit: $(git rev-parse HEAD 2>/dev/null)"
 
 MODEL="google/gemma-2-9b"
-LAYER=21
-MAXMEM="0=10GiB,1=10GiB,2=10GiB,3=10GiB"
+LAYER=20
+# bfloat16 is forced by the model, not chosen: see the header. It also halves the weights to
+# about 18.5 GB, so four cards hold them at roughly 4.6 GB each with ample room for the forward.
+DTYPE=bf16
+MAXMEM="0=6GiB,1=6GiB,2=6GiB,3=6GiB"
 DEV=(--device-map auto --max-memory "$MAXMEM")
 
 echo "=== hybrid inputs, $MODEL, four cards === host=$(hostname) at $(date)"
@@ -61,14 +73,14 @@ for spec in "${SPECS[@]}"; do
   DS="${spec%%:*}"; RG="${spec#*:}"
   echo; echo "---- $DS (regime '${RG:-canonical}') ---- $(date)"
   python -u scripts/01n_token_entropy.py --model "$MODEL" --dataset "$DS" --ood ID \
-      --dtype fp32 --attn eager --prompt-regime "$RG" "${DEV[@]}" \
+      --dtype "$DTYPE" --attn eager --prompt-regime "$RG" "${DEV[@]}" \
       || { echo "!!! entropy FAILED for $DS"; STATUS=1; }
 done
 
 echo; echo "################ STAGE 2: C4 background ################ $(date)"
 python -u scripts/01m_background_c4.py --model "$MODEL" --layer "$LAYER" \
     --n 2000 --seed 1 --budget 384 --max-prompt-tokens 2048 \
-    --dtype fp32 --attn eager --verify-prefix 8 "${DEV[@]}" \
+    --dtype "$DTYPE" --attn eager --verify-prefix 8 "${DEV[@]}" \
     || { echo "!!! C4 background FAILED"; STATUS=1; }
 
 echo; echo "=== hybrid inputs done status=$STATUS at $(date) ==="
