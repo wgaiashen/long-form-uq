@@ -57,6 +57,9 @@ def main():
     ap.add_argument("--tol", type=float, default=2e-2,
                     help="absolute tolerance for the chosen-token logprob agreement gate")
     ap.add_argument("--limit", type=int, default=0, help="debug only: stop after N records")
+    ap.add_argument("--overwrite", action="store_true",
+                    help="replace an entropy cache that already exists. Off by default so a rerun "
+                         "resumes rather than repeating verified work.")
     ap.add_argument("--slim-logits", action="store_true",
                     help="ask the model for logits at only the last G+1 positions instead of all "
                          "P+G of them. Those last G+1 positions ARE the window this script uses, so "
@@ -106,6 +109,16 @@ def main():
             sys.exit("--max-memory asked for a split but every layer landed on one device; "
                      "the memory ceiling was too high or only one GPU is visible.")
 
+
+    # RESUME GUARD, mirroring the per-token extractor. Without it a job that runs out of walltime, or
+    # one that covers a different subset of datasets, redoes work that is already on disk. The cache
+    # is only ever written after the window gate passes, so a file being present means a verified
+    # file. --overwrite is required to replace one.
+    out_path = Path(cfg.cache_dir) / "entropy" / f"{key}.npz"
+    if out_path.exists() and not args.overwrite:
+        print(f"SKIP: entropy cache already exists at {out_path}\n"
+              f"  Pass --overwrite to replace it. Nothing recomputed.")
+        return
 
     ents, idxs, worst, n_cmp = [], [], 0.0, 0
     todo = records[:args.limit] if args.limit else records

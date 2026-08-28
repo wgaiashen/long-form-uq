@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb:ngpus=4:gpu_type=RTX6000
+#PBS -l walltime=48:00:00
+#PBS -N luq_hyb4_llama
+#PBS -j oe
+
+# The two inputs the published relative-distance baselines need, on four 24 GB cards instead of one
+# 48 GB card. Replaces the single-card version, which has been queued since 24 August while no 48 GB
+# card has come free.
+#
+# THE UNMODIFIED COMPUTATION. This deliberately does NOT use the suffix-only logits path that was
+# added and gated alongside it. That gate FAILED: restricting the projection to the scored window
+# changes the entropy by up to 2.3e-05 on one model and 8.2e-06 on the other, because the saving
+# comes from a differently shaped matrix multiplication and a different shape means a different
+# reduction order and different rounding. The mathematics is identical and the arithmetic is not, so
+# the two cannot both hold: the memory saving IS the shape change. The bar was exact equality, set
+# before the run, and it is not being relaxed after seeing the number. This job therefore computes
+# logits at every position exactly as the original does.
+#
+# WHY FOUR CARDS IS THE ANSWER INSTEAD. The same gate measured what the unmodified path actually
+# needs. On four cards at 2,491 tokens the peak was 13.61 GiB on the busiest device against a 23.46
+# GiB card, with weights of 8.59 GiB resident there. The largest source here is 5,866 tokens, which
+# raises the vocabulary projection from 2.55 GiB to about 6.0 GiB on the second model, giving a peak
+# near 17 GiB. That fits. The earlier failure was on THREE cards, where the weights alone left too
+# little room. No code change is needed, only a correctly sized allocation.
+#
+# THE LONGEST DATASET RUNS FIRST, deliberately. If the sizing above is wrong, that is worth finding
+# out in the first twenty minutes rather than after the other seven have run.
+#
+# RESUMABLE. The entropy driver now skips a dataset whose cache already exists, and it only ever
+# writes after its window gate passes, so a present file is a verified file. A job that runs out of
+# walltime, or one that fails on a single dataset, can be resubmitted without repeating work.
+#
+#   qsub pbs/hybrid_inputs_llama_4gpu.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+mkdir -p logs
+LIVE="logs/hybrid_inputs_llama4__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+LAYER=15
+MAXMEM="0=9GiB,1=9GiB,2=9GiB,3=9GiB"
+DEV=(--device-map auto --max-memory "$MAXMEM")
+
+echo "=== hybrid inputs, $MODEL, four cards === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
+
+STATUS=0
+SPECS=("xsum:" "cnn_dailymail:" "pubmed_qa:" "samsum:" "med_quad:cleanv2"
+       "asqa:asqa_rp12" "expertqa:expertqa_rp12" "factscore:factscore_rp12")
+
+echo; echo "################ STAGE 1: per-token predictive entropy ################ $(date)"
+for spec in "${SPECS[@]}"; do
+  DS="${spec%%:*}"; RG="${spec#*:}"
+  echo; echo "---- $DS (regime '${RG:-canonical}') ---- $(date)"
+  python -u scripts/01n_token_entropy.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --dtype fp32 --attn eager --prompt-regime "$RG" "${DEV[@]}" \
+      || { echo "!!! entropy FAILED for $DS"; STATUS=1; }
+done
+
+echo; echo "################ STAGE 2: C4 background ################ $(date)"
+python -u scripts/01m_background_c4.py --model "$MODEL" --layer "$LAYER" \
+    --n 2000 --seed 1 --budget 384 --max-prompt-tokens 2048 \
+    --dtype fp32 --attn eager --verify-prefix 8 "${DEV[@]}" \
+    || { echo "!!! C4 background FAILED"; STATUS=1; }
+
+echo; echo "=== hybrid inputs done status=$STATUS at $(date) ==="
+exit $STATUS
