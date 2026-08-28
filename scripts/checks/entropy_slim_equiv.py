@@ -149,8 +149,13 @@ def main():
                     print(f"  record len {len(r['prompt_token_ids']) + n}: "
                           f"entropy max|d| {dH:.3e}, chosen-logprob max|d| {dl:.3e}")
 
-    print(f"\nrecords {len(picked)} | entropy worst max|d| = {worst_H:.6e} | "
-          f"chosen-logprob worst max|d| = {worst_lp:.6e} | vectors differing: {n_bad}")
+    if args.slim_only:
+        # NEVER print a comparison figure here. Nothing was compared, and a zero would read exactly
+        # like a passing equivalence result to anyone reading the log later.
+        print(f"\nrecords {len(picked)} | NO COMPARISON MADE (capability arm, suffix path only)")
+    else:
+        print(f"\nrecords {len(picked)} | entropy worst max|d| = {worst_H:.6e} | "
+              f"chosen-logprob worst max|d| = {worst_lp:.6e} | vectors differing: {n_bad}")
     for slim in (False, True):
         tag = "suffix-only" if slim else "all positions"
         if peaks[slim]:
