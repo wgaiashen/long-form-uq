@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_rmd128
+#PBS -j oe
+
+# Relative-distance grid for the datasets generated at 128 tokens: pubmed_qa,cnn_dailymail,med_quad.
+# The background is sliced to 128 generated tokens so it matches their generation length.
+# Rationale, and why the run is partitioned by budget, is in pbs/_md_hybrids_rmd_body.sh.
+# CPU only: every input already exists.
+#
+#   qsub pbs/md_hybrids_rmd_bg128.pbs
+
+export LUQ_RMD_EVALS="pubmed_qa,cnn_dailymail,med_quad"
+export LUQ_RMD_BUDGET=128
+export LUQ_RMD_TAG=bg128
+
+source "$PBS_O_WORKDIR/pbs/_md_hybrids_rmd_body.sh"
