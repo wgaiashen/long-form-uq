@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_rmdg56
+#PBS -j oe
+
+# Relative-distance grid for google/gemma-2-9b, datasets generated at 56 tokens: xsum,samsum.
+# Layer 20 and the gemma background, which was generated at that layer. The budget groups are the
+# same as the other population because the budgets are properties of the datasets, not the model.
+# Rationale for partitioning by budget is in pbs/_md_hybrids_rmd_body.sh.
+# CPU only: every input already exists.
+#
+#   qsub pbs/md_hybrids_rmd_gemma_bg56.pbs
+
+export LUQ_RMD_MODEL="google/gemma-2-9b"
+export LUQ_RMD_LAYER=20
+export LUQ_RMD_SLUG="google_gemma-2-9b"
+export LUQ_RMD_EVALS="xsum,samsum"
+export LUQ_RMD_BUDGET=56
+export LUQ_RMD_TAG=gemma_bg56
+
+source "$PBS_O_WORKDIR/pbs/_md_hybrids_rmd_body.sh"

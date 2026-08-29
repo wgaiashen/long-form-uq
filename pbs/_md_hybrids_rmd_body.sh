@@ -36,10 +36,13 @@ LIVE="logs/md_hybrids_rmd_${LUQ_RMD_TAG}__${PBS_JOBID%%.*}.log"
 exec > >(tee -a "$LIVE") 2>&1
 echo "live log: $LIVE"
 
-MODEL="meta-llama/Meta-Llama-3.1-8B"
-LAYER=15
+# Defaults keep the existing wrappers byte-identical in behaviour; a wrapper for another population
+# sets these three before sourcing.
+MODEL="${LUQ_RMD_MODEL:-meta-llama/Meta-Llama-3.1-8B}"
+LAYER="${LUQ_RMD_LAYER:-15}"
+SLUG="${LUQ_RMD_SLUG:-meta-llama_Meta-Llama-3.1-8B}"
 export LUQ_REGIME="med_quad=cleanv2"
-BG="cache/background_c4/meta-llama_Meta-Llama-3.1-8B__L15__b384.npz"
+BG="cache/background_c4/${SLUG}__L${LAYER}__b384.npz"
 
 echo "=== relative-distance grid, $MODEL === host=$(hostname) at $(date)"
 echo "commit: $(git rev-parse HEAD 2>/dev/null)"
@@ -55,7 +58,7 @@ echo; echo "################ grid ################ $(date)"
 python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer "$LAYER" \
     --seeds 1,2,3 --evals "$LUQ_RMD_EVALS" \
     --background "$BG" --bg-budget "$LUQ_RMD_BUDGET" \
-    --out "results/hybrids/pdl_hybrids_rmd_bg${LUQ_RMD_BUDGET}__meta-llama_Meta-Llama-3.1-8B.csv" \
+    --out "results/hybrids/pdl_hybrids_rmd_bg${LUQ_RMD_BUDGET}__${SLUG}.csv" \
     || { echo "!!! grid FAILED"; exit 4; }
 
 echo; echo "=== done at $(date) ==="
