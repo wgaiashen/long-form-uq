@@ -1,0 +1,46 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=01:00:00
+#PBS -N luq_entloc
+#PBS -j oe
+
+# Locate where the teacher-forced log-probabilities diverge from the cached ones. Writes nothing.
+#
+# Four datasets, chosen so the comparison is informative rather than exhaustive:
+#   pubmed_qa   canonical  -- PASSES the alignment check at 1e-04. The control: if this one also
+#                             shows divergence at the first generated token, the diagnostic itself is
+#                             measuring something other than what it claims.
+#   samsum      canonical  -- fails MARGINALLY at 0.031, and fits neither the passing nor the grossly
+#                             failing group. Worth placing.
+#   med_quad    cleanv2    -- fails at 9.08, the worst case, and is the corrected-span dataset.
+#   asqa        asqa_rp12  -- fails at 3.60, a different namespace from med_quad, so a shared cause
+#                             shows up as a shared profile.
+#
+# The reading rule is fixed before the run: divergence at position 0 on the failing datasets and not
+# on the control means the stored prompt is not the prompt those generations were produced under,
+# because the first generated token's probability depends on the prompt and nothing else. Divergence
+# starting later means something about the continuation instead, and the profiles say where.
+#
+#   qsub pbs/entropy_window_locate.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+mkdir -p logs
+LIVE="logs/entropy_window_locate__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MM="0=17GiB,1=17GiB"
+for SPEC in "pubmed_qa:" "samsum:" "med_quad:cleanv2" "asqa:asqa_rp12"; do
+  DS="${SPEC%%:*}"; RG="${SPEC#*:}"
+  echo; echo "################ $DS (regime '${RG:-canonical}') ################"
+  python -u scripts/checks/entropy_window_locate.py --dataset "$DS" --prompt-regime "$RG" \
+      --n 8 --dtype fp32 --attn eager --device-map auto --max-memory "$MM" || true
+done
+
+echo; echo "=== done at $(date) ==="
