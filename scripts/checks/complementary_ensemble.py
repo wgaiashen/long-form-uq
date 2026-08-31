@@ -276,6 +276,9 @@ def boot_ci_mean(d, b=10000, seed=0):
 
 
 def main():
+    # Declared first: these rebind module-level defaults, and Python requires the
+    # declaration before any use within the function.
+    global MASTER_OVERRIDE, LONG, RUNGS
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help="population to analyse. Default is the Llama development population, so every "
@@ -301,6 +304,11 @@ def main():
                     help="import ensemble_ladder (slow: pulls in torch) and assert the local rankavg/"
                          "zavg are bit-identical to the shared ones. Run once, not every time.")
     args = ap.parse_args()
+    MASTER_OVERRIDE = args.master or None
+    if args.panel_evals:
+        LONG = [x.strip() for x in args.panel_evals.split(",") if x.strip()]
+    if args.panel_rungs:
+        RUNGS = [x.strip() for x in args.panel_rungs.split(",") if x.strip()]
 
     if args.verify_combiner:
         verify_combiner()
@@ -319,13 +327,6 @@ def main():
         ROOT / "results" / ("pdl_perex_ens" if args.model == DEFAULT_MODEL
                             else f"pdl_perex_ens_{slug}"))
     suffix = ("__excl-" + "-".join(excluded)) if excluded else ""
-    global MASTER_OVERRIDE, LONG, RUNGS
-    MASTER_OVERRIDE = args.master or None
-    if args.panel_evals:
-        LONG = [x.strip() for x in args.panel_evals.split(",") if x.strip()]
-    if args.panel_rungs:
-        RUNGS = [x.strip() for x in args.panel_rungs.split(",") if x.strip()]
-
     out_path = args.out or str(ROOT / "results" / f"complementary_ensemble__{slug}{suffix}.csv")
 
     print("=" * 104)
