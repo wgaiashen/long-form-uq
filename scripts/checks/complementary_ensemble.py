@@ -96,6 +96,10 @@ def verify_combiner():
 
 DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # n = 8 datasets. This is the unit of analysis.
+# Set from --master / --panel-evals / --panel-rungs. The defaults reproduce the previous behaviour
+# exactly, so every population already analysed under this driver is unaffected.
+MASTER_OVERRIDE = None
+
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 # REPORT / Hidden Failures rung order. LOO comes before SameTask. Do not silently reorder.
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
@@ -148,7 +152,10 @@ def load_master(model_slug):
     Returns raw-component-keyed entries so the caller never has to know which naming a master uses.
     Raises if the file is missing: a gate that silently finds nothing to compare against is not a gate.
     """
-    path = ROOT / "results" / f"pdl_master__{model_slug}.csv"
+    path = (Path(MASTER_OVERRIDE) if MASTER_OVERRIDE
+            else ROOT / "results" / f"pdl_master__{model_slug}.csv")
+    if not path.is_absolute():
+        path = ROOT / path
     if not path.exists():
         raise SystemExit(f"GATE: canonical master not found at {path}. Refusing to run without the "
                          "reference the continuity gate exists to check against.")
@@ -279,6 +286,16 @@ def main():
     ap.add_argument("--exclude", default="",
                     help="comma-separated datasets to DROP, for a sensitivity arm (e.g. expertqa). "
                          "The excluded run is a SENSITIVITY and never replaces the full-grid primary.")
+    ap.add_argument("--master", default="",
+                    help="scored ladder the continuity gate compares against. Default is the full "
+                         "grid master for this model slug. A population evaluated on the reduced "
+                         "panel has a differently named ladder and must name it here.")
+    ap.add_argument("--panel-evals", default="",
+                    help="comma list restricting the expected evaluation datasets. Default is the "
+                         "full eight. A reduced panel must declare its six, or complete coverage "
+                         "would be reported as an incomplete full grid.")
+    ap.add_argument("--panel-rungs", default="",
+                    help="comma list restricting the expected settings. Default is all five.")
     ap.add_argument("--out", default=None)
     ap.add_argument("--verify-combiner", action="store_true",
                     help="import ensemble_ladder (slow: pulls in torch) and assert the local rankavg/"
@@ -302,18 +319,26 @@ def main():
         ROOT / "results" / ("pdl_perex_ens" if args.model == DEFAULT_MODEL
                             else f"pdl_perex_ens_{slug}"))
     suffix = ("__excl-" + "-".join(excluded)) if excluded else ""
+    global MASTER_OVERRIDE, LONG, RUNGS
+    MASTER_OVERRIDE = args.master or None
+    if args.panel_evals:
+        LONG = [x.strip() for x in args.panel_evals.split(",") if x.strip()]
+    if args.panel_rungs:
+        RUNGS = [x.strip() for x in args.panel_rungs.split(",") if x.strip()]
+
     out_path = args.out or str(ROOT / "results" / f"complementary_ensemble__{slug}{suffix}.csv")
 
     print("=" * 104)
     print("CAWSA + SAPLMA: is the combination better than SAPLMA far OOD without losing ID?")
-    print(f"Population: ProbeDriftLong long grid, {len(LONG)} evals x 5 rungs, 3 seeds, {args.model}.")
+    print(f"Population: ProbeDriftLong long grid, {len(LONG)} evals x {len(RUNGS)} rungs, "
+          f"3 seeds, {args.model}.")
     if excluded:
         print(f"SENSITIVITY ARM -- EXCLUDED: {excluded}. This never replaces the full-grid primary.")
     print(f"Source: {perex_dir}   (per-example sidecars; no training, no GPU)")
     print("=" * 104)
 
     cells, missing = load_cells(perex_dir, slug)
-    print(f"\nCOVERAGE: {len(cells)}/40 cells")
+    print(f"\nCOVERAGE: {len(cells)}/{len(LONG) * len(RUNGS)} cells")
     if missing:
         print(f"MISSING ({len(missing)}): {', '.join(missing)}")
         print("   Reported as INCOMPLETE. A partial grid is never presented as the whole one.")
