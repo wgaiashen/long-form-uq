@@ -316,7 +316,6 @@ def main():
     # model-derived paths; nothing about the Llama invocation changes
     from luq import cache as _cache
     slug = _cache._slug(args.model)
-    global LONG
     excluded = [d for d in args.exclude.split(",") if d]
     if excluded:
         missing = [d for d in excluded if d not in LONG]
