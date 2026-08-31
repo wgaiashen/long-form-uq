@@ -1,0 +1,49 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=01:00:00
+#PBS -N luq_enttop1
+#PBS -j oe
+
+# Does the cached log-probability belong to the EMITTED token or to the model's top-ranked token?
+# Writes nothing.
+#
+# WHAT THE PREVIOUS DIAGNOSTIC ESTABLISHED. On the corrected-span dataset the first generated token
+# agrees to about 1e-05, most positions agree exactly, and isolated positions disagree by 0.2 to 9.
+# On the other failing dataset the same scattered large disagreements appear on top of a small
+# offset of 0.02 to 0.06 at the first position. A repetition penalty was ruled out by measurement:
+# the diverging tokens are repeats less often than random positions are.
+#
+# THE HYPOTHESIS THIS TESTS, fixed before the run. Scattered large disagreements on a background of
+# exact agreement are what a record would look like if `token_logprobs` sometimes holds the
+# log-probability of the token the model ranked first, while `gen_token_ids` holds a different token
+# that was actually emitted. Every position where the emitted token WAS the top choice would then
+# agree exactly, and only the others would diverge.
+#
+# THE READING RULE, also fixed in advance. At each diverging position the cached value is compared
+# against both recomputed quantities. If it matches the top-ranked token's value and not the emitted
+# token's, the records store the wrong quantity. If it matches neither, the hypothesis fails and the
+# cause is elsewhere. The fraction of positions where the emitted token was the top choice is
+# reported either way, because a population generated greedily should be near 100 percent and that is
+# itself diagnostic.
+#
+#   qsub pbs/entropy_window_top1.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+mkdir -p logs
+LIVE="logs/entropy_window_top1__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"; echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MM="0=17GiB,1=17GiB"
+for SPEC in "med_quad:cleanv2" "asqa:asqa_rp12" "pubmed_qa:"; do
+  DS="${SPEC%%:*}"; RG="${SPEC#*:}"
+  echo; echo "################ $DS (regime '${RG:-canonical}') ################"
+  python -u scripts/checks/entropy_window_top1.py --dataset "$DS" --prompt-regime "$RG" \
+      --n 6 --dtype fp32 --attn eager --device-map auto --max-memory "$MM" || true
+done
+echo; echo "=== done at $(date) ==="
