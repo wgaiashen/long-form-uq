@@ -12,6 +12,7 @@ msp_min and my k=all PRR must equal published perplexity, on the SAME eval popul
 table uses (xl_rungs.eval_split, the driver's own test split). If an endpoint misses §B.2 the
 sweep is on the wrong population and nothing else is trustworthy.
 """
+import argparse
 import os
 import sys, csv as _csv
 from pathlib import Path
@@ -44,9 +45,40 @@ PUBLISHED = {
     "samsum":        {"min": -0.0243, "ppl": 0.1128},
     "expertqa":      {"min": 0.2054,  "ppl": 0.0393},
     "asqa":          {"min": 0.2498,  "ppl": 0.3161},
+    # Added 2026-09-01 so the sweep can cover the full eight-dataset long-form panel. FActScore was
+    # absent from the historical run, which is why the original result is a seven-dataset one; the
+    # two panels are labelled and must never be averaged together. Values read from the matched
+    # setting of results/pdl_master__meta-llama_Meta-Llama-3.1-8B.csv, where they are identical to
+    # the corrected-span master because this dataset carries no span correction.
+    "factscore":     {"min": 0.4283,  "ppl": 0.3260},
 }
 K_ABS = [1, 2, 3, 5, 10, 25, 50, 100]      # + "all"
 FRACS = [0.01, 0.02, 0.05, 0.10, 0.25, 0.50, 1.00]
+# REGIME-AWARE GATE REFERENCE. PUBLISHED above is the ORIGINAL-span reference. A dataset redirected
+# to a corrected-span cache root (LUQ_REGIME="med_quad=cleanv2") legitimately has different floors,
+# so checking it against the original values would be a false failure. Only redirected datasets get
+# the corrected reference; every dataset still reading its original cache is still checked against
+# PUBLISHED, and that residual check is the invariance test for the unchanged datasets. Values are
+# the matched-setting floor cells of results/cleanv2/pdl_cleanv2_master__meta-llama_Meta-Llama-3.1-8B.csv.
+PUBLISHED_CORRECTED_SPAN = {
+    "med_quad": {"min": -0.0246, "ppl": +0.1118},
+}
+
+
+def published_for(dataset):
+    """Expected floors for `dataset`, accounting for an active cache-root override."""
+    active = dict(item.split("=", 1) for item in os.environ.get("LUQ_REGIME", "").split(",")
+                  if "=" in item)
+    if active.get(dataset, "").strip() == "cleanv2":
+        if dataset not in PUBLISHED_CORRECTED_SPAN:
+            raise SystemExit(
+                f"{dataset} is redirected to the corrected-span cache but no corrected-span floor "
+                "reference is registered for it. Refusing to gate corrected data against the "
+                "original reference, and refusing to skip the check.")
+        return PUBLISHED_CORRECTED_SPAN[dataset]
+    return PUBLISHED[dataset]
+
+
 GATE_EXT_TOL = 0.01      # my floor vs published §B.2 (CSV is rounded to 4dp; seed-stable so should be ~exact)
 GATE_INT_TOL = 1e-9      # k=1 vs msp_min ranking, k=all vs perplexity (identical by construction)
 
@@ -75,7 +107,26 @@ def score_lowk(lp, k):
 
 
 def main():
-    out_rows = []          # (dataset, sweep, k, prr, n_eval, med_len)
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--datasets", default=",".join(DATASETS),
+                    help="comma list to sweep. The default is the historical panel; pass an "
+                         "explicit list to run a different coverage panel, and label it with --panel.")
+    ap.add_argument("--panel", default="historical",
+                    help="label written into every row, so two coverage panels can share one file "
+                         "without their macros ever being averaged together by accident.")
+    ap.add_argument("--out", default=None,
+                    help="output CSV path. Give one when running under a cache-root override, so a "
+                         "corrected-span table can never overwrite the original-span one.")
+    ap.add_argument("--append", action="store_true",
+                    help="append to --out instead of replacing it, for writing a second panel.")
+    args = ap.parse_args()
+    datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
+    unknown = [d for d in datasets if d not in PUBLISHED and d not in PUBLISHED_CORRECTED_SPAN]
+    if unknown:
+        raise SystemExit(f"no floor reference registered for {unknown}; the endpoint gate cannot run")
+
+    out_rows = []          # (panel, dataset, sweep, k, prr, n_eval, med_len)
     curves = {}            # dataset -> (xs, prrs, med_len, prr_k1, prr_kall)
     feats = {}             # dataset -> label-free features + oracle-k
     gate_all_ok = True
@@ -83,7 +134,7 @@ def main():
     print("=" * 78)
     print("ENDPOINT GATE (reproduce §B.2 BEFORE reading the curve)")
     print("=" * 78)
-    for d in DATASETS:
+    for d in datasets:
         records, split, y, lf = load_light(d)
         _, te = eval_split(split)                       # default seed=0 -> matches probedriftlong exactly
         yte = y[te]
@@ -98,7 +149,7 @@ def main():
         v_k1 = np.array([score_lowk(l, 1) for l in lps])
         v_kall = np.array([score_lowk(l, 10**9) for l in lps])
         prr_k1 = results.prr(yte, v_k1); prr_kall = results.prr(yte, v_kall)
-        pub = PUBLISHED[d]
+        pub = published_for(d)
         d_ext_min = abs(prr_min - pub["min"]); d_ext_ppl = abs(prr_ppl - pub["ppl"])
         d_int_1 = abs(prr_k1 - prr_min); d_int_all = abs(prr_kall - prr_ppl)
         ok = (d_ext_min < GATE_EXT_TOL and d_ext_ppl < GATE_EXT_TOL
@@ -148,20 +199,27 @@ def main():
           else "FAIL -- population wrong, DO NOT read the curve")
 
     # ---- write the sweep CSV ----
-    outdir = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral")) + "/luq_overnight_results")
+    if args.out:
+        csv_path = Path(args.out)
+        outdir = csv_path.parent
+    else:
+        outdir = Path(os.environ.get("EPHEMERAL", str(Path.home() / "ephemeral"))
+                      + "/luq_overnight_results")
+        csv_path = outdir / "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv"
     outdir.mkdir(parents=True, exist_ok=True)
-    csv_path = outdir / "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.csv"
-    with open(csv_path, "w", newline="") as fh:
+    append = args.append and csv_path.exists()
+    with open(csv_path, "a" if append else "w", newline="") as fh:
         w = _csv.writer(fh)
-        w.writerow(["dataset", "sweep", "k", "prr", "n_eval", "med_len"])
+        if not append:
+            w.writerow(["panel", "dataset", "sweep", "k", "prr", "n_eval", "med_len"])
         for r in out_rows:
-            w.writerow(r)
+            w.writerow([args.panel] + list(r))
     print(f"\nwrote {csv_path}  ({len(out_rows)} rows)")
 
     # ---- figure: PRR vs k, one curve per dataset, log-x, k=1 + k=all marked ----
     fig, ax = plt.subplots(figsize=(9.5, 6.2))
     cmap = plt.get_cmap("tab10")
-    for j, d in enumerate(DATASETS):
+    for j, d in enumerate(datasets):
         xs, prrs, med_len, prr_k1, prr_kall = curves[d]
         xnum = [x for x in xs if x != "all"]
         pnum = prrs[:len(xnum)]
@@ -177,7 +235,7 @@ def main():
     ax.legend(fontsize=7.5, ncol=2, loc="best")
     ax.grid(True, which="both", alpha=0.25)
     fig.tight_layout()
-    png = outdir / "topk_floor_sweep__meta-llama_Meta-Llama-3.1-8B.png"
+    png = csv_path.with_suffix(".png")
     fig.savefig(png, dpi=130); print(f"wrote {png}")
 
     # ---- oracle-k table (DIAGNOSTIC -- flagged, never a bar) ----
@@ -185,7 +243,7 @@ def main():
     print("ORACLE-k per dataset (DIAGNOSTIC ONLY -- label-selected, NOT a baseline the methods beat)")
     print("=" * 78)
     print(f"{'dataset':14s}{'best_k':>8s}{'best_prr':>10s}{'msp_min':>10s}{'ppl':>9s}{'gain_vs_best_pub':>18s}")
-    for d in DATASETS:
+    for d in datasets:
         f = feats[d]
         best_pub = max(f["prr_min"], f["prr_ppl"])
         print(f"{d:14s}{str(f['best_k']):>8s}{f['best_prr']:>+10.4f}{f['prr_min']:>+10.4f}"

@@ -75,6 +75,22 @@ MASTER = {
                          {"min": "floor_min", "ppl": "floor_ppl"}),
 }
 
+# REGIME-AWARE GATE REFERENCE. MASTER above is the ORIGINAL-span reference. When a dataset is
+# redirected to a corrected-span cache root (LUQ_REGIME="med_quad=cleanv2"), its floors legitimately
+# differ, and checking them against the original master would be a false failure -- the situation
+# sharpening_family.py already handles with PUBLISHED_CLEAN_MEDQUAD.
+#
+# THE GATE IS NOT WEAKENED, AND DOING IT PER DATASET IS THE POINT. Only redirected datasets get the
+# corrected reference; every dataset still reading its original cache is still checked against the
+# original master. That residual check IS the invariance test: a dataset whose population did not
+# change must still reproduce the number it always produced.
+CORRECTED_MASTER = {
+    "meta-llama/Meta-Llama-3.1-8B": (
+        ROOT / "results" / "cleanv2" / "pdl_cleanv2_master__meta-llama_Meta-Llama-3.1-8B.csv",
+        {"min": "floor_min", "ppl": "floor_ppl"}),
+}
+CORRECTED_REGIMES = {"cleanv2"}
+
 
 def load_test_records(model, dataset):
     """TEST-row records + labels, with lehmer_qwen.load_light's traps (see module docstring)."""
@@ -136,22 +152,42 @@ def features(nll, gen_text, dataset):
     }
 
 
-def load_master_floors(model):
-    """(dataset -> {min: prr, ppl: prr}) from the published master, for the G-master gate."""
-    path, nm = MASTER[model]
+def _read_master_floors(path, nm, prr_col, seed_regime=None):
+    """(dataset -> {min: prr, ppl: prr}) from one master CSV's matched-setting rows."""
     out = {}
     for r in csv.DictReader(open(path)):
-        if model.startswith("meta-llama"):
-            if r.get("seed_regime") != "3seed" or r["rung"] != "ID":
-                continue
-            method, ev, prr = r["method"], r["eval"], r["prr"]
-        else:
-            if r["rung"] != "ID":
-                continue
-            method, ev, prr = r["method"], r["eval"], r["prr_mean"]
+        if r["rung"] != "ID":
+            continue
+        if seed_regime is not None and r.get("seed_regime") != seed_regime:
+            continue
         for k, name in nm.items():
-            if method == name:
-                out.setdefault(ev, {})[k] = float(prr)
+            if r["method"] == name:
+                out.setdefault(r["eval"], {})[k] = float(r[prr_col])
+    return out
+
+
+def load_master_floors(model):
+    """Gate reference per dataset: original master, overlaid by the corrected one where redirected."""
+    path, nm = MASTER[model]
+    if model.startswith("meta-llama"):
+        out = _read_master_floors(path, nm, "prr", seed_regime="3seed")
+    else:
+        out = _read_master_floors(path, nm, "prr_mean")
+
+    redirected = [d for d, rg in PROMPT_REGIME.items() if rg in CORRECTED_REGIMES]
+    if redirected:
+        if model not in CORRECTED_MASTER:
+            raise SystemExit(f"{model} has datasets redirected to a corrected-span cache "
+                             f"({redirected}) but no corrected-span master is registered. Refusing "
+                             "to gate corrected data against the original reference.")
+        cpath, cnm = CORRECTED_MASTER[model]
+        corrected = _read_master_floors(cpath, cnm, "prr_mean")
+        for d in redirected:
+            if d not in corrected:
+                raise SystemExit(f"{d} is redirected to a corrected-span cache but the corrected "
+                                 f"master {cpath.name} has no matched-setting floors for it.")
+            out[d] = corrected[d]
+            print(f"[gate reference] {d}: corrected-span master {cpath.name}")
     return out
 
 
@@ -159,9 +195,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default=MODEL_DEFAULT)
+    ap.add_argument("--out", default=None,
+                    help="output CSV path. Give one when running under a cache-root override, so a "
+                         "corrected-span table can never overwrite the original-span one.")
     args = ap.parse_args()
     slug = cache._slug(args.model)
-    out_csv = ROOT / "results" / "analysis" / f"aggregation_regime_rows__{slug}.csv"
+    out_csv = (Path(args.out) if args.out
+               else ROOT / "results" / "analysis" / f"aggregation_regime_rows__{slug}.csv")
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     master_floors = load_master_floors(args.model)

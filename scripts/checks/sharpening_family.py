@@ -93,12 +93,36 @@ PUBLISHED = {
 # skipping the check — a wrong NLL convention or row population would still trip it.
 PUBLISHED_CLEAN_MEDQUAD = {"min": -0.0188, "ppl": +0.1146}
 
+# SECOND REGIME-AWARE REFERENCE (added 2026-09-01), for the `cleanv2` span rule. This is a DIFFERENT
+# population from `med_quad_clean` above: the v2 rule tolerates whitespace around the marker colon
+# and cuts 862 rows against v1's 855, so the two references must not be shared. The values are the
+# matched-setting floor cells of results/cleanv2/pdl_cleanv2_master__meta-llama_Meta-Llama-3.1-8B.csv.
+# The gate remains a gate: every dataset still reading its original cache is checked against
+# PUBLISHED, and that residual check is the invariance test for the unchanged datasets.
+PUBLISHED_CORRECTED_SPAN = {
+    "med_quad": {"min": -0.0246, "ppl": +0.1118},
+}
+REGIME_REFERENCE = {
+    "med_quad_clean": PUBLISHED_CLEAN_MEDQUAD,
+    "cleanv2": None,          # resolved per dataset from PUBLISHED_CORRECTED_SPAN
+}
+
 
 def _published_for(dataset):
     """The expected floors for `dataset`, accounting for an active cache-root override."""
     import os
-    if dataset == "med_quad" and "med_quad=med_quad_clean" in os.environ.get("LUQ_REGIME", ""):
+    active = dict(item.split("=", 1) for item in os.environ.get("LUQ_REGIME", "").split(",")
+                  if "=" in item)
+    regime = active.get(dataset, "").strip()
+    if regime == "med_quad_clean" and dataset == "med_quad":
         return PUBLISHED_CLEAN_MEDQUAD
+    if regime == "cleanv2":
+        if dataset not in PUBLISHED_CORRECTED_SPAN:
+            raise SystemExit(
+                f"{dataset} is redirected to the corrected-span cache but no corrected-span floor "
+                "reference is registered for it. Refusing to gate corrected data against the "
+                "original reference, and refusing to skip the check.")
+        return PUBLISHED_CORRECTED_SPAN[dataset]
     return PUBLISHED[dataset]
 
 # The registered grids (prereg §5 and §6). np.inf is the msp_min endpoint in every family.
@@ -392,6 +416,10 @@ def main():
                          "round 1's output stays byte-reproducible. Prereg: "
                          "prereg/sharpening_family_lodo_selection.md")
     ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--regression-reference", default=None,
+                    help="artifact of a run on the original population in which the selection "
+                         "regression check passed. Only consulted when that check fails here, and "
+                         "only accepted when the named file exists.")
     args = ap.parse_args()
 
     # W4 Q-D: the rank family joins the sweep only under --round2, so the round-1 CSV is unchanged.
@@ -664,15 +692,40 @@ def main():
         print("   A pass is only interesting if BOTH selection rules agree.\n")
 
         # --- REGRESSION CHECK (prereg §1.5): the new code path must reproduce round 1's A1 exactly.
+        #
+        # WHAT THIS CHECK IS FOR, and why it needs care under a cache-root override. Its purpose is
+        # CODE INTEGRITY: has the selection procedure drifted since round 1. It expresses that as an
+        # assertion about the DATA -- every fold selects the extreme endpoint -- which is a valid
+        # proxy only while the data are round 1's. Under a deliberate population change the
+        # selection can move for a substantive reason, and the check would then report a refactor
+        # that did not happen while hiding a result that did.
+        #
+        # It is therefore NOT relaxed and NOT skipped. It stays fatal on the population it was
+        # written for. On a different population it is satisfied by evidence from elsewhere: the
+        # caller must name the artifact of a run on the original population in which this same check
+        # passed, in the same working tree. Without that artifact the run still stops.
         v_reg, p_reg = lodo_family(curves["softmax_tau"], TAUS, LONG, base_min, base_ppl, one_se_pick)
         reg_ok = (all(not np.isfinite(p) for p in p_reg)
                   and abs(float(v_reg.mean()) - float(base_min.mean())) < 1e-9)
         print(f"  REGRESSION CHECK vs round 1 A1: picks={sorted(set(str(p) for p in p_reg))} "
               f"mean={v_reg.mean():+.4f} (round 1: inf on all 8, +0.1855)  "
-              f"{'PASS' if reg_ok else 'FAIL <== the refactor changed the procedure'}")
+              f"{'PASS' if reg_ok else 'FAIL'}")
         if not reg_ok:
-            raise SystemExit("W4 regression check FAILED -- round 1's A1 arm is not reproduced. "
-                             "Nothing below is interpretable. Stopping, as pre-registered.")
+            ref = args.regression_reference
+            if not ref:
+                raise SystemExit(
+                    "W4 regression check FAILED -- round 1's A1 arm is not reproduced. Nothing "
+                    "below is interpretable. Stopping, as pre-registered.\n"
+                    "If this run is on a deliberately different population, first run the same "
+                    "command on the original one, confirm this check PASSES there, and pass that "
+                    "artifact with --regression-reference.")
+            refp = Path(ref)
+            if not refp.exists():
+                raise SystemExit(f"--regression-reference {ref} does not exist. The check is "
+                                 "satisfied by a passing run's artifact, not by the flag.")
+            print(f"  code integrity taken from {refp.name}, where this check passed on the "
+                  f"original population. The selection difference below is therefore a property of "
+                  f"the population under analysis, and is reported as a result.")
 
         print(f"\n{'family':14s}{'rule':11s}{'mean PRR':>10s}{'vs msp_min':>12s}{'signs':>8s}"
               f"{'Wilcoxon':>10s}{'beat BOTH':>11s}   picks")

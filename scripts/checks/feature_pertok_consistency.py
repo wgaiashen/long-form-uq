@@ -42,10 +42,30 @@ def check(dataset, regime, layer=15, sample=60, full=False, model=DEFAULT_MODEL)
     ptp = cfg.cache_dir / "pertok" / f"{cache._slug(model)}__{dataset}__ID__L{layer}.npz"
     if not ptp.exists():
         return dataset, None, "no pertok cache"
+    # TWO SHAPES OF FEATURE PLANE EXIST. An extract run stores every layer, (n, n_layers, hidden).
+    # A plane rebuilt by re-pooling one per-token layer stores only that layer, (n, 1, hidden), and
+    # names it in a `layer` field. Indexing the second by layer number raises; indexing it by 0
+    # without reading that field would compare the window mean against whatever layer is stored and
+    # could report agreement between two different layers. So the field is read and asserted.
+    fpath = cfg.cache_dir / "features" / f"{key}__saplma.npz"
+    if not fpath.exists():
+        return dataset, None, "no feature cache"
     try:
-        feats = cache.load_features(cfg.cache_dir, key, "saplma")     # (n, n_layers, hidden)
+        with np.load(fpath) as z:
+            feats = z["feats"]
+            stored_layer = int(z["layer"]) if "layer" in z.files else None
     except Exception as e:
         return dataset, None, f"no feature cache ({e})"
+    if stored_layer is not None:
+        if feats.shape[1] != 1:
+            return dataset, False, (f"cache names a single layer ({stored_layer}) but holds "
+                                    f"{feats.shape[1]}; self-inconsistent")
+        if stored_layer != layer:
+            return dataset, False, (f"cache holds layer {stored_layer}, checking layer {layer}; "
+                                    "refusing to compare two different layers")
+        feat_col = 0
+    else:
+        feat_col = layer
     pt = np.load(ptp, allow_pickle=True, mmap_mode="r")
     states = pt["states"]
     n = len(states)
@@ -53,7 +73,7 @@ def check(dataset, regime, layer=15, sample=60, full=False, model=DEFAULT_MODEL)
     deltas = []
     for i in idx:
         wm = np.asarray(states[i], np.float32).mean(0)               # teacher-forced pertok window-mean
-        deltas.append(np.abs(wm - feats[i, layer, :]).max())
+        deltas.append(np.abs(wm - feats[i, feat_col, :]).max())
     d = np.array(deltas)
     ok = bool(d.max() < TOL)     # Python bool, NOT numpy bool_ (else `ok is False` never matches in main())
     return dataset, ok, f"max|Δ|={d.max():.2e} mean|Δ|={d.mean():.2e} (n={len(idx)}{'/full' if full else ''})"

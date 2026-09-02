@@ -23,6 +23,7 @@ Verifies, per response, over the content-token set C used by wMSP (n = |C|):
 and quantifies mu_C (content-token mean NLL) against the canonical all-token mean NLL.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -50,13 +51,37 @@ MODEL = "meta-llama/Meta-Llama-3.1-8B"
 SLUG = cache._slug(MODEL)
 LONG = ["pubmed_qa", "med_quad", "asqa", "xsum", "cnn_dailymail", "samsum", "expertqa", "factscore"]
 VIZ = ROOT / "cache" / "viz"
+
+
+# WHERE THE PERSISTED PRODUCTION WEIGHTS ARE READ FROM, and why it is overridable.
+#
+# A run on a corrected population must not read the original population's weights for the dataset
+# that changed, and must not overwrite them either: the two are the paired arms of one comparison,
+# and losing either destroys the control. LUQ_VIZ_DIR names a directory holding a freshly dumped
+# file for the corrected dataset alongside links to the unchanged ones, whose matched-setting cells
+# train only on themselves and are therefore controls.
+#
+# The override must name a directory that ALREADY EXISTS. A mistyped path would otherwise report
+# every dataset as missing weights, which reads as "not measured" rather than as a wrong path.
+_viz_env = os.environ.get("LUQ_VIZ_DIR", "").strip()
+if _viz_env:
+    VIZ_DIR = Path(_viz_env)
+    if not VIZ_DIR.is_dir():
+        raise SystemExit(f"LUQ_VIZ_DIR={_viz_env!r} is not an existing directory. Create it "
+                         "deliberately, or unset the variable to use the default weight directory.")
+    print(f"[LUQ_VIZ_DIR] reading persisted weights from {VIZ_DIR}", flush=True)
+else:
+    VIZ_DIR = VIZ
+
+# Output tag, so a second population's report cannot overwrite the first's.
+OUT_TAG = os.environ.get("LUQ_OUT_TAG", "").strip()
 ARMS = {"wMSP_pairwise": "lambda=0", "wMSP_shrink10": "lambda=10"}
 
 rows, worst = [], {}
 print(f"{'dataset':14s}{'arm':11s}{'n_ex':>6s}{'max|sumw-n|':>13s}{'max|sum d|':>12s}"
       f"{'max|U-(mu+C)|':>15s}{'CS viol':>9s}")
 for d in LONG:
-    p = VIZ / f"{SLUG}__{d}__ID__wmsp_weights.npz"
+    p = VIZ_DIR / f"{SLUG}__{d}__ID__wmsp_weights.npz"
     if not p.exists():
         print(f"{d:14s} MISSING {p.name}")
         continue
@@ -108,7 +133,7 @@ for d in LONG:
 
 OUT = ROOT / "results" / "analysis"
 OUT.mkdir(parents=True, exist_ok=True)
-json.dump(rows, open(OUT / f"wmsp_decomp__{SLUG}.json", "w"))
+json.dump(rows, open(OUT / f"wmsp_decomp{OUT_TAG}__{SLUG}.json", "w"))
 
 # ---- mu_C (content-token mean NLL) vs the canonical all-token mean NLL -------------------------
 print("\nANCHOR CHECK — content-token mean NLL vs canonical all-token mean NLL (per-response)")

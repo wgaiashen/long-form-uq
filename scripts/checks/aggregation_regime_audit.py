@@ -72,10 +72,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default=MODEL_DEFAULT)
+    ap.add_argument("--rows", default=None, help="rows table to audit (default: the original-span one)")
+    ap.add_argument("--out", default=None,
+                    help="summary CSV path. Give one alongside --rows so a corrected-span summary "
+                         "can never overwrite the original-span one.")
     args = ap.parse_args()
     slug = cache._slug(args.model)
-    rows_csv = ROOT / "results" / "analysis" / f"aggregation_regime_rows__{slug}.csv"
-    out_csv = ROOT / "results" / "analysis" / f"aggregation_regime_summary__{slug}.csv"
+    rows_csv = (Path(args.rows) if args.rows
+                else ROOT / "results" / "analysis" / f"aggregation_regime_rows__{slug}.csv")
+    out_csv = (Path(args.out) if args.out
+               else ROOT / "results" / "analysis" / f"aggregation_regime_summary__{slug}.csv")
     df = pd.read_csv(rows_csv)
     missing = [d for d in LONG if d not in set(df["eval"])]
     if missing:

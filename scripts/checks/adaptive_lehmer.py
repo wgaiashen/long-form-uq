@@ -91,8 +91,27 @@ def load_dataset(d):
     key = cache.run_key(MODEL, d, "ID")
     records = cache.load_records(cfg.cache_dir, key)
     n_orig = len(records)
-    arr = cache.load_features(cfg.cache_dir, key, "saplma")
-    feats = np.ascontiguousarray(arr[:, LAYER, :], dtype=np.float32); del arr
+    # TWO SHAPES OF POOLED FEATURE PLANE EXIST, AND PICKING THE WRONG AXIS IS SILENT.
+    # The original caches hold every layer, (n, n_layers, hidden), and are indexed by layer number.
+    # A cache rebuilt by re-pooling a single per-token layer holds only that layer, (n, 1, hidden),
+    # and records WHICH layer in a `layer` field beside the array. Indexing the second by layer
+    # number raises; indexing it by 0 without checking that field would read whatever layer happens
+    # to be stored and return a perfectly plausible number. So the field is read and asserted.
+    fpath = Path(cfg.cache_dir) / "features" / f"{key}__saplma.npz"
+    with np.load(fpath) as z:
+        arr = z["feats"]
+        stored_layer = int(z["layer"]) if "layer" in z.files else None
+        if stored_layer is not None:
+            if arr.shape[1] != 1:
+                raise SystemExit(f"FATAL {d}: {fpath.name} names a single layer ({stored_layer}) but "
+                                 f"holds {arr.shape[1]} of them; the cache is self-inconsistent.")
+            if stored_layer != LAYER:
+                raise SystemExit(f"FATAL {d}: {fpath.name} holds layer {stored_layer}, this analysis "
+                                 f"uses layer {LAYER}. Refusing to read a different layer.")
+            feats = np.ascontiguousarray(arr[:, 0, :], dtype=np.float32)
+        else:
+            feats = np.ascontiguousarray(arr[:, LAYER, :], dtype=np.float32)
+    del arr
     if len(feats) != n_orig:
         raise SystemExit(f"FATAL {d}: feature cache {len(feats)} rows vs {n_orig} records")
     lf = label_of(d)
@@ -178,12 +197,18 @@ def main():
     ap.add_argument("--smoke", action="store_true", help="integrity only; no PRR printed/saved")
     ap.add_argument("--eval", default=None, help="restrict to one eval dataset")
     ap.add_argument("--seeds", default=None, help="comma list override (default 1,2,3)")
+    ap.add_argument("--out", default=None,
+                    help="output CSV path; the diagnostic file follows its stem.")
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")] if args.seeds else SEEDS
     evals = [args.eval] if args.eval else LONG
     sha, carve = git_sha(), "legacy"
-    out = ROOT / "results" / f"adaptive_lehmer__{cache._slug(MODEL)}.csv"
-    diag_out = ROOT / "results" / f"adaptive_lehmer__{cache._slug(MODEL)}__diag.csv"
+    # --out exists so a run under a cache-root override lands in its own namespace. Without it a
+    # corrected-span run would overwrite the original-span table, and the two are the paired arms of
+    # the same comparison -- losing one destroys the control.
+    out = (Path(args.out) if args.out
+           else ROOT / "results" / f"adaptive_lehmer__{cache._slug(MODEL)}.csv")
+    diag_out = out.with_name(out.stem + "__diag" + out.suffix)
 
     print("=" * 100)
     print(f"W8 ADAPTIVE LEHMER  model={MODEL} layer={LAYER} beta_max={BETA_MAX} seeds={seeds} "

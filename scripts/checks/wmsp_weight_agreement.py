@@ -89,9 +89,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default=MODEL_DEFAULT)
+    ap.add_argument("--out", default=None,
+                    help="output CSV path. Give one when running under a cache-root override, so the "
+                         "two population arms of a paired comparison cannot overwrite each other.")
     args = ap.parse_args()
     slug = cache._slug(args.model)
-    out_csv = ROOT / "results" / "analysis" / f"wmsp_weight_agreement__{slug}.csv"
+    out_csv = (Path(args.out) if args.out
+               else ROOT / "results" / "analysis" / f"wmsp_weight_agreement__{slug}.csv")
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     device = "cpu"
 

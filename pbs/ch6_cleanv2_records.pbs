@@ -1,0 +1,73 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_ch6cv2
+#PBS -j oe
+# Mechanism-chapter tables that read cached token log-probabilities only, recomputed on the
+# corrected-span population. No GPU, no model load, no training: every driver below reads
+# record["token_logprobs"] and the stored quality label.
+#
+#   qsub -v LUQ_STAGE=aggregation pbs/ch6_cleanv2_records.pbs
+#   qsub -v LUQ_STAGE=sharpening  pbs/ch6_cleanv2_records.pbs
+#   qsub -v LUQ_STAGE=topk        pbs/ch6_cleanv2_records.pbs
+#
+# LUQ_REGIME is set here rather than passed in, because a run of these drivers WITHOUT it silently
+# reads the original-span MedQuAD cache and produces a table that looks correct and is on the wrong
+# population. Pinning it in the job script removes that failure mode from the call site.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+export LUQ_REGIME="med_quad=cleanv2"
+: "${LUQ_STAGE:?set LUQ_STAGE=aggregation|sharpening|topk|sharpening_selection_original|sharpening_selection_corrected}"
+
+A=results/analysis
+echo "=== stage=$LUQ_STAGE host=$(hostname) regime=$LUQ_REGIME at $(date) ==="
+
+case "$LUQ_STAGE" in
+  aggregation)
+    # Per-response NLL-shape rows, then the dataset-level regime table, the Lehmer curve, the
+    # length association and the within-dataset length terciles that read off it.
+    python -u scripts/checks/aggregation_regime_rows.py \
+        --out "$A/ch6_cleanv2_aggregation_regime_rows__meta-llama_Meta-Llama-3.1-8B.csv" || exit 1
+    python -u scripts/checks/aggregation_regime_audit.py \
+        --rows "$A/ch6_cleanv2_aggregation_regime_rows__meta-llama_Meta-Llama-3.1-8B.csv" \
+        --out  "$A/ch6_cleanv2_aggregation_regime_summary__meta-llama_Meta-Llama-3.1-8B.csv" \
+        2>&1 | tee "$A/ch6_cleanv2_aggregation_regime_audit_stdout__meta-llama_Meta-Llama-3.1-8B.txt"
+    ;;
+  sharpening)
+    # The three training-free weighting families and their two follow-ups. Each run writes its own
+    # file: the base name, plus __round2 and __lengthtau suffixes the driver derives itself.
+    OUT="$A/ch6_cleanv2_sharpening_family__meta-llama_Meta-Llama-3.1-8B.csv"
+    python -u scripts/checks/sharpening_family.py --out "$OUT" || exit 1
+    python -u scripts/checks/sharpening_family.py --out "$OUT" --length-tau || exit 1
+    ;;
+  sharpening_selection_original)
+    # PAIRED ARM, ORIGINAL POPULATION. The selection follow-up carries a code-integrity check
+    # expressed as an assertion about the data, so it can only be evaluated where those data are the
+    # ones it was written against. This arm must pass it; the corrected-span arm below then cites
+    # this artifact rather than skipping the check.
+    unset LUQ_REGIME
+    python -u scripts/checks/sharpening_family.py --round2         --out "$A/ch6_origspan_sharpening_family__meta-llama_Meta-Llama-3.1-8B.csv" || exit 1
+    ;;
+  sharpening_selection_corrected)
+    REF="$A/ch6_origspan_sharpening_family__meta-llama_Meta-Llama-3.1-8B__round2.csv"
+    if [ ! -e "$REF" ]; then
+      echo "FATAL: run LUQ_STAGE=sharpening_selection_original first; $REF does not exist"; exit 3
+    fi
+    python -u scripts/checks/sharpening_family.py --round2         --out "$A/ch6_cleanv2_sharpening_family__meta-llama_Meta-Llama-3.1-8B.csv"         --regression-reference "$REF" || exit 1
+    ;;
+  topk)
+    # TWO PANELS IN ONE FILE, LABELLED, NEVER POOLED. The historical panel omitted FActScore, so it
+    # is the only panel comparable with the original-span result; the extended panel adds FActScore
+    # on the identical frozen grid and is a coverage extension, not a like-for-like comparison.
+    OUT="$A/ch6_cleanv2_topk__meta-llama_Meta-Llama-3.1-8B.csv"
+    HIST="sciq,trivia_qa,pubmed_qa,xsum,cnn_dailymail,med_quad,samsum,expertqa,asqa"
+    python -u scripts/checks/topk_floor_sweep.py --panel historical --datasets "$HIST" \
+        --out "$OUT" || exit 1
+    python -u scripts/checks/topk_floor_sweep.py --panel extended --datasets "$HIST,factscore" \
+        --out "$OUT" --append || exit 1
+    ;;
+  *) echo "unknown LUQ_STAGE=$LUQ_STAGE"; exit 2 ;;
+esac
+echo "=== done at $(date) ==="

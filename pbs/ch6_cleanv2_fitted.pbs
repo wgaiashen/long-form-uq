@@ -1,0 +1,103 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=20:00:00
+#PBS -N luq_ch6fit
+#PBS -j oe
+# Mechanism-chapter analyses that FIT a model on a labelled source pool, run as a paired arm.
+#
+#   qsub -v LUQ_STAGE=adaptive,LUQ_ARM=corrected pbs/ch6_cleanv2_fitted.pbs
+#   qsub -v LUQ_STAGE=adaptive,LUQ_ARM=original  pbs/ch6_cleanv2_fitted.pbs
+#
+# WHY TWO ARMS. For a fitted method, affectedness is per cell, not per dataset: a cell that trains on
+# the corrected dataset can move on a target that did not change, and that is the expected result.
+# The cells the correction touches nowhere are the controls, and they must reproduce. Comparing the
+# corrected arm against an artifact written weeks ago would confound a population effect with any
+# code change since; running both arms from the same working tree, with the same seeds, does not.
+#
+# CPU only. These drivers train small networks on cached pooled features, so they fall back to the
+# processor without a GPU and do not need one.
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+export HF_HOME HF_HUB_OFFLINE=1
+export LUQ_CARVE=legacy
+: "${LUQ_STAGE:?set LUQ_STAGE=adaptive|weight_agreement|repool_guard|priors|weight_dump|shrinkage_mechanism}"
+: "${LUQ_ARM:?set LUQ_ARM=corrected|original}"
+
+case "$LUQ_ARM" in
+  corrected) export LUQ_REGIME="med_quad=cleanv2"; TAG="ch6_cleanv2" ;;
+  original)  unset LUQ_REGIME || true;             TAG="ch6_origspan" ;;
+  *) echo "unknown LUQ_ARM=$LUQ_ARM"; exit 2 ;;
+esac
+
+A=results/analysis
+SLUG=meta-llama_Meta-Llama-3.1-8B
+echo "=== stage=$LUQ_STAGE arm=$LUQ_ARM regime=${LUQ_REGIME:-none} host=$(hostname) at $(date) ==="
+
+# Record the cell split this arm will produce, so the control set is fixed before any result exists.
+python -u scripts/checks/ch6_cleanv2_affected_cells.py > "$A/${TAG}_affected_cells_stdout.txt" 2>&1
+
+case "$LUQ_STAGE" in
+  repool_guard)
+    # The pooled feature plane this analysis reads must be the same vector the ladder's probe reads,
+    # otherwise the two are not comparable. The guard asserts the pooled feature equals the mean of
+    # the per-token window at the probed layer. Run for the corrected dataset specifically, because
+    # its plane was rebuilt by re-pooling and holds a single layer rather than all of them.
+    python -u scripts/checks/feature_pertok_consistency.py \
+        --datasets med_quad --layer 15 --full
+    ;;
+  adaptive)
+    # Response-specific aggregation: the shared-coefficient control, the observable-shape gate, the
+    # pooled-hidden-state gate, the hybrid, and the two shuffled-hidden controls. One run, six methods.
+    python -u scripts/checks/adaptive_lehmer.py \
+        --out "$A/${TAG}_adaptive_lehmer__${SLUG}.csv"
+    ;;
+  weight_agreement)
+    # Does the learned token weighting rediscover the highest-loss token, or point elsewhere.
+    python -u scripts/checks/wmsp_weight_agreement.py \
+        --out "$A/${TAG}_weight_agreement__${SLUG}.csv"
+    ;;
+  priors)
+    # Position priors on the hidden-state branch: a frozen prior, and a prior-initialised free query,
+    # against the learned-query and uniform controls, at two priors.
+    #
+    # ONE TARGET PER JOB. This driver trains a pooler for every arm, prior, rung and seed, which on
+    # the larger targets costs about two hours per rung. A single job covering all eight cannot
+    # finish inside any reasonable walltime, and a job killed at its limit yields a PARTIAL grid,
+    # which is the one output shape that must never reach a results table. Splitting by target also
+    # matches how the original run was actually completed, which used per-target files.
+    : "${LUQ_EVAL:?set LUQ_EVAL to one target, e.g. qsub -v LUQ_STAGE=priors,LUQ_ARM=corrected,LUQ_EVAL=xsum}"
+    OUT="$A/${TAG}_fixed_prior_ladder_${LUQ_EVAL}__${SLUG}.csv"
+    if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber a completed target"; exit 3; fi
+    python -u scripts/checks/fixed_prior_ladder.py \
+        --evals "$LUQ_EVAL" --priors content_mass,nll --seeds 1,2,3 --out "$OUT"
+    ;;
+  weight_dump)
+    # The shrinkage mechanism diagnostics read PERSISTED production weights. Only the corrected
+    # dataset's matched-setting cell needs re-training: every other dataset's matched cell trains on
+    # itself alone and is a control, so its stored weights are reused by link rather than recomputed.
+    # A fresh draw on the control datasets would add stochastic noise to the one comparison meant to
+    # be exact.
+    D=cache/viz_cleanv2
+    mkdir -p "$D"
+    for ds in pubmed_qa asqa xsum cnn_dailymail samsum expertqa factscore; do
+      src="$PWD/cache/viz/${SLUG}__${ds}__ID__wmsp_weights.npz"
+      [ -e "$src" ] && ln -sf "$src" "$D/${SLUG}__${ds}__ID__wmsp_weights.npz"
+    done
+    python -u scripts/tools/visualise_token_weights.py --dataset med_quad         --dump-weights "$D/${SLUG}__med_quad__ID__wmsp_weights.npz" || exit 1
+    ls -la "$D"
+    ;;
+  shrinkage_mechanism)
+    if [ "$LUQ_ARM" = "corrected" ]; then
+      D="$PWD/cache/viz_cleanv2"
+      [ -e "$D/${SLUG}__med_quad__ID__wmsp_weights.npz" ] || {
+        echo "FATAL: run LUQ_STAGE=weight_dump first; the corrected weights do not exist"; exit 3; }
+      export LUQ_VIZ_DIR="$D"
+      export LUQ_OUT_TAG="_cleanv2"
+    else
+      export LUQ_OUT_TAG="_origspan"
+    fi
+    python -u scripts/checks/wmsp_shrinkage_mechanism.py
+    ;;
+  *) echo "unknown LUQ_STAGE=$LUQ_STAGE"; exit 2 ;;
+esac
+echo "=== done at $(date) ==="
