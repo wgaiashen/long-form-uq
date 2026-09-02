@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from ch6_cleanv2_affected_cells import derive                  # noqa: E402
+from ch6_cleanv2_affected_cells import CORRECTED, derive       # noqa: E402
 
 CONTROL_TOL = 1e-9          # identical code, identical seeds, identical inputs: bitwise or nothing
 HISTORICAL_TOL = 1e-6       # a stored artifact is rounded; this is still far tighter than any effect
@@ -114,17 +114,37 @@ def main():
                   "between the arms cannot be attributed to the population alone.")
 
     worst, n, deltas = compare(cor, org, ctrl)
-    ok = worst is not None and abs(worst[1]) <= CONTROL_TOL
     print(f"\nCONTROL CELLS  must reproduce between arms")
-    print(f"  [{'PASS' if ok else 'FAIL'}] {n} control method-cells, max abs difference "
-          f"{abs(worst[1]):.2e} at {worst[0]}" if worst else "  none")
+
+    # NO CONTROL CELLS IS NOT A FAILED CHECK, AND MUST NOT BE REPORTED AS ONE. The corrected dataset
+    # is its own evaluation population in every one of its cells, so it has none by construction.
+    # Treating "nothing to check" as "the check failed" would raise a false alarm on exactly the one
+    # dataset the correction is about -- and a warning that cries wolf there is worse than no warning,
+    # because it trains the reader to dismiss it. Any OTHER dataset having no control cells is a real
+    # problem, because it would mean the affectedness derivation is wrong.
+    evals_here = {k[0] for k in shared}
+    if not ctrl:
+        if evals_here == {CORRECTED}:
+            print(f"  not applicable: this is the corrected dataset, so all {len(aff)} of its cells "
+                  "are affected by construction. Its invariance is established by the other "
+                  "datasets, not by this one.")
+            ok = True
+        else:
+            print(f"  [FAIL] no control cells for {sorted(evals_here)}, which is not the corrected "
+                  "dataset. The affectedness derivation is wrong; do not read anything below.")
+            ok = False
+    else:
+        ok = abs(worst[1]) <= CONTROL_TOL
+        print(f"  [{'PASS' if ok else 'FAIL'}] {n} control method-cells, max abs difference "
+              f"{abs(worst[1]):.2e} at {worst[0]}")
     if not ok:
         failed = True
         big = sorted((d for d in deltas if abs(d[1]) > CONTROL_TOL),
                      key=lambda t: -abs(t[1]))[:10]
-        print("  Cells that moved without touching the corrected dataset:")
-        for k, v in big:
-            print(f"    {k}  {v:+.6f}")
+        if big:
+            print("  Cells that moved without touching the corrected dataset:")
+            for k, v in big:
+                print(f"    {k}  {v:+.6f}")
         print("  STOP. Investigate before publishing any number from this analysis.")
 
     print(f"\nAFFECTED CELLS  expected to move; this is the result, not a failure")
