@@ -45,13 +45,29 @@ def main():
     print(f"ASSEMBLING THE POSITION-PRIOR GRID  tag={args.tag}")
     print("=" * 92)
     rows, complete, incomplete, absent, fields = [], [], [], [], None
+    disagreements = []
     for ev in EVALS:
-        f = A / f"{args.tag}_fixed_prior_ladder_{ev}__{SLUG}.csv"
-        if not f.exists():
+        # A target whose per-setting cost does not fit one walltime is split across several jobs, each
+        # writing its own file. Those runs each repeat the matched setting, because the driver always
+        # includes it. The repeats are not discarded blindly: they must AGREE, and a disagreement is a
+        # reproducibility failure worth surfacing rather than a duplicate worth dropping.
+        parts = sorted(glob.glob(str(A / f"{args.tag}_fixed_prior_ladder_{ev}__{SLUG}.csv"))
+                       + sorted(glob.glob(str(A / f"{args.tag}_fixed_prior_ladder_{ev}_*__{SLUG}.csv"))))
+        if not parts:
             absent.append(ev)
             print(f"  {ev:14s} ABSENT   no file; the target was never produced")
             continue
-        rs = list(csv.DictReader(open(f)))
+        seen, rs = {}, []
+        for part in parts:
+            for r in csv.DictReader(open(part)):
+                key = (r["rung"], r["eval"], r["method"], r.get("train", ""))
+                if key in seen:
+                    a, b = seen[key].get("prr_mean", ""), r.get("prr_mean", "")
+                    if a != b:
+                        disagreements.append((ev, key, a, b))
+                    continue
+                seen[key] = r
+                rs.append(r)
         fields = fields or list(rs[0].keys())
         got = {r["rung"] for r in rs}
         if got != RUNGS:
@@ -60,8 +76,15 @@ def main():
             continue
         complete.append(ev)
         rows.extend(rs)
-        print(f"  {ev:14s} complete {len(rs)} rows")
+        note = f" (joined from {len(parts)} files)" if len(parts) > 1 else ""
+        print(f"  {ev:14s} complete {len(rs)} rows{note}")
 
+    if disagreements:
+        print(f"\n  [FAIL] {len(disagreements)} repeated cells disagree between split files:")
+        for ev, key, a, b in disagreements[:8]:
+            print(f"    {ev} {key}: {a} vs {b}")
+        raise SystemExit("a repeated computation did not reproduce; stop and investigate before "
+                         "assembling anything from these files")
     print(f"\n{len(complete)} of {len(EVALS)} targets complete")
     if incomplete or absent:
         print("WARNING: THIS IS NOT THE FULL GRID. Do not report a macro over it as an "

@@ -66,10 +66,22 @@ case "$LUQ_STAGE" in
     # which is the one output shape that must never reach a results table. Splitting by target also
     # matches how the original run was actually completed, which used per-target files.
     : "${LUQ_EVAL:?set LUQ_EVAL to one target, e.g. qsub -v LUQ_STAGE=priors,LUQ_ARM=corrected,LUQ_EVAL=xsum}"
-    OUT="$A/${TAG}_fixed_prior_ladder_${LUQ_EVAL}__${SLUG}.csv"
+    # LUQ_RUNGS optionally narrows a target to named transfer settings, so a target whose per-setting
+    # cost does not fit one walltime can be split across parallel jobs. The driver always includes the
+    # matched setting whatever the filter says; that is cheap here and gives a free reproducibility
+    # check against the run being extended, so the duplicate is wanted rather than tolerated.
+    # An empty filter is the driver's own documented default for "every setting", so it is passed
+    # unconditionally. That avoids expanding a possibly-empty array under `set -u`, which is a bash
+    # version dependency this script has no reason to carry.
+    if [ -n "${LUQ_RUNGS:-}" ]; then
+      OUT="$A/${TAG}_fixed_prior_ladder_${LUQ_EVAL}_$(echo "$LUQ_RUNGS" | tr ',' '-')__${SLUG}.csv"
+    else
+      OUT="$A/${TAG}_fixed_prior_ladder_${LUQ_EVAL}__${SLUG}.csv"
+    fi
     if [ -e "$OUT" ]; then echo "FATAL: $OUT exists, refusing to clobber a completed target"; exit 3; fi
     python -u scripts/checks/fixed_prior_ladder.py \
-        --evals "$LUQ_EVAL" --priors content_mass,nll --seeds 1,2,3 --out "$OUT"
+        --evals "$LUQ_EVAL" --priors content_mass,nll --seeds 1,2,3 \
+        --rungs "${LUQ_RUNGS:-}" --out "$OUT"
     ;;
   weight_dump)
     # The shrinkage mechanism diagnostics read PERSISTED production weights. Only the corrected
