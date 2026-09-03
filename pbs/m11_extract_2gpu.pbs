@@ -46,6 +46,7 @@ export LUQ_REGIME="med_quad=cleanv2"
 
 MODEL="meta-llama/Meta-Llama-3.1-8B"
 SLUG="meta-llama_Meta-Llama-3.1-8B"
+FAILED=""
 
 echo "=== extraction, layer $L === host=$(hostname) at $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
@@ -79,7 +80,13 @@ else
   [ "$AVAIL" -ge 40 ] || { echo "!!! under 40 GB of quota free; not starting"; exit 2; }
 fi
 
-for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; do
+# WHICH DATASETS, and why the order matters. A failure used to abort the loop, and the longest-source
+# dataset sits second, so one out-of-memory there cost the six datasets after it as well. The loop now
+# records a failure and carries on, and the job still exits non-zero naming what failed. Nothing is
+# silently skipped: the scan afterwards refuses a layer that is not complete.
+#
+# LUQ_M11_DATASETS overrides the list, which is how the long-source datasets are given more cards.
+for DS in ${LUQ_M11_DATASETS:-pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore}; do
   case "$DS" in
     med_quad)  REGIME="cleanv2" ;;
     asqa)      REGIME="asqa_rp12" ;;
@@ -104,8 +111,16 @@ for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; 
   python -u scripts/01p_pertoken_multi.py --model "$MODEL" --dataset "$DS" --ood ID \
       --layers "$L" --prompt-regime "$REGIME" --dtype fp32 --attn eager \
       --device-map auto --max-memory "0=17GiB,1=17GiB" --skip-lm-head \
-      || { echo "!!! extraction FAILED for $DS layer $L"; exit 4; }
+      || { echo "!!! extraction FAILED for $DS layer $L"; FAILED="$FAILED $DS"; }
 done
+
+if [ -n "${FAILED// /}" ]; then
+  echo; echo "!!! layer $L is INCOMPLETE. Datasets that failed:$FAILED"
+  echo "    Do not scan this layer until they are extracted. The scan checks for 40 cells and will"
+  echo "    refuse, but the reason is here."
+  df -h /rds/general/user/gs925/home | tail -1
+  exit 4
+fi
 
 df -h /rds/general/user/gs925/home | tail -1
 echo; echo "=== layer $L extracted at $(date). Scan it with:"
