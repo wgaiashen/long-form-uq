@@ -72,8 +72,6 @@ run () {
          FAILURES=$((FAILURES+1)) ;;
     esac
   done
-  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n 1 \
-      --numerical fp32/eager --device-map auto --max-memory "0=17GiB,1=17GiB" >/dev/null 2>&1 || true
 }
 FAILURES=0
 mkdir -p results/analysis
@@ -93,4 +91,40 @@ if [ "$FAILURES" != "0" ]; then
   echo "    about those datasets from this run."
   exit 5
 fi
+echo; echo "################ the verdict, across every configuration tried ################"
+python -u - "$RESULTS" <<'PYEOF2'
+import csv, sys
+from collections import defaultdict
+rows = list(csv.DictReader(open(sys.argv[1])))
+by_ds = defaultdict(list)
+for r in rows:
+    by_ds[r["dataset"]].append(r)
+print(f"{'dataset':<14} {'best forward':<12} {'processors':<15} {'worst |d|':>12}  verdict")
+unresolved = []
+for ds, rs in sorted(by_ds.items()):
+    scored = [r for r in rs if r["worst_abs_diff"]]
+    untested = sum(1 for r in rs if not r["worst_abs_diff"])
+    if not scored:
+        print(f"{ds:<14} {'-':<12} {'-':<15} {'nothing ran':>12}  NOT MEASURED")
+        unresolved.append(ds)
+        continue
+    best = min(scored, key=lambda r: float(r["worst_abs_diff"]))
+    d, tol = float(best["worst_abs_diff"]), float(best["tolerance"])
+    ok = d <= tol
+    print(f"{ds:<14} {best['forward']:<12} {best['processors']:<15} {d:>12.4e}  "
+          + ("REPRODUCED" if ok else "not reproduced"))
+    if not ok:
+        unresolved.append(ds)
+    if untested:
+        print(f"{'':<14} {untested} configuration(s) could not be run for this dataset")
+print()
+if unresolved:
+    print("READING: no configuration tried reproduces the cached values on: " + ", ".join(unresolved))
+    print("Those datasets keep their partial coverage under the registered rule, and the alignment")
+    print("tolerance is NOT relaxed to change that.")
+else:
+    print("READING: every dataset is reproduced. The entropy input can be rebuilt for all of them,")
+    print("each under the configuration named above.")
+PYEOF2
+
 echo "=== done at $(date), every dataset measured ==="
