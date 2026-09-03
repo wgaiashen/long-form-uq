@@ -1,0 +1,97 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=36:00:00
+#PBS -N luq_m11gateb
+#PBS -j oe
+
+# Gate B, the distance-invariance stop rule, plus the invariance control that goes with it.
+# Registered in prereg/M11_alllayer_published_distance_baselines.md section 5.
+#
+# THREE THINGS HAPPEN HERE, IN THIS ORDER, AND THE FIRST TWO ARE CONTROLS.
+#
+# 1. The single-layer driver is re-run at layer 15 under the window every existing row was measured
+#    on. Its output must match the recorded rows EXACTLY. The only change made to that driver was to
+#    move the reduction ahead of the two probability columns, which at one cached layer cannot fire
+#    at all because the reduction needs ten columns and there are at most three. So the correct
+#    result of this run is that nothing moves. A driver correction that moves a single-layer number
+#    is a correction in the wrong place.
+#    That run also dumps its per-example distances, which is what gate B compares against.
+#
+# 2. The layer scan is run at the same layer under the same window.
+#
+# 3. Gate B compares the two sets of per-example distance VECTORS. Not their prediction-rejection
+#    ratios: a rank statistic moves on round-off a distance does not care about, and it can also sit
+#    still while individual scores move, so it answers neither question.
+#
+# CPU ONLY. Every input exists.
+#
+#   qsub pbs/m11_gate_b.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_gate_b__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+REF="results/hybrids/pdl_hybrids_unconstrained__${SLUG}.csv"
+CTL="results/hybrids/pdl_m11_singlelayer_control__${SLUG}.csv"
+
+echo "=== gate B === host=$(hostname) at $(date)"
+
+echo; echo "################ port equivalence against the reference implementation ################"
+python -u scripts/checks/md_port_equivalence.py \
+    || { echo "!!! port equivalence FAILED -- refusing to run"; exit 2; }
+
+echo; echo "################ 1. the single-layer driver, unchanged window ################ $(date)"
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer 15 --seeds 1,2,3 \
+    --window project --dump-md-dir "results/hybrids/mdhybdump__${SLUG}" --out "$CTL" \
+    || { echo "!!! single-layer control FAILED"; exit 3; }
+
+echo; echo "################ the invariance control: nothing may have moved ################"
+python -u - "$CTL" "$REF" <<'PYEOF'
+import csv, sys
+def rows(p):
+    with open(p) as fh:
+        return {(r["eval"], r["rung"], r["method"]): r for r in csv.DictReader(fh)}
+a, b = rows(sys.argv[1]), rows(sys.argv[2])
+keys = sorted(set(a) & set(b))
+worst, where, bad = 0.0, "", []
+for k in keys:
+    ab, bb = a[k]["prr_mean"] == "", b[k]["prr_mean"] == ""
+    if ab != bb:
+        bad.append(f"{k}: blank on one side only")
+        continue
+    if ab:
+        continue
+    d = abs(float(a[k]["prr_mean"]) - float(b[k]["prr_mean"]))
+    if d > worst:
+        worst, where = d, str(k)
+print(f"compared {len(keys)} rows | only in the new run {len(set(a)-set(b))} | "
+      f"only in the recorded file {len(set(b)-set(a))}")
+print(f"worst absolute difference {worst:.6e} at {where}")
+for line in bad[:10]:
+    print("  MISMATCH", line)
+ok = (not bad) and worst == 0.0
+print("INVARIANCE CONTROL: " + ("PASS" if ok else "FAIL"))
+sys.exit(0 if ok else 1)
+PYEOF
+[ $? -eq 0 ] || { echo "!!! the single-layer rows moved. Stopping."; exit 4; }
+
+echo; echo "################ 2. the layer scan at the same layer and window ################ $(date)"
+python -u scripts/checks/md_layer_scan.py --model "$MODEL" --layer 15 --seeds 1,2,3 \
+    --window project \
+    || { echo "!!! scan FAILED"; exit 5; }
+
+echo; echo "################ 3. gate B ################ $(date)"
+python -u scripts/checks/m11_gates.py b \
+    --scan "results/hybrids/mdscan__${SLUG}" \
+    --dump "results/hybrids/mdhybdump__${SLUG}" \
+    || { echo "!!! GATE B FAILED"; exit 6; }
+
+echo; echo "=== done at $(date) ==="

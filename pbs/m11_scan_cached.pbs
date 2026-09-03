@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=24:00:00
+#PBS -N luq_m11scan
+#PBS -j oe
+
+# Reduce ONE already-cached layer to per-example distances. CPU only: the states exist.
+# Registered in prereg/M11_alllayer_published_distance_baselines.md.
+#
+# One job per layer, because layers are independent and running them concurrently is the difference
+# between half a day and a week. The layer comes from the environment:
+#
+#   for L in 0 3 6 9 12 15 18 21 24 27 30; do qsub -v LUQ_M11_LAYER=$L pbs/m11_scan_cached.pbs; done
+#
+# --require-background makes a missing background a failure rather than a file that is quietly
+# missing its relative-distance arrays and would then be dropped by the combining pass without
+# anyone noticing.
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+L="${LUQ_M11_LAYER:?set LUQ_M11_LAYER, e.g. qsub -v LUQ_M11_LAYER=3 pbs/m11_scan_cached.pbs}"
+LIVE="logs/m11_scan_L${L}__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+
+echo "=== scan, layer $L === host=$(hostname) at $(date)"
+python -u scripts/checks/md_layer_scan.py --model meta-llama/Meta-Llama-3.1-8B \
+    --layer "$L" --seeds 1,2,3 --window ref --require-background \
+    || { echo "!!! scan FAILED for layer $L"; exit 3; }
+
+N=$(ls results/hybrids/mdscan_refwin__meta-llama_Meta-Llama-3.1-8B/L${L}__*.npz 2>/dev/null | wc -l)
+echo; echo "layer $L wrote $N cell files (40 expected) at $(date)"
+[ "$N" -eq 40 ] || { echo "!!! INCOMPLETE: $N of 40 cells"; exit 4; }
+echo "=== done at $(date) ==="

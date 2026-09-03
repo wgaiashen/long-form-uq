@@ -120,6 +120,18 @@ def load_entropy(model, datasets):
     return out
 
 
+def _window(arr, window):
+    """The per-token window this run is measured on.
+
+    The cached array runs from the last prompt position through the final generated position. The
+    reference implementation's window is one row shorter, so dropping the final row turns one into
+    the other exactly, with no re-extraction and no other row touched.
+    """
+    if window == "project":
+        return arr
+    return arr[:-1] if len(arr) else arr
+
+
 def load_background(path, budget):
     """Background token states, sliced to `budget` generated tokens.
 
@@ -148,6 +160,15 @@ def main():
     ap.add_argument("--rungs", default="", help="comma list of ID,LOO,SameTask,DiffTask,1ds-Diff")
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--metric-thr", type=float, default=MD.DEFAULT_METRIC_THR)
+    ap.add_argument("--window", default="project", choices=["project", "ref"],
+                    help="'project' keeps the cached window, the last prompt position through the "
+                         "final generated position, which every existing row here was measured on. "
+                         "'ref' drops the final row, which is the reference implementation's window. "
+                         "Changing this changes every distance, so it is off by default.")
+    ap.add_argument("--dump-md-dir", default="",
+                    help="also write the per-example mean distances, one file per cell. They are "
+                         "what the layer-combining pass has to be checked against, and a rank "
+                         "statistic computed from them is not a substitute.")
     ap.add_argument("--background", default="", help="npz written by scripts/01m_background_c4.py")
     ap.add_argument("--bg-budget", type=int, default=128,
                     help="generated-token budget to slice the background to")
@@ -211,6 +232,8 @@ def main():
     print(f"\nentropy caches: {n_ent}/{len(sources)} datasets"
           + ("" if n_ent == len(sources) else "  -> the MSP-regressor variants will be SKIPPED"))
 
+    md_dump = {}
+
     BG = None
     if args.background:
         bg_rows, bg_layer, bg_budget = load_background(ROOT / args.background, args.bg_budget)
@@ -256,8 +279,8 @@ def main():
             train_rows, test_rows = build_rows(X, spec, PT, sd, sampled_train_idx)
             if not train_rows or not test_rows:
                 continue
-            tr_states = [PT[d][0][i] for d, i in train_rows]
-            te_states = [PT[d][0][i] for d, i in test_rows]
+            tr_states = [_window(PT[d][0][i], args.window) for d, i in train_rows]
+            te_states = [_window(PT[d][0][i], args.window) for d, i in test_rows]
             ytr = np.array([PT[d][2][i] for d, i in train_rows], float)
             yte = np.array([PT[d][2][i] for d, i in test_rows], float)
             yte_ref = yte
@@ -337,22 +360,36 @@ def main():
             y_dev = ytr[half_dev]
             target = np.nan_to_num(1.0 - y_dev, nan=1.0)
 
+            if args.dump_md_dir:
+                md_dump.setdefault((rung, X), {}).update({
+                    f"dev_md__{sd}": np.asarray(dev_md, float),
+                    f"test_md__{sd}": np.asarray(test_md, float),
+                    f"y_dev__{sd}": np.asarray(y_dev, float),
+                    f"y_test__{sd}": np.asarray(yte, float)})
+
             def _fit_ridge(dev_feat, test_feat, extra_dev=None, extra_test=None):
                 Xd = np.nan_to_num(np.asarray(dev_feat, float)).reshape(len(dev_feat), -1)
                 Xt = np.nan_to_num(np.asarray(test_feat, float)).reshape(len(test_feat), -1)
-                if extra_dev is not None:
-                    Xd = np.hstack([Xd, np.nan_to_num(extra_dev)])
-                    Xt = np.hstack([Xt, np.nan_to_num(extra_test)])
                 # The reduction is FITTED on the development half and only applied to the evaluation
                 # rows, matching the reference, which calls fit_transform on the dev matrix and
                 # transform on the evaluation matrix. It needs at least as many features as
-                # components: with one cached layer there is one distance column (plus at most two
-                # more for the probability-augmented variants), so it cannot run here at all. That
-                # omission is precisely what makes the single-layer versions adaptations rather than
-                # reproductions -- there is nothing to combine across layers.
+                # components: with one cached layer there is one distance column, so it cannot run
+                # here at all. That omission is precisely what makes the single-layer versions
+                # adaptations rather than reproductions -- there is nothing to combine across layers.
+                #
+                # THE REDUCTION SEES THE DISTANCE COLUMNS ONLY. The reference calls fit_transform on
+                # the layer-distance matrix and appends the sequence probability and the mean token
+                # entropy to the RESULT (average_token_mahalanobis_distance_hybrid.py). Appending
+                # first would put those two features through the reduction as well. At one layer the
+                # two orders coincide, because the guard above never fires on three columns, so this
+                # correction changes no number here; it exists so that this driver and the
+                # layer-combining one are the same method.
                 if Xd.shape[1] >= N_COMPONENTS:
                     pca = PCA(n_components=N_COMPONENTS).fit(Xd)
                     Xd, Xt = pca.transform(Xd), pca.transform(Xt)
+                if extra_dev is not None:
+                    Xd = np.hstack([Xd, np.nan_to_num(extra_dev)])
+                    Xt = np.hstack([Xt, np.nan_to_num(extra_test)])
                 # Unconstrained, as the reference's call site specifies. A positivity constraint on a
                 # single feature clips an unhelpful coefficient to zero and turns the prediction into
                 # a constant, which is what produced the degeneracy recorded before this correction.
@@ -468,6 +505,12 @@ def main():
                              "n_seeds": int(ok.sum()),
                              "degenerate_seeds": degenerate.get(m, 0),
                              "layer": layer, "metric_thr": args.metric_thr})
+        if args.dump_md_dir and (rung, X) in md_dump:
+            ddir = ROOT / args.dump_md_dir
+            ddir.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(ddir / f"L{layer}__{X}__{rung}__{slug}.npz",
+                                seeds=np.array(seeds), layer=np.array([layer]),
+                                window=str(args.window), **md_dump[(rung, X)])
         line = "  ".join(
             f"{m} " + (f"{np.nanmean(vals):+.4f}" if np.isfinite(vals).any() else "CONSTANT")
             for m, vals in sorted(per.items()))

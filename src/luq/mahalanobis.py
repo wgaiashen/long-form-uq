@@ -191,6 +191,24 @@ def md_mean(rows, stats: MDStats):
     return np.array([float(np.mean(d)) if len(d) else np.nan for d in md_tokens(rows, stats)])
 
 
+def md_and_rmd_mean(rows, fg: MDStats, bg: MDStats):
+    """Both aggregations from one pass over the foreground distances.
+
+    NOT a different method. `md_mean(rows, fg)` and `rmd_mean(rows, fg, bg)` each compute the
+    foreground per-token distances, so calling them in turn does that work twice. The layer scan needs
+    both for every row at every one of thirty-two layers, where the duplication is the difference
+    between one and two thirds of the running time. The arithmetic below is the two functions'
+    own, applied to the same arrays, so the results are identical rather than merely close;
+    `scripts/checks/md_rmd_shared_pass.py` asserts that.
+    """
+    a, b = md_tokens(rows, fg), md_tokens(rows, bg)
+    md, rmd = [], []
+    for da, db in zip(a, b):
+        md.append(float(np.mean(da)) if len(da) else np.nan)
+        rmd.append(float(np.mean(da - db)) if len(da) else np.nan)
+    return np.array(md), np.array(rmd)
+
+
 def rmd_mean(rows, fg: MDStats, bg: MDStats):
     """Relative distance: per-token MD minus per-token background MD, then averaged.
 
@@ -270,3 +288,36 @@ def grid_search_hp(epistemic, aleatoric, metrics, prr_fn,
                 if new > best:
                     best, t_min_best, t_max_best, alpha_best = new, t_min, t_max, alpha
     return best, t_min_best, t_max_best, alpha_best
+
+
+# --------------------------------------------------------------------------------------------------
+# Persistence for fitted statistics. NOT part of the port: the reference holds its fitted statistics
+# in a process-local dictionary and never writes them out.
+#
+# This exists because the background statistics for the relative distance are fitted once per layer
+# and per generation budget, and are then read by every cell of the grid at that layer. Persisting a
+# centroid and an inverse covariance costs about 67 MB at 4096 dimensions, against roughly 2.3 GB for
+# the per-token states they were fitted on, and it lets the background be prepared on one machine and
+# consumed on another without moving the states.
+# --------------------------------------------------------------------------------------------------
+def save_stats(path, stats: MDStats, **provenance):
+    """Write one fitted MDStats, plus whatever provenance the caller wants recorded alongside it."""
+    import numpy as _np
+    _np.savez(path,
+              centroid=_np.asarray(stats.centroid, dtype=_np.float64),
+              sigma_inv=_np.asarray(stats.sigma_inv, dtype=_np.float32),
+              n_tokens=_np.int64(stats.n_tokens), n_rows=_np.int64(stats.n_rows),
+              jitter=_np.float64(stats.jitter), key=str(stats.key),
+              **{k: _np.asarray(v) for k, v in provenance.items()})
+
+
+def load_stats(path) -> MDStats:
+    """Read back what save_stats wrote. The dtypes are restored exactly as fit_md produced them:
+    the centroid in float64 and the inverse covariance in float32, so a statistic that has been
+    through a file is the same object a fresh fit would have produced."""
+    import numpy as _np
+    z = _np.load(path, allow_pickle=False)
+    return MDStats(centroid=_np.asarray(z["centroid"], dtype=_np.float64),
+                   sigma_inv=_np.asarray(z["sigma_inv"], dtype=_np.float32),
+                   n_tokens=int(z["n_tokens"]), n_rows=int(z["n_rows"]),
+                   jitter=float(z["jitter"]), key=str(z["key"]))

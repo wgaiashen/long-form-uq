@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_m11bgeq
+#PBS -j oe
+
+# Does persisting the background statistic change it? Registered in
+# prereg/M11_alllayer_published_distance_baselines.md as required evidence before the new path is
+# used at any layer that has nothing to check against.
+#
+# CPU ONLY. Both sides read the same states file that already exists; nothing is generated and no
+# model is loaded. The memory ceiling is for the 2.3 GB of states plus a 4096 by 4096 covariance.
+#
+# THE WINDOW IS 'project' HERE ON PURPOSE. This isolates one question, whether writing a statistic
+# to a file and reading it back changes it. The separate question of which token window to use is
+# a deliberate difference between the two arms and is not what this job measures.
+#
+#   qsub pbs/m11_background_equivalence.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_background_equivalence__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+STATES="cache/background_c4/meta-llama_Meta-Llama-3.1-8B__L15__b384.npz"
+
+echo "=== writing the persisted statistics from the existing states ==="
+python -u scripts/01q_background_stats.py --model meta-llama/Meta-Llama-3.1-8B \
+    --from-states "$STATES" --window project --budgets 56,128,256,384 --overwrite \
+    || { echo "!!! writing FAILED"; exit 3; }
+
+echo; echo "=== comparing against the in-memory path ==="
+python -u scripts/checks/m11_background_equivalence.py --states "$STATES" || exit 4
+
+echo; echo "=== done at $(date) ==="

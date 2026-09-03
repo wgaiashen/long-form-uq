@@ -1,0 +1,45 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb:ngpus=1:gpu_type=L40S
+#PBS -l walltime=24:00:00
+#PBS -N luq_m11bgst
+#PBS -j oe
+
+# Background statistics for the layers whose per-token states are ALREADY cached here, so their scans
+# have a background to subtract. Registered in prereg/M11_alllayer_published_distance_baselines.md.
+#
+# The layers that are not yet cached do not need this job: their own fused extraction job fits their
+# background as its first step, which is what keeps the background off the critical path.
+#
+# ONE FORWARD PER BACKGROUND ROW YIELDS EVERY REQUESTED LAYER, so covering eleven layers here costs
+# one pass over the corpus rather than eleven. The states are held only until the statistics are
+# fitted and are then dropped; at about 2.3 GB per layer, eleven of them is roughly 25 GB resident,
+# which is what the memory ceiling is for.
+#
+#   qsub pbs/m11_background_stats.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_background_stats__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+LAYERS="${LUQ_M11_LAYERS:-0,3,6,9,12,15,18,21,24,27,30}"
+
+echo "=== background statistics === host=$(hostname) at $(date)"
+echo "layers: $LAYERS"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
+
+python -u scripts/01q_background_stats.py --model "$MODEL" --from-records \
+    --layers "$LAYERS" --budgets 56,128,256,384 --window ref \
+    --dtype fp32 --attn eager --device-map cuda \
+    || { echo "!!! background statistics FAILED"; exit 3; }
+
+echo; echo "=== done at $(date) ==="
