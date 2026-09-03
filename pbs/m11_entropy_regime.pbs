@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
-#PBS -l walltime=03:00:00
+#PBS -l walltime=04:00:00
 #PBS -N luq_m11entreg
 #PBS -j oe
 
@@ -13,8 +13,15 @@
 # processor does, because what generate returns in `scores`, and therefore what was cached, is the
 # distribution AFTER the processors run.
 #
-# This does not assume which processors were used. It replays each candidate through the authors'
-# own processor classes and reports which one reproduces the cached values, or that none does.
+# TWO EXPLANATIONS ARE ON THE TABLE AND THIS SWEEPS BOTH. An earlier diagnostic concluded the cached
+# values came from a forward configuration the current fp32-plus-eager recomputation does not
+# reproduce, and named dtype or the attention backend, without testing them. It separately rejected a
+# repetition penalty because the diverging positions were not enriched for repeated tokens, which is
+# weaker than it appears: a penalty renormalises the whole distribution and therefore shifts every
+# position, so which ones exceed a tolerance is a question of magnitude rather than of repetition.
+#
+# This replays five forward configurations against four processor settings and reports which
+# combination, if any, reproduces the cached values. It assumes neither explanation.
 #
 # NOTHING IS WRITTEN. It is a measurement that decides what to do next, not a fix.
 #
@@ -56,12 +63,14 @@ run () {
 }
 FAILURES=0
 
-run pubmed_qa ""            6
-run med_quad  "cleanv2"     6
-run asqa      "asqa_rp12"   4
-run samsum    ""            6
-run factscore "factscore_rp12" 4
-run expertqa  "expertqa_rp12"  3
+# THREE DATASETS, NOT EIGHT. The sweep now reloads the model for each forward configuration, so the
+# cost is in model loads rather than in records. Three datasets identify the configuration: one that
+# already passes the alignment check, and the two whose failure profiles differ most from each other.
+# If a configuration reproduces all three, the remaining datasets are confirmations and can be run
+# once, cheaply, under that configuration alone.
+run pubmed_qa ""            4
+run med_quad  "cleanv2"     4
+run asqa      "asqa_rp12"   3
 
 echo
 if [ "$FAILURES" != "0" ]; then

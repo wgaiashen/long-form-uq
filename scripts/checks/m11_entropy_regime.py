@@ -41,14 +41,38 @@ from luq.config import Config  # noqa: E402
 
 _DTYPE = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
 
-# Configurations seen in this project's generation jobs, plus the empty one. Named so the report
-# reads as a statement about generation rather than as a list of numbers.
-CANDIDATES = [
+# TWO AXES ARE SWEPT, because two different explanations are on the table and only a measurement
+# separates them.
+#
+#   The NUMERICAL axis: the dtype and attention backend of the forward pass. An earlier diagnostic
+#   concluded that the cached values came from a forward configuration the current fp32-plus-eager
+#   recomputation does not reproduce, and named dtype or the attention backend as the likely
+#   difference. It did not test them.
+#
+#   The PROCESSOR axis: logits processors active at generation time. What `generate` returns in
+#   `scores`, and therefore what was cached, is the distribution AFTER any processor runs, while a
+#   plain forward reproduces it before. The same earlier diagnostic rejected a repetition penalty on
+#   the grounds that the diverging positions were not enriched for repeated tokens. That argument is
+#   weaker than it looks: a penalty renormalises the whole distribution, so it shifts every position
+#   rather than only the repeats, and which positions then exceed a tolerance is a question of
+#   magnitude, not of whether that particular token was a repeat. Replaying the processor settles it
+#   directly, which is what this does.
+#
+# The numerical axis is the outer loop because changing it means reloading the model; the processor
+# axis is inner and costs one vector operation per position.
+NUMERICAL = [
+    ("fp32/eager", "fp32", "eager"),
+    ("fp16/eager", "fp16", "eager"),
+    ("bf16/eager", "bf16", "eager"),
+    ("fp32/sdpa", "fp32", "sdpa"),
+    ("fp16/sdpa", "fp16", "sdpa"),
+]
+
+PROCESSORS = [
     ("none", dict()),
     ("rep1.2", dict(repetition_penalty=1.2)),
     ("rep1.2+ngram3", dict(repetition_penalty=1.2, no_repeat_ngram_size=3)),
     ("ngram3", dict(no_repeat_ngram_size=3)),
-    ("rep1.3+ngram3", dict(repetition_penalty=1.3, no_repeat_ngram_size=3)),
 ]
 
 
@@ -92,69 +116,95 @@ def main():
                  prompt_regime=args.prompt_regime)
     key = cache.run_key(cfg.model_name, cfg.dataset, cfg.ood_setting)
     records = cache.load_records(cfg.cache_dir, key)
+    n = min(args.n, len(records))
     print(f"{args.model} | {args.dataset} (regime '{args.prompt_regime or 'canonical'}') | "
-          f"{len(records)} records, checking {min(args.n, len(records))}", flush=True)
+          f"{len(records)} records, checking {n}", flush=True)
 
-    model, tok = generate.load_model(args.model, attn_implementation=args.attn,
-                                     dtype=_DTYPE[args.dtype], device_map=args.device_map,
-                                     max_memory=max_memory)
-    model.eval()
-    if args.device_map == "auto":
-        placed = getattr(model, "hf_device_map", {})
-        n_dev = len({v for v in placed.values() if isinstance(v, int)})
-        print(f"device map: {n_dev} GPU(s) hold weights", flush=True)
-        if max_memory is not None and n_dev < 2:
-            sys.exit("--max-memory asked for a split but every layer landed on one device.")
-
-    worst = {name: 0.0 for name, _ in CANDIDATES}
-    over = {name: 0 for name, _ in CANDIDATES}
-    n_pos = 0
-
-    for i in range(min(args.n, len(records))):
+    rows = []
+    for i in range(n):
         r = records[i]
         p_ids, g_ids = list(r["prompt_token_ids"]), list(r["gen_token_ids"])
         cached = np.asarray(r["token_logprobs"], dtype=float)
-        P, G = len(p_ids), len(g_ids)
-        if G == 0 or len(cached) != G:
-            print(f"  row {i}: G={G} but {len(cached)} cached logprobs -> skipped")
+        if len(g_ids) == 0 or len(cached) != len(g_ids):
+            print(f"  row {i}: {len(g_ids)} generated tokens but {len(cached)} cached "
+                  f"log-probabilities -> skipped")
             continue
-        ids = torch.tensor(p_ids + g_ids)[None].to(model.device)
-        with torch.no_grad():
-            logits = model(ids).logits[0].float().cpu()
+        rows.append((p_ids, g_ids, cached))
+    if not rows:
+        sys.exit("no comparable rows")
+    n_pos = sum(len(g) for _, g, _ in rows)
 
-        for name, conf in CANDIDATES:
-            procs = build_processors(conf)
-            for t in range(G):
-                # The distribution that produced generated token t sits at position P-1+t, and the
-                # processors see the context as it stood then: the prompt plus the tokens already
-                # generated. That growing context is the whole point; a processor applied to the
-                # final context would be a different function.
-                ctx = torch.tensor(p_ids + g_ids[:t])[None]
-                scores = logits[P - 1 + t][None].clone()
-                if len(procs):
-                    scores = procs(ctx, scores)
-                lp = torch.log_softmax(scores.float(), dim=-1)[0, g_ids[t]].item()
-                d = abs(lp - cached[t])
-                worst[name] = max(worst[name], d)
-                if d > args.tol:
-                    over[name] += 1
-            if name == CANDIDATES[0][0]:
-                n_pos += G
-        print(f"  row {i}: G={G} | " + " | ".join(
-            f"{name} {worst[name]:.3g}" for name, _ in CANDIDATES), flush=True)
+    results = {}
+    for num_name, dtype, attn in NUMERICAL:
+        try:
+            model, tok = generate.load_model(args.model, attn_implementation=attn,
+                                             dtype=_DTYPE[dtype], device_map=args.device_map,
+                                             max_memory=max_memory)
+            model.eval()
+        except Exception as e:
+            print(f"  {num_name}: could not load ({type(e).__name__}) -> NOT TESTED", flush=True)
+            for proc_name, _ in PROCESSORS:
+                results[(num_name, proc_name)] = None
+            continue
 
-    print(f"\n=== {args.dataset} | {n_pos} positions ===")
-    print(f"{'configuration':<16} {'worst |d|':>12} {'positions over tol':>20}")
-    for name, _ in CANDIDATES:
-        print(f"{name:<16} {worst[name]:>12.4e} {over[name]:>20}")
-    best = min(CANDIDATES, key=lambda c: worst[c[0]])[0]
+        worst = {pn: 0.0 for pn, _ in PROCESSORS}
+        over = {pn: 0 for pn, _ in PROCESSORS}
+        for p_ids, g_ids, cached in rows:
+            P, G = len(p_ids), len(g_ids)
+            ids = torch.tensor(p_ids + g_ids)[None].to(model.device)
+            with torch.no_grad():
+                logits = model(ids).logits[0].float().cpu()
+            for proc_name, conf in PROCESSORS:
+                procs = build_processors(conf)
+                for t in range(G):
+                    # The distribution that produced generated token t sits at position P-1+t, and a
+                    # processor sees the context as it stood then: the prompt plus the tokens already
+                    # generated. That growing context is the point; a processor applied to the final
+                    # context would be a different function.
+                    scores = logits[P - 1 + t][None].clone()
+                    if len(procs):
+                        ctx = torch.tensor(p_ids + g_ids[:t])[None]
+                        scores = procs(ctx, scores)
+                    lp = torch.log_softmax(scores.float(), dim=-1)[0, g_ids[t]].item()
+                    d = abs(lp - cached[t])
+                    worst[proc_name] = max(worst[proc_name], d)
+                    if d > args.tol:
+                        over[proc_name] += 1
+        for proc_name, _ in PROCESSORS:
+            results[(num_name, proc_name)] = (worst[proc_name], over[proc_name])
+        best_here = min((worst[pn] for pn, _ in PROCESSORS))
+        print(f"  {num_name}: best worst-case {best_here:.4e}", flush=True)
+        del model
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+    print(f"\n=== {args.dataset} | {len(rows)} rows | {n_pos} positions ===")
+    print(f"{'forward':<12} {'processors':<15} {'worst |d|':>12} {'over tol':>10}")
+    best, best_key = None, None
+    for num_name, _, _ in NUMERICAL:
+        for proc_name, _ in PROCESSORS:
+            v = results.get((num_name, proc_name))
+            if v is None:
+                print(f"{num_name:<12} {proc_name:<15} {'not tested':>12} {'-':>10}")
+                continue
+            w, o = v
+            print(f"{num_name:<12} {proc_name:<15} {w:>12.4e} {o:>10}")
+            if best is None or w < best:
+                best, best_key = w, (num_name, proc_name)
+
     print(f"\ntolerance {args.tol:.1e}")
-    if worst[best] <= args.tol:
-        print(f"READING: the cached log-probabilities are reproduced by '{best}'. Entropy for this "
-              f"dataset must be computed under that configuration, not under a plain forward.")
+    if best is None:
+        print("READING: nothing was tested. This is a failure of the job, not a finding.")
+        return 2
+    if best <= args.tol:
+        print(f"READING: the cached log-probabilities ARE reproduced, by forward '{best_key[0]}' "
+              f"with processors '{best_key[1]}'. Entropy for this dataset must be computed that way.")
         return 0
-    print("READING: no candidate configuration reproduces the cached log-probabilities. The cause is "
-          "something other than a logits processor and must be found before any entropy is cached.")
+    print(f"READING: no combination reproduces the cached log-probabilities. The closest is "
+          f"'{best_key[0]}' with '{best_key[1]}' at {best:.4e}, still above {args.tol:.1e}. "
+          f"Neither the forward configuration nor a logits processor explains it on its own.")
     return 1
 
 
