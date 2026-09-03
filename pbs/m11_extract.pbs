@@ -41,9 +41,19 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 df -h /rds/general/user/gs925/home | tail -1
 
 # One layer over eight datasets is about 19 GB. Finding that out after hours of work wastes the job.
-AVAIL=$(df -BG --output=avail /rds/general/user/gs925/home | tail -1 | tr -dc '0-9')
-echo "free space: ${AVAIL} GB"
-[ "${AVAIL:-0}" -ge 40 ] || { echo "!!! under 40 GB free; not starting"; exit 2; }
+#
+# THE QUOTA IS THE LIMIT, NOT THE FILESYSTEM. `df` on this path reports the shared filesystem, which
+# has over a petabyte free and would make this guard pass unconditionally. What actually stops a
+# write here is the per-user allocation, so that is what is read. A guard that cannot fail is not a
+# guard.
+read -r USED LIMIT < <(quota -s 2>/dev/null | awk '/Home/{u=$3;l=$5;gsub(/[^0-9.]/,"",u);gsub(/[^0-9.]/,"",l); if(l<10) l=l*1024; printf "%.0f %.0f\n",u,l}')
+if [ -z "${USED:-}" ] || [ -z "${LIMIT:-}" ]; then
+  echo "!!! could not read the storage quota. Refusing to guess; not starting."
+  exit 2
+fi
+AVAIL=$((LIMIT - USED))
+echo "quota: ${USED} GB of ${LIMIT} GB used, ${AVAIL} GB free"
+[ "$AVAIL" -ge 40 ] || { echo "!!! under 40 GB of quota free; not starting"; exit 2; }
 
 for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; do
   case "$DS" in
