@@ -1,0 +1,53 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=RTX6000
+#PBS -l walltime=03:00:00
+#PBS -N luq_m11entreg
+#PBS -j oe
+
+# Which generation-time logits processors produced the cached token log-probabilities?
+#
+# The entropy input the probability-augmented hybrids need exists for three of the eight datasets.
+# On the other five the extractor's own alignment check fails, and the failure profile does not look
+# like a misaligned window: on one dataset the early positions agree to about 1e-5 and later ones
+# differ by several nats, on another every position differs from the first. Both are what a logits
+# processor does, because what generate returns in `scores`, and therefore what was cached, is the
+# distribution AFTER the processors run.
+#
+# This does not assume which processors were used. It replays each candidate through the authors'
+# own processor classes and reports which one reproduces the cached values, or that none does.
+#
+# NOTHING IS WRITTEN. It is a measurement that decides what to do next, not a fix.
+#
+#   qsub pbs/m11_entropy_regime.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_entropy_regime__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+echo "=== entropy regime === host=$(hostname) at $(date)"
+
+# One dataset that PASSES is included on purpose. If the plain configuration does not win there, the
+# diagnostic itself is wrong and nothing it says about the failing datasets can be believed.
+run () {
+  echo; echo "################ $1 (regime '${2:-canonical}') ################"
+  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}" \
+      || echo "  (no candidate matched for $1)"
+}
+
+run pubmed_qa ""            6
+run med_quad  "cleanv2"     6
+run asqa      "asqa_rp12"   4
+run samsum    ""            6
+run factscore "factscore_rp12" 4
+run expertqa  "expertqa_rp12"  3
+
+echo; echo "=== done at $(date) ==="

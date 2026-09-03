@@ -1,0 +1,52 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=120gb
+#PBS -l walltime=04:00:00
+#PBS -N luq_m11bgx15
+#PBS -j oe
+
+# The verification target for the background, registered in amendment A1.5.
+#
+# The background statistics for all thirty-two layers are recomputed on one machine from the stored
+# token records. Thirty-one of those layers have nothing to check against. Layer 15 does: its
+# per-token states are already on disk, so its statistics can be derived through a path that loads no
+# model and recomputes nothing. That derivation is what the recomputed layer 15 must reproduce, and
+# it is the only check available on the recomputation path the other thirty-one rely on.
+#
+# THE WINDOW IS 'ref' HERE, unlike the earlier persistence check, because this target is compared
+# against the reproduction arm, which uses the reference window throughout.
+#
+# CPU ONLY, no model.
+#
+#   qsub pbs/m11_background_exact_l15.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_background_exact_l15__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+STATES="cache/background_c4/meta-llama_Meta-Llama-3.1-8B__L15__b384.npz"
+OUT="cache/background_c4_exact_l15"
+mkdir -p "$OUT"
+
+echo "=== exact layer-15 background, reference window === host=$(hostname) at $(date)"
+# Written to its own directory so it can never be mistaken for, or silently used in place of, the
+# recomputed statistics the scans consume.
+python -u scripts/01q_background_stats.py --model meta-llama/Meta-Llama-3.1-8B \
+    --from-states "$STATES" --window ref --budgets 56,128,256,384 --overwrite \
+    || { echo "!!! FAILED"; exit 3; }
+
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+for B in 56 128 256 384; do
+  mv -v "cache/background_c4/${SLUG}__bgstats__L15__b${B}__refwin.npz" \
+        "${OUT}/${SLUG}__bgstats__L15__b${B}__refwin.npz"
+done
+
+echo; echo "The recomputed layer-15 statistics must reproduce these. Once they arrive, run:"
+echo "  python scripts/checks/m11_gates.py bg \\"
+echo "    --exact  '${OUT}/${SLUG}__bgstats__L15__b{b}__refwin.npz' \\"
+echo "    --recomputed 'cache/background_c4/${SLUG}__bgstats__L15__b{b}__refwin.npz'"
+echo; echo "=== done at $(date) ==="

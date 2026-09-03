@@ -198,3 +198,100 @@ complete, or a disagreement with the authors' source in the port equivalence che
 - No relaxation of the entropy input's alignment check in order to increase coverage of the two
   probability-augmented variants. If that input cannot be produced for a dataset, those two methods
   are reported on reduced coverage and excluded from aggregate figures.
+
+---
+
+# Amendment 1, 2026-09-03
+
+Added after the original file was committed and before any distance, any prediction-rejection value
+or any comparison between methods existed. The original text above is unchanged; this section is
+additive, and the commit that introduced it is separate from the commit that introduced the file.
+
+## A1.1 What had and had not been run when this was registered
+
+The pre-registration must not be presented as predating everything, so the order is recorded exactly.
+
+| time, 2026-09-03 | event |
+|---|---|
+| 13:42:45 | background record identity check: 2000 of 2000 re-derived prompt lengths exact |
+| 13:47:09 | this pre-registration and the implementation committed and pushed |
+| 13:57:22 | background persistence check: centroid and inverse covariance exact at all four budgets |
+
+One of those two checks therefore ran **before** the commit and one ran **after** it.
+
+Both are engineering identity checks. Neither is an outcome. The first asks whether a corpus rebuilt
+from stored token identities is the corpus that was originally generated; the second asks whether
+writing a fitted statistic to a file and reading it back changes it. Neither involves a distance, a
+label, a method comparison or a prediction-rejection value, and neither could have been informative
+about any prediction in section 6.
+
+At the moment of the commit, and at the moment this amendment was written, **no layer scan file, no
+per-example distance dump and no result file from this registration existed**. No prediction-rejection
+value and no comparison between any two methods had been computed or inspected.
+
+## A1.2 Coverage, and what may enter the main table
+
+Fixed here, before the coverage of any method is known.
+
+- `SATMD`, `SATRMD`, `HUQ-SATMD` and `HUQ-SATRMD` may enter the main comparison table **only** with
+  the complete grid: eight evaluation datasets by five training conditions, three seeds each.
+- `MSP-SATMD` and `MSP-SATRMD` may enter the main comparison table **only** if the mean token entropy
+  input is reconstructed faithfully **and** their grid is likewise complete.
+- If that input cannot be reconstructed faithfully, those two methods may be reported **only** as a
+  clearly labelled appendix diagnostic that states its exact coverage in cells, and they may not
+  enter any aggregate, any macro average or any headline comparison.
+- **This rule is not weakened after seeing results.** In particular the alignment tolerance of the
+  entropy extractor is not relaxed in order to increase coverage.
+
+## A1.3 The two response windows have two different purposes
+
+Section 4 fixes the reference window for the reproduction. Two further uses are separated here so
+that neither is mistaken for the other.
+
+- **The pipeline gate (gate C) uses the project window.** Its purpose is to show that the
+  layer-combining pass, restricted to one layer, reproduces the single-layer implementation already
+  on record. That implementation was measured under the project window, so the gate must be too.
+  A gate run under a different window would be testing the window, not the pipeline.
+- **The reproduction uses the reference window**, as section 4 states.
+- **The hybrid back-off is re-run under the reference window** and reported beside its existing row.
+  Its layer choice was already faithful, because the released launch script selects the middle layer
+  out of the saved stack. The window is the only thing that changes for it, and reporting both rows
+  makes the size of that change visible instead of absorbing it.
+
+## A1.4 Gate D, the cross-cluster sentinel. Stop rule.
+
+The layers of this experiment are extracted on two compute clusters with different accelerator
+generations, referred to below as the primary cluster, which holds the per-token states cached
+earlier, and the secondary cluster.
+
+**Layer 15 is computed independently on both.** The primary cluster scans it from its existing cache;
+the secondary cluster extracts it from the model and scans it. The two per-example mean distance
+vectors, and the two relative distance vectors, must agree to a **relative tolerance of 1e-4**, the
+same bar section 5 fixes for gate B, on vectors and never on a rank statistic derived from them.
+
+This is the measurement the earlier layer registration stopped short of. That registration compared
+hidden states recomputed on a different accelerator against cached ones and stopped when they
+differed in their last bits. It never asked the question that decides a result, which is whether such
+a difference survives into a Mahalanobis distance. Gate D asks exactly that, end to end, and it can
+stop this experiment.
+
+To avoid confounding accelerator type with layer depth, the layers are **interleaved** between the
+two clusters rather than split into contiguous blocks, so that each cluster contributes layers across
+the whole depth of the model. Every cell file records the accelerator that produced it.
+
+## A1.5 The background has one owner, and one verification
+
+The background corpus statistics for all thirty-two layers are computed on **one** cluster, the
+secondary one, from the stored token records. A background fitted on a mixture of accelerators would
+introduce a per-layer difference of its own into the very quantity that is subtracted, which is
+avoided by construction rather than measured afterwards.
+
+**Verification, before any relative distance uses them.** The layer-15 background statistics can also
+be derived from the per-token states already on disk, through a path that involves no model and no
+recomputation. The secondary cluster's recomputed layer-15 statistics must reproduce those to the
+same 1e-4 relative tolerance. This is the only check available on the recomputation path that the
+other thirty-one layers depend on.
+
+No relative-distance work proceeds without the background present: the scan is run with the option
+that turns a missing background into a failure, rather than into a file that is quietly missing its
+relative arrays.

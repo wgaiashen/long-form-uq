@@ -4,11 +4,16 @@
 #PBS -N luq_m11bgst
 #PBS -j oe
 
-# Background statistics for the layers whose per-token states are ALREADY cached here, so their scans
-# have a background to subtract. Registered in prereg/M11_alllayer_published_distance_baselines.md.
+# FALLBACK ONLY. DO NOT RUN THIS UNLESS THE PRIMARY PATH IS UNAVAILABLE.
 #
-# The layers that are not yet cached do not need this job: their own fused extraction job fits their
-# background as its first step, which is what keeps the background off the critical path.
+# Under amendment A1.5 of prereg/M11_alllayer_published_distance_baselines.md the background
+# statistics for ALL thirty-two layers are computed on ONE machine, the secondary cluster, so that
+# the background does not carry a per-layer accelerator difference of its own into the very quantity
+# being subtracted. Producing some layers here and the rest there would reintroduce exactly that.
+#
+# This script remains only for the case where the secondary cluster cannot be used at all. If it is
+# ever run, every layer must be produced by it, none may be mixed with statistics from elsewhere,
+# and the deviation must be reported.
 #
 # ONE FORWARD PER BACKGROUND ROW YIELDS EVERY REQUESTED LAYER, so covering eleven layers here costs
 # one pass over the corpus rather than eleven. The states are held only until the statistics are

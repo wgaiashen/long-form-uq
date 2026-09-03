@@ -1,0 +1,74 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_m11smoke
+#PBS -j oe
+
+# SMOKE TEST. One evaluation dataset, one rung, at a layer that is already cached, so it loads about
+# 1.8 GB rather than 19 GB and finishes in minutes.
+#
+# It is here because the layer jobs spend hours extracting before they scan, and a scan that fails
+# after that wastes the extraction. This exercises the whole scan path first: the window, loading the
+# background statistics, the relative distance, the entropy passthrough, the provenance fields and
+# the file format the combining pass reads.
+#
+# ITS OUTPUT IS NOT A MEASUREMENT and goes to its own directory, which is deleted afterwards. No cell
+# file from this job may reach a results table.
+#
+#   qsub pbs/m11_smoke.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_smoke__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+OUT="results/hybrids/SMOKE_mdscan__meta-llama_Meta-Llama-3.1-8B"
+rm -rf "$OUT"
+
+echo "=== SMOKE TEST, not a measurement === host=$(hostname) at $(date)"
+python -u scripts/checks/md_layer_scan.py --model meta-llama/Meta-Llama-3.1-8B \
+    --layer 15 --seeds 1,2,3 --evals pubmed_qa --rungs ID \
+    --window project --require-background --out-dir "$OUT" \
+    || { echo "!!! SMOKE FAILED"; exit 3; }
+
+echo; echo "=== what the cell file actually contains ==="
+python -u - "$OUT" <<'PYEOF'
+import glob, sys
+import numpy as np
+files = sorted(glob.glob(sys.argv[1] + "/*.npz"))
+print(f"{len(files)} cell file(s)")
+for f in files:
+    z = np.load(f, allow_pickle=True)
+    print(f"\n{f.split('/')[-1]}")
+    print(f"  window={str(z['window'])}  bg_budget={int(z['bg_budget'])}  "
+          f"has_background={int(z['has_background'])}")
+    print(f"  card={str(z['card'])}  commit={str(z['commit'])}")
+    for k in sorted(z.files):
+        if k.endswith("__1"):
+            a = np.asarray(z[k], float).ravel()
+            fin = np.isfinite(a)
+            print(f"  {k:<16} n={a.size:<5} finite={int(fin.sum()):<5} "
+                  f"mean={np.nanmean(a):+.4f}" if fin.any() else f"  {k:<16} all nan")
+    need = ["dev_md__1", "test_md__1", "dev_rmd__1", "test_rmd__1", "ent_dev__1", "ent_test__1",
+            "msp_dev__1", "msp_test__1", "y_dev__1", "y_test__1"]
+    missing = [k for k in need if k not in z.files]
+    print("  MISSING KEYS:", missing if missing else "none")
+    if missing:
+        sys.exit(1)
+    # The relative distance must not be a copy of the ordinary one, and must not be constant.
+    md, rmd = np.asarray(z["test_md__1"], float), np.asarray(z["test_rmd__1"], float)
+    print(f"  md vs rmd: identical={np.array_equal(md, rmd)}  "
+          f"corr={np.corrcoef(md, rmd)[0,1]:+.4f}  rmd ptp={np.ptp(rmd):.4f}")
+    if np.array_equal(md, rmd):
+        sys.exit("the relative distance equals the ordinary one; the background did nothing")
+print("\nSMOKE TEST: the scan writes what the combining pass needs.")
+PYEOF
+S=$?
+rm -rf "$OUT"
+echo; echo "=== smoke output deleted; exit $S at $(date) ==="
+exit $S

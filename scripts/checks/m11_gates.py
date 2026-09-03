@@ -143,6 +143,103 @@ def gate_c(args):
     return 0 if ok else 1
 
 
+def gate_d(args):
+    """The cross-cluster sentinel: one layer computed independently on two machines.
+
+    Registered in amendment A1.4. The earlier layer registration compared hidden states recomputed on
+    a different accelerator against cached ones and stopped when they differed in their last bits. It
+    never asked whether such a difference survives into a distance. This does, end to end, on the
+    per-example mean distance AND on the relative distance, which is the quantity a background is
+    subtracted from and therefore the one with the most room to amplify anything.
+    """
+    a_dir, b_dir = ROOT / args.a, ROOT / args.b
+    for d in (a_dir, b_dir):
+        if not d.is_dir():
+            sys.exit(f"FATAL: {d} is not a directory. Gate D has nothing to compare.")
+
+    pat = f"L{args.layer}__*.npz"
+    a_files = {p.name for p in a_dir.glob(pat)}
+    b_files = {p.name for p in b_dir.glob(pat)}
+    common = sorted(a_files & b_files)
+    print(f"layer {args.layer} | {args.a}: {len(a_files)} cells | {args.b}: {len(b_files)} cells | "
+          f"comparable {len(common)}")
+    if len(common) != args.expect_cells:
+        print(f"  expected {args.expect_cells} comparable cells")
+    if not common:
+        sys.exit("FATAL: no cell of this layer appears on both sides.")
+
+    cards, worst, n_cmp, bad = {}, {}, 0, []
+    for key in ("md", "rmd"):
+        worst[key] = (0.0, "")
+    for name in common:
+        a, b = np.load(a_dir / name, allow_pickle=True), np.load(b_dir / name, allow_pickle=True)
+        for side, z in (("a", a), ("b", b)):
+            if "card" in z.files:
+                cards.setdefault(side, set()).add(str(z["card"]))
+        wa = {str(z["window"]) for z in (a, b) if "window" in z.files}
+        if len(wa) > 1:
+            sys.exit(f"FATAL [{name}]: the two sides used different windows {sorted(wa)}.")
+        seeds = [int(s) for s in np.asarray(a["seeds"]).ravel()]
+        for sd in seeds:
+            for key, keys in (("md", (f"dev_md__{sd}", f"test_md__{sd}")),
+                              ("rmd", (f"dev_rmd__{sd}", f"test_rmd__{sd}"))):
+                for k in keys:
+                    if k not in a.files or k not in b.files:
+                        continue
+                    x, y = np.asarray(a[k], float), np.asarray(b[k], float)
+                    if x.shape != y.shape:
+                        bad.append(f"{name} {k}: shape {x.shape} vs {y.shape}")
+                        continue
+                    scale = np.maximum(np.abs(y), 1e-12)
+                    rel = float(np.max(np.abs(x - y) / scale))
+                    n_cmp += 1
+                    if rel > worst[key][0]:
+                        worst[key] = (rel, f"{name} {k}")
+
+    print(f"accelerators: {args.a} = {sorted(cards.get('a', {'unrecorded'}))} | "
+          f"{args.b} = {sorted(cards.get('b', {'unrecorded'}))}")
+    print(f"\ncompared {n_cmp} vectors")
+    for key in ("md", "rmd"):
+        w, where = worst[key]
+        print(f"  {key:<4} worst relative difference {w:.3e} at {where or 'nothing compared'}")
+    print(f"pre-registered bar: {args.tol:.1e} relative, on both")
+    for line in bad[:10]:
+        print(f"  MISMATCH {line}")
+    ok = (not bad) and all(worst[k][0] <= args.tol for k in worst) and n_cmp > 0
+    if worst["rmd"][1] == "":
+        print("  the relative distance was not present on both sides, so it was NOT tested")
+        ok = False
+    print("GATE D: " + ("PASS" if ok else "FAIL"))
+    return 0 if ok else 1
+
+
+def gate_bg(args):
+    """The background verification of amendment A1.5.
+
+    The layer-15 background can be derived from per-token states already on disk, with no model and no
+    recomputation. The recomputed statistics that the other thirty-one layers rely on must reproduce
+    that one. This is the only check available on the recomputation path.
+    """
+    sys.path.insert(0, str(ROOT / "src"))
+    from luq import mahalanobis as _MD
+    status, budgets = 0, [int(b) for b in args.budgets.split(",") if b.strip()]
+    for b in budgets:
+        fa, fb = ROOT / args.exact.format(b=b), ROOT / args.recomputed.format(b=b)
+        if not fa.exists() or not fb.exists():
+            print(f"b{b}: missing {'exact' if not fa.exists() else 'recomputed'} statistic -> NOT CHECKED")
+            status = 1
+            continue
+        x, y = _MD.load_stats(fa), _MD.load_stats(fb)
+        dc = float(np.max(np.abs(x.centroid - y.centroid) / np.maximum(np.abs(x.centroid), 1e-12)))
+        ds = float(np.max(np.abs(x.sigma_inv - y.sigma_inv) / np.maximum(np.abs(x.sigma_inv), 1e-12)))
+        print(f"b{b}: centroid {dc:.3e} | sigma_inv {ds:.3e} | tokens {x.n_tokens} vs {y.n_tokens}")
+        if max(dc, ds) > args.tol or x.n_tokens != y.n_tokens:
+            status = 1
+    print(f"\npre-registered bar: {args.tol:.1e} relative")
+    print("BACKGROUND VERIFICATION: " + ("PASS" if status == 0 else "FAIL"))
+    return status
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="gate", required=True)
@@ -157,8 +254,21 @@ def main():
     c.add_argument("--reference", required=True)
     c.add_argument("--tol", type=float, default=1e-6)
 
+    d = sub.add_parser("d", help="cross-cluster sentinel, one layer computed on two machines")
+    d.add_argument("--a", required=True, help="scan directory from one cluster")
+    d.add_argument("--b", required=True, help="scan directory from the other")
+    d.add_argument("--layer", type=int, default=15)
+    d.add_argument("--expect-cells", type=int, default=40)
+    d.add_argument("--tol", type=float, default=1e-4)
+
+    g = sub.add_parser("bg", help="background verification, recomputed against the exact path")
+    g.add_argument("--exact", required=True, help="path template with {b} for the budget")
+    g.add_argument("--recomputed", required=True, help="path template with {b} for the budget")
+    g.add_argument("--budgets", default="56,128,256,384")
+    g.add_argument("--tol", type=float, default=1e-4)
+
     args = ap.parse_args()
-    return gate_b(args) if args.gate == "b" else gate_c(args)
+    return {"b": gate_b, "c": gate_c, "d": gate_d, "bg": gate_bg}[args.gate](args)
 
 
 if __name__ == "__main__":

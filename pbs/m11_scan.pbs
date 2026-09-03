@@ -4,18 +4,19 @@
 #PBS -N luq_m11scan
 #PBS -j oe
 
-# Reduce ONE already-cached layer to per-example distances. CPU only: the states exist.
+# Reduce ONE layer to per-example distances. CPU only: the states already exist, either because they
+# were cached earlier or because pbs/m11_extract.pbs has just produced them.
 # Registered in prereg/M11_alllayer_published_distance_baselines.md.
+#
+# THE BACKGROUND MUST BE PRESENT. --require-background turns a missing background statistic into a
+# failure rather than a file that is quietly missing its relative-distance arrays and would then be
+# dropped by the combining pass without anyone noticing (amendment A1.5).
 #
 # One job per layer, because layers are independent and running them concurrently is the difference
 # between half a day and a week. The layer comes from the environment:
 #
-#   for L in 0 3 6 9 12 15 18 21 24 27 30; do qsub -v LUQ_M11_LAYER=$L pbs/m11_scan_cached.pbs; done
+#   for L in 0 3 6 9 12 15 18 21 24 27 30; do qsub -v LUQ_M11_LAYER=$L pbs/m11_scan.pbs; done
 #
-# --require-background makes a missing background a failure rather than a file that is quietly
-# missing its relative-distance arrays and would then be dropped by the combining pass without
-# anyone noticing.
-
 set -uo pipefail
 cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
 
