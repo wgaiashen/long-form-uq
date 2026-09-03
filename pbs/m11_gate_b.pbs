@@ -1,7 +1,8 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=8:mem=120gb
-#PBS -l walltime=36:00:00
+#PBS -l walltime=24:00:00
 #PBS -N luq_m11gateb
+#PBS -q v1_small72a
 #PBS -j oe
 
 # Gate B, the distance-invariance stop rule, plus the invariance control that goes with it.
@@ -24,6 +25,11 @@
 #    still while individual scores move, so it answers neither question.
 #
 # CPU ONLY. Every input exists.
+#
+# QUEUE. This is CPU-only work and it is sent to the high-throughput pool explicitly. The two pools
+# accept identical resources, but at the time of writing the default one had 137 jobs waiting against
+# 128 running, while this one had 38 waiting against 2727 running. A job that waits a day to run a
+# gate that takes an hour is the schedule risk, not the gate.
 #
 #   qsub pbs/m11_gate_b.pbs
 
