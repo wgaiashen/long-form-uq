@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=L40S
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
 #PBS -l walltime=03:00:00
 #PBS -N luq_m11entreg
 #PBS -j oe
@@ -44,7 +44,8 @@ echo "=== entropy regime === host=$(hostname) at $(date)"
 # is the finding; anything else is a failure of the job.
 run () {
   echo; echo "################ $1 (regime '${2:-canonical}') ################"
-  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}"
+  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}" \
+      --device-map auto --max-memory "0=17GiB,1=17GiB"
   local rc=$?
   case $rc in
     0) ;;

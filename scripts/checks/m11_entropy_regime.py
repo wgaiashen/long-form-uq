@@ -76,7 +76,17 @@ def main():
     ap.add_argument("--dtype", default="fp32", choices=["fp32", "fp16", "bf16"])
     ap.add_argument("--attn", default="eager", choices=["eager", "sdpa"])
     ap.add_argument("--device-map", default="cuda")
+    ap.add_argument("--max-memory", default="",
+                    help="per-device ceilings when sharding, e.g. '0=17GiB,1=17GiB'. Needed with "
+                         "--device-map auto: on its own that fills the first card and a float32 8B "
+                         "model then runs out of memory on a 24 GB one rather than sharding.")
     args = ap.parse_args()
+    max_memory = None
+    if args.max_memory:
+        max_memory = {}
+        for item in args.max_memory.split(","):
+            k, v = item.split("=")
+            max_memory[int(k.strip())] = v.strip()
 
     cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting=args.ood,
                  prompt_regime=args.prompt_regime)
@@ -86,8 +96,15 @@ def main():
           f"{len(records)} records, checking {min(args.n, len(records))}", flush=True)
 
     model, tok = generate.load_model(args.model, attn_implementation=args.attn,
-                                     dtype=_DTYPE[args.dtype], device_map=args.device_map)
+                                     dtype=_DTYPE[args.dtype], device_map=args.device_map,
+                                     max_memory=max_memory)
     model.eval()
+    if args.device_map == "auto":
+        placed = getattr(model, "hf_device_map", {})
+        n_dev = len({v for v in placed.values() if isinstance(v, int)})
+        print(f"device map: {n_dev} GPU(s) hold weights", flush=True)
+        if max_memory is not None and n_dev < 2:
+            sys.exit("--max-memory asked for a split but every layer landed on one device.")
 
     worst = {name: 0.0 for name, _ in CANDIDATES}
     over = {name: 0 for name, _ in CANDIDATES}

@@ -1,0 +1,85 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=24:00:00
+#PBS -N luq_m11ext2
+#PBS -j oe
+
+# Per-token hidden states for ONE layer, over the eight long-form datasets. Extraction only.
+# Registered in prereg/M11_alllayer_published_distance_baselines.md.
+#
+# SHARDED ACROSS TWO SMALLER CARDS. This is the same job as pbs/m11_extract.pbs and computes the
+# same values; only where the weights live differs. It exists because the 48 GB cards on this cluster
+# are fully subscribed while the 24 GB ones are not, and a float32 8B model does not fit on one 24 GB
+# card. Two of them with a ceiling of 17 GiB each does fit, which is the arrangement the earlier
+# multi-layer extraction on this cluster used. The dtype, the sequence handling and every value
+# written are identical to the single-card job.
+#
+# The accelerator is recorded in every cell file the scan later writes, so a layer produced here can
+# always be told from one produced elsewhere.
+#
+# WHY EXTRACTION AND SCANNING ARE SEPARATE JOBS HERE. The scan subtracts a background distance, and
+# the background statistics for every layer are computed on one machine so that they do not carry a
+# per-layer accelerator difference of their own (amendment A1.5). Extraction does not depend on the
+# background at all, so it runs now and the scan follows when the background has arrived and been
+# verified. Nothing waits that does not have to.
+#
+# NOTHING IS DELETED. There is room for these layers alongside the ones already cached, and under
+# amendment A1.4 the cached layers stay until every scan has passed its checks and the combined
+# result exists. The other cluster deletes as it goes only because its storage cap leaves no choice.
+#
+#   for L in 2 5 8 11 14 17 20 23 26 29; do qsub -v LUQ_M11_LAYER=$L pbs/m11_extract_2gpu.pbs; done
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+L="${LUQ_M11_LAYER:?set LUQ_M11_LAYER, e.g. qsub -v LUQ_M11_LAYER=2 pbs/m11_extract.pbs}"
+LIVE="logs/m11_extract2_L${L}__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export LUQ_REGIME="med_quad=cleanv2"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+
+echo "=== extraction, layer $L === host=$(hostname) at $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
+df -h /rds/general/user/gs925/home | tail -1
+
+# One layer over eight datasets is about 19 GB. Finding that out after hours of work wastes the job.
+#
+# THE QUOTA IS THE LIMIT, NOT THE FILESYSTEM. `df` on this path reports the shared filesystem, which
+# has over a petabyte free and would make this guard pass unconditionally. What actually stops a
+# write here is the per-user allocation, so that is what is read. A guard that cannot fail is not a
+# guard.
+read -r USED LIMIT < <(quota -s 2>/dev/null | awk '/Home/{u=$3;l=$5;gsub(/[^0-9.]/,"",u);gsub(/[^0-9.]/,"",l); if(l<10) l=l*1024; printf "%.0f %.0f\n",u,l}')
+if [ -z "${USED:-}" ] || [ -z "${LIMIT:-}" ]; then
+  echo "!!! could not read the storage quota. Refusing to guess; not starting."
+  exit 2
+fi
+AVAIL=$((LIMIT - USED))
+echo "quota: ${USED} GB of ${LIMIT} GB used, ${AVAIL} GB free"
+[ "$AVAIL" -ge 40 ] || { echo "!!! under 40 GB of quota free; not starting"; exit 2; }
+
+for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; do
+  case "$DS" in
+    med_quad)  REGIME="cleanv2" ;;
+    asqa)      REGIME="asqa_rp12" ;;
+    expertqa)  REGIME="expertqa_rp12" ;;
+    factscore) REGIME="factscore_rp12" ;;
+    *)         REGIME="" ;;
+  esac
+  echo; echo "---- $DS (regime '${REGIME:-canonical}') at $(date)"
+  python -u scripts/01p_pertoken_multi.py --model "$MODEL" --dataset "$DS" --ood ID \
+      --layers "$L" --prompt-regime "$REGIME" --dtype fp32 --attn eager \
+      --device-map auto --max-memory "0=17GiB,1=17GiB" --skip-lm-head \
+      || { echo "!!! extraction FAILED for $DS layer $L"; exit 4; }
+done
+
+df -h /rds/general/user/gs925/home | tail -1
+echo; echo "=== layer $L extracted at $(date). Scan it with:"
+echo "      qsub -v LUQ_M11_LAYER=$L pbs/m11_scan.pbs"
