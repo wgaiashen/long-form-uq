@@ -54,6 +54,14 @@ def main():
     ap.add_argument("--attn", default="eager", choices=["auto", "eager", "sdpa"])
     ap.add_argument("--prompt-regime", default="",
                     help="cache namespace tag; MUST match the one 01_extract used for this population")
+    ap.add_argument("--repetition-penalty", type=float, default=None,
+                    help="the repetition penalty this dataset was GENERATED with, if any. What "
+                         "generation returns in `scores`, and therefore what the record cached, is "
+                         "the distribution AFTER the logits processors run; a plain forward "
+                         "reproduces it before them. Supplying the wrong setting, or none where one "
+                         "was used, makes the window gate below fail rather than pass quietly.")
+    ap.add_argument("--no-repeat-ngram-size", type=int, default=None,
+                    help="the repeated-n-gram ban this dataset was generated with, if any")
     ap.add_argument("--tol", type=float, default=2e-2,
                     help="absolute tolerance for the chosen-token logprob agreement gate")
     ap.add_argument("--limit", type=int, default=0, help="debug only: stop after N records")
@@ -114,6 +122,19 @@ def main():
     # one that covers a different subset of datasets, redoes work that is already on disk. The cache
     # is only ever written after the window gate passes, so a file being present means a verified
     # file. --overwrite is required to replace one.
+    # The processors that were active at generation time, rebuilt from the authors' own classes so
+    # this is the same function, not an approximation of it.
+    from transformers import (LogitsProcessorList, RepetitionPenaltyLogitsProcessor,
+                              NoRepeatNGramLogitsProcessor)
+    PROCS = LogitsProcessorList()
+    if args.repetition_penalty:
+        PROCS.append(RepetitionPenaltyLogitsProcessor(penalty=float(args.repetition_penalty)))
+    if args.no_repeat_ngram_size:
+        PROCS.append(NoRepeatNGramLogitsProcessor(int(args.no_repeat_ngram_size)))
+    print(f"generation-time processors: repetition_penalty={args.repetition_penalty}, "
+          f"no_repeat_ngram_size={args.no_repeat_ngram_size}"
+          + ("" if len(PROCS) else "  (none)"), flush=True)
+
     out_path = Path(cfg.cache_dir) / "entropy" / f"{key}.npz"
     if out_path.exists() and not args.overwrite:
         print(f"SKIP: entropy cache already exists at {out_path}\n"
@@ -143,8 +164,20 @@ def main():
             else:
                 logits = model(ids).logits[0]                # (P+G, vocab)
                 win = logits[P - 1:P + G - 1].float()        # the positions that PREDICT the G gen tokens
+            if len(PROCS):
+                # A processor is a function of the context AS IT STOOD at that step, so it has to be
+                # applied position by position against the growing prefix. Applying it once against
+                # the final context would be a different function.
+                win = torch.stack([
+                    PROCS(torch.tensor(p_ids + g_ids[:t], device=win.device)[None],
+                          win[t:t + 1].clone())[0]
+                    for t in range(G)])
             logp = torch.log_softmax(win, dim=-1)            # (G, vocab)
-            H = -(logp.exp() * logp).sum(-1)                 # (G,) full-distribution entropy
+            # A repeated-n-gram ban sets banned tokens to -inf, so their probability is exactly zero
+            # and the usual p*log(p) term is 0 * -inf, which is nan rather than the 0 it should be.
+            # Left alone that turns every entropy on such a dataset into nan.
+            pr = logp.exp()
+            H = -(torch.where(pr > 0, pr * logp, torch.zeros_like(pr))).sum(-1)
             chosen = logp[torch.arange(G), torch.tensor(g_ids, device=logp.device)]
         ents.append(H.cpu().numpy().astype(np.float32).copy())
         idxs.append(r.get("idx", i))
@@ -182,11 +215,16 @@ def main():
             print(f"PEAK MEMORY device {d}: allocated {peak:.2f} GiB, reserved {resv:.2f} GiB "
                   f"(slim_logits={args.slim_logits})")
 
+    # Recorded in the file, because an entropy vector is meaningless without the configuration it was
+    # computed under and this one is not recoverable from the numbers.
     out_dir = Path(cfg.cache_dir) / "entropy"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{key}.npz"
     np.savez_compressed(out, entropy=np.array(ents, dtype=object), idx=np.array(idxs),
-                        logprob_max_abs_dev=np.float64(worst))
+                        logprob_max_abs_dev=np.float64(worst),
+                        repetition_penalty=np.float64(args.repetition_penalty or 0.0),
+                        no_repeat_ngram_size=np.int64(args.no_repeat_ngram_size or 0),
+                        dtype=str(args.dtype), attn=str(args.attn))
     lens = np.array([len(e) for e in ents])
     print(f"wrote {out}\n  {len(ents)} rows | mean entropy "
           f"{np.mean([e.mean() for e in ents if len(e)]):.4f} | token count {int(lens.sum())}")
