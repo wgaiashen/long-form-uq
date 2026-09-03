@@ -35,6 +35,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export LUQ_REGIME="med_quad=cleanv2"
 
 MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
 
 echo "=== extraction, layer $L === host=$(hostname) at $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
@@ -63,6 +64,19 @@ for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; 
     factscore) REGIME="factscore_rp12" ;;
     *)         REGIME="" ;;
   esac
+  # RESUMABILITY. The extractor REFUSES a layer that already exists rather than skipping it, which is
+  # right for it and wrong for a loop: on a resubmission after a walltime overrun the first completed
+  # dataset would abort the whole job. So the already-done datasets are skipped here, which is what
+  # the extractor's own message tells the caller to do. This is what makes a shorter walltime safe.
+  case "$REGIME" in
+    "") CACHE_DIR="cache" ;;
+    *)  CACHE_DIR="cache/$REGIME" ;;
+  esac
+  TARGET="${CACHE_DIR}/pertok/${SLUG}__${DS}__ID__L${L}.npz"
+  if [ -f "$TARGET" ]; then
+    echo "  $DS layer $L already cached, skipping"
+    continue
+  fi
   echo; echo "---- $DS (regime '${REGIME:-canonical}') at $(date)"
   python -u scripts/01p_pertoken_multi.py --model "$MODEL" --dataset "$DS" --ood ID \
       --layers "$L" --prompt-regime "$REGIME" --dtype fp32 --attn eager \
