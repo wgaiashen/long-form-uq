@@ -54,17 +54,30 @@ df -h /rds/general/user/gs925/home | tail -1
 # One layer over eight datasets is about 19 GB. Finding that out after hours of work wastes the job.
 #
 # THE QUOTA IS THE LIMIT, NOT THE FILESYSTEM. `df` on this path reports the shared filesystem, which
-# has over a petabyte free and would make this guard pass unconditionally. What actually stops a
-# write here is the per-user allocation, so that is what is read. A guard that cannot fail is not a
-# guard.
-read -r USED LIMIT < <(quota -s 2>/dev/null | awk '/Home/{u=$3;l=$5;gsub(/[^0-9.]/,"",u);gsub(/[^0-9.]/,"",l); if(l<10) l=l*1024; printf "%.0f %.0f\n",u,l}')
-if [ -z "${USED:-}" ] || [ -z "${LIMIT:-}" ]; then
-  echo "!!! could not read the storage quota. Refusing to guess; not starting."
-  exit 2
+# has over a petabyte free and would make this check pass unconditionally. What actually stops a write
+# is the per-user allocation.
+#
+# BUT THE QUOTA TOOL IS NOT AVAILABLE ON COMPUTE NODES. It reports nothing here, so the figure is
+# measured on the submitting node instead and passed in. An earlier version refused to start when it
+# could not read the quota, which cost a scheduled slot on a queue this contended and protected
+# nothing: the real consequence of running out of space is a write error part way through, and the
+# per-dataset resume above turns that into a resubmission rather than lost work. So a missing figure
+# now warns loudly and proceeds, while a figure that IS available and too small still stops the job.
+#
+#   qsub -v LUQ_M11_LAYER=$L,LUQ_QUOTA_FREE_GB=$(quota_free_gb) pbs/m11_extract.pbs
+AVAIL="${LUQ_QUOTA_FREE_GB:-}"
+if [ -z "$AVAIL" ]; then
+  read -r U L < <(quota -s 2>/dev/null | awk '/Home/{u=$3;l=$5;gsub(/[^0-9.]/,"",u);gsub(/[^0-9.]/,"",l); if(l<10) l=l*1024; printf "%.0f %.0f\n",u,l}')
+  [ -n "${U:-}" ] && [ -n "${L:-}" ] && AVAIL=$((L - U))
 fi
-AVAIL=$((LIMIT - USED))
-echo "quota: ${USED} GB of ${LIMIT} GB used, ${AVAIL} GB free"
-[ "$AVAIL" -ge 40 ] || { echo "!!! under 40 GB of quota free; not starting"; exit 2; }
+if [ -z "$AVAIL" ]; then
+  echo "WARNING: could not determine the storage quota here and none was passed in. Proceeding."
+  echo "         One layer needs about 19 GB. If the allocation is full this will fail on a write,"
+  echo "         and the per-dataset resume above makes that recoverable by resubmitting."
+else
+  echo "quota headroom at submission: ${AVAIL} GB"
+  [ "$AVAIL" -ge 40 ] || { echo "!!! under 40 GB of quota free; not starting"; exit 2; }
+fi
 
 for DS in pubmed_qa xsum cnn_dailymail samsum med_quad asqa expertqa factscore; do
   case "$DS" in
