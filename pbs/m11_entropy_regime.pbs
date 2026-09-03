@@ -49,19 +49,34 @@ echo "=== entropy regime === host=$(hostname) at $(date)"
 # two are different findings and an earlier version of this job printed the same line for both, which
 # made six out-of-memory failures look like six datasets where no configuration matched. Exit code 1
 # is the finding; anything else is a failure of the job.
+# ONE PROCESS PER FORWARD CONFIGURATION. A model dispatched across two devices is not released by
+# deleting the reference, so a second load in the same process runs out of memory and that
+# configuration silently goes untested. The first version of this job tested one of five and reported
+# the other four as "not tested", which was at least honest but useless. A fresh process per
+# configuration cannot leak.
+FORWARDS="fp32/eager fp16/eager bf16/eager fp32/sdpa fp16/sdpa"
+RESULTS="results/analysis/m11_entropy_regime__meta-llama_Meta-Llama-3.1-8B.csv"
+
 run () {
   echo; echo "################ $1 (regime '${2:-canonical}') ################"
-  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}" \
-      --device-map auto --max-memory "0=17GiB,1=17GiB"
-  local rc=$?
-  case $rc in
-    0) ;;
-    1) echo "  FINDING: no candidate configuration reproduces the cached values for $1" ;;
-    *) echo "  !!! THE DIAGNOSTIC FAILED for $1 (exit $rc). This is NOT a finding about $1."
-       FAILURES=$((FAILURES+1)) ;;
-  esac
+  for FW in $FORWARDS; do
+    echo; echo "---- $1 | forward $FW"
+    python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}" \
+        --numerical "$FW" --append-to "$RESULTS" \
+        --device-map auto --max-memory "0=17GiB,1=17GiB"
+    rc=$?
+    case $rc in
+      0) echo "  $FW REPRODUCES the cached values for $1" ;;
+      1) echo "  $FW does not reproduce them for $1" ;;
+      *) echo "  !!! $FW FAILED to run for $1 (exit $rc). NOT a finding about $1."
+         FAILURES=$((FAILURES+1)) ;;
+    esac
+  done
+  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n 1 \
+      --numerical fp32/eager --device-map auto --max-memory "0=17GiB,1=17GiB" >/dev/null 2>&1 || true
 }
 FAILURES=0
+mkdir -p results/analysis
 
 # THREE DATASETS, NOT EIGHT. The sweep now reloads the model for each forward configuration, so the
 # cost is in model loads rather than in records. Three datasets identify the configuration: one that

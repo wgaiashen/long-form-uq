@@ -27,6 +27,7 @@ does, that is the answer and it says so.
     python scripts/checks/m11_entropy_regime.py --dataset asqa --prompt-regime asqa_rp12 --n 6
 """
 import argparse
+import gc
 import sys
 from pathlib import Path
 
@@ -100,6 +101,15 @@ def main():
     ap.add_argument("--dtype", default="fp32", choices=["fp32", "fp16", "bf16"])
     ap.add_argument("--attn", default="eager", choices=["eager", "sdpa"])
     ap.add_argument("--device-map", default="cuda")
+    ap.add_argument("--numerical", default="",
+                    help="test ONE forward configuration by name, e.g. 'fp16/eager'. One process per "
+                         "configuration is the only reliable way to do this: a model dispatched "
+                         "across devices is not released by deleting the reference, so a second "
+                         "load in the same process runs out of memory and the configuration goes "
+                         "untested. Untested must not look like tested, so it is reported as such.")
+    ap.add_argument("--append-to", default="",
+                    help="append one row per configuration to this CSV, so a job that runs each "
+                         "configuration as its own process can still reach a single verdict")
     ap.add_argument("--max-memory", default="",
                     help="per-device ceilings when sharding, e.g. '0=17GiB,1=17GiB'. Needed with "
                          "--device-map auto: on its own that fills the first card and a float32 8B "
@@ -134,8 +144,15 @@ def main():
         sys.exit("no comparable rows")
     n_pos = sum(len(g) for _, g, _ in rows)
 
+    todo = NUMERICAL
+    if args.numerical:
+        todo = [c for c in NUMERICAL if c[0] == args.numerical]
+        if not todo:
+            sys.exit(f"--numerical {args.numerical!r} is not one of "
+                     f"{[c[0] for c in NUMERICAL]}")
+
     results = {}
-    for num_name, dtype, attn in NUMERICAL:
+    for num_name, dtype, attn in todo:
         try:
             model, tok = generate.load_model(args.model, attn_implementation=attn,
                                              dtype=_DTYPE[dtype], device_map=args.device_map,
@@ -174,16 +191,35 @@ def main():
             results[(num_name, proc_name)] = (worst[proc_name], over[proc_name])
         best_here = min((worst[pn] for pn, _ in PROCESSORS))
         print(f"  {num_name}: best worst-case {best_here:.4e}", flush=True)
-        del model
+        # Best effort only, and NOT relied upon: see --numerical. A dispatched model keeps
+        # references that outlive the local name, so this reduces the leak without removing it.
+        del model, tok
+        gc.collect()
         try:
             torch.cuda.empty_cache()
         except Exception:
             pass
 
+    if args.append_to:
+        import csv as _csv
+        out = Path(args.append_to)
+        new_file = not out.exists()
+        with open(out, "a", newline="") as fh:
+            w = _csv.writer(fh)
+            if new_file:
+                w.writerow(["dataset", "regime", "forward", "processors", "worst_abs_diff",
+                            "positions_over_tol", "n_positions", "tolerance"])
+            for (nn, pn), v in results.items():
+                if v is None:
+                    w.writerow([args.dataset, args.prompt_regime, nn, pn, "", "", n_pos, args.tol])
+                else:
+                    w.writerow([args.dataset, args.prompt_regime, nn, pn, f"{v[0]:.6e}", v[1],
+                                n_pos, args.tol])
+
     print(f"\n=== {args.dataset} | {len(rows)} rows | {n_pos} positions ===")
     print(f"{'forward':<12} {'processors':<15} {'worst |d|':>12} {'over tol':>10}")
     best, best_key = None, None
-    for num_name, _, _ in NUMERICAL:
+    for num_name, _, _ in todo:
         for proc_name, _ in PROCESSORS:
             v = results.get((num_name, proc_name))
             if v is None:
