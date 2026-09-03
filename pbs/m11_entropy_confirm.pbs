@@ -1,0 +1,98 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=05:00:00
+#PBS -N luq_m11entc
+#PBS -j oe
+
+# Determine the generation configuration for EVERY long-form dataset, and confirm it by measurement.
+#
+# WHY THIS IS A TEST AND NOT A SEARCH. The first sweep established two things: the forward pass is
+# fp32 with the eager attention backend, since that reproduces the datasets exactly where anything
+# does; and the differences come from LOGITS PROCESSORS active at generation time, not from numerics.
+# It also identified the corrected-span dataset's processor as a repeated three-gram ban, which its
+# own extraction job script independently states in words.
+#
+# So the processor settings are now READ FROM THE EXTRACTION JOB SCRIPTS and the measurement checks
+# them. A prediction that fails is more informative than a search that succeeds.
+#
+# Predictions, from the extraction scripts:
+#   pubmed_qa, xsum, cnn_dailymail   no processor
+#   med_quad                          three-gram ban            (already confirmed, rerun at 8 records)
+#   asqa, samsum                      repetition penalty 1.2
+#   expertqa                          penalty 1.3 + three-gram ban
+#   factscore                         penalty 1.2               (its script was not located; this is
+#                                                                the weakest prediction of the set)
+#
+# ONE FORWARD CONFIGURATION ONLY, so this is one model load per dataset rather than five.
+#
+#   qsub pbs/m11_entropy_confirm.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs results/analysis
+LIVE="logs/m11_entropy_confirm__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+RESULTS="results/analysis/m11_entropy_confirm__meta-llama_Meta-Llama-3.1-8B.csv"
+rm -f "$RESULTS"
+FAILURES=0
+
+run () {
+  echo; echo "################ $1 (regime '${2:-canonical}') | predicted: $3 ################"
+  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n 8 \
+      --numerical fp32/eager --append-to "$RESULTS" \
+      --device-map auto --max-memory "0=17GiB,1=17GiB"
+  rc=$?
+  [ $rc -le 1 ] || { echo "  !!! FAILED to run for $1 (exit $rc). NOT a finding about $1."; FAILURES=$((FAILURES+1)); }
+}
+
+run pubmed_qa     ""                "none"
+run xsum          ""                "none"
+run cnn_dailymail ""                "none"
+run samsum        ""                "rep1.2"
+run med_quad      "cleanv2"         "ngram3"
+run asqa          "asqa_rp12"       "rep1.2"
+run expertqa      "expertqa_rp12"   "rep1.3+ngram3"
+run factscore     "factscore_rp12"  "rep1.2"
+
+echo; echo "################ verdict ################"
+python -u - "$RESULTS" <<'PYEOF2'
+import csv, sys
+from collections import defaultdict
+rows = list(csv.DictReader(open(sys.argv[1])))
+by = defaultdict(list)
+for r in rows:
+    by[r["dataset"]].append(r)
+print(f"{'dataset':<15} {'best processors':<16} {'worst |d|':>12} {'over tol':>9}  verdict")
+bad = []
+for ds, rs in sorted(by.items()):
+    scored = [r for r in rs if r["worst_abs_diff"]]
+    if not scored:
+        print(f"{ds:<15} {'-':<16} {'nothing ran':>12} {'-':>9}  NOT MEASURED")
+        bad.append(ds); continue
+    b = min(scored, key=lambda r: float(r["worst_abs_diff"]))
+    d, tol = float(b["worst_abs_diff"]), float(b["tolerance"])
+    ok = d <= tol
+    print(f"{ds:<15} {b['processors']:<16} {d:>12.4e} {b['positions_over_tol']:>9}  "
+          + ("REPRODUCED" if ok else "NOT reproduced"))
+    if not ok:
+        bad.append(ds)
+print()
+if bad:
+    print("Datasets whose cached values are still not reproduced: " + ", ".join(bad))
+    print("They keep their partial coverage. The alignment tolerance is NOT relaxed.")
+else:
+    print("Every dataset is reproduced. The entropy input can be rebuilt for all eight, each under")
+    print("its own processor setting, which makes the probability-augmented hybrids computable on")
+    print("the full grid.")
+PYEOF2
+
+echo; echo "=== done at $(date), failures: $FAILURES ==="
+exit $FAILURES

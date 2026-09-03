@@ -69,11 +69,17 @@ NUMERICAL = [
     ("fp16/sdpa", "fp16", "sdpa"),
 ]
 
+# Every combination that appears in this project's own extraction jobs, plus the empty one. The list
+# is derived from those job scripts rather than guessed, so a dataset whose configuration is recorded
+# there has a candidate that can match it. `rep1.3+ngram3` is here because the factual-writing
+# extraction used it; leaving it out would have made that dataset look unexplainable.
 PROCESSORS = [
     ("none", dict()),
     ("rep1.2", dict(repetition_penalty=1.2)),
-    ("rep1.2+ngram3", dict(repetition_penalty=1.2, no_repeat_ngram_size=3)),
     ("ngram3", dict(no_repeat_ngram_size=3)),
+    ("rep1.2+ngram3", dict(repetition_penalty=1.2, no_repeat_ngram_size=3)),
+    ("rep1.3", dict(repetition_penalty=1.3)),
+    ("rep1.3+ngram3", dict(repetition_penalty=1.3, no_repeat_ngram_size=3)),
 ]
 
 
