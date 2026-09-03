@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=8:mem=96gb:ngpus=2:gpu_type=RTX6000
+#PBS -l walltime=06:00:00
+#PBS -N luq_m11entb
+#PBS -j oe
+
+# Rebuild the token-entropy caches, each dataset under the generation configuration that was SHOWN to
+# reproduce its cached log-probabilities.
+#
+# THE SETTINGS ARE READ FROM THE MEASUREMENT, not from a list written down here. Whatever setting is
+# used for a dataset is by construction the one the sweep demonstrated, so the two cannot drift apart,
+# and a dataset the sweep did not resolve produces no command at all rather than a plausible guess.
+#
+# THE EXTRACTOR IS ITS OWN GATE. It recomputes the chosen token's log-probability at the same
+# positions and refuses to write a cache whose window does not agree with the record. That check is
+# what surfaced this whole problem and its tolerance is unchanged.
+#
+# WHY THIS MATTERS. The two probability-augmented distance hybrids need a mean token entropy, and
+# without it they stand at 6 of 40 cells. With it they are computable on the full grid.
+#
+#   qsub pbs/m11_entropy_build.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_entropy_build__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export HF_HOME
+export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+RESULTS="results/analysis/m11_entropy_confirm__meta-llama_Meta-Llama-3.1-8B.csv"
+
+echo "=== entropy rebuild === host=$(hostname) at $(date)"
+echo; echo "################ the settings, as measured ################"
+python -u scripts/checks/m11_entropy_settings.py --results "$RESULTS" || exit 2
+
+FAILURES=0
+BUILT=0
+while IFS=$'\t' read -r DS REGIME FLAGS; do
+  [ -z "$DS" ] && continue
+  echo; echo "---- $DS (regime '${REGIME:-canonical}') flags: ${FLAGS:-none} at $(date)"
+  # shellcheck disable=SC2086
+  python -u scripts/01n_token_entropy.py --model "$MODEL" --dataset "$DS" \
+      --prompt-regime "$REGIME" --dtype fp32 --attn eager --slim-logits \
+      --device-map auto --max-memory "0=17GiB,1=17GiB" \
+      $FLAGS
+  rc=$?
+  case $rc in
+    0) BUILT=$((BUILT+1)) ;;
+    *) echo "  !!! $DS FAILED (exit $rc)"; FAILURES=$((FAILURES+1)) ;;
+  esac
+done < <(python -u scripts/checks/m11_entropy_settings.py --results "$RESULTS" --shell)
+
+echo; echo "################ coverage after the rebuild ################"
+python -u - <<'PYEOF'
+import sys
+from pathlib import Path
+sys.path.insert(0, "src")
+from luq import cache
+from luq.config import Config
+REGIME = {"med_quad": "cleanv2", "asqa": "asqa_rp12", "expertqa": "expertqa_rp12",
+          "factscore": "factscore_rp12"}
+have = 0
+for ds in ["pubmed_qa", "xsum", "cnn_dailymail", "samsum", "med_quad", "asqa", "expertqa",
+           "factscore"]:
+    cfg = Config(model_name="meta-llama/Meta-Llama-3.1-8B", dataset=ds, ood_setting="ID",
+                 prompt_regime=REGIME.get(ds, ""))
+    p = Path(cfg.cache_dir) / "entropy" / f"{cache.run_key('meta-llama/Meta-Llama-3.1-8B', ds, 'ID')}.npz"
+    print(f"  {ds:<15} {'present' if p.exists() else 'ABSENT'}")
+    have += p.exists()
+print(f"\n{have} of 8 datasets have an entropy cache.")
+print("The probability-augmented hybrids are computable on every cell whose train AND eval sources")
+print("all sit inside that set; below 8 they remain a partial grid under the registered rule.")
+PYEOF
+
+echo; echo "=== done at $(date): $BUILT built, $FAILURES failed ==="
+exit $FAILURES
