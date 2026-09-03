@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=RTX6000
+#PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=L40S
 #PBS -l walltime=03:00:00
 #PBS -N luq_m11entreg
 #PBS -j oe
@@ -37,11 +37,23 @@ echo "=== entropy regime === host=$(hostname) at $(date)"
 
 # One dataset that PASSES is included on purpose. If the plain configuration does not win there, the
 # diagnostic itself is wrong and nothing it says about the failing datasets can be believed.
+# A CRASH MUST NOT READ AS A NEGATIVE RESULT. The script exits 1 when no candidate configuration
+# reproduces the cached values, and it also exits non-zero when it fails for any other reason. Those
+# two are different findings and an earlier version of this job printed the same line for both, which
+# made six out-of-memory failures look like six datasets where no configuration matched. Exit code 1
+# is the finding; anything else is a failure of the job.
 run () {
   echo; echo "################ $1 (regime '${2:-canonical}') ################"
-  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}" \
-      || echo "  (no candidate matched for $1)"
+  python -u scripts/checks/m11_entropy_regime.py --dataset "$1" --prompt-regime "$2" --n "${3:-6}"
+  local rc=$?
+  case $rc in
+    0) ;;
+    1) echo "  FINDING: no candidate configuration reproduces the cached values for $1" ;;
+    *) echo "  !!! THE DIAGNOSTIC FAILED for $1 (exit $rc). This is NOT a finding about $1."
+       FAILURES=$((FAILURES+1)) ;;
+  esac
 }
+FAILURES=0
 
 run pubmed_qa ""            6
 run med_quad  "cleanv2"     6
@@ -50,4 +62,10 @@ run samsum    ""            6
 run factscore "factscore_rp12" 4
 run expertqa  "expertqa_rp12"  3
 
-echo; echo "=== done at $(date) ==="
+echo
+if [ "$FAILURES" != "0" ]; then
+  echo "=== $FAILURES dataset(s) DID NOT PRODUCE A MEASUREMENT at $(date). Nothing may be concluded"
+  echo "    about those datasets from this run."
+  exit 5
+fi
+echo "=== done at $(date), every dataset measured ==="
