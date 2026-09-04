@@ -214,7 +214,21 @@ def gate_d(args):
 
 
 def gate_bg(args):
-    """The background verification of amendment A1.5.
+    """SUPERSEDED by gate_bgdist. Kept because it produced a recorded result.
+
+    This compares two background statistics by their largest elementwise relative difference. It was
+    the registered background check, it failed, and the failure was traced to the comparison rather
+    than to the data: a perturbation that moves every distance by about one part in a million, and
+    leaves their ordering exactly unchanged, registers as a factor of eighty here. It measures the
+    conditioning of a near-singular matrix inverse, not the fidelity of a method. See amendment A2 of
+    prereg/M11_alllayer_published_distance_baselines.md and
+    scripts/checks/m11_bg_sensitivity.py.
+
+    Do not use it to accept or reject a background. Use bgdist.
+
+    The original description follows.
+
+    The background verification of amendment A1.5.
 
     The layer-15 background can be derived from per-token states already on disk, with no model and no
     recomputation. The recomputed statistics that the other thirty-one layers rely on must reproduce

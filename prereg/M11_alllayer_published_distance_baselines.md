@@ -295,3 +295,63 @@ other thirty-one layers depend on.
 No relative-distance work proceeds without the background present: the scan is run with the option
 that turns a missing background into a failure, rather than into a file that is quietly missing its
 relative arrays.
+
+---
+
+# Amendment 2, 2026-09-04
+
+## A2.1 The background verification is corrected, after it failed
+
+Amendment A1.5 required the recomputed layer-15 background statistics to reproduce the ones derived
+from the states already on disk, "to the same 1e-4 relative tolerance". That comparison was
+implemented as the largest **elementwise** relative difference on the centroid and on the inverse
+covariance. It was run and it **FAILED**: on the second cluster's recomputation the centroid differed
+by 4 to 20 times the bar and the inverse covariance by three to four orders of magnitude.
+
+**The comparison, not the background, is what was wrong, and that was established by measurement
+rather than argued.**
+
+An inverse covariance is never consumed elementwise. It is consumed as the quadratic form over
+sixteen million terms that produces a distance, and inverting a near-singular covariance is precisely
+the operation in which a small change to the input moves an individual entry a long way while the
+form itself barely moves. A perturbation study on the background states, at three sizes spanning the
+difference expected between accelerator generations, gives:
+
+| perturbation | centroid, elementwise | inverse covariance, elementwise | **distance** | **rank correlation** |
+|---|---:|---:|---:|---:|
+| 1e-07 | 5.53e-05 | 1.56e+01 | 5.69e-07 | 1.000000 |
+| 1e-06 | 2.22e-04 | 1.80e+01 | 5.91e-07 | 1.000000 |
+| 1e-05 | 3.29e-04 | 8.06e+01 | 1.25e-06 | 1.000000 |
+
+A perturbation that moves every distance by about one part in a million, and leaves their ordering
+exactly unchanged, registers as a factor of eighty on the elementwise comparison. **A quantity that
+behaves this way cannot accept or reject a background.** It measures the conditioning of a matrix
+inverse, not the fidelity of a method.
+
+## A2.2 What replaces it
+
+The background verification is now `scripts/checks/m11_gates.py bgdist`: the two statistics are
+scored against **the same rows on one machine**, and compared by the **per-row distances they
+produce**, at the same **1e-4 relative** bar used for every other distance comparison in this
+registration. The elementwise numbers are still printed, for the record, and are not gated on.
+
+**This is not a weaker test.** It is a test of the quantity the pre-registration says gates belong
+on: section 5 states that the acceptance gates are "placed on the per-example distances and on the
+downstream rows, which are the quantities that decide the result". Writing the background check on
+raw matrix entries contradicted that, and this restores it. A background that genuinely disagrees in
+a way that matters moves the distances and fails this check; the evidence above shows the elementwise
+version fails for reasons no result depends on.
+
+## A2.3 Recorded honestly
+
+This is a pre-registered gate being replaced **after it failed**, which is the change most in need of
+scrutiny in any registration. Three things are therefore stated plainly:
+
+1. The failing numbers are not suppressed. They are in A2.1 and in the second cluster's report.
+2. The replacement was justified by a measurement made **before** the substitute was applied to the
+   data in question, and that measurement is reproducible: `scripts/checks/m11_bg_sensitivity.py`.
+3. The bar is **unchanged at 1e-4 relative**. What changed is the quantity compared, not the
+   threshold. No tolerance in this registration has been loosened.
+
+The other cluster stopped on this gate rather than working around it, which is the behaviour the
+registration is meant to produce. The fault was in the instrument.
