@@ -240,6 +240,66 @@ def gate_bg(args):
     return status
 
 
+def gate_bgdist(args):
+    """Compare two background statistics by the DISTANCES they produce, not by their entries.
+
+    This is what a background is for. The inverse covariance is consumed as a quadratic form over
+    sixteen million terms, so the question that decides a result is whether the per-row distances
+    move, and by how much.
+
+    NOT A WEAKER TEST THAN THE ELEMENTWISE ONE. It is a different one, on the quantity the
+    pre-registration says gates belong on. If the two backgrounds genuinely disagree in a way that
+    matters, the distances move and this fails; the elementwise comparison can fail for conditioning
+    of the matrix inverse alone, which no result depends on.
+
+    Both statistics are scored against the SAME rows on one machine, so nothing here depends on where
+    either was fitted.
+    """
+    sys.path.insert(0, str(ROOT / "src"))
+    from luq import mahalanobis as _MD
+    from scipy.stats import spearmanr
+
+    z = np.load(ROOT / args.states, allow_pickle=True)
+    rows = []
+    for st in z["states"]:
+        st = np.asarray(st, dtype=np.float32)
+        if len(st):
+            rows.append(st)
+    if args.n_score:
+        rows = rows[:args.n_score]
+    print(f"scoring {len(rows)} rows from {args.states}")
+
+    budgets = [int(b) for b in args.budgets.split(",") if b.strip()]
+    status = 0
+    print(f"\n{'budget':>7} {'centroid rel':>13} {'sigma_inv rel':>14} | "
+          f"{'DISTANCE rel':>13} {'rank corr':>10}  verdict")
+    for b in budgets:
+        fa, fb = ROOT / args.exact.format(b=b), ROOT / args.recomputed.format(b=b)
+        if not fa.exists() or not fb.exists():
+            print(f"{b:>7} {'missing a statistic':>40}")
+            status = 1
+            continue
+        A, B = _MD.load_stats(fa), _MD.load_stats(fb)
+        dc = float(np.max(np.abs(A.centroid - B.centroid) /
+                          np.maximum(np.abs(A.centroid), 1e-12)))
+        ds = float(np.max(np.abs(A.sigma_inv - B.sigma_inv) /
+                          np.maximum(np.abs(A.sigma_inv), 1e-12)))
+        sliced = [r[:b + 1] for r in rows]
+        da, db = _MD.md_mean(sliced, A), _MD.md_mean(sliced, B)
+        ok = np.isfinite(da) & np.isfinite(db)
+        rel = float(np.max(np.abs(db[ok] - da[ok]) / np.maximum(np.abs(da[ok]), 1e-12)))
+        rho = float(spearmanr(da[ok], db[ok]).statistic)
+        good = rel <= args.tol
+        status = status or (0 if good else 1)
+        print(f"{b:>7} {dc:>13.3e} {ds:>14.3e} | {rel:>13.3e} {rho:>10.6f}  "
+              + ("ok" if good else "FAIL"))
+
+    print(f"\nbar: {args.tol:.1e} relative on the per-row distances")
+    print("The two left columns are reported for the record, not gated on.")
+    print("BACKGROUND DISTANCE CHECK: " + ("PASS" if status == 0 else "FAIL"))
+    return status
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="gate", required=True)
@@ -267,8 +327,17 @@ def main():
     g.add_argument("--budgets", default="56,128,256,384")
     g.add_argument("--tol", type=float, default=1e-4)
 
+    bd = sub.add_parser("bgdist", help="two backgrounds compared by the distances they produce")
+    bd.add_argument("--exact", required=True, help="path template with {b} for the budget")
+    bd.add_argument("--recomputed", required=True, help="path template with {b} for the budget")
+    bd.add_argument("--states", required=True, help="per-token states to score both against")
+    bd.add_argument("--budgets", default="56,128,256,384")
+    bd.add_argument("--n-score", type=int, default=400)
+    bd.add_argument("--tol", type=float, default=1e-4)
+
     args = ap.parse_args()
-    return {"b": gate_b, "c": gate_c, "d": gate_d, "bg": gate_bg}[args.gate](args)
+    return {"b": gate_b, "c": gate_c, "d": gate_d, "bg": gate_bg,
+            "bgdist": gate_bgdist}[args.gate](args)
 
 
 if __name__ == "__main__":
