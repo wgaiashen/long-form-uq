@@ -58,6 +58,22 @@ MODEL="meta-llama/Meta-Llama-3.1-8B"
 SLUG="meta-llama_Meta-Llama-3.1-8B"
 FAILED=""
 
+# THE PER-CARD CEILING IS DERIVED FROM WHAT WAS ACTUALLY ALLOCATED, not hard-coded. A four-card
+# request can sit unschedulable for a long time while nodes with three free cards go unused, and the
+# earlier multi-layer extraction on this cluster ran the same work on three cards at 12 GiB each and
+# on four at 9 GiB. Reading the count here means the same script serves either, and the total ceiling
+# stays comfortably above the float32 weights whichever it gets.
+NGPU=$(nvidia-smi -L 2>/dev/null | wc -l)
+[ "${NGPU:-0}" -ge 2 ] || { echo "!!! need at least 2 cards, found ${NGPU:-0}"; exit 2; }
+case "$NGPU" in
+  2) PER=17 ;;
+  3) PER=12 ;;
+  *) PER=9  ;;
+esac
+MAXMEM=""
+for i in $(seq 0 $((NGPU-1))); do MAXMEM="${MAXMEM}${MAXMEM:+,}${i}=${PER}GiB"; done
+echo "allocated $NGPU card(s); per-card ceiling $MAXMEM"
+
 echo "=== extraction, layer $L === host=$(hostname) at $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 df -h /rds/general/user/gs925/home | tail -1
@@ -120,7 +136,7 @@ for DS in ${LUQ_M11_DATASETS:-pubmed_qa xsum cnn_dailymail samsum med_quad asqa 
   echo; echo "---- $DS (regime '${REGIME:-canonical}') at $(date)"
   python -u scripts/01p_pertoken_multi.py --model "$MODEL" --dataset "$DS" --ood ID \
       --layers "$L" --prompt-regime "$REGIME" --dtype fp32 --attn eager \
-      --device-map auto --max-memory "0=9GiB,1=9GiB,2=9GiB,3=9GiB" --skip-lm-head \
+      --device-map auto --max-memory "$MAXMEM" --skip-lm-head \
       || { echo "!!! extraction FAILED for $DS layer $L"; FAILED="$FAILED $DS"; }
 done
 
