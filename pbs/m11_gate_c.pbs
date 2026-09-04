@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=02:00:00
+#PBS -N luq_m11gc
+#PBS -q v1_small72a
+#PBS -j oe
+
+# Gate C, the pipeline-invariance stop rule. Registered in section 5 of
+# prereg/M11_alllayer_published_distance_baselines.md.
+#
+# The layer-combining pass, restricted to ONE layer, must reproduce the single-layer rows already on
+# record, degeneracy decisions included. A pipeline that cannot reproduce the one-layer result it
+# extends cannot be trusted on the thirty-one layers that have nothing to check against.
+#
+# THE WINDOW IS 'project' (amendment A1.3). The recorded rows were measured under that window, so the
+# gate must use it; running the gate under the reference window would be testing the window rather
+# than the pipeline. Its input is the layer-15 project-window scan produced alongside gate B.
+#
+# AT ONE LAYER THE TEN-COMPONENT REDUCTION CANNOT FIRE, which is the point: this checks that the
+# combining pass degenerates exactly to the implementation it generalises.
+#
+#   qsub pbs/m11_gate_c.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_gate_c__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+CTL="results/hybrids/pdl_m11_1layer_control__${SLUG}.csv"
+
+echo "=== gate C === host=$(hostname) at $(date)"
+
+echo; echo "################ the combining pass, restricted to layer 15 ################"
+python -u scripts/checks/md_multilayer.py --model "$MODEL" --layers 15 --tag 1layer \
+    --window project --out "$CTL" \
+    || { echo "!!! the layer-15 control FAILED"; exit 3; }
+
+echo; echo "################ gate C ################"
+python -u scripts/checks/m11_gates.py c \
+    --control "$CTL" \
+    --reference "results/hybrids/pdl_hybrids_unconstrained__${SLUG}.csv" \
+    || { echo "!!! GATE C FAILED"; exit 4; }
+
+echo; echo "=== done at $(date) ==="
