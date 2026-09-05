@@ -1,0 +1,41 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=96gb
+#PBS -l walltime=06:00:00
+#PBS -N luq_m11l15
+#PBS -q v1_small72a
+#PBS -j oe
+
+# Recompute THIS cluster's layer 15 into its own directory.
+#
+# WHY. The other cluster's transfer sent its layer 15 into the shared scan directory, where this
+# cluster's own layer 15 already lived under identical filenames, and overwrote it. Both sides of the
+# cross-cluster sentinel then came from the same machine, which would have compared a set against
+# itself and reported perfect agreement for the wrong reason. The states this is computed from were
+# never deleted, so it costs one scan to restore an independent comparison.
+#
+# The output goes to its own directory. Nothing writes into the shared one.
+#
+#   qsub pbs/m11_rescan_l15_rcs.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_rescan_l15__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+OUT="results/hybrids/mdscan_refwin_rcs_l15__${SLUG}"
+
+echo "=== recomputing layer 15 on this cluster === host=$(hostname) at $(date)"
+python -u scripts/checks/md_layer_scan.py --model meta-llama/Meta-Llama-3.1-8B \
+    --layer 15 --seeds 1,2,3 --window ref --require-background --out-dir "$OUT" \
+    || { echo "!!! scan FAILED"; exit 3; }
+
+N=$(ls "$OUT"/L15__*.npz 2>/dev/null | wc -l)
+echo "wrote $N cell files (40 expected)"
+[ "$N" -eq 40 ] || exit 4
+echo "=== done at $(date) ==="

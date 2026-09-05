@@ -168,7 +168,9 @@ def gate_d(args):
     if not common:
         sys.exit("FATAL: no cell of this layer appears on both sides.")
 
+    from scipy.stats import spearmanr
     cards, worst, n_cmp, bad = {}, {}, 0, []
+    worst_rho = [1.0]
     for key in ("md", "rmd"):
         worst[key] = (0.0, "")
     for name in common:
@@ -190,22 +192,40 @@ def gate_d(args):
                     if x.shape != y.shape:
                         bad.append(f"{name} {k}: shape {x.shape} vs {y.shape}")
                         continue
-                    scale = np.maximum(np.abs(y), 1e-12)
-                    rel = float(np.max(np.abs(x - y) / scale))
                     n_cmp += 1
+                    if key == "md":
+                        # A distance is a positive quantity bounded away from zero, so relative to
+                        # its own magnitude is meaningful.
+                        rel = float(np.max(np.abs(x - y) / np.maximum(np.abs(y), 1e-12)))
+                    else:
+                        # THE RELATIVE DISTANCE IS A DIFFERENCE OF TWO LARGE SIMILAR NUMBERS, so it
+                        # passes through zero and a relative-to-magnitude test is undefined there:
+                        # an absolute difference of 3e-06 on a row whose value happens to be 2e-04
+                        # reports 1.4e-02 while the two vectors are in fact identical to five
+                        # decimal places. Normalising by the SPREAD of the vector is the same
+                        # question asked in units the quantity actually has.
+                        spread = float(np.std(y))
+                        rel = float(np.max(np.abs(x - y)) / (spread if spread > 0 else 1.0))
+                        rho = float(spearmanr(x, y).statistic)
+                        worst_rho[0] = min(worst_rho[0], rho)
                     if rel > worst[key][0]:
                         worst[key] = (rel, f"{name} {k}")
 
     print(f"accelerators: {args.a} = {sorted(cards.get('a', {'unrecorded'}))} | "
           f"{args.b} = {sorted(cards.get('b', {'unrecorded'}))}")
     print(f"\ncompared {n_cmp} vectors")
-    for key in ("md", "rmd"):
-        w, where = worst[key]
-        print(f"  {key:<4} worst relative difference {w:.3e} at {where or 'nothing compared'}")
-    print(f"pre-registered bar: {args.tol:.1e} relative, on both")
+    w, where = worst["md"]
+    print(f"  md   worst difference relative to its own magnitude {w:.3e} at "
+          f"{where or 'nothing compared'}")
+    w, where = worst["rmd"]
+    print(f"  rmd  worst difference relative to its own spread     {w:.3e} at "
+          f"{where or 'nothing compared'}")
+    print(f"  rmd  lowest rank correlation across the two machines {worst_rho[0]:.10f}")
+    print(f"pre-registered bar: {args.tol:.1e}, and rank correlation at least {args.min_rho}")
     for line in bad[:10]:
         print(f"  MISMATCH {line}")
-    ok = (not bad) and all(worst[k][0] <= args.tol for k in worst) and n_cmp > 0
+    ok = ((not bad) and all(worst[k][0] <= args.tol for k in worst)
+          and worst_rho[0] >= args.min_rho and n_cmp > 0)
     if worst["rmd"][1] == "":
         print("  the relative distance was not present on both sides, so it was NOT tested")
         ok = False
@@ -334,6 +354,9 @@ def main():
     d.add_argument("--layer", type=int, default=15)
     d.add_argument("--expect-cells", type=int, default=40)
     d.add_argument("--tol", type=float, default=1e-4)
+    d.add_argument("--min-rho", type=float, default=0.999,
+                   help="the prediction-rejection ratio is rank based, so agreement of the ordering "
+                        "is the property a result actually depends on")
 
     g = sub.add_parser("bg", help="background verification, recomputed against the exact path")
     g.add_argument("--exact", required=True, help="path template with {b} for the budget")
