@@ -1,0 +1,109 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -N luq_m11fin
+#PBS -q v1_small72a
+#PBS -j oe
+
+# THE REMAINING PIPELINE, END TO END. Runs unattended.
+#
+# Order matters and each step gates the next:
+#   1. the cross-cluster sentinel, a STOP RULE. Nothing downstream is trustworthy without it.
+#   2. provenance, reported not gated: which machine produced which layer.
+#   3. coverage, a STOP RULE: every one of the thirty-two layers must have all forty cells with
+#      three seeds and a relative distance, or the combination rests on fewer cells than the grid.
+#   4. the reduction itself, which IS the reproduction.
+#   5. proof the ten-component reduction actually fired on thirty-two features everywhere. If it did
+#      not, the published aggregation is still absent and no row may be called a reproduction.
+#   6. the consolidated master.
+#
+# WHAT IT WILL NOT DO. It will not relax a threshold, will not fill a missing cell, and will not
+# report a partial grid as a whole one. If a stop rule fails it exits and says so.
+#
+#   qsub -W depend=afterok:<layer-15 rescan> pbs/m11_finalise.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_finalise__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+SCAN="results/hybrids/mdscan_refwin__${SLUG}"
+RCS15="results/hybrids/mdscan_refwin_rcs_l15__${SLUG}"
+DOC15="results/hybrids/mdscan_refwin_doc_l15__${SLUG}"
+LAYERS="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,32"
+OUT="results/hybrids/pdl_mdlayers_alllayer__${SLUG}.csv"
+
+echo "=== finalising M11 === host=$(hostname) at $(date)"
+
+echo; echo "################ 1. cross-cluster sentinel (STOP RULE) ################"
+NA=$(ls "$RCS15"/L15__*.npz 2>/dev/null | wc -l); NB=$(ls "$DOC15"/L15__*.npz 2>/dev/null | wc -l)
+echo "this cluster $NA cells | other cluster $NB cells"
+if [ "$NA" -ne 40 ] || [ "$NB" -ne 40 ]; then
+  echo "!!! both sides need 40 cells. The comparison is not made and nothing downstream runs."
+  exit 2
+fi
+python -u scripts/checks/m11_gates.py d --a "$RCS15" --b "$DOC15" --layer 15 \
+  || { echo "!!! GATE D FAILED. The two clusters do not agree; the interleaved layer set cannot be"
+       echo "    treated as one population. STOPPING before any reduction."; exit 3; }
+
+echo; echo "################ 2. provenance (reported, not gated) ################"
+python -u scripts/checks/m11_provenance.py --scan "$SCAN" || true
+
+echo; echo "################ 3. coverage of all 32 layers (STOP RULE) ################"
+python -u scripts/checks/m11_coverage.py --scan "$SCAN" --layers "$LAYERS" \
+  || { echo "!!! coverage incomplete. Refusing to combine a partial layer set."; exit 4; }
+
+echo; echo "################ 4. THE REPRODUCTION ################ $(date)"
+python -u scripts/checks/md_multilayer.py --model "$MODEL" --layers "$LAYERS" \
+    --tag alllayer --window ref --out "$OUT" \
+  || { echo "!!! the reduction FAILED"; exit 5; }
+
+echo; echo "################ 5. did the published reduction actually fire? ################"
+python -u - "results/hybrids/pdl_mdlayers_alllayer__${SLUG}__diagnostics.csv" <<'PYEOF'
+import csv, sys
+rows=list(csv.DictReader(open(sys.argv[1])))
+n=len(rows)
+bad=[r for r in rows if r.get("satmd_pca_applied")!="1" or r.get("satmd_n_features_in")!="32"]
+ent=sum(1 for r in rows if r.get("has_entropy")=="1")
+rmd=sum(1 for r in rows if r.get("has_rmd")=="1")
+print(f"cell-seeds {n} | reduction applied with 32 features on {n-len(bad)}")
+print(f"relative family on {rmd} | entropy usable on {ent}")
+for r in bad[:5]:
+    print(f"  NOT REDUCED {r['eval']}/{r['rung']} seed {r['seed']}")
+print("REDUCTION CHECK: " + ("PASS" if not bad else "FAIL"))
+sys.exit(0 if not bad else 1)
+PYEOF
+[ $? -eq 0 ] || { echo "!!! the published aggregation did not run everywhere. Nothing here is a"
+                  echo "    reproduction."; exit 6; }
+
+echo; echo "################ 6. consolidated master ################"
+python -u scripts/checks/assemble_consolidated_master.py || { echo "!!! assembly FAILED"; exit 7; }
+
+echo; echo "################ the headline rows ################"
+python -u - "$OUT" <<'PYEOF'
+import csv, sys, statistics
+from collections import defaultdict
+rows=list(csv.DictReader(open(sys.argv[1])))
+by=defaultdict(lambda: defaultdict(list))
+for r in rows:
+    m=r["method"]
+    if m.startswith("md_mean_L") or m.startswith("rmd_mean_L"): continue
+    if not r["prr_mean"]: continue
+    grp = "ID" if r["rung"]=="ID" else "shifted"
+    by[m][grp].append(float(r["prr_mean"]))
+print(f"{'method':<26} {'ID':>8} {'shifted':>9} {'cells':>7}")
+for m in sorted(by):
+    i=by[m]["ID"]; s=by[m]["shifted"]
+    print(f"{m:<26} {statistics.fmean(i) if i else float('nan'):>8.3f} "
+          f"{statistics.fmean(s) if s else float('nan'):>9.3f} {len(i)+len(s):>7}")
+print()
+print("The shifted column averages the four shifted conditions. These are the FULL-LAYER numbers.")
+PYEOF
+
+echo; echo "=== done at $(date) ==="
