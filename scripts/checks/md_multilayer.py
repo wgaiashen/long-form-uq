@@ -175,10 +175,19 @@ def main():
             msp_te = np.asarray(z[layers[0]][f"msp_test__{sd}"], float)
             target = np.nan_to_num(1.0 - y_dev, nan=1.0)
 
+            # THE KEY BEING PRESENT IS NOT THE SAME AS THE ENTROPY BEING USABLE. The scan always
+            # writes these arrays and fills them with nan for a dataset that has no entropy cache, so
+            # testing for the key reports availability everywhere and is simply wrong. What decides
+            # whether the probability-augmented variants can be fitted is whether every value is
+            # finite, which is what the fit itself checks, so the flag must agree with the fit.
             ent_key = f"ent_dev__{sd}"
-            has_ent = all(ent_key in z[L].files for L in layers[:1])
-            ent_dev = np.asarray(z[layers[0]][ent_key], float) if has_ent else None
-            ent_te = np.asarray(z[layers[0]][f"ent_test__{sd}"], float) if has_ent else None
+            ent_dev = ent_te = None
+            if all(ent_key in z[L].files for L in layers[:1]):
+                _d = np.asarray(z[layers[0]][ent_key], float)
+                _t = np.asarray(z[layers[0]][f"ent_test__{sd}"], float)
+                if np.isfinite(_d).all() and np.isfinite(_t).all():
+                    ent_dev, ent_te = _d, _t
+            has_ent = ent_dev is not None
 
             # The relative family, present only where every layer carried a background statistic. A
             # partial layer set would be a different feature matrix per cell, which is not the
