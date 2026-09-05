@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=120gb
+#PBS -l walltime=12:00:00
+#PBS -N luq_m11hbo
+#PBS -q v1_small72a
+#PBS -j oe
+
+# The hybrid back-off under the reference response window.
+#
+# WHY THIS ONE IS DIFFERENT FROM THE REST. Every other published distance method here is a
+# middle-layer adaptation being replaced by a full-layer reproduction. The back-off is not: its
+# released launch script selects the middle layer out of the saved stack, so the implementation
+# already on record IS its published configuration. The only fidelity gap it has is the response
+# window, one position longer here than in the reference.
+#
+# So this re-runs the single-layer driver under the reference window and nothing else changes. Both
+# rows are reported side by side, which makes the size of the window effect visible rather than
+# absorbed into a comparison.
+#
+# It also produces reference-window rows for the middle-layer distance methods, which is what the
+# appendix fidelity ladder needs: the same methods at one layer and at thirty-two, measured on the
+# same window.
+#
+#   qsub pbs/m11_hbo_refwin.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_hbo_refwin__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+
+echo "=== the back-off under the reference window === host=$(hostname) at $(date)"
+
+echo; echo "################ port equivalence ################"
+python -u scripts/checks/md_port_equivalence.py || { echo "!!! port equivalence FAILED"; exit 2; }
+
+echo; echo "################ the single-layer driver, reference window ################ $(date)"
+python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer 15 --seeds 1,2,3 \
+    --window ref \
+    --out "results/hybrids/pdl_hybrids_refwin__${SLUG}.csv" \
+    || { echo "!!! FAILED"; exit 3; }
+
+echo; echo "################ how much did the window move each method? ################"
+python -u - "results/hybrids/pdl_hybrids_refwin__${SLUG}.csv" \
+             "results/hybrids/pdl_hybrids_unconstrained__${SLUG}.csv" <<'PYEOF'
+import csv, sys
+from collections import defaultdict
+def load(p):
+    with open(p) as fh:
+        return {(r["eval"], r["rung"], r["method"]): r for r in csv.DictReader(fh)}
+new, old = load(sys.argv[1]), load(sys.argv[2])
+by = defaultdict(list)
+for k in set(new) & set(old):
+    a, b = new[k]["prr_mean"], old[k]["prr_mean"]
+    if a and b:
+        by[k[2]].append(float(a) - float(b))
+print(f"{'method':<18} {'cells':>6} {'mean delta':>12} {'worst delta':>13}")
+for m, ds in sorted(by.items()):
+    import statistics
+    print(f"{m:<18} {len(ds):>6} {statistics.fmean(ds):>+12.4f} "
+          f"{max(ds, key=abs):>+13.4f}")
+print()
+print("This is the size of the one-position window difference, per method. It is reported, not")
+print("corrected for: the reference window is what the reproduction uses and the project window is")
+print("what the project's own methods were validated on.")
+PYEOF
+
+echo; echo "=== done at $(date) ==="

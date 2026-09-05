@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=32gb
+#PBS -l walltime=03:00:00
+#PBS -N luq_m11dry
+#PBS -q v1_small72a
+#PBS -j oe
+
+# A DRY RUN OF THE FINAL REDUCTION. NOT A RESULT. NOTHING HERE MAY BE QUOTED.
+#
+# The layer-combining pass has so far only ever run on ONE layer, where the ten-component reduction
+# cannot fire because it needs ten input columns. This runs it on the twenty-one layers already
+# scanned, which is the first time that stage executes on real data, along with the relative family
+# and the probability-augmented variants.
+#
+# THE POINT IS TO FIND BUGS NOW rather than when the remaining layers arrive and the reduction is the
+# last step before the write-up. Twenty-one of thirty-two layers is a SUBSET: the script says so
+# itself and labels every row a sensitivity. The output file is named to make that impossible to
+# forget.
+#
+#   qsub pbs/m11_reduction_dryrun.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_reduction_dryrun__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+LAYERS="0,2,3,5,6,8,9,11,12,14,15,17,18,20,21,23,24,26,27,29,30"
+
+echo "=== reduction dry run, NOT A RESULT === host=$(hostname) at $(date)"
+
+echo; echo "################ coverage of the twenty-one scanned layers ################"
+python -u scripts/checks/m11_coverage.py --scan "results/hybrids/mdscan_refwin__${SLUG}" \
+    --layers "$LAYERS" || { echo "!!! coverage check failed"; exit 2; }
+
+echo; echo "################ the reduction over 21 layers ################ $(date)"
+python -u scripts/checks/md_multilayer.py --model "$MODEL" --layers "$LAYERS" \
+    --tag DRYRUN_21of32 --window ref \
+    --out "results/hybrids/DRYRUN_NOT_A_RESULT_pdl_mdlayers_21of32__${SLUG}.csv" \
+    || { echo "!!! the reduction FAILED"; exit 3; }
+
+echo; echo "################ did the ten-component reduction actually fire? ################"
+python -u - "results/hybrids/DRYRUN_NOT_A_RESULT_pdl_mdlayers_21of32__${SLUG}__diagnostics.csv" <<'PYEOF'
+import csv, sys
+rows = list(csv.DictReader(open(sys.argv[1])))
+n = len(rows)
+applied = sum(1 for r in rows if r.get("satmd_pca_applied") == "1")
+feats = {r.get("satmd_n_features_in") for r in rows}
+rmd = sum(1 for r in rows if r.get("has_rmd") == "1")
+ent = sum(1 for r in rows if r.get("has_entropy") == "1")
+print(f"cell-seeds: {n}")
+print(f"  reduction applied on {applied} of {n}")
+print(f"  input feature counts seen: {sorted(feats)}   (expect only 21 here)")
+print(f"  relative family present on {rmd} of {n}")
+print(f"  entropy present on {ent} of {n}")
+if applied != n:
+    print("  !! the reduction did not fire everywhere; at 21 layers it must")
+    sys.exit(1)
+print("  the reduction fires. This is the stage that has never run before.")
+PYEOF
+[ $? -eq 0 ] || exit 4
+
+echo; echo "=== done at $(date). NOTHING IN THIS FILE IS A RESULT. ==="
