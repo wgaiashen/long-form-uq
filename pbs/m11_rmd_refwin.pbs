@@ -1,0 +1,77 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=2:mem=120gb
+#PBS -l walltime=16:00:00
+#PBS -N luq_m11rmdref
+#PBS -q v1_small72a
+#PBS -j oe
+
+# The middle-layer RELATIVE distance family under the reference window.
+#
+# WHY IT IS NEEDED. The appendix fidelity ladder sets the middle-layer methods beside the full-layer
+# reproduction, and that comparison is only about the layer set if both sides use the SAME response
+# window. The reference-window middle-layer run was done without a background, so the relative family
+# has no reference-window counterpart and its ladder entry would otherwise compare a layer change and
+# a window change at once. That is the confound this removes.
+#
+# FOUR PASSES, ONE PER GENERATION BUDGET, because a background is sliced to the budget its evaluation
+# dataset was generated at and the driver takes one budget per run. This is the partition the earlier
+# relative-distance runs used, unchanged.
+#
+#   qsub pbs/m11_rmd_refwin.pbs
+
+set -uo pipefail
+cd "$PBS_O_WORKDIR"; source pbs/_env.sh; luq_activate || exit 1; cd "$LUQ_REPO"
+
+mkdir -p logs
+LIVE="logs/m11_rmd_refwin__${PBS_JOBID%%.*}.log"
+exec > >(tee -a "$LIVE") 2>&1
+echo "live log: $LIVE"
+echo "commit: $(git rev-parse HEAD 2>/dev/null)"
+
+export LUQ_REGIME="med_quad=cleanv2"
+MODEL="meta-llama/Meta-Llama-3.1-8B"
+SLUG="meta-llama_Meta-Llama-3.1-8B"
+BG="cache/background_c4/${SLUG}__L15__b384.npz"
+
+echo "=== middle-layer relative family, reference window === host=$(hostname) at $(date)"
+[ -f "$BG" ] || { echo "!!! background states missing at $BG"; exit 2; }
+
+STATUS=0
+run () {   # $1 = evals   $2 = budget
+  echo; echo "---- evals $1 at budget $2, $(date)"
+  python -u scripts/checks/md_hybrids.py --model "$MODEL" --layer 15 --seeds 1,2,3 \
+      --window ref --evals "$1" --background "$BG" --bg-budget "$2" \
+      --out "results/hybrids/pdl_hybrids_rmd_refwin_bg${2}__${SLUG}.csv" \
+      || { echo "!!! FAILED for budget $2"; STATUS=1; }
+}
+
+run "xsum,samsum"                    56
+run "pubmed_qa,cnn_dailymail,med_quad" 128
+run "asqa,factscore"                 256
+run "expertqa"                       384
+
+echo; echo "################ merging the four budget partitions ################"
+python -u - "$SLUG" <<'PYEOF'
+import csv, glob, sys
+slug = sys.argv[1]
+rows, seen = [], set()
+for f in sorted(glob.glob(f"results/hybrids/pdl_hybrids_rmd_refwin_bg*__{slug}.csv")):
+    for r in csv.DictReader(open(f)):
+        k = (r["eval"], r["rung"], r["method"])
+        if k in seen:
+            continue
+        seen.add(k); rows.append(r)
+if not rows:
+    sys.exit("nothing to merge")
+out = f"results/hybrids/pdl_hybrids_rmd_refwin__{slug}.csv"
+with open(out, "w", newline="") as fh:
+    w = csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+from collections import Counter
+c = Counter(r["method"] for r in rows)
+print(f"wrote {out}  ({len(rows)} rows)")
+for m, n in sorted(c.items()):
+    print(f"  {m:<20} {n} cells")
+PYEOF
+
+echo; echo "=== done at $(date), status $STATUS ==="
+exit $STATUS
