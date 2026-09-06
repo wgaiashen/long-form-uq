@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=2:mem=96gb
-#PBS -l walltime=06:00:00
+#PBS -l walltime=16:00:00
 #PBS -N luq_m11l15
 #PBS -q v1_small72a
 #PBS -j oe
@@ -14,6 +14,10 @@
 # never deleted, so it costs one scan to restore an independent comparison.
 #
 # The output goes to its own directory. Nothing writes into the shared one.
+#
+# RESUMABLE, and the walltime is set from the measured cost rather than optimism: the same scan under
+# the other window took about seven and a half hours, and a six-hour request killed this one at 33 of
+# 40 cells. Those 33 are kept and skipped on this run.
 #
 #   qsub pbs/m11_rescan_l15_rcs.pbs
 

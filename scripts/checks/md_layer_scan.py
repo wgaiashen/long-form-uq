@@ -116,6 +116,9 @@ def main():
                          "implementation's window and needs no re-extraction.")
     ap.add_argument("--background-dir", default="cache/background_c4",
                     help="where scripts/01q_background_stats.py wrote its fitted statistics")
+    ap.add_argument("--overwrite", action="store_true",
+                    help="recompute cells whose output already exists. Off by default so a job that "
+                         "ran out of walltime continues rather than starting again.")
     ap.add_argument("--require-background", action="store_true",
                     help="fail rather than silently omitting the relative distance. Use this in any "
                          "job whose output is meant to be complete.")
@@ -185,6 +188,23 @@ def main():
     written = 0
 
     for rung, X, spec in cells:
+        # RESUME. A scan of one layer takes several hours and a walltime overrun previously threw
+        # away every completed cell. A cell whose file is already on disk is skipped, but only after
+        # it has been opened and found to contain what the combining pass needs: a truncated file
+        # from a job killed mid-write would otherwise be treated as done. Pass --overwrite to redo.
+        _out = out_dir / f"L{args.layer}__{X}__{rung}__{slug}.npz"
+        if _out.exists() and not args.overwrite:
+            try:
+                _z = np.load(_out, allow_pickle=True)
+                _seeds = [int(v) for v in np.asarray(_z["seeds"]).ravel()]
+                if all(f"test_md__{sd}" in _z.files for sd in _seeds):
+                    print(f"  [{rung:14s}/{X:14s}] already done, skipping", flush=True)
+                    written += 1
+                    continue
+                print(f"  [{rung}/{X}] existing file is incomplete -> recomputing", flush=True)
+            except Exception as e:
+                print(f"  [{rung}/{X}] existing file unreadable ({type(e).__name__}) -> recomputing",
+                      flush=True)
         if X not in PT or any(d not in PT for d, _ in spec):
             print(f"  [{rung}/{X}] inputs missing -> cell SKIPPED, left absent (never zero)", flush=True)
             continue
