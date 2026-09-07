@@ -5,9 +5,19 @@ to clear, and each was committed **before** the run it describes. The commit tim
 it shows that a prediction pre-dates its result. Where a registration was later amended, the
 amendment is recorded in the file rather than replacing what was originally written.
 
-Several of these are recorded negatives, and they are kept deliberately. A pre-registration that is
-removed once it fails is worth nothing, and the analyses in the write-up that ask which nearby
-designs fail rest on exactly these files.
+**Reading the dates.** Every file in this directory was renamed on 2026-08-21, from a short working
+label to a descriptive filename. A plain `git log` therefore reports that date as the first commit
+for most of them, which makes the directory look as though it were written in one sitting after the
+experiments finished. Use `git log --follow -- prereg/<file>` instead. The real dates run from
+2026-07-30 to 2026-09-03.
+
+**The retention rule.** A registration is kept whenever an outcome was recorded, and that includes
+every failure, null, tie and stopped gate. Most files here are recorded negatives and they are kept
+deliberately: a pre-registration that is removed once it fails is worth nothing, and the analyses in
+the write-up that ask which nearby designs fail rest on exactly these files. A registration that was
+never run and never written up is not carried into the published tree, and remains in the commit
+history. One file has been removed under that rule: an early draft of the pooling and head
+registration, superseded two days later by the revised version the experiment actually ran under.
 
 Everything in this directory is a pre-registration. Two files that were previously kept here are
 not, and have moved: the checksum manifest for the frozen caches is now
@@ -15,8 +25,9 @@ not, and have moved: the checksum manifest for the frozen caches is now
 them, and the reconstructed provenance record for a set of result rows written before provenance
 stamping existed is kept outside this repository with the project's other result-facing notes.
 
-The `Recorded outcome` column quotes the file's own status line where it has one. A dash means the
-file does not carry a one-line status, not that the experiment was not run: read the file.
+The `Recorded outcome` column quotes each file's own status line. Lines marked as added on
+2026-09-07 are retrospective summaries written from the result files and the project's records, not
+notes made at the time; the others were written as the experiment closed.
 
 Read those outcomes precisely, because "failed its bar" covers three different things here and they
 are not interchangeable. One registration fails because the setting it pre-committed to **tied** with
@@ -35,7 +46,6 @@ effect**, and those say so in those words. Only the third kind is a null in the 
 | [`cawsa_saplma_ensemble_qwen_replication.md`](cawsa_saplma_ensemble_qwen_replication.md) | does the CAWSA + SAPLMA complementarity result replicate on Qwen2.5-14B? | run. Replicates, and is the clearest dataset-level effect of the three populations. |
 | [`entropy_penalty_on_spread_datasets.md`](entropy_penalty_on_spread_datasets.md) | the one-sided entropy penalty on the untested spread regime | run. The predicted null on the untested regime, with the mechanism confirming it. |
 | [`head_and_aggregation_2x2.md`](head_and_aggregation_2x2.md) | the missing 2x2 cell: learned attention with an MLP head | run. A clean negative: the apparent head effect that motivated it was a training-recipe artefact, and all four correctness gates passed. |
-| [`head_and_aggregation_2x2_first_version.md`](head_and_aggregation_2x2_first_version.md) | the missing 2x2 cell, first version | — |
 | [`hybrid_backoff_reproduction.md`](hybrid_backoff_reproduction.md) | implement hybrid back-off and validate it before using it as a baseline | run. The reproduction was validated on its own terms before the method was used as a baseline anywhere. |
 | [`id_attention_entropy_as_drop_predictor.md`](id_attention_entropy_as_drop_predictor.md) | does in-distribution attention entropy alone predict the OOD drop? | run. Fails all three registered bars at the honest unit of analysis, and the registered stopping rule closed this line. |
 | [`label_free_gate_experiments.md`](label_free_gate_experiments.md) | two label-free gate attempts | run. Three gate families, three shuffled controls, three clean nulls, with the per-dataset pattern the opposite of the registered prediction. |
