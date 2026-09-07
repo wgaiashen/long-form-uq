@@ -52,6 +52,20 @@ DOC_BRIEF*.md
 DOC_INSTRUCTIONS.md
 *_HANDOVER*.md
 
+# Working prompts and agent briefs. Same class as the hand-over documents above: written to
+# orient somebody through a piece of work, not to describe the submitted artifact. Files with
+# these exact names exist in the directory above this repository and must never be swept in by a
+# `git add -A`. Pre-registrations, READMEs and comments explaining why the code does what it does
+# are not in this class and stay tracked.
+AGENT_PROMPT_*.md
+RCS_PROMPT_*.md
+PROMPT_*.md
+
+# Audit, mapping and planning documents. These belong outside this repository. Five of them were
+# committed here by an automated `git add -A` and had to be removed by a history rewrite; this
+# pattern is the second line of defence so that cannot recur.
+docs/
+
 # Editor / tooling scratch directories and worktrees. A 42MB unlabelled records duplicate was found
 # in one of these on 2026-08-11, untracked but NOT ignored, so a `git add -A` would have swept it
 # into the submitted artifact.
