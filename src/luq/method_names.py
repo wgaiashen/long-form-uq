@@ -35,7 +35,12 @@ CANONICAL = {
     "SAPLMA per-sentence": "SAPLMA (per-sentence)",
     "per-token": "SAPLMA (per-token)", "per-token(mean)": "SAPLMA (per-token)",
     "SAPLMA per-token": "SAPLMA (per-token)",
-    "linear": "Mean-pool probe", "ptrue": "P(True)", "ptrue_accurate": "P(True)",
+    "linear": "Mean-pool probe",
+    # Table 4.1 lists two distinct P(True) methods and they must not collapse into one: the
+    # verdict-state probe reads the hidden state at the verification position, while the
+    # training-free variant reads the emitted yes/no probability.
+    "ptrue": "P(True) verdict-state probe", "ptrue_accurate": "P(True) verdict-state probe",
+    "ptrue_unsup": "P(True), training-free",
     "lookback": "Lookback Lens",
 
     # ---- learned aggregation over token states ----
@@ -68,6 +73,29 @@ CANONICAL = {
     "special": "Activation-weighted keep=no-EOS (default)", "special_punct": "Activation-weighted keep=no-EOS+punct",
     "content": "Activation-weighted keep=content (no stop-words)", "segment": "Activation-weighted, per-segment",
 
+    # ---- published probability, distance and hybrid comparators ----
+    # Two naming conventions coexist in the result files. The ladder writes short implementation
+    # keys; the published-baseline and combination drivers write report-style strings directly.
+    # Both are mapped so a table built from either reads the same.
+    "TokenSAR": "TokenSAR",
+    "answer-span mean NLL": "Answer-span mean NLL",
+    "answer-span sequence NLL": "Answer-span sequence NLL",
+    "mean token NLL": "Mean token NLL",
+    "minimum token probability": "Minimum token probability",
+    # the published Maximum Sequence Probability, which is the sum aggregate under another name
+    "sequence NLL (published MSP)": "Sum NLL", "msp": "Sum NLL",
+    "md_mean_mid": "Raw MD, middle layer", "rmd_mean_mid": "Raw RMD, middle layer",
+    "satmd_mid": "SATMD-mid", "satrmd_mid": "SATRMD-mid",
+    "huq_satmd_mid": "HUQ-SATMD-mid", "huq_satrmd_mid": "HUQ-SATRMD-mid",
+    "msp_satmd_mid": "MSP-SATMD-mid", "msp_satrmd_mid": "MSP-SATRMD-mid",
+    "hbo": "HBO",
+
+    # ---- score combinations, and the earlier display name for the constrained weighting ----
+    "HAPES \u03bb=2": "CAWSA (lambda=2)", "cawsa": "CAWSA (lambda=2)",
+    "cawsa_hbo": "HBO with the CAWSA probability branch",
+    "cawsa_saplma_cohort50": "CAWSA + SAPLMA, equal-rank average",
+    "cawsa_saplma_src50": "CAWSA + SAPLMA, source-calibrated",
+
     # ---- decompose-and-aggregate (per-sentence probe + aggregator) ----
     "seg_mean": "Seg-probe + mean", "seg_min": "Seg-probe + min",
     "seg_geomean": "Seg-probe + geomean", "seg_learned": "Seg-probe + learned alpha",
@@ -96,6 +124,18 @@ FAMILY = {
     "Activation-weighted keep=no-EOS+punct": "5. Activation-weighted token subsets",
     "Activation-weighted keep=content (no stop-words)": "5. Activation-weighted token subsets",
     "Activation-weighted, per-segment": "5. Activation-weighted token subsets",
+    "TokenSAR": "1. Training-free probability",
+    "Answer-span mean NLL": "1. Training-free probability",
+    "Answer-span sequence NLL": "1. Training-free probability",
+    "P(True), training-free": "1. Training-free probability",
+    "P(True) verdict-state probe": "2. Hidden-state probe",
+    "Raw MD, middle layer": "7. Density", "Raw RMD, middle layer": "7. Density",
+    "SATMD-mid": "7. Density", "SATRMD-mid": "7. Density",
+    "MSP-SATMD-mid": "7. Density", "MSP-SATRMD-mid": "7. Density",
+    "HUQ-SATMD-mid": "8. Hybrid", "HUQ-SATRMD-mid": "8. Hybrid", "HBO": "8. Hybrid",
+    "HBO with the CAWSA probability branch": "8. Hybrid",
+    "CAWSA + SAPLMA, equal-rank average": "8. Hybrid",
+    "CAWSA + SAPLMA, source-calibrated": "8. Hybrid",
     "Seg-probe + mean": "6. Decompose & aggregate", "Seg-probe + min": "6. Decompose & aggregate",
     "Seg-probe + geomean": "6. Decompose & aggregate",
     "Seg-probe + learned alpha": "6. Decompose & aggregate",
