@@ -69,19 +69,33 @@ agreement is stated per claim. Llama-3.1-8B carries the widest method coverage a
 used for the aggregation analysis.
 
 **Datasets.** Eight long-form evaluation sets (PubMedQA, XSum, CNN/DailyMail, SAMSum, MedQuAD,
-ASQA, ExpertQA, FActScore) across three task families, plus two short-form sets (SciQ, TriviaQA)
-used for the short/long contrasts.
+ASQA, ExpertQA, FActScore) across three task families. Two short-form sets, SciQ and TriviaQA, are
+reachable through a transfer setting but are not part of the benchmark and are not evaluated in the
+write-up.
 
-**Methods.** The baselines are three training-free probability aggregates (Minimum token
-probability `msp_min`, Mean token NLL `perplexity`, Sum NLL `msp_sum`), the hidden-state probes
-(SAPLMA, a mean-pool probe, P(True), Lookback Lens), and learned attention pooling. CAWSA is
-implemented as `wmsp_shrink2`, with its unconstrained precursor as `wmsp_norm`.
+**Methods.** CAWSA is implemented as `wmsp_shrink2`, with its unconstrained control at lambda = 0
+as `wmsp_norm`. It is compared against three training-free probability aggregates (Minimum token
+probability `msp_min`, Mean token NLL `perplexity`, Sum NLL `msp_sum`), three hidden-state methods
+sharing the same features (SAPLMA, a mean-pooling control and learned attention pooling), and the
+combination of CAWSA with SAPLMA. Those form the panel evaluated on all three models.
 
-The repository also contains the alternative designs that were tried and did not carry: hard top-k
-and softmax sharpening, adaptive Lehmer aggregation, SAR and Orgad token-importance weighting,
-attention-pooling position priors, and multi-head, hierarchical and segment pooling. Most of these
-are reported as negative or mixed results. `prereg/README.md` indexes the pre-registrations behind
-them. They are kept because knowing which nearby designs fail is part of the argument.
+Further comparators are evaluated on fewer models: P(True) in a training-free and a probe form, and
+Lookback Lens, on two; and on Llama-3.1-8B, TokenSAR, the answer-span probability baselines, the
+Mahalanobis and relative-Mahalanobis density estimators with their supervised and hybrid forms, and
+Hybrid Back-Off. `src/luq/method_names.py` maps every implementation key to the name used in the
+write-up.
+
+Alongside these the repository holds the method development that did not carry: hard token masks,
+sentence-level aggregation, probability-guided and multi-head pooling, and several weighting schemes
+that were registered and then failed their own bar. These are development evidence rather than
+benchmark results, were mostly run on one model, and are summarised as such in the write-up. They
+are kept because the argument that no fixed aggregation rule works depends on knowing which nearby
+designs were tried and did not work; `prereg/README.md` groups them with their outcomes.
+
+The repository also contains work that the write-up does not report at all: an earlier ten-dataset
+benchmark that preceded this one, a long-to-short transfer experiment, and two model populations
+that were generated and not carried forward. They are left in place rather than pruned, so that what
+was run is visible, but nothing in the write-up rests on them.
 
 ## Pipeline (`scripts/`)
 
