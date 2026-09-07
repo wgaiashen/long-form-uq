@@ -38,9 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from luq import cache, msp as msp_mod                          # noqa: E402
 from luq.config import Config                                  # noqa: E402
 from xl_rungs import eval_split, label_of                      # noqa: E402
-from likeforlike_table import LONG_SRC, REGIME, SAR_SUFFIX, SLUG, MODEL  # noqa: E402
+from likeforlike_table import LONG_SRC, MODEL_CFG  # noqa: E402
 
-OUT = ROOT / "results" / "analysis" / f"ch6_cleanv2_tokensar_diagnostic__{SLUG}.csv"
 EPS = 1e-12
 
 
@@ -61,8 +60,19 @@ def normalised_entropy(rel):
 
 
 def main():
-    argparse.ArgumentParser(description=__doc__,
-                            formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B", choices=list(MODEL_CFG),
+                    help="which population to diagnose. The relevance cache and the dataset regime map "
+                         "both depend on it, so both are taken from the builder's own per-model entry.")
+    args = ap.parse_args()
+
+    MODEL = args.model
+    SLUG = cache._slug(MODEL)
+    REGIME = MODEL_CFG[MODEL]["regime"]
+    SAR_SUFFIX = MODEL_CFG[MODEL]["sar_suffix"]
+    OUT = ROOT / "results" / "analysis" / f"ch6_cleanv2_tokensar_diagnostic__{SLUG}.csv"
+
     print("=" * 104)
     print(f"RELEVANCE-WEIGHTING UNIFORMITY  model={MODEL}  population=corrected span, scored test rows")
     print("rho: Spearman(relevance-weighted score, mean token NLL).  entropy: 1.0 is exactly uniform.")
@@ -120,6 +130,11 @@ def main():
     scored = [r for r in rows if r["relevance_cache"] != "MISSING"]
     rhos = [r["spearman_vs_mean_token_nll"] for r in scored]
     Hs = [r["median_normalised_weight_entropy"] for r in scored]
+    if not scored:
+        # No relevance cache resolved for this population. Say so and stop, rather than summarising an
+        # empty set: an absent measurement must never be reported as a value.
+        sys.exit(f"no relevance cache resolved for {MODEL} on any of the {len(rows)} datasets; "
+                 "nothing measured, so no summary is written.")
     print(f"\nacross {len(scored)} datasets: Spearman {min(rhos):.3f} to {max(rhos):.3f}, "
           f"median normalised weight entropy {min(Hs):.3f} to {max(Hs):.3f}")
 
