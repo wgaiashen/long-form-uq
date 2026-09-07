@@ -60,10 +60,13 @@ response quality here is graded rather than binary.
 A method is just a feature extractor plus an aggregation choice. The rest of the pipeline is
 shared, so every method is scored by the identical harness on the identical population.
 
-**Models.** `meta-llama/Meta-Llama-3.1-8B` is the primary model (frozen, middle layer 15).
-`Qwen/Qwen2.5-14B` is a second model (layer 23), chosen to change both family and size, and carries
-its own full grid. The two are never pooled into one table: each result is reported per population,
-and cross-model agreement is stated as a replication verdict per claim rather than as an average.
+**Models.** Three base models are evaluated on the full eight-dataset benchmark:
+`meta-llama/Meta-Llama-3.1-8B` at layer 15 of 32, `Qwen/Qwen2.5-14B` at layer 23 of 48, and
+`google/gemma-2-9b` at layer 20 of 42. The layer is fixed per model by a single rule and is never
+selected per target, because a target-specific layer would not be available under transfer. The
+three are never pooled into one table: each result is reported per population, and cross-model
+agreement is stated per claim. Llama-3.1-8B carries the widest method coverage and is the model
+used for the aggregation analysis.
 
 **Datasets.** Eight long-form evaluation sets (PubMedQA, XSum, CNN/DailyMail, SAMSum, MedQuAD,
 ASQA, ExpertQA, FActScore) across three task families, plus two short-form sets (SciQ, TriviaQA)
@@ -105,11 +108,14 @@ its cache, so probes can be retrained without touching a GPU.
 - `src/luq/` — the pipeline library: data, generation, cache, probe, results, plus
   `features/` (saplma, ptrue, lookback, sar, orgad) and `labels/` (string match,
   LLM judge, AlignScore, FActScore).
-- `scripts/` — the numbered stages above, plus `checks/` (254 analysis and verification
-  drivers, see `scripts/checks/README.md`) and `tools/` (21 helpers, mostly visualisation).
-- `prereg/` — 39 pre-registrations, written and committed **before** the runs they describe, so
-  the commit timestamp shows a prediction pre-dates its result. Indexed with their outcomes in
-  `prereg/README.md`. Several are recorded negatives and are kept deliberately.
+- `scripts/` — the numbered stages above, plus `checks/` (309 analysis and verification
+  drivers, see `scripts/checks/README.md`) and `tools/` (22 helpers, mostly visualisation).
+- `prereg/` — 41 pre-registrations, written and committed **before** the runs they describe, so
+  the commit timestamp shows a prediction pre-dates its result. Note that the files were renamed
+  on 2026-08-21, so `git log --follow` is what shows when each was actually written. Indexed with
+  their outcomes in `prereg/README.md`. Most are recorded negatives and are kept deliberately:
+  the argument that no fixed aggregation rule works across tasks depends on knowing which nearby
+  designs were tried and failed.
 - `tests/` — 13 files, 73 CPU unit tests over the maths and the aggregation code.
 - `pbs/`, `slurm/` — cluster job scripts (see below).
 - FActScore's entity list and Wikipedia database are not redistributed here; `src/luq/factscore.py`
@@ -140,8 +146,9 @@ export HF_HOME=/path/to/big/volume/hf_cache   # NOT ~/.cache, home is usually ov
 export OPENAI_API_KEY=...                     # only for the long-form judge (02_label)
 ```
 
-Main dependencies: PyTorch, transformers, lm-polygraph, ProbeDrift,
-scikit-learn, scipy, and the OpenAI client for the long-form judge. The judge-comparison panel
+Main dependencies are pinned in `requirements.txt`: PyTorch, transformers, ProbeDrift,
+scikit-learn, scipy, and the OpenAI client for the long-form judge. The mean-NLL aggregate was
+verified against lm-polygraph, but that package is not required at run time. The judge-comparison panel
 (`scripts/checks/judge_agreement.py`) additionally uses `krippendorff` and `irrCAC`
 (`pip install krippendorff irrCAC`) and degrades gracefully to `n/a` without them.
 
@@ -153,9 +160,9 @@ repository.
 Jobs run on either of two independent clusters. The Python pipeline is identical, only the
 submission wrapper and a few paths differ.
 
-- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (108 files).
+- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (119 files).
 - **RCS HPC (CX3)** — PBSPro, a larger pool (default L40S 48GB, and its A100 is a 40GB card).
-  Scripts in `pbs/` (232 files).
+  Scripts in `pbs/` (304 files).
 
 The two directories are **not** a one-for-one mirror. They accumulated per experiment and per
 cluster, so most jobs exist on one side only. Treat them as a record of what was actually
@@ -204,8 +211,9 @@ Both require the cached records, which are not distributed with this repository.
 pytest -q    # 73 CPU unit tests: surprisal and PRR maths, weighting, pooling, score parsing
 ```
 
-The suite pins the mean-NLL aggregate to lm-polygraph's `Perplexity` estimator to ~1e-6, so a
-refactor that changes the uncertainty maths fails loudly.
+The suite pins the uncertainty maths, so a refactor that changes it fails loudly. The mean-NLL
+aggregate is the same quantity lm-polygraph calls `Perplexity`, and the two were checked against
+each other by hand; the tests assert the formula rather than importing that package.
 
 Method-fidelity checks against the original authors' released code load the model, so they are
 GPU scripts run by hand: `scripts/checks/check_lookback_vs_authors.py` (Lookback Lens vs Chuang
@@ -215,11 +223,12 @@ reference repositories to be checked out alongside this one, and they are not ve
 
 ## Status
 
-The full long-form grid (8 evaluation sets by 5 in-distribution and out-of-distribution rungs, 3
-seeds) has been run for Llama-3.1-8B and replicated on Qwen2.5-14B, together with the cross-task
-transfer matrix, the aggregation-regime audit, the cross-length transfer experiment and the CAWSA
-method line. A reduced panel on further model families is still in progress, so the multi-model
-results are the least settled part of the work.
+The full long-form grid, eight evaluation sets by five in-distribution and out-of-distribution
+settings at three seeds, is complete on all three base models, together with the cross-task
+transfer matrix, the aggregation analysis, the published probability, distance and hybrid
+comparators on Llama-3.1-8B, and the combination of CAWSA with a hidden-state probe. The result
+tables the reported numbers come from are in `published_results/`, with
+`scripts/report_numbers.py` to recompute the reported quantities from them.
 
 Several results are pre-registered negatives. `prereg/` records what was predicted before each run
 and `prereg/README.md` indexes them.
