@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Quantify few-shot continuation junk in the generations, per model x dataset.
 
-Occasioned 2026-08-11 by the author's visual audit of the Qwen gen-quality pages: xsum/cnn/samsum
+Occasioned 2026-08-11 by a visual audit of the Qwen gen-quality pages: xsum/cnn/samsum
 carry "Here's the text/dialogue and its short summary…" continuations, expertqa/factscore a
 multiple-choice "Available choices" artifact. This script (a) counts marker rates in gen_text for
 both populations, (b) for the affected cells compares judge label and generation length on

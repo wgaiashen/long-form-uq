@@ -3,7 +3,7 @@
 WHY THIS EXISTS (distinct from visualise_attention.py)
 ------------------------------------------------------
 `visualise_attention.py` shows where a per-token SIGNAL lands, to debug the UQ probe. This tool
-answers a different question the author raised: *is the GENERATION itself poor (repetition, hitting
+answers a different question: *is the GENERATION itself poor (repetition, hitting
 the token budget, format mismatch) in a way that could be depressing our long-form scores, rather
 than the UQ method being at fault?* So it puts the model generation next to the gold answer and
 flags quality problems, sorted so the worst cases are easy to eyeball.

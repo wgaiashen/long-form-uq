@@ -72,7 +72,7 @@ TASKS=(
   # med_quad has TWO independent settings that are easy to confuse. Both are pinned to v1 here.
   #
   # (1) BUDGET 128, i.e. v1. med_quad was regenerated at cap 768 (v2), and v2 was ARCHIVED with v1
-  #     re-emerging as canonical (author's decision 2026-08-04, the project's working notes). v1 is
+  #     re-emerging as canonical. v1 is
   #     hash-pinned in scripts/checks/CANONICAL_v1_MANIFEST.sha256 and the file on disk verifies against it.
   #     So this is deliberately the CAPPED version, 97.7% capped and all, not the long one.
   #

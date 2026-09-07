@@ -7,7 +7,7 @@
 
 Priors (label-free, example-local): content_mass, nll (soft-Orgad is a SEPARATE RCS task, §3.6).
 
-PRE-REGISTERED (see worklog 2026-07-28): expect **A and D over C** OOD (S1 showed the learned query beats
+PRE-REGISTERED: expect **A and D over C** OOD (S1 showed the learned query beats
 mean-pool; Idea-2 showed a frozen prior ≈ baseline). BAR = the LONG-ladder per-cell `msp_min` (NOT the
 standard-ladder 0.284). Every arm trained in THIS run (no arm inherited); arm A must reproduce its §C.3 PRR
 (the reproduction gate) before C/D are trusted. Correctness: arm C's query stays frozen (runtime assert);

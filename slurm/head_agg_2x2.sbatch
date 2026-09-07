@@ -20,7 +20,7 @@
 # reference runs. Does NOT recompute floors/wMSP, and does NOT touch anything RCS is writing.
 #
 # PROVENANCE: the driver ABORTS if the tracked tree is dirty -- commit the attn_pool.py edit + the new
-# files first (author's call), else this job exits immediately.
+# files first, else this job exits immediately.
 set -uo pipefail
 EVAL="${1:?usage: sbatch slurm/head_agg_2x2.sbatch <eval> [--early-stop]}"
 EXTRA="${2:-}"

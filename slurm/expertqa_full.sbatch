@@ -14,7 +14,7 @@
 #                          signals these generations used the repetition fix (records do NOT
 #                          stamp the decoding params, so the namespace is the provenance).
 #   --repetition-penalty 1.3 --no-repeat-ngram-size 3 -> the decoding fix that took the
-#                          re-pilot from 48.5% -> 0% repetition-degenerate (worklog 2026-07-05).
+#                          re-pilot from 48.5% -> 0% repetition-degenerate.
 #   --dtype fp32 --attn eager -> matches the other Llama datasets for feature comparability.
 #                          This is why the job runs on DoC's A100-80GB: fp32 8B + hidden-states
 #                          over a 384-token generation OOMs RCS's 48GB L40S/A40 cards.

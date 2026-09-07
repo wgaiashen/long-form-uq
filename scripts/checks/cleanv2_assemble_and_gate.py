@@ -229,7 +229,7 @@ def assemble(affected, control, write, in_dir=None, out_name="pdl_cleanv2_alleva
         # PREFER A MEASURED VALUE OVER A BLANK. Some methods were filled by a later per-method job:
         # asqa/ID/wmsp_seg_softmax is NaN in pdl_fam_asqa but 0.3618 in pdl_fam_asqa_segsm. Taking
         # whichever row happened to come first shipped the NaN, turning "measured" into "not
-        # measured" -- the exact confusion this project bans. Sort non-null first, then dedupe.
+        # measured" -- the exact confusion this pipeline is built to avoid. Sort non-null first, then dedupe.
         d = (d.assign(_isnull=d["prr_mean"].isna())
                .sort_values("_isnull", kind="stable")
                .drop_duplicates("method", keep="first")

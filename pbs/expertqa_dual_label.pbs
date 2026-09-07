@@ -7,7 +7,7 @@
 #PBS -j oe
 # DUAL-LABEL ExpertQA: re-score the ExpertQA cells under the OTHER judge label, so the method ranking can
 # be checked against two independently-computed targets. LUQ_EXPERTQA_LABEL selects the label; output is
-# suffixed with it so nothing is overwritten (additive, per the author's instruction).
+# suffixed with it so nothing is overwritten (additive, by design).
 #   faithfulness = covered-claims ratio (~44% of claims visible, null on 292/2016 rows)
 #   consistency  = whole-answer judge (full 2016/2016 coverage, harsher, r=0.72 with faithfulness)
 set -uo pipefail

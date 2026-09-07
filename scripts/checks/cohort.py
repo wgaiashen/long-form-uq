@@ -32,7 +32,7 @@ CANONICAL_10 = ["sciq", "trivia_qa", "pubmed_qa", "med_quad", "asqa",
 LONG_8 = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa", "factscore"]
 SHORT_2 = ["sciq", "trivia_qa"]
 
-# Task families (author's decision 2026-08-03). factuality is its OWN broad family: those sets are
+# Task families. factuality is its OWN broad family: those sets are
 # checked against WORLD KNOWLEDGE rather than against a supplied question. asqa stays in QA despite
 # data.py describing it as "closed-book factuality QA" — recorded explicitly because that phrasing
 # invites the opposite grouping.

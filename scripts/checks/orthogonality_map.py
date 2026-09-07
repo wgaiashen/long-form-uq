@@ -9,7 +9,7 @@ the two probes, and that has been read as "the two signals are near-orthogonal, 
 both should win". Every attempt to build such a method has failed, and §8 has now shown the oracle
 headroom that motivated them was a max-over-K artefact.
 
-THE CONTROL THAT DECIDES BETWEEN THE TWO EXPLANATIONS (the author's, 2026-08-09):
+THE CONTROL THAT DECIDES BETWEEN THE TWO EXPLANATIONS:
 compare each method's correlation with ITSELF ACROSS SEEDS to its correlation with other methods.
 
     self-agreement HIGH (~0.7) and cross LOW (~0.18)

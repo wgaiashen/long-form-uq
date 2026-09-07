@@ -2,7 +2,7 @@
 
 From the cached Tier-1 records + Tier-2 features + labels, this regenerates every
 supervised score (03_probe) and PRR table (04_eval) — NO GPU. This is the step a marker
-or supervisor runs to reproduce the worklog ID tables from the cache.
+or supervisor runs to reproduce the in-distribution results tables from the cache.
 
 It does NOT re-run the heavy GPU extraction (01_extract / 01b_ptrue / 01c_lookback) or the
 labelling (02_label); those produce the cache this reads. See README.md for the full
@@ -12,7 +12,7 @@ from-scratch flow.
     python scripts/reproduce.py --dataset xsum   # just one
 
 Each method uses 03_probe's default middle layer (saplma/linear/ptrue -> middle, lookback
--> 0), which is exactly the layer the worklog reports, so the printed PRRs should match it.
+-> 0), which is exactly the layer the results tables report, so the printed PRRs should match them.
 saplma is the A&M 4-layer MLP; linear is the linear-probe baseline on the same hidden states.
 """
 import argparse

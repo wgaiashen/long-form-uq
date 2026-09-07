@@ -6,7 +6,7 @@ long-form OOD rungs, vs the K=1 baseline (arm A, reused from the S3 fixed_prior_
                                    isolates "more classifier heads" from "attention diversity")
   K=1       n_query=1, n_head=1  — = arm A (reused from S3; not retrained)
 
-PRE-REGISTERED (worklog 2026-07-28): MH beats K=1 modestly OOD, and the ABLATION captures most of that gain
+PRE-REGISTERED: MH beats K=1 modestly OOD, and the ABLATION captures most of that gain
 (classifier ensembling, not attention diversity). Bar = per-cell long-ladder msp_min. K=4 fixed, no sweep,
 no head-subset sampling (measure collapse first). MH/ABLATION at temperature=1 (no select_temperature) — the
 K=1 baseline from S3 used best_T, so MH-vs-K1 carries a temperature caveat; MH-vs-ABLATION (both in-run, T=1)

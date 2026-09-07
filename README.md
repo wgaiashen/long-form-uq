@@ -138,7 +138,7 @@ its cache, so probes can be retrained without touching a GPU.
 
 The drivers read and write a `results/` directory at the repo root, and **a fresh clone will not
 have one**. The result tables contain unpublished numbers and are version-controlled separately.
-On the author's machines `results` is a symlink to a directory outside this repo, which is why
+In the development environment `results` is a symlink to a directory outside this repo, which is why
 every path in the code still resolves unchanged.
 
 To run anything that writes results, create the directory first:

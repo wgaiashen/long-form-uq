@@ -12,7 +12,7 @@ Two grids, two denominators:
 A method absent from a grid entirely is shown as 0, not omitted -- an omitted row reads as "not part of
 the study", a zero reads as "not run", and those must not be confusable.
 
-EXCLUDED METHODS (author's decision 2026-08-04): `linear` is not a baseline the report uses, so it is
+EXCLUDED METHODS: `linear` is not a baseline the report uses, so it is
 listed under EXCLUDED rather than dropped in silence -- a method that simply vanishes from a coverage
 table is indistinguishable from one that was forgotten. It is still COMPUTED, because it is a logistic
 regression on pooled vectors already in memory (seconds per cell, against poolers that dominate the job)
@@ -101,7 +101,7 @@ def report(title, got, bad, cells, groups, show_missing):
     for m in EXCLUDED:
         if m in got:
             have = got[m] & cellset
-            print(f"\n  EXCLUDED (computed, not reported — author's decision 2026-08-04)"
+            print(f"\n  EXCLUDED (computed, not reported)"
                   f"\n        {m:26s} {len(have):3d}/{n} cells exist on disk")
     # per-eval completeness across ALL REPORTED methods in this grid
     allm = [m for _, ms in groups for m in ms]

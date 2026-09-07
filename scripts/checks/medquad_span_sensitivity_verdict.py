@@ -19,7 +19,7 @@ WHAT IT DOES, in order:
     committed R-claim scorer on it (`replication_claims.py --population llama --csv <shadow>`)
     — the scorer stays the single test definition; nothing is re-derived here.
  5. Prints the decision-rule scaffold (conclusions stand → freeze + limitation paragraph;
-    a headline flips → stop for the author's canonical-promotion decision).
+    a headline flips → stop for a decision on canonical promotion).
 
     python scripts/checks/medquad_span_sensitivity_verdict.py
 """
@@ -190,9 +190,9 @@ def main():
     print(f"\nwrote {shadow_master} — re-run THE scorer on it (SENSITIVITY label, never a gate):")
     print(f"  python scripts/checks/replication_claims.py --population llama --csv {shadow_master}")
 
-    print("\nDECISION RULE (author's, 2026-08-11): if the macro rankings, floor ordering, and the "
+    print("\nDECISION RULE: if the macro rankings, floor ordering, and the "
           "hardest-rung story stand → freeze the master, write the limitation paragraph. If a "
-          "headline flips → STOP and put canonical promotion to the author.")
+          "headline flips → STOP and refer canonical promotion for a decision.")
 
 
 if __name__ == "__main__":

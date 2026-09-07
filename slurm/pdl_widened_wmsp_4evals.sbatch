@@ -10,7 +10,7 @@
 # that are narrow-only and block the canonical table: asqa, med_quad, samsum, factscore.
 #   - WIDENED pool is the DEFAULT post-Task-A sampler (no flag): probedriftlong loads all LONG_SRC + evals.
 #   - WITHOUT --skip-wmsp, so the wMSP KEEP variants are widened too. But the DoC luq env has NO torchsort,
-#     and the 3 blondel variants hard-raise without it. Per the author (2026-07-29): each wMSP variant is a
+#     and the 3 blondel variants hard-raise without it. By design: each wMSP variant is a
 #     SEPARATE MLP fit (verified) so dropping saves real compute; the canonical widened wMSP set is the three
 #     the brief named -- wmsp_norm (reference), wmsp_shrink2 (materially diverges from @10 in the narrow-pool
 #     numbers, often stronger -> kept), wmsp_shrink10 (load-bearing for the "floor strong -> shrink wins"

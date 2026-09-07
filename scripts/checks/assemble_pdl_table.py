@@ -82,12 +82,12 @@ ALIAS = {
     # collapsing them onto one label would hide exactly the comparison they exist to make.
     "ptrue_unsup": "P(True)-unsup",
     "lookback": "Lookback Lens",
-    # SUPPRESSED 2026-08-04 (author's decision): the `linear` logistic probe is not a baseline the
+    # SUPPRESSED 2026-08-04: the `linear` logistic probe is not a baseline the
     # report uses. It is still COMPUTED (a logistic regression on pooled vectors already in memory,
     # seconds per cell) and its rows stay in the CSVs; None routes it through the EXISTING explicit-
     # suppression path, so it is dropped on purpose rather than falling out as an unknown method.
     # This does NOT touch SAPLMA: SAPLMA is `saplma` (long) / `mean-pool+MLP` (XL), both aliased
-    # to "SAPLMA" below and above. `linear` is the author's own linear probe on the same features.
+    # to "SAPLMA" below and above. `linear` is an ordinary linear probe on the same features.
     "linear": None,
     "saplma": "SAPLMA", "uniform": "armB(mean-pool)", "armB": "armB(mean-pool)",
     "attention": "armA(attention)", "armA": "armA(attention)",
@@ -128,7 +128,7 @@ STALE = {
         "softmax NaN fix of 2026-08-03, so every ensemble built on wMSP is stale. Measured against the "
         "finished grid: 12 of 40 wMSP cells differ by >0.02, and asqa/ID differs by 0.52 "
         "(-0.044 stale vs +0.477 fresh, the NaN signature). LOO-long is understated on 6 of 8 datasets. "
-        "NOT being re-run (author's decision 2026-08-05: the ensembles are not a focus). The non-wMSP "
+        "NOT being re-run, because the ensembles are not a focus of the report. The non-wMSP "
         "ensembles, ens{MSP,SAPLMA} and ens-z{MSP,SAPLMA}, are affected only via their shared cells "
         "and are flagged with the rest rather than picked apart."),
 }

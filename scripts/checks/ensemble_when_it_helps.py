@@ -2,7 +2,7 @@
 """M6 POST-HOC (2026-08-20) -- WHY DOES xsum LOSE, AND WHEN DOES COMBINING HELP?
 
 
-EXPLORATORY, NOT PRE-REGISTERED. Run at the author's request AFTER the M6 verdict. It explains that
+EXPLORATORY, NOT PRE-REGISTERED. Run outside the registered set AFTER the M6 verdict. It explains that
 result; it does not revise it. The registered outcome stands: not established under the bar.
 
 TWO QUESTIONS

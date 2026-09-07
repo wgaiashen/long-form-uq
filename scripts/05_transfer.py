@@ -150,7 +150,7 @@ def main():
                           file=sys.stderr)
             print(f"{train_ds:>14}    " + "".join(f"{c:>14}" for c in cells))
 
-    # Save the matrix for the worklog.
+    # Save the matrix for later analysis.
     out_path = Path(cfg.results_dir) / f"transfer_matrix__{cache._slug(args.model)}__{args.ood}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     import csv as _csv

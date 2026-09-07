@@ -18,7 +18,7 @@
 # results/generation_quality.csv). Writing them here would dirty the repo with a side effect.
 #
 # Expected spend: ~12,648 rows over the six datasets, about £2-4 at the measured gpt-5-mini rate
-# ($0.64 / 2,560 rows). Approved by the author 2026-08-15.
+# ($0.64 / 2,560 rows). Approved before the run.
 #
 #   bash scripts/checks/wmodels_label.sh meta-llama/Llama-3.1-8B-Instruct
 #   bash scripts/checks/wmodels_label.sh google/gemma-2-9b-it --estimate-only

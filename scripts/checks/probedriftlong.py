@@ -6,7 +6,7 @@ long-only setting, does weighted-MSP / shrink overtake the probes, measured agai
 (max of msp_sum, perplexity, msp_min)?
 
 LONG UNIVERSE: pubmed_qa, xsum, cnn_dailymail, med_quad, samsum, expertqa, asqa.
-  UPDATE 2026-07-22 (author's decision): ExpertQA and ASQA are ORDINARY TRAINING SOURCES, so the long pool
+  ExpertQA and ASQA are ORDINARY TRAINING SOURCES rather than eval-only targets, so the long pool
   is MIXED-LABEL by default (ExpertQA = claim-precision, the rest = reference-agreement). Cells are tagged
   `different_label_projection`. `--label-homogeneous` drops ExpertQA from the sources to reproduce the
   pre-2026-07-22 baseline as the control.

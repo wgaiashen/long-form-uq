@@ -107,7 +107,7 @@ def main():
         print(f"    vs {name:38s} {ref:+.4f}   margin {blend - ref:+.4f}")
     print("\n  the project log quoted +0.034 against the FIRST of these, not SAPLMA. Both numbers were")
     print("  right; they were being compared as if they answered the same question. It is a comparator")
-    print("  mismatch, not a provenance bug. Note the worklog's own caveat at the time: the significance")
+    print("  mismatch, not a provenance bug. Note the caveat recorded at the time: the significance")
     print("  rested on 'an optimistic within-cell bootstrap'.")
 
     common = sorted(set(rt) & set(can))

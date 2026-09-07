@@ -9,7 +9,7 @@ COMPARES PER-EXAMPLE VECTORS, NOT PRR. PRR moves ~1e-4 on 1e-7 of round-off, so 
 would pass runs that are not the same computation.
 
 A cell present in one run and absent from the other is reported, never skipped silently -- that is
-the "blank reads as measured" failure this project bans.
+the "blank reads as measured" failure this pipeline is built to avoid.
 
     python scripts/checks/wmodels_lambda_control.py --model google/gemma-2-9b
 """

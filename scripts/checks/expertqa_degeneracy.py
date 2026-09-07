@@ -1,8 +1,8 @@
 """ExpertQA generation-quality (degeneracy) scan — the Stage-2 go/no-go check.
 
 This measures whether the base-Llama generations loop/repeat, WITHOUT needing the judge
-labels (it reads only the cached generations). It reproduces the ad-hoc scan from the
-2026-07-05 worklog entries so the full-set can be compared to the pilot on the same yardstick.
+labels (it reads only the cached generations). It reproduces the ad-hoc scan from
+the pilot records so the full set can be compared to the pilot on the same yardstick.
 
 Degeneracy modes (EXPERTQA_PLAN Stage-2, item 3):
   - REPETITION: the base model, with no natural stop on open-ended prompts, runs to the token
@@ -10,14 +10,14 @@ Degeneracy modes (EXPERTQA_PLAN Stage-2, item 3):
     repeated >= 3x.
   - CAP-COUPLING: repetition is tightly coupled to hitting the max_new_tokens cap, so we also
     report P(degenerate | capped) vs P(degenerate | not capped) — the single decisive number
-    in the worklog (64.4% of capped pilot generations looped).
+    in the pilot records (64.4% of capped pilot generations looped).
   - HEDGE / REFUSAL: generic non-answers ("I don't know", "It depends"). A keyword + short-length
     heuristic, reported separately (a different failure mode from looping).
 
 Run (reads only records; no GPU, no judge):
     python scripts/checks/expertqa_degeneracy.py --ood ID --prompt-regime expertqa_reppen
 
-Self-validation: run it on the ORIGINAL no-reppen pilot and it reproduces the worklog's
+Self-validation: run it on the ORIGINAL no-reppen pilot and it reproduces the recorded
 73% cap / 48.5% repetition-degenerate (verified 2026-07-06):
     python scripts/checks/expertqa_degeneracy.py --ood pilot --prompt-regime expertqa
 """
@@ -52,7 +52,7 @@ def distinct_n(tokens, n):
 
 
 def max_sentence_repeat(text):
-    """Largest count of any single (normalised) sentence — >=3 is the worklog's loop flag."""
+    """Largest count of any single (normalised) sentence — >=3 is the recorded loop flag."""
     # split on sentence enders; normalise whitespace/case so near-identical loops collapse
     sents = [re.sub(r"\s+", " ", s).strip().lower() for s in re.split(r"[.!?\n]+", text)]
     sents = [s for s in sents if len(s) > 3]  # ignore trivial fragments
@@ -93,7 +93,7 @@ def main():
     capped = np.array(capped)
     d3 = np.array(d3)
     srepeat = np.array(srepeat)
-    # worklog definition of repetition-degenerate: distinct-3 < 0.5 OR a sentence repeated >= 3x
+    # recorded definition of repetition-degenerate: distinct-3 < 0.5 OR a sentence repeated >= 3x
     degen = (d3 < 0.5) | (srepeat >= 3)
 
     n = len(recs)

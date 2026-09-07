@@ -23,8 +23,7 @@
 #      MUST reproduce the canonical master to 4 dp.
 #   2. --out goes to results/analysis/ under a sensitivity name — the canonical
 #      probedriftlong__Qwen_Qwen2.5-14B__*.csv and pdl_master are NEVER touched by this job. Promoted
-#      to canonical only after the invariance check passes (author's decision rule, matching the
-#      med_quad sensitivity precedent).
+#      to canonical only after the invariance check passes.
 #
 # --wmsp-only pins the wMSP family to the three registry variants (method-set freeze, author
 # 2026-08-11): the other variants (seg_flat, seg_softmax, blondel ablations) stay on the

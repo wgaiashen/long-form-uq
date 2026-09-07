@@ -12,7 +12,7 @@ Two per-target properties the ladders must respect:
     OOD rung (correctness-world sources -> factuality eval) is flagged `different_label_projection`: the
     target is scored on CLAIM PRECISION while the pool was trained on REFERENCE AGREEMENT (see that
     function's docstring -- the old "factuality vs factuality" framing was wrong).
-    UPDATE 2026-07-22 (author's decision): ExpertQA and ASQA are ORDINARY TRAINING SOURCES, not eval-only,
+    ExpertQA and ASQA are ORDINARY TRAINING SOURCES, not eval-only,
     so pools are MIXED-LABEL by default and the flag is how those cells stay identifiable.
   * EVAL SPLIT (`eval_split`): the XL sets are split-less (ExpertQA all-`test`; med_quad/samsum all-`train`), so
     the eval target's held-out test set is CARVED here (fixed & deterministic), NOT baked into `load_per_token`.
@@ -40,7 +40,7 @@ import probe_drift_long as _pdl  # noqa: E402
 # Full dataset universe + task-family taxonomy (lifted from xl_eval_ladder, + expertqa as long-form QA).
 ALL = ["sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum", "expertqa", "asqa",
        "factscore"]   # factscore added 2026-07-27 (Round-3 Task A): eval-only, but a valid TRAINING SOURCE
-# FACTUALITY IS ITS OWN FAMILY (author's decision 2026-08-03, resolving the "property tag deferred" /
+# FACTUALITY IS ITS OWN FAMILY, resolving the "property tag deferred" /
 # "factuality-family split is a pending decision" placeholders left in data.py:32,43,47).
 # BEFORE: expertqa, factscore AND asqa were all "long_qa", i.e. one undifferentiated QA family.
 # NOW:
@@ -64,7 +64,7 @@ KEYSTONES = {"sciq", "trivia_qa", "pubmed_qa", "xsum", "cnn_dailymail"}   # -> g
 # else. A constant that claims to be "the non-keystones" and isn't is a trap waiting for the first
 # `x in XL_EVALS`, and that is precisely the shape of the three defects this file was just fixed for.
 XL_EVALS = set(ALL) - KEYSTONES                                          # -> rung_sources (taxonomy)
-# TRAINING SOURCE POOL = every dataset (author's decision 2026-07-22): ASQA and ExpertQA are treated the
+# TRAINING SOURCE POOL = every dataset: ASQA and ExpertQA are treated the
 # SAME as the rest, not eval-only. Consequence to keep visible: ExpertQA carries a FAITHFULNESS label while
 # the others carry correctness, so pools that include it are MIXED-LABEL. That is deliberate -- what used to
 # be the separate `--include-expertqa` "universal" variant is now the default. Every affected cell is still

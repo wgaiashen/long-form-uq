@@ -12,7 +12,7 @@ special tokens excluded), populations ladder-identical (finite-label filter FIRS
 xl_rungs.eval_split — the §3.1a order). Then, on each TEST response, compare the weight vector w
 with the NLL vector.
 
-MATCHED-MASK SENSITIVITY (author's 2026-08-10 review): the canonical floors read ALL generated
+MATCHED-MASK SENSITIVITY: the canonical floors read ALL generated
 tokens while wMSP masks specials (content_keep), so every agreement statistic is computed under
 BOTH token populations:
   floor-policy   all G tokens (w is 0 on masked positions by construction);

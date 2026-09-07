@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Assemble the 13-method Qwen report table (author's spec, 2026-08-12).
+"""Assemble the 13-method Qwen report table.
 
 One-off assembly script for the final-report table, NOT a modification of
 qwen_pdl_master_clean.py (whose 9-method list stays exactly what the invariance sweep and M2

@@ -44,31 +44,16 @@ cache
 # bare form is required or the tree reads permanently dirty.
 results
 
-# Day-to-day working notes: cluster hand-over briefs and orientation documents. These are kept
-# outside this repository alongside the planning documents. Pre-registrations and analysis scripts
-# are not in this class and stay tracked here.
+# Working documents that describe the process of doing the work rather than the work itself.
+# These are kept outside this repository; the patterns are here so that a stray copy is not
+# committed by accident. Pre-registrations, README files and code comments are not in this class
+# and stay tracked.
 *_BRIEF_*.md
-DOC_BRIEF*.md
-DOC_INSTRUCTIONS.md
 *_HANDOVER*.md
-
-# Working prompts and agent briefs. Same class as the hand-over documents above: written to
-# orient somebody through a piece of work, not to describe the submitted artifact. Files with
-# these exact names exist in the directory above this repository and must never be swept in by a
-# `git add -A`. Pre-registrations, READMEs and comments explaining why the code does what it does
-# are not in this class and stay tracked.
-AGENT_PROMPT_*.md
-RCS_PROMPT_*.md
-PROMPT_*.md
-
-# Audit, mapping and planning documents. These belong outside this repository. Five of them were
-# committed here by an automated `git add -A` and had to be removed by a history rewrite; this
-# pattern is the second line of defence so that cannot recur.
+DOC_INSTRUCTIONS.md
 docs/
 
-# Editor / tooling scratch directories and worktrees. A 42MB unlabelled records duplicate was found
-# in one of these on 2026-08-11, untracked but NOT ignored, so a `git add -A` would have swept it
-# into the submitted artifact.
+# Editor and tool directories.
 .vscode/
 .idea/
 .claude/

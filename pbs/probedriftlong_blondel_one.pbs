@@ -6,7 +6,7 @@
 #PBS -N luq_pdlB
 #PBS -j oe
 # W2 — ProbeDriftLong carrying the Blondel-loss shrink variants, written to a SEPARATE csv so the committed
-# PART VII baseline is ADDED TO, never replaced (author's instruction 2026-07-22).
+# PART VII baseline is ADDED TO, never replaced.
 # The run reproduces the baseline pools exactly (asqa reverted to eval-only), and re-scores every baseline
 # method alongside the 2 new Blondel variants -- so the OVERLAP with the committed file doubles as a
 # REPRODUCIBILITY CHECK, and the Blondel-vs-pairwise contrast is paired within this single job.

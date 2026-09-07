@@ -20,7 +20,7 @@ Scored (all training-free, hence RUNG-INVARIANT — one number per dataset, n = 
     perplexity · msp_min · msp_sum · Lehmer beta=1 · softmax tau=1
 
 NOT scored here, and why: SAPLMA / uniform / attention / wMSP-norm / wMSP-shrink@2 are supervised,
-and the author's Step 2b requires EXISTING trained probes rather than retraining. **No Qwen probe or
+and Step 2b requires EXISTING trained probes rather than retraining. **No Qwen probe or
 weighter exists on disk** (`cache/probes/` holds Llama attention poolers only), so that half cannot
 be run under that constraint. It is reported as blocked, not silently skipped or quietly retrained.
 

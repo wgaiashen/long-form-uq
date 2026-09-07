@@ -62,7 +62,7 @@ LAB = "correctness"
 EVALS = ["sciq", "trivia_qa", "pubmed_qa"]
 # Candidate training sources; each included only if its pertok cache actually loads. (ExpertQA is EVAL-ONLY
 # -- excluded as a source since its faithfulness label must not mix into the correctness training pool.)
-# ASQA + ExpertQA included (author's decision 2026-07-22): they are ORDINARY training sources, not
+# ASQA + ExpertQA included: they are ORDINARY training sources, not
 # eval-only. Leaving them out here also silently starved canonical_ladder, which uses this as its
 # --sources default. See the loading guard added there.
 # factscore ADDED 2026-08-04. It was the only one of the ten missing, and that had two effects:

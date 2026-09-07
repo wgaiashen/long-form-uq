@@ -18,7 +18,7 @@ information is combined:
 Everything reuses the existing functions (attn_pool.py, aggregators.py, pertoken_aggregate.py) so
 there is one implementation of each aggregator, not a copy.
 
-Three things make this airtight rather than just reproducible (see the plan / worklog):
+Three things make this airtight rather than just reproducible:
   1. EXPLICIT, STAMPED LABEL. The bare `correctness` field differs by dataset (gpt-5 short-form,
      gpt-5-mini long-form). We read a named --label-field and print the per-dataset model, and fail
      loudly on a missing/NaN label. AlignScore is a secondary field, read by regime (alive
@@ -30,7 +30,7 @@ Three things make this airtight rather than just reproducible (see the plan / wo
      We report whatever it says -- if long-form comes back null, that is the finding.
 
 Verification is anchored to the cache, NOT to the old ad-hoc numbers: the mean-pool row must match
-the cached SAPLMA L15 PRR (a HARD assert). If a margin differs from the old worklog table, that is
+the cached SAPLMA L15 PRR (a HARD assert). If a margin differs from an earlier recorded table, that is
 the consolidation working -- investigate, do not force a match.
 
     python scripts/checks/aggregation_table.py --label-fields correctness,correctness_alignscore \

@@ -5,7 +5,7 @@ WHY THIS CAN BE A CHEAP FOLLOW-UP
 ---------------------------------
 Unsupervised P(True) needs no training: the score is already on each record (`ptrue_unsup`, written by
 01g). So scoring it is just PRR over the eval's test split — CPU, seconds, no pertok cache, no probe.
-That is why adding it does not justify restarting a 20-job ladder run (author's decision 2026-08-03).
+That is why adding it does not justify restarting a 20-job ladder run.
 
 IT IS A FLOOR, SO IT IS SHIFT-INVARIANT. Like `msp_min`/`perplexity`, the score depends only on the
 EVAL set, never on what was trained on. Its value is therefore identical across all 5 rungs, and it is

@@ -18,7 +18,7 @@
 # WRITES TO NEW FILES. results/pdl_fam_*.csv are the frozen sources of the 1,664-cell master
 # table and are never overwritten here -- the whole point is to diff against them.
 #
-# METHOD SET = the paper set only (author's instruction 2026-08-08), not the 42-arm grid:
+# METHOD SET = the paper set only, not the 42-arm grid:
 #   floors (msp_sum/perplexity/msp_min) + fair_floor + SAPLMA + attention pooler + mean-pool
 #   control + wmsp_norm/shrink2/shrink10 + the ptrue and lookback baselines.
 # Trimming wMSP from 8 arms to 3 removes the dominant cost (each arm is a separate MLP fit).

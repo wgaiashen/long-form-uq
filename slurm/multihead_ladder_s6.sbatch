@@ -11,7 +11,7 @@
 # both trained in-run at T=1. --defer-baseline leaves the K=1 columns EMPTY + baseline_deferred=True;
 # the MH-vs-K=1 reference is filled POST-HOC by join_arma_baseline.py from S3's arm A. So S6 needs NO
 # dependency on S3 and runs NOW on a free A100.
-# factscore is EXCLUDED from S6 by design (see worklog 2026-07-28): S3's ~77 min/cell rate over 21
+# factscore is EXCLUDED from S6 by design: S3's ~77 min/cell rate over 21
 # cells vs 24h makes its OOD cells unlikely to exist in time, and it is the thinnest eval (n=455, base
 # rate 0.386) with an rp12 decoding confound. -> 12 paired cells (6 evals x 2 OOD rungs) + 6 ID.
 set -uo pipefail

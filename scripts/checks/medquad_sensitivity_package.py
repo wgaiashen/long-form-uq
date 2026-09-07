@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """FINAL MedQuAD span sensitivity package — READ-ONLY, from CSVs that already exist.
 
-FRAMING (author's decision 2026-08-12, superseding the earlier conditional promotion):
+FRAMING:
 the ORIGINAL canonical Llama population is FROZEN AS PRIMARY; the MedQuAD clean-span regime is a
 SENSITIVITY ANALYSIS. Nothing is promoted, no job is launched, no cache rebuilt, no canonical file
 written. This script only reads.

@@ -243,7 +243,7 @@ def aux_penalty(a, D, mask, normalise=False):
     NO clamp_min ON THE DENOMINATOR. `aux_ref` is exactly 0 when D is uniform, which is the documented
     degenerate case the content-mass builder falls back to. Clamping would turn 0/0 into a large finite
     penalty, handing rows that carry NO target the largest gradient in the batch -- the "silent default
-    that returns a plausible number" class this project bans. Those rows are DROPPED from the penalty and
+    that returns a plausible number" class, which this pipeline treats as an error. Those rows are DROPPED from the penalty and
     COUNTED, so the caller can report them; a dropped row is visibly not-measured, never quietly weighted.
     """
     raw = ((a - D) ** 2 * mask).sum(1)

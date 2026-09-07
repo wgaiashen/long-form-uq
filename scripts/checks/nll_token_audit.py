@@ -4,8 +4,7 @@
 The researcher-facing question: when max-NLL works, is the extreme token actually answer-bearing /
 fact-bearing? When it fails, is it a harmless rare name, formatting token, or lexical choice?
 
-SAMPLING IS DETERMINISTIC AND PRE-COMMITTED (author's 2026-08-10 review cut the plan's 40/dataset
-to ~12): the dataset's scored TEST rows are split into quality quartiles, and within each quartile
+SAMPLING IS DETERMINISTIC AND PRE-COMMITTED: the dataset's scored TEST rows are split into quality quartiles, and within each quartile
 3 examples are chosen by ascending sha1("<dataset>:<idx>:<position>") — no hand-picking. Any
 example later quoted in the report must come from this audit and be labelled illustrative.
 
