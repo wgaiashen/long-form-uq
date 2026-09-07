@@ -1,6 +1,6 @@
 # Pre-registration — shrinkage mechanism diagnostic and configuration-selection audit
 
-> **Recorded outcome (added 2026-09-07):** run. The mechanism diagnostic holds, and the configuration-selection audit is recorded as retrospective rather than prospective.
+> **Recorded outcome:** run. The mechanism diagnostic holds, and the configuration-selection audit is recorded as retrospective rather than prospective.
 
 **Date:** 2026-08-13. **Population:** `meta-llama/Meta-Llama-3.1-8B`, canonical ProbeDriftLong,
 layer 15, carve `legacy`. **Written and committed BEFORE any arm-vs-arm mechanism output was

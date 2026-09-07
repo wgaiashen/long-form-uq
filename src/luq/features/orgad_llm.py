@@ -10,8 +10,8 @@ is found for correct AND incorrect rows and "located" no longer tracks correctne
 This is a faithful port of `temp_idea_1_msp_probe/extract_exact_answer/get_exact_answer.py`
 (`extract_exact_answer` + `get_indices_of_exact_answer`), with two deliberate changes, both documented in
 the report's method section:
-  * we use an API LLM (gpt-5-mini) for the extraction instead of a local Llama generate() -- cheaper and
-    what the author asked for; the prompt is the verbatim (2 few-shot examples, "NO ANSWER" escape).
+  * the extraction uses an API model (gpt-5-mini) rather than a local generate() call, which is
+    cheaper; the prompt is the published one verbatim (2 few-shot examples, "NO ANSWER" escape).
   * SHORT-FORM only, exactly like the reference implementation (which asserts dataset in {truthfulqa, sciq, medquad}); a long
     multi-sentence answer has no single short answer.
 Validity rule is the: the extracted string must be a non-empty substring of the model answer and not
@@ -83,7 +83,7 @@ def extract_model_answer(question, model_answer, model="gpt-5-mini", max_retries
 # Task-adaptive summarisation variant (the ONE method extended to summaries).
 # QA has a single "exact answer"; a summary has no answer, so the important-token CONCEPT becomes
 # "the key information-bearing spans" (entities/numbers/claims). Same idea, task-appropriate prompt --
-# exactly the QA-vs-summarisation split our LLM-judge already uses. Chosen by the author 2026-07-09.
+# exactly the QA-vs-summarisation split the response-quality judge already uses.
 # --------------------------------------------------------------------------------------------------
 SUMMARY_DATASETS = {"xsum", "cnn_dailymail", "samsum"}
 
@@ -140,7 +140,7 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 
 
 # --------------------------------------------------------------------------------------------------
-# Refined LONG-FORM QA variant (the "broad prompt", 2026-07-19). The short-form exact-answer prompt is
+# Refined LONG-FORM QA variant (the "broad prompt"). The short-form exact-answer prompt is
 # degenerate on multi-sentence QA answers -- on pubmed it collapses to the yes/no verdict for 73% of
 # examples, on med_quad it fails (NO ANSWER) 42% of the time. A long QA answer has no single exact answer:
 # the important-token CONCEPT becomes the SET of claim-bearing spans (the verdict PLUS the findings/
@@ -149,14 +149,14 @@ def extract_summary_spans(summary, model="gpt-5-mini", max_retries=4):
 # A DATASET MISSING FROM THIS SET DOES NOT FAIL -- IT SILENTLY GETS THE WRONG PROMPT. `extract_important`
 # falls through to `extract_model_answer`, the SHORT-ANSWER prompt, which asks for "the short answer" to a
 # question. On a biography or a long-form QA answer that mostly returns "NO ANSWER", so the run completes,
-# costs real money, and writes a cache that looks fine and is nearly empty. Caught 2026-08-06 before
+# costs real money, and writes a cache that looks fine and is nearly empty. This was caught before
 # spending on factscore/asqa. Anything long-form and claim-bearing belongs here.
 #   asqa      -- long-form QA, answers carry multiple verifiable claims
 #   factscore -- biographies; not literally "QA", but the claim-span prompt (entities, dates, numbers) is
 #                exactly right for them, and the short-answer prompt is exactly wrong
 LONGFORM_QA_DATASETS = {"pubmed_qa", "med_quad", "expertqa", "asqa", "factscore"}
 
-# DOMAIN-NEUTRAL BY DESIGN (rewritten 2026-08-06). The first version named medical entity types
+# DOMAIN-NEUTRAL BY DESIGN. Naming medical entity types in the prompt
 # explicitly -- "drugs, genes, conditions, procedures" -- and BOTH few-shot examples were biomedical
 # (DMSO/telomerase, ETHE1). That was written when this path served pubmed_qa and med_quad only. Applied to
 # a BIOGRAPHY (factscore) it asks for drugs and genes when the claim-bearing terms are names, dates, places
@@ -200,7 +200,7 @@ Answer: {model_answer}
 Spans:"""
 
 
-# PER-DOMAIN PROMPT SPLIT (author's decision, 2026-08-06). The claim-span prompt comes in two forms and
+# PER-DOMAIN PROMPT SPLIT. The claim-span prompt comes in two forms and
 # the dataset chooses. This is a DELIBERATE, RECORDED inconsistency, not an accident, and it must be stated
 # in any table caption that uses Orgad masks:
 #   MEDICAL_QA_DATASETS  -> the biomedical prompt (drugs/genes/conditions/procedures, biomedical examples).
@@ -282,7 +282,7 @@ def extract_longform_qa_spans(question, model_answer, model="gpt-5-mini", max_re
 def extract_important(dataset, question, model_answer, model="gpt-5-mini", variant="exact"):
     """Task-adaptive dispatch. Returns the value to cache (str for short QA, list for the span variants).
       * summarisation                     -> key fact-bearing spans (list)
-      * long-form QA + variant="broad"    -> the refined claim-bearing span SET (list)   [2026-07-19]
+      * long-form QA + variant="broad"    -> the refined claim-bearing span SET (list)
       * short QA (or long QA, variant="exact") -> the single exact answer (str)
     variant="exact" preserves the original behaviour; only long-form QA under variant="broad" changes."""
     if is_summarisation(dataset):

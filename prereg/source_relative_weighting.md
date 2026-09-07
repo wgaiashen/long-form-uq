@@ -1,6 +1,6 @@
 # Pre-registration — source-relative rank supervision for activation-weighted surprisal
 
-> **Recorded outcome (added 2026-09-07):** run, under the condition its registration set.
+> **Recorded outcome:** run, under the condition its registration set.
 
 **Date:** 2026-08-12. **Population:** `meta-llama/Meta-Llama-3.1-8B`, canonical ProbeDriftLong,
 carve `legacy`, layer 15, seeds 1/2/3, 1800-row supervised pools.

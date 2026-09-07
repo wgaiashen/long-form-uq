@@ -61,7 +61,7 @@ def save_prompt_hash(digest: str, cache_dir: Path, key: str) -> Path:
 
 # ---- source-library provenance: WHICH probe_drift produced these prompts -------------
 # The prompt_hash above catches a prompt change WITHIN one cache namespace. It cannot catch
-# the case that actually bit us on 2026-08-01: a fresh --prompt-regime starts with no stored
+# the case this guards against: a fresh --prompt-regime starts with no stored
 # hash, so nothing compares it against the v1 cache it is destined to be read beside. The
 # xsum probe was generated under a DIFFERENT probe_drift from its own v1 cache, changing the
 # prompt and the drawn examples at the same time as the budget, and no guard could fire.

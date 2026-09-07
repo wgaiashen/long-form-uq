@@ -11,8 +11,9 @@ domain = metadata['field']; filter = metadata['question_type'] ('|'-separated fu
 We emit `field` + `cluster` per record from day one so the Role-C within-ExpertQA domain-shift OOD
 split is a free re-slice later.
 
-Prompt + gold-length decisions are Stage-0 locked; see EXPERTQA_PLAN.md. Vendors the field->cluster
-map and the factual-core filter from the project's expertqa_loader.py starter.
+The prompt and the gold-length rule are frozen here so that the prompt hash is stable across runs.
+The field-to-cluster map and the factual-core filter are carried over from the loader written when
+this dataset was brought into the benchmark.
 """
 import json
 import random

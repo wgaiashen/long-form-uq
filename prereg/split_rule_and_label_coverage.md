@@ -1,6 +1,6 @@
 # Pre-registration — the split rule and label coverage
 
-> **Recorded outcome (added 2026-09-07):** run. The rule fired mechanically on the second model, as intended.
+> **Recorded outcome:** run. The rule fired mechanically on the second model, as intended.
 
 **Written 2026-08-08, BEFORE any Qwen2.5-14B generation exists.** Committed ahead of the run, so
 every threshold and decision rule below is fixed while only the Llama numbers are known.

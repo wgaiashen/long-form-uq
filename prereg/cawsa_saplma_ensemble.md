@@ -1,6 +1,6 @@
 # Pre-registration — does CAWSA supply a complementary signal to SAPLMA?
 
-> **Recorded outcome (added 2026-09-07):** run. The combination improves on the probe alone in mean out-of-distribution PRR on every population tested, and beats the matched control.
+> **Recorded outcome:** run. The combination improves on the probe alone in mean out-of-distribution PRR on every population tested, and beats the matched control.
 
 ## 0. Provenance and honest chronology — read this first
 

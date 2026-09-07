@@ -81,7 +81,7 @@ _CHAT_EOS_CANDIDATES = ("<|im_end|>", "<|eot_id|>", "<end_of_turn>")
 def _chat_eos_ids(tok):
     """Resolve whichever _CHAT_EOS_CANDIDATES tokens this tokenizer actually has.
 
-    Found empirically on Qwen2.5-32B (2026-08-21): tok.eos_token_id is <|endoftext|> (151643),
+    Found empirically on Qwen2.5-32B: tok.eos_token_id is <|endoftext|> (151643),
     but apply_chat_template's turn boundary is <|im_end|> (151645) -- a different token the base
     generation_config never learned to stop on. Without it, chat-template generation runs straight
     past its own turn boundary and hallucinates the next user turn to fill the rest of the token

@@ -182,7 +182,7 @@ def _spearman_loss(soft_r, target_rank):
 # MSP floor) is left untouched so the constant==MSP grounding test and the floor stay invariant.
 _SPECIAL_ID_MIN = 128000
 
-# THE >=128000 RULE IS LLAMA-3 ONLY, AND IT IS A SILENT BUG ON ANY OTHER MODEL (2026-08-08).
+# THE >=128000 RULE IS LLAMA-3 ONLY, AND IT IS A SILENT BUG ON ANY OTHER MODEL.
 # Qwen2.5's vocabulary is 152,064 with its specials at 151,643+, so `id >= 128000` would classify a
 # large band of ORDINARY CONTENT TOKENS as special and zero their weight -- no crash, no warning,
 # just a quietly different method. This feeds `content_keep`, which feeds weighted MSP, which is a
@@ -246,7 +246,7 @@ def _weights_from_raw(raw, weight_mode: str, keep=None):
         if keep is None:
             return torch.softmax(raw, dim=0) * n
         n_kept = torch.clamp(keep.sum(), min=1.0)
-        # EVERY-TOKEN-EXCLUDED IS THE NaN CASE (found 2026-08-03 via the asqa wMSP outlier).
+        # EVERY-TOKEN-EXCLUDED IS THE NaN CASE.
         # If keep is all-zero, masked_fill sets EVERY position to -inf and softmax(all -inf) = NaN, so
         # the whole example scores NaN. The clamp above protects the SCALE but not the softmax. Those
         # NaNs then flowed into prr(), which used to rank them arbitrarily and return a plausible number
@@ -306,11 +306,11 @@ def _segment_softmax_weights(raw, sid, keep=None):
     # path gets from _weights_from_raw's -inf masking. Default (all-ones) = every token kept.
     if keep is None:
         keep = torch.ones_like(raw)
-    # THE SAME EVERY-TOKEN-EXCLUDED NaN AS THE TOKEN PATH (fixed 2026-08-05). When `keep` is all-zero
+    # THE SAME EVERY-TOKEN-EXCLUDED NaN AS THE TOKEN PATH. When `keep` is all-zero
     # every segment gets `counts == 0`, so the `torch.where` below sets EVERY seg_mean to -inf and
-    # softmax(all -inf) = NaN. That was left unchased when the token-level case was fixed on 2026-08-03,
-    # and it is why `wmsp_seg_softmax` alone came back NaN on 17 of its 42 long cells while the other
-    # seven wMSP variants were clean. Same honest fallback as the token path: with no token judged
+    # softmax(all -inf) = NaN. The segment path needs the guard as much as the token path does: without
+    # it, `wmsp_seg_softmax` alone returns NaN wherever no token is keepable, while the other variants
+    # look clean. Same honest fallback as the token path: with no token judged
     # keepable there is no basis to prefer any, so weight uniformly (wMSP reduces to plain MSP for that
     # example) rather than emit a NaN that prr() must then refuse.
     if float(keep.sum()) < 0.5:

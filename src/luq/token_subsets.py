@@ -19,7 +19,7 @@ SPACE_MARKERS = ("Ġ", "▁")          # HF byte-level / sentencepiece leading-s
 NEWLINE_GLYPHS = ("Ċ", "ċ", "ĉ")    # byte-level newline / tab glyphs
 SENT_END = {".", "!", "?"}
 _SPECIAL_ID_MIN = 128000            # Llama-3 reserved/special token range
-# LLAMA-3 ONLY, AND A SILENT BUG ON ANY OTHER MODEL (2026-08-08). Qwen2.5's vocabulary is 152,064
+# LLAMA-3 ONLY, AND A SILENT BUG ON ANY OTHER MODEL. Qwen2.5's vocabulary is 152,064
 # with its specials at 151,643+, so `id >= 128000` would classify a large band of ORDINARY CONTENT
 # TOKENS as special and drop them from the keep-mask -- no crash, just a quietly different method.
 # Mirrors the fix already made in `weighted_msp.py`; `set_special_ids(tok.all_special_ids)` below

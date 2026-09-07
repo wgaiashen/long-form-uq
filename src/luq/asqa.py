@@ -7,17 +7,16 @@ knowledge, not a RAG/faithfulness test. This patterns with biographies / ExpertQ
 
 Gold (instance-level, for the LLM judge): the TWO annotator long_answers JOINED. ASQA gives exactly two
 long_answers per question, same facts in different wording (like TriviaQA aliases), so concatenating both
-avoids penalising a model answer that matches the second annotator's phrasing (decision confirmed with
-the author 2026-07-21). The qa_pairs' short_answers are kept per record for the FREE Str-EM coverage
-cross-check (labels/asqa_strem), not the primary label.
+avoids penalising a model answer that matches the second annotator's phrasing. The qa_pairs'
+short_answers are kept per record for the free Str-EM coverage cross-check (labels/asqa_strem), not
+the primary label.
 
 Eval-only (like ExpertQA): ASQA is a NEW factuality EVAL target for the cross-task OOD ladder — probes
 are trained on the existing pool and tested on ASQA — so there is no ASQA train split. We use the full
 dev split (948), in its natural (deterministic) order, so record idx aligns to load_records() for the
 Str-EM re-join with no manifest needed.
 
-Prompt + budget are frozen here (design-once; the frozen prompt stabilises 01_extract's prompt_hash
-guard). See the worklog 2026-07-21 entry for the pilot GATE that justified building this set.
+Prompt and budget are frozen here, so that 01_extract's prompt_hash guard is stable across runs.
 """
 HF_NAME = "din0s/asqa"
 SPLIT = "dev"

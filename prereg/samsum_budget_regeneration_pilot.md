@@ -1,6 +1,6 @@
 # Pre-registration — the SAMSum budget regeneration pilot
 
-> **Recorded outcome (added 2026-09-07):** run. The pilot informed the token budget and the truncation convention.
+> **Recorded outcome:** run. The pilot informed the token budget and the truncation convention.
 
 **Written 2026-07-31, BEFORE generating or judging anything.** Committed ahead of the run.
 

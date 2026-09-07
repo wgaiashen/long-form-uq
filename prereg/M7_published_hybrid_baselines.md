@@ -1,6 +1,6 @@
 # M7 — Published probability, distance and hybrid baselines on the corrected-span populations
 
-> **Recorded outcome (added 2026-09-07):** run. The comparator grid completed on the corrected-span populations, and every published distance and hybrid method evaluated here lands below the simplest probability aggregate.
+> **Recorded outcome:** run. The comparator grid completed on the corrected-span populations, and every published distance and hybrid method evaluated here lands below the simplest probability aggregate.
 
 Written before any hybrid prediction-rejection ratio has been computed, inspected or interpreted.
 

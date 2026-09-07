@@ -60,7 +60,8 @@ CANONICAL = {
     "weighted-MSP Blondel": "Activation-weighted +Blondel loss",
     "wmsp_shrink2": "CAWSA (lambda=2)", "wmsp_shrink10": "CAWSA (lambda=10)",
     # STANDARD-ladder names (weighted_msp_all_variants uses these bare forms, no `wmsp_` prefix).
-    # These were UNMAPPED, so our primary method was invisible on our primary ladder (2026-07-23).
+    # Without these the constrained weighting is invisible on the standard ladder, which writes the
+    # bare forms rather than the `wmsp_` prefixed ones.
     "shrink@2": "CAWSA (lambda=2)", "shrink@10": "CAWSA (lambda=10)",
     "shrink@2-blondel": "CAWSA (lambda=2) +Blondel loss", "shrink@10-blondel": "CAWSA (lambda=10) +Blondel loss",
     "kl@2": "Activation-weighted +KL penalty", "entropy_hinge@2": "Activation-weighted +entropy hinge",

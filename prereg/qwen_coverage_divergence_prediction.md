@@ -1,6 +1,6 @@
 # Pre-registration — predicted label-coverage divergence for Qwen2.5-14B
 
-> **Recorded outcome (added 2026-09-07):** run. The predicted coverage divergence matched the observed counts to the row on both affected datasets.
+> **Recorded outcome:** run. The predicted coverage divergence matched the observed counts to the row on both affected datasets.
 
 **Written 2026-08-08, on DoC, BEFORE the full Qwen generation run and BEFORE any Qwen judge call.**
 Nothing here has seen a Qwen coverage number, because none exists yet: no Qwen row has been labelled.

@@ -1,8 +1,8 @@
 """The long-form dataset universe and its task-family taxonomy.
 
-This is the single definition of the dataset universe and its task families. It was previously
-duplicated across several analysis modules, which then needed a separate check that the copies
-still agreed. Import from here rather than adding another copy.
+This is the single definition of the dataset universe and its task families. Import from here
+rather than keeping a second copy anywhere: two copies that drift apart change what every result
+means, without any error being raised.
 
 The order of `LONG_SRC` is load-bearing. The `1ds-Diff-long` rung takes the first source from a
 different task family, so re-ordering this list changes that rung's composition on every
@@ -30,7 +30,7 @@ LONG_SRC = ["pubmed_qa", "xsum", "cnn_dailymail", "med_quad", "samsum",
 SHORT_DATASETS = ["sciq", "trivia_qa"]
 
 # ---------------------------------------------------------------------------------------------
-# Fine task families (the 2026-07-27 / 2026-08-03 factuality split).
+# Fine task families.
 # ---------------------------------------------------------------------------------------------
 # correctness-QA (agreement with a gold answer) is kept SEPARATE from factuality (claim support
 # against an external reference), so "SameTask" means same PROPERTY, not merely same surface form.

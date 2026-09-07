@@ -38,11 +38,10 @@ else:
 # Results stay WITH THE CODE on every machine: they are small, they are the precious artifact, and
 # they are what gets committed and compared. Only the big regenerable caches move.
 #
-# Since 2026-08-14 `<repo>/results` is a SYMLINK to `../results`, i.e. to a directory outside
-# this repo, where results are version-controlled (they previously sat in no repository at all).
-# Nothing here changes: the path still resolves, so this constant, the ~130 per-file
-# `ROOT / "results"` idioms, the 148 PBS scripts and the 6 hardcoded absolute paths all keep working.
-# That transparency is exactly why the symlink was chosen over moving the directory.
+# `<repo>/results` may be a symlink to a directory outside the repository, which is how results are
+# version-controlled separately from the code. Nothing here depends on that: the path resolves either
+# way, so this constant, the per-file `ROOT / "results"` idioms and the job scripts all keep working.
+# That is why a symlink is used rather than moving the directory and rewriting the paths.
 RESULTS_DIR = REPO_ROOT / "results"
 
 

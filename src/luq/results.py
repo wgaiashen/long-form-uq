@@ -57,7 +57,7 @@ def prr(correctness, uncertainty) -> float:
     uncertainty = np.asarray(uncertainty, dtype=float)
     n = len(correctness)
 
-    # A NON-FINITE SCORE MUST NOT PRODUCE A NUMBER (added 2026-08-03).
+    # A NON-FINITE SCORE MUST NOT PRODUCE A NUMBER.
     # np.argsort puts NaN at the end and happily ranks the rest, so an ALL-NaN score vector used to
     # return the PRR of an arbitrary permutation -- a different plausible-looking value for every label
     # vector (-0.686, +0.013, -0.044 on three different inputs). That is exactly how asqa's wMSP cell

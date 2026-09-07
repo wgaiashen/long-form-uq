@@ -43,7 +43,7 @@ def msp_uncertainty(token_logprobs, aggregate: str = "mean") -> float:
 # ---- the FAIR unsupervised floor -------------------------------------------------------------------
 FLOOR_AGGREGATES = ("sum", "perplexity", "min")
 
-# ---- the PRE-REGISTERED primary floor (2026-07-24 meeting decision) ---------------------------------
+# ---- the pre-registered primary floor ---------------------------------------------------------
 # Max-of-three was rejected ("gives the baseline three shots; one may look good by chance"). Instead we
 # FIX ONE aggregate in advance and use it as the bar on EVERY dataset. `min` is chosen because it is the
 # strongest averaged ACROSS datasets (cross-dataset mean PRR: min ~0.28 > perplexity ~0.21 > sum ~0.20),
@@ -85,7 +85,7 @@ def primary_floor(records_te, agg: str = PRIMARY_FLOOR_AGG):
 def fair_floor(records_te, y_te, prr_fn, aggregates=FLOOR_AGGREGATES):
     """The honest unsupervised bar for a cell: the BEST-scoring of the standard MSP floors.
 
-    WHY THIS EXISTS (2026-07-22). Drivers used to hard-code the floor to `sum`, which is NOT
+    WHY THIS EXISTS. Hard-coding the floor to `sum` is not
     length-normalised. On several datasets a different aggregate is far stronger -- pubmed_qa
     sum=+0.202 vs min=+0.371, ASQA sum=+0.148 vs perplexity=+0.316 -- so a "beats the floor" claim
     measured against `sum` alone can be more than twice the honest margin. That is exactly the

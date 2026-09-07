@@ -1,6 +1,6 @@
 # M9 — Layer sensitivity for the supervised distance family
 
-> **Recorded outcome (added 2026-09-07):** run and stopped. Extraction completed at 88 of 88 layer files and the first acceptance gate failed, so under this registration no result was computed. This is registered, extracted and gate-stopped, which is not the same as not run.
+> **Recorded outcome:** run and stopped. Extraction completed at 88 of 88 layer files and the first acceptance gate failed, so under this registration no result was computed. This is registered, extracted and gate-stopped, which is not the same as not run.
 
 Written 2026-08-24, before any multi-layer distance score has been computed, inspected or interpreted.
 

@@ -1,21 +1,16 @@
 """Train/test carving, source sampling, and the row-order guard.
 
-THE CHANGE THIS FILE EXISTS FOR (2026-08-08)
---------------------------------------------
-The old order of operations was: DROP unlabelled rows, THEN carve 30% for test. On the two
-partially-labelled datasets the label is absent because of what THAT MODEL generated
-(`factuality is None` when `uncovered == 1.0`, i.e. the judge ran and found no claim the
-reference could adjudicate), so a different model produced a DIFFERENT test row set and the two
-models' numbers were not on the same population.
+WHY THE CARVE RUNS BEFORE THE LABEL FILTER
+-----------------------------------------
+On the two partially-labelled datasets the quality label is absent because of what that particular
+model generated: `factuality` is None when `uncovered == 1.0`, meaning the judge ran and found no
+claim the reference could adjudicate. Dropping unlabelled rows before carving the test set would
+therefore give a different model a different test set, and two models' numbers would not be on the
+same population.
 
-The fix is to reverse it: CARVE 30% from ALL rows, then score whichever of those carry labels.
-Measured consequence on Llama-3.1-8B -- only the two datasets that actually drift move:
-
-    med_quad   1800 rows, 1800 labelled -> 540 test both ways   IDENTICAL
-    samsum     1800 rows, 1800 labelled -> 540 test both ways   IDENTICAL
-    asqa        948 rows,  948 labelled -> 284 test both ways   IDENTICAL
-    expertqa   2016 rows, 1724 labelled -> 517 old / 516 scored of 605 carved   MOVES
-    factscore   500 rows,  455 labelled -> 136 old / 133 scored of 150 carved   MOVES
+So the carve runs over all rows, and whichever of those carry labels are then scored. Only the two
+datasets whose label coverage varies by model are affected; where every row is labelled, the two
+orders give the same test set.
 
 This does not fully equalise the populations. Each model is still scored on the subset its own
 quality labels cover, so the compared row sets still differ. What the change buys is that the
@@ -27,9 +22,9 @@ WHY POSITIONAL, NOT HASHED
 A content hash would be model-independent by construction, but it would also reassign rows on
 med_quad/samsum/asqa, which have no drift problem -- five datasets re-scored instead of two, for
 no gain. Positional is reproducible here because row order is a deterministic function of the
-data, verified: `cache.load_records` preserves file order with no sort, and all five
-carve-relevant datasets are single-split, contiguous and idx-ordered. `assert_canonical_order`
-below is what keeps that true instead of merely currently-true.
+data: records are loaded in file order with no sort, and the carve-relevant datasets are
+single-split, contiguous and index-ordered. `assert_canonical_order` below enforces that rather
+than assuming it.
 """
 
 import numpy as np
@@ -71,9 +66,9 @@ def eval_split(split, labelled=None, *, seed=CARVE_SEED, test_frac=XL_TEST_FRAC,
     untouched. A split-less dataset gets a fixed deterministic carve at `seed`, so there is ONE
     stable test set and the per-run seed varies only the training subsample.
 
-    carve="legacy"    reproduces the pre-2026-08-08 behaviour EXACTLY. Pass the ALREADY-FILTERED
-                      split array, as the old callers did, and leave `labelled` as None. Kept so
-                      the equivalence gate can prove the packaging changed nothing.
+    carve="legacy"    filter first, then carve. Pass an already-filtered split array and leave
+                      `labelled` as None. This is the rule the published numbers were produced
+                      under, so it is kept for reproducing them.
     carve="all-rows"  the fix. Pass the FULL split array plus a boolean `labelled` mask of the
                       same length; the carve runs over ALL rows and unlabelled rows are then
                       dropped from BOTH sides. Returned indices are positions in the FULL array
@@ -86,7 +81,7 @@ def eval_split(split, labelled=None, *, seed=CARVE_SEED, test_frac=XL_TEST_FRAC,
         raise ValueError("carve='legacy' takes a pre-filtered split array and no `labelled` mask")
     if carve == "all-rows" and labelled is None:
         raise ValueError("carve='all-rows' needs the `labelled` mask — that is the whole point. "
-                         "Pass carve='legacy' if you deliberately want the old behaviour.")
+                         "Pass carve='legacy' if you deliberately want filter-then-carve.")
 
     if len(np.unique(split)) >= 2:                      # real baked-in split
         tr = np.where(split == "train")[0]
@@ -127,9 +122,9 @@ def sampled_train_idx(split, seed, cap):
 
     A source with no dedicated train split (the eval-only sets) draws from ALL its rows. That is
     safe because `cells_long` always excludes a dataset from its own eval's sources, so no row
-    can be both trained on and tested on. The earlier version filtered to split=="train"
-    unconditionally, which returned EMPTY for eval-only sources -- so a listed source like
-    `expertqa:360` silently contributed zero rows and the pool label overstated its contents.
+    can be both trained on and tested on. Filtering to split=="train" unconditionally would return
+    nothing for an eval-only source, so a listed source such as `expertqa:360` would contribute
+    zero rows while the pool label still claimed it.
     """
     split = np.asarray(split)
     tr = np.where(split == "train")[0]
@@ -144,9 +139,8 @@ def build_rows(X, spec, splits, seed, sampled_fn=sampled_train_idx, labelled=Non
                carve="all-rows"):
     """(train_rows, test_rows) for one cell, as lists of (dataset, idx).
 
-    `splits`   : {dataset: split array}. Only the split array is ever read -- the old signature
-                 took the whole heavyweight PT tuple and used index [1] of it, which made this
-                 look like it needed states and records when it never did.
+    `splits`   : {dataset: split array}. Only the split array is ever read; this function needs
+                 neither hidden states nor records.
     `labelled` : {dataset: bool mask}, required when carve="all-rows".
 
     The eval target X uses its fixed `eval_split`; OOD sources are drawn by `sampled_fn`.

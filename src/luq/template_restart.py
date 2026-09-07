@@ -11,9 +11,9 @@ and committed BEFORE its effect on any UQ score was computed — the git history
 This module is DELIBERATELY SEPARATE from `luq.answer_span`:
   * `answer_span` is live on the Llama path via `01_extract --truncate-answer-span` and its rules
     are already promoted; changing it would change an existing, published behaviour.
-  * this module is a CANDIDATE rule set for a sensitivity analysis. Nothing consumes it in the
-    canonical pipeline. If the author later approves a boundary, it gets wired into `answer_span`
-    then, as an explicit promotion.
+  * this module is a candidate rule set for a sensitivity analysis. Nothing in the main pipeline
+    consumes it. Promoting a boundary means wiring it into `answer_span` explicitly, so that the
+    change to a published behaviour is deliberate rather than incidental.
 It is also strictly MODEL-AGNOSTIC. The same rule must be testable on Llama and Qwen; firing often
 on one and rarely on the other is a finding, not a reason to retune.
 

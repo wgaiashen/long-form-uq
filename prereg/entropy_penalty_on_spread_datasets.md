@@ -1,6 +1,6 @@
 # Pre-registration — the one-sided entropy penalty on the untested spread regime
 
-> **Recorded outcome (added 2026-09-07):** run. The predicted null on the untested regime, with the mechanism confirming it.
+> **Recorded outcome:** run. The predicted null on the untested regime, with the mechanism confirming it.
 
 **Written 2026-08-03, BEFORE the run.** Registered because it CORRECTS a justification that appears in
 the approved plan, and a corrected prediction written after seeing the result would be worthless.

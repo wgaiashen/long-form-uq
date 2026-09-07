@@ -1,6 +1,6 @@
 # Pre-registration — two label-free gate attempts
 
-> **Recorded outcome (added 2026-09-07):** run. Three gate families, three shuffled controls, three clean nulls, with the per-dataset pattern the opposite of the registered prediction.
+> **Recorded outcome:** run. Three gate families, three shuffled controls, three clean nulls, with the per-dataset pattern the opposite of the registered prediction.
 
 Population: the ProbeDriftLong OOD cells (`router_pdl`'s 32 cells = 8 long evals × {SameTask, DiffTask, LOO,
 1ds}-long). Seed regime: **seed-1** post-hoc reads off the saved attention poolers (NOT the 3-seed ladder — do

@@ -1,6 +1,6 @@
 # Pre-registration — does in-distribution attention entropy alone predict the OOD drop?
 
-> **Recorded outcome (added 2026-09-07):** run. Fails all three registered bars at the honest unit of analysis, and the registered stopping rule closed this line.
+> **Recorded outcome:** run. Fails all three registered bars at the honest unit of analysis, and the registered stopping rule closed this line.
 
 **Written 2026-08-05, before running this analysis.** Committed ahead of the run so the procedure and the
 decision rule are timestamped.

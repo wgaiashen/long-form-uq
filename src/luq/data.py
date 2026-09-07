@@ -29,10 +29,10 @@ JUDGE_NAME_MAP = {
 SHORT_FORM = {"sciq", "trivia_qa", "qa"}
 
 # `task` column for the results CSV (read by robust-uq-eval).
-# NOTE: expertqa's OOD placement (factuality vs faithfulness property tag) is DEFERRED — see
-# EXPERTQA_PLAN.md "Task tag / OOD placement". This coarse "long_qa" tag is a PLACEHOLDER used only
-# for the results CSV column; it is NOT wired into any OOD splitter (the pilot runs no OOD), so it is
-# safe until the property-tag decision is made.
+# NOTE: this coarse "long_qa" tag for expertqa is a placeholder used only for the results CSV
+# column. The task family that actually drives the training settings is defined in
+# `probe_drift_long.dataset_configs`, where expertqa sits in the factuality family; nothing here is
+# wired into a splitter, so the two do not conflict.
 TASK_OF = {
     "sciq": "short_qa",
     "trivia_qa": "short_qa",

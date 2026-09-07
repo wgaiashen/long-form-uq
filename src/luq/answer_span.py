@@ -40,9 +40,8 @@ SHORT_FORM = {"sciq", "trivia_qa"}
 # soft-loop check only, and will usually return "no-cut".
 #
 # WHY THIS SET IS EXPORTED. As a post-hoc analysis tool, "no-cut" for an unknown dataset is a
-# perfectly good answer. As a GENERATION-TIME flag (01_extract --truncate-answer-span, added
-# 2026-08-02) it is a trap: you ask for the generation to be cut, silently get no cut, and the run
-# looks like it worked. That is the "a silent default is worse than a crash" failure. Callers that
+# perfectly good answer. As a generation-time flag (01_extract --truncate-answer-span) it is a trap:
+# you ask for the generation to be cut, silently get no cut, and the run looks like it worked. That is the "a silent default is worse than a crash" failure. Callers that
 # depend on a cut actually existing must check membership here and fail loudly instead.
 DATASETS_WITH_RULES = {"med_quad", "xsum", "pubmed_qa"} | SHORT_FORM
 
@@ -192,7 +191,7 @@ def answer_span(text, dataset, context=None, version=1):
     failure this module warns about, occurring inside the module.
 
       version=1  the frozen historical rule. Byte-identical behaviour, and the default, so every
-                 existing caller and every artifact built before 2026-08-21 is untouched.
+                 existing caller and every artifact built under it is untouched.
       version=2  identical except the `Question:` / `Answer:` markers tolerate whitespace around the
                  colon. No other dataset and no other marker changes.
 
