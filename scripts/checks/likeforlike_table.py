@@ -31,7 +31,9 @@ existing masked implementation does. That makes the restricted score equal to th
 those rows, so the located rate is reported per dataset and must be read alongside the result.
 
     python scripts/checks/likeforlike_table.py
+    python scripts/checks/likeforlike_table.py --model Qwen/Qwen2.5-14B
 """
+import argparse
 import csv as _csv
 import json
 import sys
@@ -52,26 +54,42 @@ from probe_drift_long import LONG_SRC                  # noqa: E402
 # silently carves a DIFFERENT test set, which is what the floor gate caught on the first attempt.
 from xl_rungs import eval_split, label_of              # noqa: E402
 
-MODEL = "meta-llama/Meta-Llama-3.1-8B"
-SLUG = cache._slug(MODEL)
-MASTER = ROOT / "results" / "cleanv2" / f"pdl_cleanv2_master__{SLUG}.csv"
 RUNGS = ["ID", "LOO-long", "SameTask-long", "DiffTask-long", "1ds-Diff-long"]
-
-# The corrected-span resolution, and the corrected-span derived caches where they differ.
-REGIME = {"pubmed_qa": "", "xsum": "", "cnn_dailymail": "", "samsum": "",
-          "med_quad": "cleanv2", "asqa": "asqa_rp12",
-          "expertqa": "expertqa_rp12", "factscore": "factscore_rp12"}
-SAR_SUFFIX = {"med_quad": "__cleanv2"}
-ORGAD_SUFFIX = {"med_quad": "__cleanv2"}
-# Master method key -> the name used in this table.
 FLOOR_KEY = {"floor_sum": "sequence NLL (published MSP)",
              "floor_ppl": "mean token NLL",
              "floor_min": "minimum token probability"}
 
+# Per-model resolution, taken verbatim from `clean_core_manifest.py`'s CORE dict (the frozen
+# report-facing regime map), so this script and the manifest can never silently disagree about which
+# cache namespace a dataset reads. SAR/ORGAD suffix only exists for Llama, where an OLDER (pre-2026-08-24
+# uncorrected) cache sat next to the corrected one under the same base name and had to be disambiguated;
+# Qwen's and gemma's SAR/answer-span caches are computed for the first time directly on the corrected
+# population, so there is nothing to disambiguate and no suffix is used.
+MODEL_CFG = {
+    "meta-llama/Meta-Llama-3.1-8B": dict(
+        master_rel="cleanv2/pdl_cleanv2_master__{slug}.csv",
+        regime={"pubmed_qa": "", "xsum": "", "cnn_dailymail": "", "samsum": "",
+                "med_quad": "cleanv2", "asqa": "asqa_rp12",
+                "expertqa": "expertqa_rp12", "factscore": "factscore_rp12"},
+        sar_suffix={"med_quad": "__cleanv2"}, orgad_suffix={"med_quad": "__cleanv2"}),
+    "Qwen/Qwen2.5-14B": dict(
+        master_rel="analysis/pdl_master_qwenclean__{slug}.csv",
+        regime={"pubmed_qa": "", "xsum": "", "cnn_dailymail": "", "asqa": "asqa_rp12",
+                "samsum": "trunc_v1", "med_quad": "trunc_v1",
+                "expertqa": "expertqa_rp12_trunc_v1", "factscore": "factscore_rp12_trunc_v1"},
+        sar_suffix={}, orgad_suffix={}),
+    "google/gemma-2-9b": dict(
+        master_rel="cleanv2/wmodels_sens8_cleanv2_master__{slug}.csv",
+        regime={"pubmed_qa": "", "xsum": "", "cnn_dailymail": "", "samsum": "",
+                "med_quad": "cleanv2", "asqa": "asqa_rp12",
+                "expertqa": "expertqa_rp12", "factscore": "factscore_rp12"},
+        sar_suffix={}, orgad_suffix={}),
+}
 
-def load_master():
+
+def load_master(master_path):
     out = {}
-    for r in _csv.DictReader(open(MASTER)):
+    for r in _csv.DictReader(open(master_path)):
         try:
             out[(r["method"], r["eval"], r["rung"])] = float(r["prr_mean"])
         except (ValueError, KeyError):
@@ -101,9 +119,21 @@ def orgad_scores(tok, records, spans, agg):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B", choices=list(MODEL_CFG))
+    args = ap.parse_args()
+
+    MODEL = args.model
+    SLUG = cache._slug(MODEL)
+    cfg = MODEL_CFG[MODEL]
+    MASTER = ROOT / "results" / cfg["master_rel"].format(slug=SLUG)
+    REGIME = cfg["regime"]
+    SAR_SUFFIX = cfg["sar_suffix"]
+    ORGAD_SUFFIX = cfg["orgad_suffix"]
+
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(MODEL)
-    master = load_master()
+    master = load_master(MASTER)
 
     rows_out, gate_fail = [], []
     print(f"population: corrected-span eight-dataset grid, {MODEL}\n")

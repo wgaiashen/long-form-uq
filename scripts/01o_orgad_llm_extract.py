@@ -8,23 +8,57 @@ records already extracted, checkpoints every 25. LOGIN NODE (API); costs gpt-5-m
     export OPENAI_API_KEY=...   # source .openai_key
     python scripts/01o_orgad_llm_extract.py --dataset sciq
     python scripts/01o_orgad_llm_extract.py --dataset trivia_qa
+    python scripts/01o_orgad_llm_extract.py --model Qwen/Qwen2.5-14B --dataset xsum --variant broad --eval-only
 """
 import argparse
 import json
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts" / "checks"))
 
 from transformers import AutoTokenizer  # noqa: E402
 
 from luq import cache  # noqa: E402
 from luq.config import Config  # noqa: E402
 from luq.features import orgad_llm  # noqa: E402
+from xl_rungs import eval_split, label_of  # noqa: E402
 
 MODEL = "meta-llama/Meta-Llama-3.1-8B"
+
+
+def checkpoint_write(out, done, retries=40, delay=5.0):
+    """Write the checkpoint, retrying through a brief `FileNotFoundError` on the cache path. Observed
+    on the shared network filesystem this project runs on: the path becomes briefly unreadable with no
+    process holding a lock on it, then recovers within well under a minute. This budgets up to ~200s
+    before giving up; a persistent problem still raises after `retries`."""
+    for attempt in range(retries):
+        try:
+            out.write_text(json.dumps(done))
+            return
+        except FileNotFoundError:
+            if attempt == retries - 1:
+                raise
+            print(f"  [checkpoint_write] retry {attempt+1}/{retries} after FileNotFoundError on {out}",
+                  flush=True)
+            time.sleep(delay)
+
+
+def checkpoint_read(out, confirm_absent=3, delay=2.0):
+    """Load an existing checkpoint, guarding against the SAME transient path outage as
+    `checkpoint_write`: if `out.exists()` is falsely False during a brief filesystem blip, resuming would
+    silently discard everything already extracted and start over. Re-checks a few times before trusting
+    an absent file; a genuinely fresh run (never extracted before) pays a few seconds for this, once."""
+    for attempt in range(confirm_absent):
+        if out.exists():
+            return json.loads(out.read_text())
+        if attempt < confirm_absent - 1:
+            time.sleep(delay)
+    return {}
 
 
 def question_of(prompt):
@@ -51,19 +85,38 @@ def main():
                          "writes a SEPARATE __broad cache so the old exact-answer cache is preserved.")
     ap.add_argument("--prompt-regime", default="",
                     help="namespace for the records cache dir (e.g. expertqa_rp12 for ExpertQA).")
+    ap.add_argument("--model", default=MODEL, help="model whose cached records to read/extract for.")
+    ap.add_argument("--eval-only", action="store_true",
+                    help="restrict extraction to the labelled eval-target TEST subset (xl_rungs.label_of "
+                         "+ eval_split, same carve as likeforlike_table.py), instead of every cached "
+                         "record. Cuts API spend roughly in half; the like-for-like table only ever reads "
+                         "spans for this subset anyway, so nothing downstream needs the rest.")
+    ap.add_argument("--limit", type=int, default=0, help="only the first N records in scope (smoke test)")
     args = ap.parse_args()
 
-    cfg = Config(model_name=MODEL, dataset=args.dataset, ood_setting="ID", prompt_regime=args.prompt_regime)
-    recs = cache.load_records(cfg.cache_dir, cache.run_key(MODEL, args.dataset, "ID"))
+    cfg = Config(model_name=args.model, dataset=args.dataset, ood_setting="ID", prompt_regime=args.prompt_regime)
+    recs = cache.load_records(cfg.cache_dir, cache.run_key(args.model, args.dataset, "ID"))
+    if args.eval_only:
+        import numpy as np
+        field = label_of(args.dataset)
+        y = np.array([r.get(field, np.nan) for r in recs], dtype=float)
+        keep = np.where(np.isfinite(y))[0]
+        recs_labelled = [recs[i] for i in keep]
+        split = np.array([r["split"] for r in recs_labelled])
+        _, te = eval_split(split)
+        recs = [recs_labelled[i] for i in te]
+    if args.limit:
+        recs = recs[: args.limit]
     out_dir = ROOT / "cache" / "orgad_llm"
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = "__broad" if args.variant == "broad" else ""
-    out = out_dir / f"{cache._slug(MODEL)}__{args.dataset}__ID{suffix}.json"
-    done = json.loads(out.read_text()) if out.exists() else {}   # idx(str) -> extracted
+    out = out_dir / f"{cache._slug(args.model)}__{args.dataset}__ID{suffix}.json"
+    done = checkpoint_read(out)   # idx(str) -> extracted
 
-    tok = AutoTokenizer.from_pretrained(MODEL)
+    tok = AutoTokenizer.from_pretrained(args.model)
     todo = [r for r in recs if f"{r['split']}:{r['idx']}" not in done]
-    print(f"[{args.dataset}] {len(done)} cached, {len(todo)} to extract, {args.workers} workers", flush=True)
+    print(f"[{args.dataset}] {len(recs)} in scope ({'eval-test subset' if args.eval_only else 'full record set'}), "
+          f"{len(done)} cached, {len(todo)} to extract, {args.workers} workers", flush=True)
 
     def work(r):
         # split:idx is unique; idx alone collides across train/test
@@ -80,9 +133,9 @@ def main():
             done[key] = val
             n_new += 1
             if n_new % 50 == 0:
-                out.write_text(json.dumps(done))
+                checkpoint_write(out, done)
                 print(f"extracted {n_new}/{len(todo)}", flush=True)
-    out.write_text(json.dumps(done))
+    checkpoint_write(out, done)
 
     # report located rate (span found in the generation) -- this is the number that should NO LONGER
     # track correctness (the leak fix). Split it by correct-vs-incorrect: if located-rate is much higher
