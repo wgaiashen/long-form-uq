@@ -34,7 +34,7 @@
 # IT WRITES INTO THE TIER-1 RECORDS, so the results DO NOT go back as record files. The export step
 # below emits a small SIDECAR CSV instead; RCS merges that into its OWN canonical records. Shipping
 # records back would overwrite the files carrying the £-paid judge labels, the ones hashed in
-# prereg/CANONICAL_v1_MANIFEST.md, and rsync guards against deletion, not against overwriting.
+# scripts/checks/CANONICAL_v1_MANIFEST.md, and rsync guards against deletion, not against overwriting.
 
 set -uo pipefail
 export HF_HOME=/vol/gpudata/gs925-msc_project/hf_cache

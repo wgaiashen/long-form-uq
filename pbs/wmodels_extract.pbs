@@ -78,7 +78,7 @@ case "$DS" in
   #
   # med_quad takes --no-repeat-ngram-size 3 and specifically NOT --repetition-penalty: rep-pen
   # penalises its long few-shot context and forces immediate EOS, which produced ~35% EMPTY generations.
-  # Budget 128 is the hash-pinned v1 (prereg/CANONICAL_v1_MANIFEST.sha256), deliberately the CAPPED
+  # Budget 128 is the hash-pinned v1 (scripts/checks/CANONICAL_v1_MANIFEST.sha256), deliberately the CAPPED
   # version, not the archived v2 at 768.
   med_quad)      BUD=128; EXTRA="--no-repeat-ngram-size 3" ;;                                # 1800 rows
   # expertqa is the longest budget in the project and ~29% of the whole eight-dataset generation

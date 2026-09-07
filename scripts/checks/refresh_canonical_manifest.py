@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Regenerate prereg/CANONICAL_v1_MANIFEST.{md,sha256} after a DELIBERATE change to the records.
+"""Regenerate scripts/checks/CANONICAL_v1_MANIFEST.{md,sha256} after a deliberate change to the records.
 
 WHY THIS IS NEEDED, AND WHY IT DEMANDS A REASON
 ------------------------------------------------
@@ -28,8 +28,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MD = ROOT / "prereg" / "CANONICAL_v1_MANIFEST.md"
-SHA = ROOT / "prereg" / "CANONICAL_v1_MANIFEST.sha256"
+MD = ROOT / "scripts" / "checks" / "CANONICAL_v1_MANIFEST.md"
+SHA = ROOT / "scripts" / "checks" / "CANONICAL_v1_MANIFEST.sha256"
 
 
 def sha256(p):

@@ -6,7 +6,7 @@ rest on an mtime. That is the gap this file closes: presence and mtime lie, a ha
 
 Regenerate/compare with:
 ```
-cd msc-project-gs925 && sha256sum -c prereg/CANONICAL_v1_MANIFEST.sha256
+sha256sum -c scripts/checks/CANONICAL_v1_MANIFEST.sha256
 ```
 
 | bytes | sha256 | file |

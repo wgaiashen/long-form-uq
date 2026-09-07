@@ -6,7 +6,7 @@ WHY A SIDECAR
 `01g_ptrue_unsup.py` writes `ptrue_unsup` / `ptrue_unsup_mass` back INTO the Tier-1 record. That is fine
 when it runs where the records live. It is NOT fine across clusters: syncing the modified records back
 would overwrite RCS's canonical copies — the ones carrying the £-paid judge labels and the ones hashed in
-`prereg/CANONICAL_v1_MANIFEST.md`. A stale or partial remote copy landing on top of them is an
+`scripts/checks/CANONICAL_v1_MANIFEST.md`. A stale or partial remote copy landing on top of them is an
 unrecoverable loss, and rsync protects against deletion, not against overwriting a same-named file.
 
 So: DoC exports a tiny CSV keyed by row position, RCS merges it into its OWN records. ~50KB crosses the

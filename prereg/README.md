@@ -9,9 +9,11 @@ Several of these are recorded negatives, and they are kept deliberately. A pre-r
 removed once it fails is worth nothing, and the analyses in the write-up that ask which nearby
 designs fail rest on exactly these files.
 
-Two files here are not pre-registrations. `CANONICAL_v1_MANIFEST.md` and its `.sha256` are a
-checksum manifest for the frozen v1 caches, and `xl_contribution_provenance.md` reconstructs
-provenance for a set of result rows that were written before provenance stamping existed.
+Everything in this directory is a pre-registration. Two files that were previously kept here are
+not, and have moved: the checksum manifest for the frozen caches is now
+`scripts/checks/CANONICAL_v1_MANIFEST.md` with its `.sha256`, beside the script that regenerates
+them, and the reconstructed provenance record for a set of result rows written before provenance
+stamping existed is kept outside this repository with the project's other result-facing notes.
 
 The `Recorded outcome` column quotes the file's own status line where it has one. A dash means the
 file does not carry a one-line status, not that the experiment was not run: read the file.
@@ -66,4 +68,3 @@ effect**, and those say so in those words. Only the third kind is a null in the 
 | [`source_relative_weighting.md`](source_relative_weighting.md) | source-relative rank supervision for activation-weighted surprisal | run, under the condition its registration set. |
 | [`split_rule_and_label_coverage.md`](split_rule_and_label_coverage.md) | the split rule and label coverage | run. The rule fired mechanically on the second model, as intended. |
 | [`topk_surprisal_prior.md`](topk_surprisal_prior.md) | the top-k surprisal prior | run. Complete on the long grid; the prior did not carry. |
-| [`xl_contribution_provenance.md`](xl_contribution_provenance.md) | ProbeDrift-XL contribution ladder — reconstructed provenance | — |
