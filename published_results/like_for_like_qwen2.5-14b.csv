@@ -1,0 +1,89 @@
+dataset,method,prr,n_test,located_rate
+pubmed_qa,sequence NLL (published MSP),-0.333496,2000,0.8925
+pubmed_qa,mean token NLL,0.021901,2000,0.8925
+pubmed_qa,minimum token probability,-0.204041,2000,0.8925
+pubmed_qa,TokenSAR,0.037259,2000,0.8925
+pubmed_qa,answer-span sequence NLL,-0.297577,2000,0.8925
+pubmed_qa,answer-span mean NLL,0.112606,2000,0.8925
+pubmed_qa,CAWSA lambda=2 [ID],0.4703,2000,
+pubmed_qa,CAWSA lambda=2 [LOO-long],0.1541,2000,
+pubmed_qa,CAWSA lambda=2 [SameTask-long],0.2072,2000,
+pubmed_qa,CAWSA lambda=2 [DiffTask-long],0.2138,2000,
+pubmed_qa,CAWSA lambda=2 [1ds-Diff-long],0.2839,2000,
+xsum,sequence NLL (published MSP),-0.026519,2000,0.975
+xsum,mean token NLL,0.002203,2000,0.975
+xsum,minimum token probability,0.160018,2000,0.975
+xsum,TokenSAR,0.004486,2000,0.975
+xsum,answer-span sequence NLL,0.053743,2000,0.975
+xsum,answer-span mean NLL,0.045517,2000,0.975
+xsum,CAWSA lambda=2 [ID],0.3691,2000,
+xsum,CAWSA lambda=2 [LOO-long],0.1541,2000,
+xsum,CAWSA lambda=2 [SameTask-long],0.0479,2000,
+xsum,CAWSA lambda=2 [DiffTask-long],0.1509,2000,
+xsum,CAWSA lambda=2 [1ds-Diff-long],0.0866,2000,
+cnn_dailymail,sequence NLL (published MSP),-0.292256,2000,0.9705
+cnn_dailymail,mean token NLL,-0.044174,2000,0.9705
+cnn_dailymail,minimum token probability,-0.107652,2000,0.9705
+cnn_dailymail,TokenSAR,-0.073769,2000,0.9705
+cnn_dailymail,answer-span sequence NLL,-0.085762,2000,0.9705
+cnn_dailymail,answer-span mean NLL,-0.041942,2000,0.9705
+cnn_dailymail,CAWSA lambda=2 [ID],0.3136,2000,
+cnn_dailymail,CAWSA lambda=2 [LOO-long],0.1191,2000,
+cnn_dailymail,CAWSA lambda=2 [SameTask-long],0.169,2000,
+cnn_dailymail,CAWSA lambda=2 [DiffTask-long],-0.0141,2000,
+cnn_dailymail,CAWSA lambda=2 [1ds-Diff-long],0.093,2000,
+med_quad,sequence NLL (published MSP),-0.117438,540,0.963
+med_quad,mean token NLL,0.220773,540,0.963
+med_quad,minimum token probability,0.120057,540,0.963
+med_quad,TokenSAR,0.212728,540,0.963
+med_quad,answer-span sequence NLL,-0.070037,540,0.963
+med_quad,answer-span mean NLL,0.227666,540,0.963
+med_quad,CAWSA lambda=2 [ID],0.4368,540,
+med_quad,CAWSA lambda=2 [LOO-long],0.2539,540,
+med_quad,CAWSA lambda=2 [SameTask-long],0.2398,540,
+med_quad,CAWSA lambda=2 [DiffTask-long],0.2254,540,
+med_quad,CAWSA lambda=2 [1ds-Diff-long],0.1871,540,
+samsum,sequence NLL (published MSP),0.230688,540,0.9907
+samsum,mean token NLL,0.299019,540,0.9907
+samsum,minimum token probability,0.195685,540,0.9907
+samsum,TokenSAR,0.293872,540,0.9907
+samsum,answer-span sequence NLL,0.038186,540,0.9907
+samsum,answer-span mean NLL,-0.008988,540,0.9907
+samsum,CAWSA lambda=2 [ID],0.464,540,
+samsum,CAWSA lambda=2 [LOO-long],0.2412,540,
+samsum,CAWSA lambda=2 [SameTask-long],0.1611,540,
+samsum,CAWSA lambda=2 [DiffTask-long],0.2466,540,
+samsum,CAWSA lambda=2 [1ds-Diff-long],0.2693,540,
+expertqa,sequence NLL (published MSP),0.658668,476,0.9853
+expertqa,mean token NLL,0.271825,476,0.9853
+expertqa,minimum token probability,0.50701,476,0.9853
+expertqa,TokenSAR,0.273612,476,0.9853
+expertqa,answer-span sequence NLL,0.37801,476,0.9853
+expertqa,answer-span mean NLL,0.005589,476,0.9853
+expertqa,CAWSA lambda=2 [ID],0.6488,476,
+expertqa,CAWSA lambda=2 [LOO-long],0.4009,476,
+expertqa,CAWSA lambda=2 [SameTask-long],0.4493,476,
+expertqa,CAWSA lambda=2 [DiffTask-long],0.4156,476,
+expertqa,CAWSA lambda=2 [1ds-Diff-long],0.1123,476,
+asqa,sequence NLL (published MSP),0.103793,284,0.9859
+asqa,mean token NLL,0.18508,284,0.9859
+asqa,minimum token probability,0.124709,284,0.9859
+asqa,TokenSAR,0.173759,284,0.9859
+asqa,answer-span sequence NLL,0.223465,284,0.9859
+asqa,answer-span mean NLL,0.253374,284,0.9859
+asqa,CAWSA lambda=2 [ID],0.3751,284,
+asqa,CAWSA lambda=2 [LOO-long],0.2054,284,
+asqa,CAWSA lambda=2 [SameTask-long],0.1901,284,
+asqa,CAWSA lambda=2 [DiffTask-long],0.2032,284,
+asqa,CAWSA lambda=2 [1ds-Diff-long],0.1716,284,
+factscore,sequence NLL (published MSP),0.247427,140,0.9571
+factscore,mean token NLL,0.33987,140,0.9571
+factscore,minimum token probability,0.297675,140,0.9571
+factscore,TokenSAR,0.33043,140,0.9571
+factscore,answer-span sequence NLL,0.136608,140,0.9571
+factscore,answer-span mean NLL,0.317865,140,0.9571
+factscore,CAWSA lambda=2 [ID],0.4536,140,
+factscore,CAWSA lambda=2 [LOO-long],0.4144,140,
+factscore,CAWSA lambda=2 [SameTask-long],0.4758,140,
+factscore,CAWSA lambda=2 [DiffTask-long],0.3263,140,
+factscore,CAWSA lambda=2 [1ds-Diff-long],0.2257,140,

@@ -1,0 +1,17 @@
+model,dataset,regime,label_field,n,mean,median,sd,min,max,eval_test_n,eval_test_mean,eval_test_median
+meta-llama/Meta-Llama-3.1-8B,PubMedQA,(canonical),correctness,3800,21.19,15.0,22.76,1,121,2000,20.78,15.0
+meta-llama/Meta-Llama-3.1-8B,MedQuAD,cleanv2,correctness,1800,66.25,77.0,33.51,2,114,540,66.75,77.0
+meta-llama/Meta-Llama-3.1-8B,ASQA,asqa_rp12,correctness,948,73.98,57.0,63.11,0,234,284,76.20,64.5
+meta-llama/Meta-Llama-3.1-8B,XSum,(canonical),correctness,3800,28.90,26.0,11.89,5,54,2000,29.06,26.0
+meta-llama/Meta-Llama-3.1-8B,CNN/DailyMail,(canonical),correctness,3800,49.20,31.0,34.64,7,120,2000,50.65,31.0
+meta-llama/Meta-Llama-3.1-8B,SAMSum,(canonical),correctness,1800,36.38,42.0,13.15,7,53,540,35.91,42.5
+meta-llama/Meta-Llama-3.1-8B,ExpertQA,expertqa_rp12,factuality,1724,174.25,167.0,86.89,1,368,517,173.18,165.0
+meta-llama/Meta-Llama-3.1-8B,FActScore,factscore_rp12,factuality,455,76.16,63.0,54.11,5,230,136,72.50,58.5
+Qwen/Qwen2.5-14B,PubMedQA,(canonical),correctness,3800,37.81,24.0,34.28,1,116,2000,37.51,21.0
+Qwen/Qwen2.5-14B,MedQuAD,trunc_v1,correctness,1800,62.36,70.0,33.84,1,117,540,64.20,74.0
+Qwen/Qwen2.5-14B,ASQA,asqa_rp12,correctness,948,73.36,55.0,59.98,2,240,284,72.14,55.0
+Qwen/Qwen2.5-14B,XSum,(canonical),correctness,3800,33.97,35.0,10.41,8,55,2000,33.93,35.0
+Qwen/Qwen2.5-14B,CNN/DailyMail,(canonical),correctness,3800,54.26,51.0,23.09,6,116,2000,54.63,51.0
+Qwen/Qwen2.5-14B,SAMSum,trunc_v1,correctness,1800,24.76,24.0,9.21,2,51,540,24.96,23.0
+Qwen/Qwen2.5-14B,ExpertQA,expertqa_rp12_trunc_v1,factuality,1585,149.12,106.0,120.64,3,365,476,145.45,100.5
+Qwen/Qwen2.5-14B,FActScore,factscore_rp12_trunc_v1,factuality,468,104.35,75.0,73.19,4,234,140,109.05,114.0

@@ -1,0 +1,89 @@
+dataset,method,prr,n_test,located_rate
+pubmed_qa,sequence NLL (published MSP),0.201819,2000,0.999
+pubmed_qa,mean token NLL,-0.173625,2000,0.999
+pubmed_qa,minimum token probability,0.370996,2000,0.999
+pubmed_qa,TokenSAR,-0.178567,2000,0.999
+pubmed_qa,answer-span sequence NLL,-0.003843,2000,0.999
+pubmed_qa,answer-span mean NLL,-0.145121,2000,0.999
+pubmed_qa,CAWSA lambda=2 [ID],0.6398,2000,
+pubmed_qa,CAWSA lambda=2 [LOO-long],0.2456,2000,
+pubmed_qa,CAWSA lambda=2 [SameTask-long],0.0531,2000,
+pubmed_qa,CAWSA lambda=2 [DiffTask-long],0.2308,2000,
+pubmed_qa,CAWSA lambda=2 [1ds-Diff-long],0.3056,2000,
+xsum,sequence NLL (published MSP),-0.204913,2000,0.944
+xsum,mean token NLL,-0.171928,2000,0.944
+xsum,minimum token probability,-0.01489,2000,0.944
+xsum,TokenSAR,-0.173363,2000,0.944
+xsum,answer-span sequence NLL,-0.126456,2000,0.944
+xsum,answer-span mean NLL,-0.145575,2000,0.944
+xsum,CAWSA lambda=2 [ID],0.4334,2000,
+xsum,CAWSA lambda=2 [LOO-long],0.0962,2000,
+xsum,CAWSA lambda=2 [SameTask-long],0.1456,2000,
+xsum,CAWSA lambda=2 [DiffTask-long],-0.0808,2000,
+xsum,CAWSA lambda=2 [1ds-Diff-long],0.0071,2000,
+cnn_dailymail,sequence NLL (published MSP),-0.084844,2000,0.9225
+cnn_dailymail,mean token NLL,0.409648,2000,0.9225
+cnn_dailymail,minimum token probability,0.119785,2000,0.9225
+cnn_dailymail,TokenSAR,0.413146,2000,0.9225
+cnn_dailymail,answer-span sequence NLL,0.019645,2000,0.9225
+cnn_dailymail,answer-span mean NLL,0.199822,2000,0.9225
+cnn_dailymail,CAWSA lambda=2 [ID],0.5663,2000,
+cnn_dailymail,CAWSA lambda=2 [LOO-long],0.3538,2000,
+cnn_dailymail,CAWSA lambda=2 [SameTask-long],0.3704,2000,
+cnn_dailymail,CAWSA lambda=2 [DiffTask-long],0.3066,2000,
+cnn_dailymail,CAWSA lambda=2 [1ds-Diff-long],0.3127,2000,
+med_quad,sequence NLL (published MSP),-0.137643,540,0.8815
+med_quad,mean token NLL,0.11177,540,0.8815
+med_quad,minimum token probability,-0.024629,540,0.8815
+med_quad,TokenSAR,0.117712,540,0.8815
+med_quad,answer-span sequence NLL,-0.13481,540,0.8815
+med_quad,answer-span mean NLL,0.083963,540,0.8815
+med_quad,CAWSA lambda=2 [ID],0.4879,540,
+med_quad,CAWSA lambda=2 [LOO-long],0.18,540,
+med_quad,CAWSA lambda=2 [SameTask-long],0.1627,540,
+med_quad,CAWSA lambda=2 [DiffTask-long],0.2381,540,
+med_quad,CAWSA lambda=2 [1ds-Diff-long],0.1419,540,
+samsum,sequence NLL (published MSP),-0.133384,540,0.9852
+samsum,mean token NLL,0.112828,540,0.9852
+samsum,minimum token probability,-0.024259,540,0.9852
+samsum,TokenSAR,0.102794,540,0.9852
+samsum,answer-span sequence NLL,0.159491,540,0.9852
+samsum,answer-span mean NLL,0.138371,540,0.9852
+samsum,CAWSA lambda=2 [ID],0.4441,540,
+samsum,CAWSA lambda=2 [LOO-long],0.2109,540,
+samsum,CAWSA lambda=2 [SameTask-long],0.3065,540,
+samsum,CAWSA lambda=2 [DiffTask-long],-0.0174,540,
+samsum,CAWSA lambda=2 [1ds-Diff-long],0.16,540,
+expertqa,sequence NLL (published MSP),0.143797,517,0.9671
+expertqa,mean token NLL,0.039254,517,0.9671
+expertqa,minimum token probability,0.205411,517,0.9671
+expertqa,TokenSAR,0.034146,517,0.9671
+expertqa,answer-span sequence NLL,-0.018114,517,0.9671
+expertqa,answer-span mean NLL,0.032401,517,0.9671
+expertqa,CAWSA lambda=2 [ID],0.5411,517,
+expertqa,CAWSA lambda=2 [LOO-long],0.1395,517,
+expertqa,CAWSA lambda=2 [SameTask-long],0.0652,517,
+expertqa,CAWSA lambda=2 [DiffTask-long],0.1753,517,
+expertqa,CAWSA lambda=2 [1ds-Diff-long],0.1068,517,
+asqa,sequence NLL (published MSP),0.148285,284,0.9859
+asqa,mean token NLL,0.31611,284,0.9859
+asqa,minimum token probability,0.24982,284,0.9859
+asqa,TokenSAR,0.310421,284,0.9859
+asqa,answer-span sequence NLL,0.284597,284,0.9859
+asqa,answer-span mean NLL,0.35472,284,0.9859
+asqa,CAWSA lambda=2 [ID],0.494,284,
+asqa,CAWSA lambda=2 [LOO-long],0.441,284,
+asqa,CAWSA lambda=2 [SameTask-long],0.3131,284,
+asqa,CAWSA lambda=2 [DiffTask-long],0.3927,284,
+asqa,CAWSA lambda=2 [1ds-Diff-long],0.4497,284,
+factscore,sequence NLL (published MSP),0.282102,136,1.0
+factscore,mean token NLL,0.325967,136,1.0
+factscore,minimum token probability,0.428254,136,1.0
+factscore,TokenSAR,0.309118,136,1.0
+factscore,answer-span sequence NLL,0.265692,136,1.0
+factscore,answer-span mean NLL,0.373589,136,1.0
+factscore,CAWSA lambda=2 [ID],0.5889,136,
+factscore,CAWSA lambda=2 [LOO-long],0.2762,136,
+factscore,CAWSA lambda=2 [SameTask-long],0.3998,136,
+factscore,CAWSA lambda=2 [DiffTask-long],0.2698,136,
+factscore,CAWSA lambda=2 [1ds-Diff-long],0.3515,136,

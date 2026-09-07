@@ -109,12 +109,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dir", default="published_results",
                     help="directory holding the per-population tables")
-    ap.add_argument("--glob", default="*.csv", help="filename pattern within that directory")
+    ap.add_argument("--glob", default="master_*.csv",
+                    help="filename pattern for the per-population masters within that directory")
     ap.add_argument("--ensemble", default=None,
-                    help="the combination driver's equal-model table, normally "
-                         "results/analysis/ensemble_clean/ensemble_clean_equalmodel.csv. Section 5.7 "
-                         "cannot be computed from the masters, which carry no combination rows.")
+                    help="the combination table. Defaults to combination_equal_model.csv inside "
+                         "--dir. Section 5.7 cannot be computed from the masters, which carry no "
+                         "combination rows.")
     args = ap.parse_args()
+
+    # The combination lives in its own file because the masters carry no combination rows. Default
+    # to the published copy so the script reproduces every reported quantity with no arguments.
+    if args.ensemble is None:
+        default = os.path.join(args.dir, "combination_equal_model.csv")
+        if os.path.exists(default):
+            args.ensemble = default
 
     data = load(args.dir, args.glob)
     print(f"tables read from {args.dir!r}\n")

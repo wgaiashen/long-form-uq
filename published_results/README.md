@@ -1,7 +1,23 @@
-# Published result masters
+# Published results
 
-One file per evaluated population, added at submission. Each is the corrected-span master from
-which the reported tables and figures were computed.
+The result files the reported tables and figures are computed from. `scripts/report_numbers.py`
+reads this directory and recomputes the reported quantities from it.
+
+There are two kinds. The three **masters**, one per evaluated population, hold the main comparison:
+every method scored on every target under every training setting. The remaining files hold the
+supplementary comparisons, which are computed by their own drivers and are not rows of a master.
+
+| file | what it holds |
+|---|---|
+| `master_llama-3.1-8b.csv`, `master_qwen2.5-14b.csv`, `master_gemma-2-9b.csv` | the main comparison, one row per method, target and setting |
+| `combination_equal_model.csv` | the combination of the constrained weighting with the hidden-state probe, averaged equally over the two populations with certified corrected-span per-response scores |
+| `combination_per_model.csv` | the same, per population |
+| `density_all_layer_llama-3.1-8b.csv` | the published density and hybrid estimators at their full layer set, per cell, with the layer count and response window recorded per row |
+| `hybrid_backoff_llama-3.1-8b.csv`, `hybrid_backoff_gemma-2-9b.csv` | the back-off gate: the mean weight it gives its supervised branch per setting, and the paired comparisons for the substitution experiment |
+| `like_for_like_llama-3.1-8b.csv`, `like_for_like_qwen2.5-14b.csv`, `like_for_like_gemma-2-9b.csv` | the training-free probability comparators, including the relevance-weighted and answer-span variants, with the rate at which a span was located |
+| `response_lengths.csv` | mean and median response length per population and dataset, over all labelled rows and over the held-out evaluation partition separately |
+
+The sections below describe the masters, which have the most involved schema.
 
 ## Scope
 
@@ -12,12 +28,7 @@ and a result table for a model the report never mentions would raise a question 
 answer. Their pre-registrations remain in `prereg/`, so the record that the work was done is public
 even though the numbers are not.
 
-## Naming
-
-`master_<model>.csv`, with the model written as it appears in the report: `master_llama-3.1-8b.csv`,
-`master_qwen2.5-14b.csv`, `master_gemma-2-9b.csv`.
-
-## Columns
+## Columns of a master
 
 | column | meaning |
 |---|---|
@@ -48,6 +59,13 @@ implemented in `src/luq/results.py`. The long-form ladder that computes the cell
 `scripts/checks/probedriftlong.py`; the published distance and hybrid comparators come from
 `scripts/checks/md_hybrids.py` and `scripts/checks/hbo.py`. `scripts/report_numbers.py` recomputes
 the reported tables from the files in this directory.
+
+Two cautions that apply to the supplementary files. `response_lengths.csv` carries two populations:
+the reported length table is the held-out evaluation partition, in the `eval_test_*` columns, and
+reading the wider `mean` column instead gives values that differ by several words. And
+`density_all_layer_llama-3.1-8b.csv` records the response window per row, because a middle-layer row
+under one window and an all-layer row under another differ in two ways at once; compare rows that
+share a window.
 
 ## Two things to expect when reading these files
 

@@ -1,0 +1,16 @@
+model,rung,comparison,n,mean_delta,wins,p_exact,ci_lo,ci_hi,mean_w_sv,frac_beyond_gate
+meta-llama/Meta-Llama-3.1-8B,ID,cawsa_hbo-hbo,8,0.383944,8,0.007812,0.269587,0.484329,0.232176,0.254789
+meta-llama/Meta-Llama-3.1-8B,ID,cawsa_hbo-cawsa,8,0.038491,8,0.007812,0.023783,0.053326,0.232176,0.254789
+meta-llama/Meta-Llama-3.1-8B,ID,cawsa_hbo-saplma,8,-0.032656,2,0.039062,-0.057218,-0.008249,0.232176,0.254789
+meta-llama/Meta-Llama-3.1-8B,LOO-long,cawsa_hbo-hbo,8,0.197305,6,0.039062,0.083501,0.292612,0.051441,0.766698
+meta-llama/Meta-Llama-3.1-8B,LOO-long,cawsa_hbo-cawsa,8,0.001836,4,1.0,-0.006869,0.012274,0.051441,0.766698
+meta-llama/Meta-Llama-3.1-8B,LOO-long,cawsa_hbo-saplma,8,-0.003843,3,0.84375,-0.075048,0.080647,0.051441,0.766698
+meta-llama/Meta-Llama-3.1-8B,SameTask-long,cawsa_hbo-hbo,8,0.197442,6,0.054688,0.045261,0.335496,0.013593,0.912553
+meta-llama/Meta-Llama-3.1-8B,SameTask-long,cawsa_hbo-cawsa,8,0.002752,4,0.1875,-3.6e-05,0.007208,0.013593,0.912553
+meta-llama/Meta-Llama-3.1-8B,SameTask-long,cawsa_hbo-saplma,8,-0.096365,2,0.148438,-0.193868,0.001484,0.013593,0.912553
+meta-llama/Meta-Llama-3.1-8B,DiffTask-long,cawsa_hbo-hbo,8,0.162852,8,0.007812,0.064474,0.271055,0.005326,0.958066
+meta-llama/Meta-Llama-3.1-8B,DiffTask-long,cawsa_hbo-cawsa,8,0.00256,4,0.1875,0.000133,0.005613,0.005326,0.958066
+meta-llama/Meta-Llama-3.1-8B,DiffTask-long,cawsa_hbo-saplma,8,-0.024444,3,0.640625,-0.12642,0.089661,0.005326,0.958066
+meta-llama/Meta-Llama-3.1-8B,1ds-Diff-long,cawsa_hbo-hbo,8,0.202494,7,0.015625,0.103921,0.293981,0.0,1.0
+meta-llama/Meta-Llama-3.1-8B,1ds-Diff-long,cawsa_hbo-cawsa,8,0.0,0,,0.0,0.0,0.0,1.0
+meta-llama/Meta-Llama-3.1-8B,1ds-Diff-long,cawsa_hbo-saplma,8,0.01844,5,0.742188,-0.072338,0.101824,0.0,1.0

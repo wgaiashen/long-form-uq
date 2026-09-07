@@ -1,0 +1,16 @@
+model,rung,comparison,n,mean_delta,wins,p_exact,ci_lo,ci_hi,mean_w_sv,frac_beyond_gate
+google/gemma-2-9b,ID,cawsa_hbo-hbo,8,0.258625,8,0.007812,0.173618,0.351065,0.261847,0.221578
+google/gemma-2-9b,ID,cawsa_hbo-cawsa,8,0.029251,7,0.015625,0.013499,0.04562,0.261847,0.221578
+google/gemma-2-9b,ID,cawsa_hbo-saplma,8,-0.04745,2,0.148438,-0.096553,0.004621,0.261847,0.221578
+google/gemma-2-9b,LOO-long,cawsa_hbo-hbo,8,0.056441,6,0.382812,-0.123079,0.22174,0.035525,0.774742
+google/gemma-2-9b,LOO-long,cawsa_hbo-cawsa,8,0.005418,4,0.296875,-6.4e-05,0.012268,0.035525,0.774742
+google/gemma-2-9b,LOO-long,cawsa_hbo-saplma,8,-0.061309,2,0.382812,-0.177557,0.058776,0.035525,0.774742
+google/gemma-2-9b,SameTask-long,cawsa_hbo-hbo,8,0.070098,5,0.460938,-0.100298,0.215255,0.015817,0.889936
+google/gemma-2-9b,SameTask-long,cawsa_hbo-cawsa,8,0.002965,4,0.21875,-8e-06,0.006708,0.015817,0.889936
+google/gemma-2-9b,SameTask-long,cawsa_hbo-saplma,8,-0.121876,1,0.039062,-0.205844,-0.039025,0.015817,0.889936
+google/gemma-2-9b,DiffTask-long,cawsa_hbo-hbo,8,0.058003,5,0.460938,-0.11771,0.219577,0.001582,0.985637
+google/gemma-2-9b,DiffTask-long,cawsa_hbo-cawsa,8,-0.000236,0,0.25,-0.000609,-0.0,0.001582,0.985637
+google/gemma-2-9b,DiffTask-long,cawsa_hbo-saplma,8,0.00161,5,0.84375,-0.09543,0.08811,0.001582,0.985637
+google/gemma-2-9b,1ds-Diff-long,cawsa_hbo-hbo,8,0.071386,5,0.382812,-0.071588,0.203058,0.0,1.0
+google/gemma-2-9b,1ds-Diff-long,cawsa_hbo-cawsa,8,0.0,0,,0.0,0.0,0.0,1.0
+google/gemma-2-9b,1ds-Diff-long,cawsa_hbo-saplma,8,-0.043403,4,0.546875,-0.165731,0.081283,0.0,1.0
