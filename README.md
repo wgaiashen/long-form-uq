@@ -24,6 +24,26 @@ constraint is the point: supervision is used to learn *where to read* the probab
 than to learn an unrestricted mapping from activations to correctness, which is what loses its
 advantage under task shift.
 
+## ProbeDriftLong
+
+ProbeDriftLong is the controlled long-form out-of-distribution evaluation framework introduced in
+this work. Its benchmark definition is implemented in `src/probe_drift_long/`, while dataset loading
+and experiment execution are provided by the surrounding project code.
+
+The definition is deliberately small and separable: `dataset_configs.py` fixes the eight evaluation
+targets, their task families and the quality label each carries; `ood_settings.py` fixes the five
+training settings, the sources feeding each and the 1,800-example budget with its per-source caps;
+and `splits.py` fixes the deterministic train and test carve, its seed and the row-order guard that
+keeps it reproducible. Together they answer only the question of which examples go where. They do not
+generate, judge, extract features, train probes or compute PRR, all of which live in `src/luq/` and
+`scripts/`.
+
+Five of the eight evaluation targets are supplied by the upstream ProbeDrift library
+(`github.com/joestacey/ProbeDrift`), which covers short-form and mixed tasks, and are inherited
+unchanged so that the reproduction stays faithful. The remaining three have their own loaders in
+`src/luq/`. The benchmark datasets themselves are obtained from their original public sources and are
+not redistributed here.
+
 ## Approach
 
 1. Generate long-form outputs from a frozen base model.
@@ -79,6 +99,9 @@ its cache, so probes can be retrained without touching a GPU.
 
 ## Repository layout
 
+- `src/probe_drift_long/` — the ProbeDriftLong benchmark definition: the evaluation targets and
+  their task families, the five training settings with their budgets and caps, and the
+  deterministic train and test carve. See the section above.
 - `src/luq/` — the pipeline library: data, generation, cache, probe, results, plus
   `features/` (saplma, ptrue, lookback, sar, orgad) and `labels/` (string match,
   LLM judge, AlignScore, FActScore).

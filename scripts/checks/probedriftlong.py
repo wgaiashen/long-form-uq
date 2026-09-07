@@ -49,8 +49,8 @@ DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 # CSV). Every use is path/config construction; no logic branches on the model.
 MODEL = DEFAULT_MODEL
 
-# SHIM AS OF 2026-08-08 — the long-form GRID now lives in the installed `probe_drift_long`
-# library and is re-exported here under its historical names, so the ~19 modules doing
+# Re-export shim. The long-form grid is defined in `src/probe_drift_long/` and is re-exported
+# here under its historical names, so the modules doing
 # `import probedriftlong as pdl` and reaching for `pdl.LONG_SRC` / `pdl.cells_long` /
 # `pdl.sampled_train_idx` keep working unchanged.
 #

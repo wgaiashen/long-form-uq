@@ -22,9 +22,9 @@ import os
 
 from probe_drift.ood_settings import get_training_spec  # noqa: E402  (ProbeDrift's faithful rung spec)
 
-# SHIM AS OF 2026-08-08. The shared pieces below — `label_of`, `different_label_projection`,
-# `eval_split`, `build_rows` — now live in the installed `probe_drift_long` library and are
-# re-exported here so the ~43 modules importing this file keep working unchanged. Their
+# Re-export shim. The shared pieces below, `label_of`, `different_label_projection`,
+# `eval_split` and `build_rows`, are defined in `src/probe_drift_long/` and are re-exported here
+# so the modules importing this file keep working unchanged. Their
 # signatures are preserved EXACTLY (verified: no caller passes a positional second argument to
 # `eval_split`, and every `build_rows` call uses the 5-positional PT form).
 #
