@@ -110,9 +110,9 @@ def main():
     ap.add_argument("--dir", default="published_results",
                     help="directory holding the per-population tables")
     ap.add_argument("--glob", default="*.csv", help="filename pattern within that directory")
-    ap.add_argument("--ensemble", default=None,
-                    help="optional per-example combination results, for the combination test in "
-                         "Section 5.7. That test cannot be computed from the masters alone.")
+    ap.add_argument("--ensemble", action="append", default=[],
+                    help="a combination result file, repeatable, one per population. Section 5.7 "
+                         "cannot be computed from the masters, which carry no combination rows.")
     args = ap.parse_args()
 
     data = load(args.dir, args.glob)
@@ -187,21 +187,42 @@ def main():
     print()
 
     # ---- Section 5.7, the combination -----------------------------------------------------
-    print("Section 5.7, the combination of CAWSA with the hidden-state probe")
-    if args.ensemble is None:
-        print("  not computed. This test reads the per-example combination results, which are not\n"
-              "  part of the published master tables. Pass --ensemble to compute it. The field is\n"
-              "  left blank rather than filled from another source.")
+    # Reported on the two populations with complete clean per-response inputs, so this reads the
+    # combination result files rather than the masters, which carry no combination rows.
+    print("Section 5.7 and Table 5.3, the combination, equal-model over the two clean populations")
+    if not args.ensemble:
+        print("  not computed. Pass --ensemble once per population. The field is left blank rather\n"
+              "  than filled from another source.")
     else:
-        with open(args.ensemble, newline="") as fh:
-            rows = [r for r in csv.DictReader(fh)
-                    if r.get("wilcoxon_p") not in ("", None) and r.get("section") == "estimand_A"
-                    and r.get("method", "").startswith("PRIMARY")]
-        if not rows:
-            raise SystemExit(f"{args.ensemble}: no primary estimand row with a p-value")
-        r = rows[0]
-        print(f"  mean {float(r['macro']):+.4f}   improved on {r['signs_positive']} of {r['n']}"
-              f"   exact Wilcoxon p = {float(r['wilcoxon_p']):.4f}")
+        prof, stat = {}, {}
+        for path in args.ensemble:
+            for r in csv.DictReader(open(path, newline="")):
+                if r["section"] == "rung_profile" and r["value"]:
+                    prof.setdefault((r["method"], r["rung"]), []).append(float(r["value"]))
+                if r["section"] == "estimand_A" and r.get("macro"):
+                    stat.setdefault(r["method"], []).append(r)
+        order = ["CAWSA \u03bb=2", "SAPLMA", "CONTROL  SAPLMA + attention-pool",
+                 "PRIMARY  CAWSA \u03bb=2 + SAPLMA", "REF      msp_min + SAPLMA"]
+        print(f"  {'method':34s}" + "".join(f"{r.replace('-long',''):>11s}" for r in RUNGS)
+              + f"{'mean OOD':>11s}")
+        for meth in order:
+            vals = [prof.get((meth, r)) for r in RUNGS]
+            if any(v is None for v in vals):
+                print(f"  {meth:34s}  not present in the files given"); continue
+            means = [sum(v) / len(v) for v in vals]
+            print(f"  {meth:34s}" + "".join(f"{v:11.4f}" for v in means)
+                  + f"{sum(means[1:]) / 4:11.4f}")
+        print()
+        print("  against SAPLMA alone, out of distribution, dataset as the unit:")
+        for meth in ["PRIMARY  CAWSA \u03bb=2 + SAPLMA", "REF      msp_min + SAPLMA"]:
+            for r in stat.get(meth, []):
+                print(f"    {meth:34s} macro {float(r['macro']):+.4f}  "
+                      f"{r['signs_positive']} of {r['n']}  p = {float(r['wilcoxon_p']):.4f}")
+        print()
+        print("  The reference combination of minimum token probability with the probe is printed\n"
+              "  deliberately. Its mean out-of-distribution score is close to, and can exceed, the\n"
+              "  reported combination, so it should be read next to its in-distribution behaviour\n"
+              "  rather than on the shifted settings alone.")
     print()
 
 
