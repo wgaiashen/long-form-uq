@@ -1,4 +1,9 @@
-"""DRAFT — three-state factuality judge for ExpertQA (NOT wired into the pipeline yet).
+"""Three-state factuality judge for ExpertQA: each substantive claim is marked supported,
+contradicted or uncovered.
+
+This is the labelling path ExpertQA actually uses, through `scripts/02_label_expertqa.py`, and the
+prompt below is the one that produced the labels behind every ExpertQA result. The filename retains
+the word draft for historical reasons only.
 
 Projection this label captures (stated explicitly, per the label-definition decision): FACTUAL
 FAITHFULNESS of the response's claims, judged against the expert gold answer + its citations as a

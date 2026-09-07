@@ -1,4 +1,7 @@
-"""DRAFT — three-state factuality judge for FActScore-Bio (NOT wired / NOT run until the prompt is cleared).
+"""Three-state factuality judge for FActScore-Bio, the partner of the ExpertQA judge, sharing its
+JSON contract and its parser.
+
+This is the labelling path FActScore actually uses, through `scripts/02_label_factscore.py`.
 
 FActScore-Bio is ExpertQA's SAME-TASK factuality partner, so it uses the SAME three-state judge and the
 SAME score definition (factuality = SUPPORTED/(SUPPORTED+CONTRADICTED) = factual PRECISION, which is
