@@ -55,8 +55,10 @@ The masters carry more methods than the report reports. The report presents a se
 the master is the full grid that comparison was drawn from, including variants that were computed
 and not carried forward.
 
-Two methods, `msp_satmd_mid` and `msp_satrmd_mid`, appear with only six cells filled and
-`complete_grid` set to `NO`. Those are the entropy-augmented density variants that the report states
-were not evaluated across the benchmark, because aligned token-entropy features were not available
-for every required dataset. They are left in the file rather than stripped, so the gap is visible
-rather than silent, and they must not be read as a result.
+Four methods in the Llama-3.1-8B file carry `complete_grid` set to `NO`: `msp_satmd_mid` and
+`msp_satrmd_mid` at 6 cells of 40, and `msp_satmd_alllayer` and `msp_satrmd_alllayer` at 15. These
+are the entropy-augmented density variants, which the report states were not evaluated across the
+benchmark because generation-time entropy was unavailable for two of the eight datasets. They are
+left in the file rather than stripped, so the gap is visible rather than silent. Read the
+`complete_grid` column before aggregating anything: a mean taken over a partial method is not
+comparable with one taken over a complete method, and these four must not be read as results.

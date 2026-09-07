@@ -1,0 +1,801 @@
+model,eval,rung,train,method,family,prr_mean,prr_std,n_seeds,degenerate_seeds,source,method_cells,complete_grid
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,floor_sum,reference baseline,0.3696,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,floor_ppl,reference baseline,-0.1636,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,floor_min,reference baseline,0.4075,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,fair_floor,reference baseline,0.4075,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,saplma,reference baseline,0.2686,0.0275,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,uniform,this project,0.1524,0.0767,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,attention,this project,0.1468,0.1049,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,wmsp_norm,this project,-0.1169,0.0913,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,wmsp_shrink1_5,this project,-0.0757,0.0697,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,wmsp_shrink2,this project,-0.0404,0.082,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,VERDICT:bestw_vs_fairfloor,verdict,-0.4299,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,VERDICT:bestw_vs_bestpooler,verdict,-0.205,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad:900+asqa:900,VERDICT:attention_vs_fairfloor,verdict,-0.2784,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_sum,reference baseline,0.3696,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_ppl,reference baseline,-0.1636,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_min,reference baseline,0.4075,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,fair_floor,reference baseline,0.4075,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,saplma,reference baseline,0.2731,0.1085,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,uniform,this project,0.1459,0.2513,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,attention,this project,0.2303,0.2207,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_norm,this project,-0.3105,0.0913,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,-0.0596,0.0959,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink2,this project,-0.0637,0.0627,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,-0.4063,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,-0.2804,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,-0.1259,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_sum,reference baseline,-0.2129,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_ppl,reference baseline,-0.2128,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_min,reference baseline,-0.037,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,fair_floor,reference baseline,-0.037,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,saplma,reference baseline,0.1141,0.0699,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,uniform,this project,0.0892,0.0876,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,attention,this project,0.0499,0.0519,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_norm,this project,-0.0517,0.0691,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink1_5,this project,-0.1007,0.0127,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink2,this project,-0.1256,0.0373,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,0.0165,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,-0.1525,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,0.0963,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_sum,reference baseline,-0.2129,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_ppl,reference baseline,-0.2128,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_min,reference baseline,-0.037,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,fair_floor,reference baseline,-0.037,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,saplma,reference baseline,0.3015,0.0242,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,uniform,this project,0.2112,0.0347,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,attention,this project,0.1753,0.0063,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_norm,this project,0.0753,0.0074,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,0.0535,0.0163,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink2,this project,0.0323,0.0347,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,0.1193,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,-0.2057,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,0.2727,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_sum,reference baseline,0.0115,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_ppl,reference baseline,0.1502,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_min,reference baseline,0.1157,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,fair_floor,reference baseline,0.1157,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,saplma,reference baseline,0.0289,0.0385,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,uniform,this project,0.0218,0.0293,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,attention,this project,0.1013,0.0474,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_norm,this project,0.062,0.0349,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink1_5,this project,0.1106,0.0184,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink2,this project,0.1111,0.02,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,0.0221,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,-0.0178,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,0.0399,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_sum,reference baseline,0.0115,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_ppl,reference baseline,0.1502,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_min,reference baseline,0.1157,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,fair_floor,reference baseline,0.1157,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,saplma,reference baseline,0.2591,0.017,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,uniform,this project,0.1197,0.0339,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,attention,this project,0.1762,0.0217,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_norm,this project,0.103,0.0123,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,0.1734,0.032,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink2,this project,0.1753,0.0195,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,0.0911,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,-0.0347,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa:257+xsum:257+med_quad:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,0.1258,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,floor_sum,reference baseline,0.0433,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,floor_ppl,reference baseline,0.1116,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,floor_min,reference baseline,0.0289,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,fair_floor,reference baseline,0.0289,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,saplma,reference baseline,0.4561,0.0088,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,uniform,this project,0.3988,0.0134,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,attention,this project,0.4006,0.0132,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,wmsp_norm,this project,0.4034,0.0152,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,wmsp_shrink1_5,this project,0.5021,0.013,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,wmsp_shrink2,this project,0.5028,0.015,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,VERDICT:bestw_vs_fairfloor,verdict,0.4924,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,VERDICT:bestw_vs_bestpooler,verdict,0.1139,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad:1260,VERDICT:attention_vs_fairfloor,verdict,0.3785,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,floor_sum,reference baseline,0.0433,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,floor_ppl,reference baseline,0.1116,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,floor_min,reference baseline,0.0289,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,fair_floor,reference baseline,0.0289,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,saplma,reference baseline,0.2111,0.0146,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,uniform,this project,0.1886,0.0112,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,attention,this project,0.1711,0.0239,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,wmsp_norm,this project,0.036,0.0152,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,wmsp_shrink1_5,this project,0.1077,0.0419,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,wmsp_shrink2,this project,0.0785,0.0528,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,VERDICT:bestw_vs_fairfloor,verdict,0.0789,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,VERDICT:bestw_vs_bestpooler,verdict,-0.0926,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa:900+asqa:900,VERDICT:attention_vs_fairfloor,verdict,0.1542,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_sum,reference baseline,0.0433,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_ppl,reference baseline,0.1116,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_min,reference baseline,0.0289,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,fair_floor,reference baseline,0.0289,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,saplma,reference baseline,0.289,0.0107,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,uniform,this project,0.2102,0.0374,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,attention,this project,0.1696,0.0723,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_norm,this project,0.0742,0.039,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink1_5,this project,0.3315,0.0635,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink2,this project,0.3376,0.0499,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,0.3751,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,0.1375,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,0.1739,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_sum,reference baseline,0.0433,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_ppl,reference baseline,0.1116,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,floor_min,reference baseline,0.0289,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,fair_floor,reference baseline,0.0289,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,saplma,reference baseline,0.2641,0.0016,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,uniform,this project,0.173,0.0544,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,attention,this project,0.2077,0.0603,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_norm,this project,0.1089,0.0369,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,0.1214,0.0085,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink2,this project,0.1501,0.0307,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,0.1779,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,-0.0703,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+samsum:257+expertqa:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,0.2482,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,floor_sum,reference baseline,0.0433,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,floor_ppl,reference baseline,0.1116,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,floor_min,reference baseline,0.0289,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,fair_floor,reference baseline,0.0289,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,saplma,reference baseline,0.0336,0.0107,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,uniform,this project,-0.0204,0.0105,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,attention,this project,-0.0366,0.0192,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,wmsp_norm,this project,0.0892,0.0119,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,wmsp_shrink1_5,this project,0.1147,0.0399,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,wmsp_shrink2,this project,0.1248,0.0128,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_fairfloor,verdict,0.0983,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_bestpooler,verdict,0.1481,,3,,corrected-span master,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum:1800,VERDICT:attention_vs_fairfloor,verdict,-0.0676,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_sum,reference baseline,-0.1211,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_ppl,reference baseline,0.3171,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,floor_min,reference baseline,0.0695,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,fair_floor,reference baseline,0.0695,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,saplma,reference baseline,0.1374,0.1646,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,uniform,this project,0.2867,0.0994,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,attention,this project,0.3096,0.1088,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_norm,this project,0.1671,0.0148,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink1_5,this project,0.2414,0.0401,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,wmsp_shrink2,this project,0.2709,0.043,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,0.2639,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,-0.0862,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa:360+med_quad:360+expertqa:360+asqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,0.3501,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,floor_sum,reference baseline,-0.1211,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,floor_ppl,reference baseline,0.3171,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,floor_min,reference baseline,0.0695,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,fair_floor,reference baseline,0.0695,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,saplma,reference baseline,0.1767,0.0412,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,uniform,this project,0.2606,0.0634,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,attention,this project,0.1366,0.0275,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,wmsp_norm,this project,0.2259,0.0259,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,0.27,0.0291,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,wmsp_shrink2,this project,0.331,0.0091,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,0.316,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,0.0665,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+expertqa:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,0.1287,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_sum,reference baseline,0.3567,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_ppl,reference baseline,0.1442,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_min,reference baseline,0.4039,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,fair_floor,reference baseline,0.4039,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,saplma,reference baseline,0.1009,0.1353,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,uniform,this project,-0.0588,0.1601,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,attention,this project,0.0483,0.157,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_norm,this project,0.0552,0.054,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_shrink1_5,this project,0.1596,0.1293,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_shrink2,this project,0.1395,0.1288,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:bestw_vs_fairfloor,verdict,-0.2135,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:bestw_vs_bestpooler,verdict,0.1217,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:attention_vs_fairfloor,verdict,-0.3352,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,floor_sum,reference baseline,0.3567,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,floor_ppl,reference baseline,0.1442,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,floor_min,reference baseline,0.4039,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,fair_floor,reference baseline,0.4039,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,saplma,reference baseline,0.2859,0.0437,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,uniform,this project,0.2429,0.0342,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,attention,this project,0.3114,0.0179,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,wmsp_norm,this project,0.1249,0.0415,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,wmsp_shrink1_5,this project,0.2118,0.0532,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,wmsp_shrink2,this project,0.2203,0.0492,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,-0.1573,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,-0.1301,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+asqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,-0.0272,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,floor_sum,reference baseline,0.1775,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,floor_ppl,reference baseline,0.1707,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,floor_min,reference baseline,0.1036,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,fair_floor,reference baseline,0.1036,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,saplma,reference baseline,0.2847,0.0168,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,uniform,this project,0.2246,0.0232,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,attention,this project,0.2095,0.0113,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,wmsp_norm,this project,0.0948,0.0521,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,wmsp_shrink1_5,this project,0.1363,0.0136,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,wmsp_shrink2,this project,0.1568,0.0201,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,VERDICT:bestw_vs_fairfloor,verdict,0.0569,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,VERDICT:bestw_vs_bestpooler,verdict,-0.0776,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa:900+med_quad:900,VERDICT:attention_vs_fairfloor,verdict,0.1641,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,floor_sum,reference baseline,0.1775,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,floor_ppl,reference baseline,0.1707,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,floor_min,reference baseline,0.1036,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,fair_floor,reference baseline,0.1036,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,saplma,reference baseline,0.2055,0.0311,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,uniform,this project,0.1401,0.0381,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,attention,this project,0.0789,0.0598,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,wmsp_norm,this project,0.1022,0.0636,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,wmsp_shrink1_5,this project,0.1953,0.0258,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,wmsp_shrink2,this project,0.1887,0.0227,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,VERDICT:bestw_vs_fairfloor,verdict,0.1143,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,VERDICT:bestw_vs_bestpooler,verdict,0.0842,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+factscore:257,VERDICT:attention_vs_fairfloor,verdict,-0.0021,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_sum,reference baseline,0.3178,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_ppl,reference baseline,0.511,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,floor_min,reference baseline,0.3125,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,fair_floor,reference baseline,0.3125,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,saplma,reference baseline,0.3901,0.0648,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,uniform,this project,0.3723,0.0638,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,attention,this project,0.3722,0.0343,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_norm,this project,0.1627,0.0687,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_shrink1_5,this project,0.4922,0.0604,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,wmsp_shrink2,this project,0.5376,0.0641,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:bestw_vs_fairfloor,verdict,0.2905,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:bestw_vs_bestpooler,verdict,0.1661,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa:300+xsum:300+cnn_dailymail:300+med_quad:300+samsum:300+asqa:300,VERDICT:attention_vs_fairfloor,verdict,0.1629,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,floor_sum,reference baseline,0.3178,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,floor_ppl,reference baseline,0.511,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,floor_min,reference baseline,0.3125,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,fair_floor,reference baseline,0.3125,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,saplma,reference baseline,0.178,0.0695,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,uniform,this project,0.3102,0.0631,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,attention,this project,0.2865,0.0514,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,wmsp_norm,this project,0.1914,0.0998,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,wmsp_shrink1_5,this project,0.4013,0.0736,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,wmsp_shrink2,this project,0.3761,0.0367,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,VERDICT:bestw_vs_fairfloor,verdict,0.1165,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,VERDICT:bestw_vs_bestpooler,verdict,0.0474,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa:257+xsum:257+cnn_dailymail:257+med_quad:257+samsum:257+expertqa:257+asqa:257,VERDICT:attention_vs_fairfloor,verdict,0.0327,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,floor_sum,reference baseline,0.3696,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,floor_ppl,reference baseline,-0.1636,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,floor_min,reference baseline,0.4075,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,fair_floor,reference baseline,0.4075,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,saplma,reference baseline,0.7308,0.0062,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,uniform,this project,0.6998,0.0105,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,attention,this project,0.6773,0.0057,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,wmsp_norm,this project,0.4493,0.0222,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,wmsp_shrink1_5,this project,0.5349,0.0022,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,wmsp_shrink2,this project,0.5372,0.0116,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,0.1459,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,-0.151,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,0.2883,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_sum,reference baseline,0.3696,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_ppl,reference baseline,-0.1636,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_min,reference baseline,0.4075,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,fair_floor,reference baseline,0.4075,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,saplma,reference baseline,0.1906,0.0915,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,uniform,this project,-0.0153,0.1842,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,attention,this project,0.0406,0.163,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_norm,this project,-0.3169,0.2746,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink1_5,this project,-0.0419,0.1031,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink2,this project,-0.0003,0.0932,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,-0.3746,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,-0.0294,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,-0.3452,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,floor_sum,reference baseline,0.3696,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,floor_ppl,reference baseline,-0.1636,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,floor_min,reference baseline,0.4075,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,fair_floor,reference baseline,0.4075,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,saplma,reference baseline,0.2129,0.0345,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,uniform,this project,0.111,0.0123,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,attention,this project,0.0413,0.0083,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,wmsp_norm,this project,0.1281,0.0369,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,wmsp_shrink1_5,this project,0.0533,0.0131,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,wmsp_shrink2,this project,0.066,0.0206,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_fairfloor,verdict,-0.2783,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_bestpooler,verdict,0.0165,,3,,corrected-span master,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum:1800,VERDICT:attention_vs_fairfloor,verdict,-0.3648,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,floor_sum,reference baseline,-0.2129,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,floor_ppl,reference baseline,-0.2128,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,floor_min,reference baseline,-0.037,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,fair_floor,reference baseline,-0.037,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,saplma,reference baseline,0.5065,0.0084,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,uniform,this project,0.427,0.0066,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,attention,this project,0.3939,0.0074,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,wmsp_norm,this project,0.3019,0.0262,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,wmsp_shrink1_5,this project,0.3386,0.0178,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,wmsp_shrink2,this project,0.3595,0.0345,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,VERDICT:bestw_vs_fairfloor,verdict,0.4401,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,VERDICT:bestw_vs_bestpooler,verdict,-0.0274,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,ID,xsum:1800,VERDICT:attention_vs_fairfloor,verdict,0.4343,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,floor_sum,reference baseline,-0.2129,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,floor_ppl,reference baseline,-0.2128,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,floor_min,reference baseline,-0.037,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,fair_floor,reference baseline,-0.037,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,saplma,reference baseline,0.2634,0.0332,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,uniform,this project,0.1946,0.0119,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,attention,this project,0.1582,0.0189,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,wmsp_norm,this project,0.0638,0.0743,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,wmsp_shrink1_5,this project,0.1116,0.0134,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,wmsp_shrink2,this project,0.0927,0.0343,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,VERDICT:bestw_vs_fairfloor,verdict,0.1661,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,VERDICT:bestw_vs_bestpooler,verdict,-0.0992,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail:900+samsum:900,VERDICT:attention_vs_fairfloor,verdict,0.2194,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,floor_sum,reference baseline,-0.2129,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,floor_ppl,reference baseline,-0.2128,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,floor_min,reference baseline,-0.037,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,fair_floor,reference baseline,-0.037,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,saplma,reference baseline,0.3591,0.0212,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,uniform,this project,0.1713,0.0137,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,attention,this project,0.1672,0.0275,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,wmsp_norm,this project,0.0684,0.036,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.0766,0.0356,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink2,this project,0.0345,0.0065,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,0.1206,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,-0.0881,,3,,corrected-span master,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,0.222,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,floor_sum,reference baseline,0.0115,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,floor_ppl,reference baseline,0.1502,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,floor_min,reference baseline,0.1157,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,fair_floor,reference baseline,0.1157,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,saplma,reference baseline,0.4547,0.006,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,uniform,this project,0.3501,0.0168,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,attention,this project,0.3384,0.0143,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,wmsp_norm,this project,0.2716,0.0331,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,wmsp_shrink1_5,this project,0.3491,0.0095,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,wmsp_shrink2,this project,0.3591,0.0078,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,VERDICT:bestw_vs_fairfloor,verdict,0.2631,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,VERDICT:bestw_vs_bestpooler,verdict,0.0234,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail:1800,VERDICT:attention_vs_fairfloor,verdict,0.2285,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,floor_sum,reference baseline,0.0115,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,floor_ppl,reference baseline,0.1502,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,floor_min,reference baseline,0.1157,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,fair_floor,reference baseline,0.1157,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,saplma,reference baseline,0.2978,0.0227,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,uniform,this project,0.194,0.0255,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,attention,this project,0.2128,0.0332,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,wmsp_norm,this project,0.1558,0.0113,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,wmsp_shrink1_5,this project,0.2411,0.0244,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,wmsp_shrink2,this project,0.2503,0.0024,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,VERDICT:bestw_vs_fairfloor,verdict,0.1808,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,VERDICT:bestw_vs_bestpooler,verdict,0.0194,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum:900+samsum:900,VERDICT:attention_vs_fairfloor,verdict,0.1614,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,floor_sum,reference baseline,0.0115,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,floor_ppl,reference baseline,0.1502,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,floor_min,reference baseline,0.1157,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,fair_floor,reference baseline,0.1157,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,saplma,reference baseline,0.3325,0.0202,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,uniform,this project,0.3084,0.0106,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,attention,this project,0.2891,0.0074,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,wmsp_norm,this project,0.1083,0.0023,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.1905,0.0189,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink2,this project,0.1787,0.0283,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,0.0848,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,-0.1109,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,0.2023,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,floor_sum,reference baseline,-0.1211,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,floor_ppl,reference baseline,0.3171,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,floor_min,reference baseline,0.0695,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,fair_floor,reference baseline,0.0695,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,saplma,reference baseline,0.6597,0.0025,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,uniform,this project,0.5481,0.0137,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,attention,this project,0.5846,0.0269,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,wmsp_norm,this project,0.5356,0.0013,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,wmsp_shrink1_5,this project,0.5044,0.0306,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,wmsp_shrink2,this project,0.5129,0.0084,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,VERDICT:bestw_vs_fairfloor,verdict,0.5242,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,VERDICT:bestw_vs_bestpooler,verdict,-0.0047,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,ID,samsum:1260,VERDICT:attention_vs_fairfloor,verdict,0.5289,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,floor_sum,reference baseline,-0.1211,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,floor_ppl,reference baseline,0.3171,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,floor_min,reference baseline,0.0695,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,fair_floor,reference baseline,0.0695,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,saplma,reference baseline,0.2337,0.0476,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,uniform,this project,0.1182,0.0214,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,attention,this project,0.1422,0.0591,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,wmsp_norm,this project,0.1978,0.0513,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,wmsp_shrink1_5,this project,0.2201,0.0214,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,wmsp_shrink2,this project,0.225,0.0168,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,VERDICT:bestw_vs_fairfloor,verdict,0.1865,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,VERDICT:bestw_vs_bestpooler,verdict,0.1083,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum:900+cnn_dailymail:900,VERDICT:attention_vs_fairfloor,verdict,0.0782,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,floor_sum,reference baseline,-0.1211,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,floor_ppl,reference baseline,0.3171,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,floor_min,reference baseline,0.0695,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,fair_floor,reference baseline,0.0695,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,saplma,reference baseline,0.4391,0.0173,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,uniform,this project,0.3535,0.0095,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,attention,this project,0.3818,0.0114,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,wmsp_norm,this project,0.3085,0.0932,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.2302,0.0335,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink2,this project,0.2537,0.0478,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,0.3317,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,-0.0038,,3,,corrected-span master,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,0.3355,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,floor_sum,reference baseline,0.3567,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,floor_ppl,reference baseline,0.1442,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,floor_min,reference baseline,0.4039,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,fair_floor,reference baseline,0.4039,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,saplma,reference baseline,0.7094,0.0055,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,uniform,this project,0.7144,0.0064,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,attention,this project,0.698,0.0186,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,wmsp_norm,this project,0.425,0.0444,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,wmsp_shrink1_5,this project,0.6221,0.0275,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,wmsp_shrink2,this project,0.6224,0.0245,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,VERDICT:bestw_vs_fairfloor,verdict,0.2358,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,VERDICT:bestw_vs_bestpooler,verdict,-0.0734,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa:1159,VERDICT:attention_vs_fairfloor,verdict,0.2997,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,floor_sum,reference baseline,0.3567,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,floor_ppl,reference baseline,0.1442,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,floor_min,reference baseline,0.4039,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,fair_floor,reference baseline,0.4039,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,saplma,reference baseline,0.5584,0.0079,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,uniform,this project,0.4604,0.0124,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,attention,this project,0.4801,0.007,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,wmsp_norm,this project,-0.043,0.0338,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,wmsp_shrink1_5,this project,0.275,0.016,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,wmsp_shrink2,this project,0.2871,0.0097,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,VERDICT:bestw_vs_fairfloor,verdict,-0.115,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,VERDICT:bestw_vs_bestpooler,verdict,-0.2025,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore:478,VERDICT:attention_vs_fairfloor,verdict,0.0875,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,floor_sum,reference baseline,0.3567,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,floor_ppl,reference baseline,0.1442,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,floor_min,reference baseline,0.4039,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,fair_floor,reference baseline,0.4039,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,saplma,reference baseline,0.1877,0.0241,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,uniform,this project,0.1356,0.0161,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,attention,this project,0.1286,0.0347,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,wmsp_norm,this project,0.0992,0.0072,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.2216,0.0206,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink2,this project,0.271,0.0134,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,-0.1244,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,0.1427,,3,,corrected-span master,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,-0.273,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,floor_sum,reference baseline,0.1775,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,floor_ppl,reference baseline,0.1707,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,floor_min,reference baseline,0.1036,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,fair_floor,reference baseline,0.1036,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,saplma,reference baseline,0.29,0.0345,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,uniform,this project,0.3049,0.0119,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,attention,this project,0.3054,0.0425,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,wmsp_norm,this project,0.2864,0.0371,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,wmsp_shrink1_5,this project,0.3432,0.044,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,wmsp_shrink2,this project,0.3429,0.035,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,VERDICT:bestw_vs_fairfloor,verdict,0.2522,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,VERDICT:bestw_vs_bestpooler,verdict,0.035,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,ID,asqa:664,VERDICT:attention_vs_fairfloor,verdict,0.2172,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_sum,reference baseline,0.1775,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_ppl,reference baseline,0.1707,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,floor_min,reference baseline,0.1036,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,fair_floor,reference baseline,0.1036,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,saplma,reference baseline,0.1415,0.0107,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,uniform,this project,0.0489,0.0163,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,attention,this project,0.0565,0.0355,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_norm,this project,0.1222,0.0435,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink1_5,this project,0.1558,0.0183,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,wmsp_shrink2,this project,0.1366,0.0075,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_fairfloor,verdict,0.0578,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:bestw_vs_bestpooler,verdict,0.1383,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum:360+cnn_dailymail:360+samsum:360+expertqa:360+factscore:360,VERDICT:attention_vs_fairfloor,verdict,-0.0804,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,floor_sum,reference baseline,0.1775,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,floor_ppl,reference baseline,0.1707,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,floor_min,reference baseline,0.1036,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,fair_floor,reference baseline,0.1036,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,saplma,reference baseline,0.1204,0.0564,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,uniform,this project,-0.0179,0.0184,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,attention,this project,0.0661,0.0171,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,wmsp_norm,this project,0.0313,0.0249,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,wmsp_shrink1_5,this project,0.1516,0.0215,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,wmsp_shrink2,this project,0.1371,0.0229,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_fairfloor,verdict,0.0631,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,VERDICT:bestw_vs_bestpooler,verdict,0.1001,,3,,corrected-span master,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum:1800,VERDICT:attention_vs_fairfloor,verdict,-0.0371,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,floor_sum,reference baseline,0.3178,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,floor_ppl,reference baseline,0.511,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,floor_min,reference baseline,0.3125,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,fair_floor,reference baseline,0.3125,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,saplma,reference baseline,0.7381,0.0026,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,uniform,this project,0.6868,0.0052,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,attention,this project,0.6317,0.0079,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,wmsp_norm,this project,0.5396,0.1243,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,wmsp_shrink1_5,this project,0.683,0.015,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,wmsp_shrink2,this project,0.6948,0.0118,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,VERDICT:bestw_vs_fairfloor,verdict,0.3779,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,VERDICT:bestw_vs_bestpooler,verdict,0.0023,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,ID,factscore:335,VERDICT:attention_vs_fairfloor,verdict,0.3211,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,floor_sum,reference baseline,0.3178,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,floor_ppl,reference baseline,0.511,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,floor_min,reference baseline,0.3125,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,fair_floor,reference baseline,0.3125,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,saplma,reference baseline,0.3947,0.0181,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,uniform,this project,0.4085,0.0075,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,attention,this project,0.4612,0.0233,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,wmsp_norm,this project,0.1425,0.048,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,wmsp_shrink1_5,this project,0.4513,0.0156,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,wmsp_shrink2,this project,0.4636,0.0195,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,VERDICT:bestw_vs_fairfloor,verdict,0.1914,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,VERDICT:bestw_vs_bestpooler,verdict,0.048,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa:1655,VERDICT:attention_vs_fairfloor,verdict,0.1435,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,floor_sum,reference baseline,0.3178,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,floor_ppl,reference baseline,0.511,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,floor_min,reference baseline,0.3125,0.0,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,fair_floor,reference baseline,0.3125,0.0,0,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,saplma,reference baseline,0.1753,0.0472,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,uniform,this project,0.0829,0.0107,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,attention,this project,0.1506,0.0963,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,wmsp_norm,this project,0.1085,0.0757,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.4351,0.0118,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink2,this project,0.4476,0.0525,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_fairfloor,verdict,0.1762,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,0.3323,,3,,corrected-span master,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,-0.1561,,3,,corrected-span master,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,hbo,published baseline,0.011516,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,0.044346,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,0.035476,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,satmd_mid,published baseline,0.035476,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,hbo,published baseline,0.356727,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,0.168629,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,0.120864,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,satmd_mid,published baseline,0.120864,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,hbo,published baseline,0.317814,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,0.21622,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,0.198886,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,satmd_mid,published baseline,0.198886,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,hbo,published baseline,-0.121123,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,-0.178697,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,-0.177403,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,satmd_mid,published baseline,-0.177403,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,hbo,published baseline,-0.212885,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,-0.07285,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,-0.042165,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,satmd_mid,published baseline,-0.042165,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,hbo,published baseline,0.177468,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,huq_satmd_mid,published baseline,-0.086156,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,md_mean_mid,published baseline,-0.086156,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,satmd_mid,published baseline,-0.086156,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,hbo,published baseline,0.043292,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,huq_satmd_mid,published baseline,-0.027262,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,md_mean_mid,published baseline,-0.027262,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,satmd_mid,published baseline,-0.027262,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,hbo,published baseline,0.369628,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,huq_satmd_mid,published baseline,0.256368,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,md_mean_mid,published baseline,0.256368,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,satmd_mid,published baseline,0.256368,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,hbo,published baseline,0.357091,0.000157,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,huq_satmd_mid,published baseline,0.046639,0.022685,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,md_mean_mid,published baseline,0.050603,0.027757,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,satmd_mid,published baseline,0.050603,0.027757,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,hbo,published baseline,0.317814,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,huq_satmd_mid,published baseline,0.252656,0.008049,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,md_mean_mid,published baseline,0.252656,0.008049,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,satmd_mid,published baseline,0.252656,0.008049,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,hbo,published baseline,0.011516,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satmd_mid,published baseline,0.020562,0.012519,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,md_mean_mid,published baseline,0.046141,0.005757,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satmd_mid,published baseline,0.046141,0.005757,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,hbo,published baseline,-0.121123,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satmd_mid,published baseline,-0.123043,0.00167,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,md_mean_mid,published baseline,-0.153599,0.006201,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satmd_mid,published baseline,-0.153599,0.006201,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,hbo,published baseline,-0.212885,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satmd_mid,published baseline,-0.187831,0.005932,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,md_mean_mid,published baseline,0.11624,0.008984,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satmd_mid,published baseline,0.11624,0.008984,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,hbo,published baseline,0.176176,0.001047,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satmd_mid,published baseline,0.193346,0.024713,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,md_mean_mid,published baseline,-0.186594,0.006382,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satmd_mid,published baseline,0.250643,0.008785,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,hbo,published baseline,0.043292,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satmd_mid,published baseline,-0.107292,0.033762,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,md_mean_mid,published baseline,0.13951,0.005919,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satmd_mid,published baseline,-0.14048,0.011141,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,hbo,published baseline,0.369627,1e-06,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satmd_mid,published baseline,-0.244526,0.089972,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,md_mean_mid,published baseline,0.368838,0.001796,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satmd_mid,published baseline,-0.542441,0.032361,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,hbo,published baseline,0.248951,0.028323,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,huq_satmd_mid,published baseline,0.160473,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,md_mean_mid,published baseline,0.017345,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,satmd_mid,published baseline,0.056026,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,hbo,published baseline,0.082648,0.00043,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,huq_satmd_mid,published baseline,-0.044948,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,md_mean_mid,published baseline,-0.005698,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,satmd_mid,published baseline,-0.065538,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,hbo,published baseline,0.417304,0.001716,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,huq_satmd_mid,published baseline,0.535779,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,md_mean_mid,published baseline,0.32764,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,satmd_mid,published baseline,0.32764,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,hbo,published baseline,0.586534,0.00795,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,huq_satmd_mid,published baseline,0.374598,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,md_mean_mid,published baseline,0.166778,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,satmd_mid,published baseline,-0.035759,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,hbo,published baseline,0.22127,0.003466,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,huq_satmd_mid,published baseline,-0.025913,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,md_mean_mid,published baseline,0.071212,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,satmd_mid,published baseline,-0.076755,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,hbo,published baseline,0.449902,0.004111,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,huq_satmd_mid,published baseline,0.444641,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,md_mean_mid,published baseline,0.470642,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,satmd_mid,published baseline,0.470642,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,hbo,published baseline,0.108299,0.000601,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,huq_satmd_mid,published baseline,-0.00823,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,md_mean_mid,published baseline,-0.041882,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,satmd_mid,published baseline,-0.008391,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,hbo,published baseline,-0.018249,0.011078,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,huq_satmd_mid,published baseline,0.074539,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,md_mean_mid,published baseline,0.112447,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,satmd_mid,published baseline,0.112447,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,hbo,published baseline,-0.18967,0.000799,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,huq_satmd_mid,published baseline,-0.112763,0.039646,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,md_mean_mid,published baseline,0.014815,0.006464,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,satmd_mid,published baseline,0.014815,0.006464,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,hbo,published baseline,-0.124622,0.001785,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,huq_satmd_mid,published baseline,-0.220572,0.003739,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,md_mean_mid,published baseline,-0.274556,0.006543,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,satmd_mid,published baseline,-0.274556,0.006543,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,hbo,published baseline,0.374586,0.003459,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,huq_satmd_mid,published baseline,0.38542,0.005184,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,md_mean_mid,published baseline,0.358667,0.004601,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,satmd_mid,published baseline,0.358667,0.004601,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,hbo,published baseline,0.043292,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,huq_satmd_mid,published baseline,0.057634,0.000946,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,md_mean_mid,published baseline,0.089126,0.003467,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,satmd_mid,published baseline,0.089126,0.003467,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,hbo,published baseline,0.321151,0.000927,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,huq_satmd_mid,published baseline,0.245639,0.024815,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,md_mean_mid,published baseline,0.224844,0.0046,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,satmd_mid,published baseline,0.224844,0.0046,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,hbo,published baseline,0.35977,0.000948,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,huq_satmd_mid,published baseline,0.371303,0.08558,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,md_mean_mid,published baseline,0.014722,0.018651,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,satmd_mid,published baseline,0.014722,0.018651,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,hbo,published baseline,0.040806,0.003917,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,huq_satmd_mid,published baseline,-0.026378,0.015234,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,md_mean_mid,published baseline,-0.038195,0.002562,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,satmd_mid,published baseline,-0.038195,0.002562,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,hbo,published baseline,0.176543,0.000602,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,huq_satmd_mid,published baseline,0.078175,0.050056,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,md_mean_mid,published baseline,-0.164586,0.006214,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,satmd_mid,published baseline,-0.164586,0.006214,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,hbo,published baseline,0.369671,1.9e-05,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,huq_satmd_mid,published baseline,0.378635,0.015587,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,md_mean_mid,published baseline,0.308617,0.000767,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,satmd_mid,published baseline,0.308617,0.000767,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,hbo,published baseline,0.043292,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,huq_satmd_mid,published baseline,0.033807,0.005436,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,md_mean_mid,published baseline,-0.102399,0.010667,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,satmd_mid,published baseline,-0.102399,0.010667,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,hbo,published baseline,-0.206204,0.000716,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,huq_satmd_mid,published baseline,-0.033056,0.003343,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,md_mean_mid,published baseline,-0.033056,0.003343,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,satmd_mid,published baseline,-0.033056,0.003343,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,hbo,published baseline,-0.121161,2.8e-05,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,huq_satmd_mid,published baseline,-0.122499,0.220982,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,md_mean_mid,published baseline,-0.278701,0.002598,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,satmd_mid,published baseline,-0.060424,0.308764,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,hbo,published baseline,0.31861,0.000305,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,huq_satmd_mid,published baseline,0.406298,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,md_mean_mid,published baseline,0.096766,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,satmd_mid,published baseline,0.096766,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,hbo,published baseline,0.361542,0.000934,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,huq_satmd_mid,published baseline,0.231582,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,md_mean_mid,published baseline,-0.071254,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,satmd_mid,published baseline,-0.093444,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,hbo,published baseline,0.177468,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,huq_satmd_mid,published baseline,0.171187,0.00382,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,md_mean_mid,published baseline,0.037173,0.001585,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,satmd_mid,published baseline,0.037173,0.001585,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,hbo,published baseline,0.033389,0.002322,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,huq_satmd_mid,published baseline,-0.023893,0.00198,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,md_mean_mid,published baseline,-0.023893,0.00198,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,satmd_mid,published baseline,-0.023893,0.00198,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,huq_satrmd_mid,published baseline,-0.050614,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satrmd_mid,published baseline,0.051215,0.068637,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,huq_satrmd_mid,published baseline,0.159645,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,huq_satrmd_mid,published baseline,0.097347,0.049386,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,huq_satrmd_mid,published baseline,0.18246,0.003027,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,huq_satrmd_mid,published baseline,0.040299,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,0.025608,0.012297,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,huq_satrmd_mid,published baseline,-0.049543,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.009678,0.002551,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,huq_satrmd_mid,published baseline,-0.024715,0.002387,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,huq_satrmd_mid,published baseline,0.110315,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,huq_satrmd_mid,published baseline,0.160202,0.037711,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,huq_satrmd_mid,published baseline,0.452498,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,huq_satrmd_mid,published baseline,0.374089,0.039923,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,huq_satrmd_mid,published baseline,0.232992,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,huq_satrmd_mid,published baseline,0.142867,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,huq_satrmd_mid,published baseline,0.202932,0.03464,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,huq_satrmd_mid,published baseline,0.344323,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,huq_satrmd_mid,published baseline,0.132885,0.004065,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,huq_satrmd_mid,published baseline,0.366966,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,huq_satrmd_mid,published baseline,-0.088352,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satrmd_mid,published baseline,0.038434,0.060897,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,huq_satrmd_mid,published baseline,0.027386,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.006742,0.005211,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,huq_satrmd_mid,published baseline,-0.031328,0.018169,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,huq_satrmd_mid,published baseline,0.155251,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,huq_satrmd_mid,published baseline,0.134329,0.268894,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,huq_satrmd_mid,published baseline,0.436848,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,0.311538,0.021603,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,huq_satrmd_mid,published baseline,0.304841,0.001613,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,huq_satrmd_mid,published baseline,-0.136064,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.09583,0.006133,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,huq_satrmd_mid,published baseline,0.051329,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.202882,0.00848,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,huq_satrmd_mid,published baseline,0.07444,0.27778,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,huq_satrmd_mid,published baseline,-0.080927,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.203645,0.006486,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,huq_satrmd_mid,published baseline,0.104778,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,huq_satrmd_mid,published baseline,-0.161173,0.006556,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,huq_satrmd_mid,published baseline,-0.084659,0.003835,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,rmd_mean_mid,published baseline,-0.050614,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,rmd_mean_mid,published baseline,-0.119705,0.009075,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,rmd_mean_mid,published baseline,0.136471,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,rmd_mean_mid,published baseline,-0.054899,0.010005,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,rmd_mean_mid,published baseline,0.145246,0.000572,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,rmd_mean_mid,published baseline,0.040299,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,rmd_mean_mid,published baseline,0.062542,0.006676,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,rmd_mean_mid,published baseline,-0.008747,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,rmd_mean_mid,published baseline,-0.037584,0.003128,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,rmd_mean_mid,published baseline,-0.024715,0.002387,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,rmd_mean_mid,published baseline,0.110315,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,rmd_mean_mid,published baseline,0.126748,0.021198,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,rmd_mean_mid,published baseline,0.325324,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,rmd_mean_mid,published baseline,0.071507,0.022498,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,rmd_mean_mid,published baseline,-0.079588,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,rmd_mean_mid,published baseline,0.142867,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,rmd_mean_mid,published baseline,0.184665,0.0214,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,rmd_mean_mid,published baseline,0.135839,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,rmd_mean_mid,published baseline,0.130906,0.006828,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,rmd_mean_mid,published baseline,0.008477,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,rmd_mean_mid,published baseline,-0.088352,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,rmd_mean_mid,published baseline,0.105919,0.006822,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,rmd_mean_mid,published baseline,-0.000969,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,rmd_mean_mid,published baseline,-0.009777,0.012996,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,rmd_mean_mid,published baseline,-0.254539,0.002148,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,rmd_mean_mid,published baseline,0.155251,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,rmd_mean_mid,published baseline,0.249109,0.015878,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,rmd_mean_mid,published baseline,0.462428,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,rmd_mean_mid,published baseline,0.219827,0.021635,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,rmd_mean_mid,published baseline,0.166033,0.005389,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,rmd_mean_mid,published baseline,-0.136064,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,rmd_mean_mid,published baseline,0.095844,0.012634,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,rmd_mean_mid,published baseline,0.051329,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,rmd_mean_mid,published baseline,-0.28637,0.003914,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,rmd_mean_mid,published baseline,-0.294824,0.009119,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,rmd_mean_mid,published baseline,-0.080927,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,rmd_mean_mid,published baseline,0.137966,0.011738,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,rmd_mean_mid,published baseline,0.102986,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,rmd_mean_mid,published baseline,-0.05153,0.00826,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,rmd_mean_mid,published baseline,-0.084659,0.003835,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,1ds-Diff-long,xsum,satrmd_mid,published baseline,-0.050614,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satrmd_mid,published baseline,-0.119705,0.009075,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,ID,asqa,satrmd_mid,published baseline,-0.036487,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+factscore,satrmd_mid,published baseline,-0.054899,0.010005,3,0,published baselines,40,yes
+google/gemma-2-9b,asqa,SameTask-long,pubmed_qa+med_quad,satrmd_mid,published baseline,0.145246,0.000572,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,1ds-Diff-long,pubmed_qa,satrmd_mid,published baseline,0.040299,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satrmd_mid,published baseline,0.062542,0.006676,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,ID,cnn_dailymail,satrmd_mid,published baseline,-0.050753,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,LOO-long,pubmed_qa+xsum+med_quad+samsum+expertqa+asqa+factscore,satrmd_mid,published baseline,-0.037584,0.003128,3,0,published baselines,40,yes
+google/gemma-2-9b,cnn_dailymail,SameTask-long,xsum+samsum,satrmd_mid,published baseline,-0.024715,0.002387,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,1ds-Diff-long,pubmed_qa,satrmd_mid,published baseline,0.110315,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,satrmd_mid,published baseline,0.126748,0.021198,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,ID,expertqa,satrmd_mid,published baseline,0.325324,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa+factscore,satrmd_mid,published baseline,0.071507,0.022498,3,0,published baselines,40,yes
+google/gemma-2-9b,expertqa,SameTask-long,factscore,satrmd_mid,published baseline,-0.141838,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,1ds-Diff-long,pubmed_qa,satrmd_mid,published baseline,0.142867,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,DiffTask-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+asqa,satrmd_mid,published baseline,0.184665,0.0214,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,ID,factscore,satrmd_mid,published baseline,0.037919,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa,satrmd_mid,published baseline,0.130906,0.006828,3,0,published baselines,40,yes
+google/gemma-2-9b,factscore,SameTask-long,expertqa,satrmd_mid,published baseline,0.008477,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,1ds-Diff-long,xsum,satrmd_mid,published baseline,-0.088352,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satrmd_mid,published baseline,0.046841,0.085666,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,ID,med_quad,satrmd_mid,published baseline,-0.031358,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,LOO-long,pubmed_qa+xsum+cnn_dailymail+samsum+expertqa+asqa+factscore,satrmd_mid,published baseline,-0.009777,0.012996,3,0,published baselines,40,yes
+google/gemma-2-9b,med_quad,SameTask-long,pubmed_qa+asqa,satrmd_mid,published baseline,-0.254539,0.002148,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,1ds-Diff-long,xsum,satrmd_mid,published baseline,0.155251,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,DiffTask-long,xsum+cnn_dailymail+samsum+expertqa+factscore,satrmd_mid,published baseline,-0.002721,0.347078,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,ID,pubmed_qa,satrmd_mid,published baseline,0.462428,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,LOO-long,xsum+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,satrmd_mid,published baseline,0.219827,0.021635,3,0,published baselines,40,yes
+google/gemma-2-9b,pubmed_qa,SameTask-long,med_quad+asqa,satrmd_mid,published baseline,0.166033,0.005389,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,1ds-Diff-long,pubmed_qa,satrmd_mid,published baseline,-0.136064,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satrmd_mid,published baseline,0.095844,0.012634,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,ID,samsum,satrmd_mid,published baseline,0.051329,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,LOO-long,pubmed_qa+xsum+cnn_dailymail+med_quad+expertqa+asqa+factscore,satrmd_mid,published baseline,-0.28637,0.003914,3,0,published baselines,40,yes
+google/gemma-2-9b,samsum,SameTask-long,xsum+cnn_dailymail,satrmd_mid,published baseline,0.110027,0.293843,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,1ds-Diff-long,pubmed_qa,satrmd_mid,published baseline,-0.080927,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,DiffTask-long,pubmed_qa+med_quad+expertqa+asqa+factscore,satrmd_mid,published baseline,0.137966,0.011738,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,ID,xsum,satrmd_mid,published baseline,0.102986,0.0,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,LOO-long,pubmed_qa+cnn_dailymail+med_quad+samsum+expertqa+asqa+factscore,satrmd_mid,published baseline,-0.05153,0.00826,3,0,published baselines,40,yes
+google/gemma-2-9b,xsum,SameTask-long,cnn_dailymail+samsum,satrmd_mid,published baseline,-0.084659,0.003835,3,0,published baselines,40,yes
