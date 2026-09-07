@@ -129,7 +129,8 @@ its cache, so probes can be retrained without touching a GPU.
   its outcome, in `prereg/README.md`. Most record a negative, and are kept for that reason: the
   argument that no fixed aggregation rule works across tasks depends on knowing which nearby designs
   were tried and failed.
-- `tests/` — 13 files, 73 CPU unit tests over the maths and the aggregation code.
+- `tests/` — 14 files, 93 CPU unit tests over the uncertainty maths, the aggregation code and
+  the benchmark definition.
 - `pbs/`, `slurm/` — cluster job scripts (see below).
 - FActScore's entity list and Wikipedia database are not redistributed here; `src/luq/factscore.py`
   documents what the labeller expects and where it looks for them.
@@ -221,7 +222,8 @@ Both require the cached records, which are not distributed with this repository.
 ## Tests and verification
 
 ```bash
-pytest -q    # 73 CPU unit tests: surprisal and PRR maths, weighting, pooling, score parsing
+pytest -q    # 93 CPU unit tests: surprisal and PRR maths, weighting, pooling, score parsing,
+             # and the benchmark grid, carve and row-order guard
 ```
 
 The suite pins the uncertainty maths, so a refactor that changes it fails loudly. The mean-NLL
