@@ -111,11 +111,10 @@ its cache, so probes can be retrained without touching a GPU.
 - `scripts/` — the numbered stages above, plus `checks/` (309 analysis and verification
   drivers, see `scripts/checks/README.md`) and `tools/` (22 helpers, mostly visualisation).
 - `prereg/` — 41 pre-registrations, written and committed **before** the runs they describe, so
-  the commit timestamp shows a prediction pre-dates its result. Note that the files were renamed
-  on 2026-08-21, so `git log --follow` is what shows when each was actually written. Indexed with
-  their outcomes in `prereg/README.md`. Most are recorded negatives and are kept deliberately:
-  the argument that no fixed aggregation rule works across tasks depends on knowing which nearby
-  designs were tried and failed.
+  the commit timestamp shows a prediction pre-dates its result. Grouped by what each supports, with
+  its outcome, in `prereg/README.md`. Most record a negative, and are kept for that reason: the
+  argument that no fixed aggregation rule works across tasks depends on knowing which nearby designs
+  were tried and failed.
 - `tests/` — 13 files, 73 CPU unit tests over the maths and the aggregation code.
 - `pbs/`, `slurm/` — cluster job scripts (see below).
 - FActScore's entity list and Wikipedia database are not redistributed here; `src/luq/factscore.py`
