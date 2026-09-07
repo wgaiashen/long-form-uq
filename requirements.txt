@@ -1,0 +1,48 @@
+# Derived from the imports that actually appear in src/, scripts/ and tests/, with versions read
+# from the environment the reported results were produced in (Python 3.11.5). Nothing here is a
+# guess: a package appears only if some file imports it, and a version only if it was read from
+# that environment.
+
+numpy==1.26.4
+scipy==1.12.0
+pandas==3.0.3
+scikit-learn==1.9.0
+torch==2.12.1
+transformers==4.57.6
+datasets==5.0.0
+accelerate==1.14.0
+sentencepiece==0.2.1
+matplotlib==3.11.0
+openai==2.41.0
+tiktoken==0.13.0
+nltk==3.9.4
+tqdm==4.68.3
+pytest==9.1.1
+
+# The upstream short-form and mixed-task benchmark, installed from source rather than from an
+# index. It supplies five of the eight long-form evaluation targets; see the ProbeDriftLong
+# section of README.md.
+#   github.com/joestacey/ProbeDrift
+probe-drift==0.1.0
+
+# Optional. Each is imported by a small number of files and each degrades cleanly when absent.
+#   torchsort               the differentiable ranking objective offered as an alternative to the
+#                           default pairwise loss. Without it that loss is unavailable and says so.
+#   spacy                   sentence segmentation for the per-sentence aggregation experiments
+#   sentence-transformers   the external relevance model used by the TokenSAR comparator
+#   krippendorff, irrCAC    agreement statistics for the judge comparison, which prints n/a
+#                           without them. Neither is installed in the environment above, so no
+#                           version is given for either.
+torchsort==0.1.10
+spacy==3.7.5
+sentence-transformers==5.6.0
+krippendorff
+irrCAC
+
+# Two packages in this repository are imported by path rather than installed: `luq`, the pipeline
+# library, and `probe_drift_long`, the benchmark definition. Both live under `src/`, which
+# `pbs/_env.sh` puts on PYTHONPATH and which the drivers and `tests/conftest.py` add themselves.
+# There is deliberately no setup.py.
+
+# scipy is held below 1.13 because scripts/checks/report_pack_stats.py calls the exact Wilcoxon
+# signed-rank test through the older `mode` argument, which later versions renamed.
