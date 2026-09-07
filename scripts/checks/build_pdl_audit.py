@@ -21,6 +21,7 @@ Only files whose basename matches an explicit allow-regex are read, so wMSP-vari
 (blondel/seg/universal) and label_* sidecars cannot leak base rows into the audit.
 """
 import csv
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
