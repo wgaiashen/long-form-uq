@@ -110,8 +110,9 @@ def main():
     ap.add_argument("--dir", default="published_results",
                     help="directory holding the per-population tables")
     ap.add_argument("--glob", default="*.csv", help="filename pattern within that directory")
-    ap.add_argument("--ensemble", action="append", default=[],
-                    help="a combination result file, repeatable, one per population. Section 5.7 "
+    ap.add_argument("--ensemble", default=None,
+                    help="the combination driver's equal-model table, normally "
+                         "results/analysis/ensemble_clean/ensemble_clean_equalmodel.csv. Section 5.7 "
                          "cannot be computed from the masters, which carry no combination rows.")
     args = ap.parse_args()
 
@@ -186,43 +187,30 @@ def main():
         print(f"  {rung.replace('-long',''):16s} {adv:+.4f}")
     print()
 
-    # ---- Section 5.7, the combination -----------------------------------------------------
-    # Reported on the two populations with complete clean per-response inputs, so this reads the
-    # combination result files rather than the masters, which carry no combination rows.
+    # ---- Section 5.7 and Table 5.3, the combination ---------------------------------------
+    # The combination is reported on the two populations whose corrected-span per-response scores
+    # exist and are certified, so it is computed by its own driver rather than from the masters,
+    # which carry no combination rows. `--ensemble` takes that driver's equal-model table.
     print("Section 5.7 and Table 5.3, the combination, equal-model over the two clean populations")
     if not args.ensemble:
-        print("  not computed. Pass --ensemble once per population. The field is left blank rather\n"
-              "  than filled from another source.")
+        print("  not computed. Pass --ensemble <ensemble_clean_equalmodel.csv>. The field is left\n"
+              "  blank rather than filled from another source.")
     else:
-        prof, stat = {}, {}
-        for path in args.ensemble:
-            for r in csv.DictReader(open(path, newline="")):
-                if r["section"] == "rung_profile" and r["value"]:
-                    prof.setdefault((r["method"], r["rung"]), []).append(float(r["value"]))
-                if r["section"] == "estimand_A" and r.get("macro"):
-                    stat.setdefault(r["method"], []).append(r)
-        order = ["CAWSA \u03bb=2", "SAPLMA", "CONTROL  SAPLMA + attention-pool",
-                 "PRIMARY  CAWSA \u03bb=2 + SAPLMA", "REF      msp_min + SAPLMA"]
-        print(f"  {'method':34s}" + "".join(f"{r.replace('-long',''):>11s}" for r in RUNGS)
-              + f"{'mean OOD':>11s}")
+        with open(args.ensemble, newline="") as fh:
+            rows = {r["method"]: r for r in csv.DictReader(fh)}
+        order = ["CAWSA lambda=2", "SAPLMA", "SAPLMA + attention pooling",
+                 "CAWSA lambda=2 + SAPLMA"]
+        missing = [m for m in order if m not in rows]
+        if missing:
+            raise SystemExit(f"{args.ensemble}: missing rows {missing}")
+        cols = ["ID", "SameTask-long", "LOO-long", "DiffTask-long", "1ds-Diff-long", "mean_ood"]
+        print(f"  {'method':28s}" + "".join(f"{c.replace('-long',''):>12s}" for c in cols))
         for meth in order:
-            vals = [prof.get((meth, r)) for r in RUNGS]
-            if any(v is None for v in vals):
-                print(f"  {meth:34s}  not present in the files given"); continue
-            means = [sum(v) / len(v) for v in vals]
-            print(f"  {meth:34s}" + "".join(f"{v:11.4f}" for v in means)
-                  + f"{sum(means[1:]) / 4:11.4f}")
-        print()
-        print("  against SAPLMA alone, out of distribution, dataset as the unit:")
-        for meth in ["PRIMARY  CAWSA \u03bb=2 + SAPLMA", "REF      msp_min + SAPLMA"]:
-            for r in stat.get(meth, []):
-                print(f"    {meth:34s} macro {float(r['macro']):+.4f}  "
-                      f"{r['signs_positive']} of {r['n']}  p = {float(r['wilcoxon_p']):.4f}")
-        print()
-        print("  The reference combination of minimum token probability with the probe is printed\n"
-              "  deliberately. Its mean out-of-distribution score is close to, and can exceed, the\n"
-              "  reported combination, so it should be read next to its in-distribution behaviour\n"
-              "  rather than on the shifted settings alone.")
+            print(f"  {meth:28s}" + "".join(f"{float(rows[meth][c]):12.4f}" for c in cols))
+        d = float(rows["CAWSA lambda=2 + SAPLMA"]["delta_vs_saplma"])
+        c = float(rows["CAWSA lambda=2 + SAPLMA"]["delta_vs_saplma_attention"])
+        print(f"\n  combination over SAPLMA alone            {d:+.4f}")
+        print(f"  combination over the attention control   {c:+.4f}")
     print()
 
 
