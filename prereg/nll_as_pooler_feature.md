@@ -1,5 +1,7 @@
 # Pre-registration — token probabilities as a pooler input
 
+> **Recorded outcome (added 2026-09-07):** run to a complete 40-cell grid, with the margins against the learned-attention control recorded in the result files. No written verdict was produced, so the numbers should be read from those files rather than summarised.
+
 ## What C2 is (and is NOT)
 C2 feeds the model's own per-token NLL (= −logprob) to the attention pooler as an EXTRA INPUT FEATURE
 (concatenated onto the 4096-dim hidden state → a 4097-dim input). The learned query can then weight tokens

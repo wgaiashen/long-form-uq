@@ -1,5 +1,7 @@
 # Pre-registration — retrospective development-set selection of the shrinkage level
 
+> **Recorded outcome (added 2026-09-07):** run. The two missing coefficients were computed and the selection is recorded as retrospective; no clean prospective development-set choice of the shrinkage level exists, which is what this registration was written to establish.
+
 **Date:** 2026-08-13. **Population for selection:** short-form `sciq` and `trivia_qa` only.
 **Population for the frozen look-up:** the existing 8-dataset ProbeDriftLong Llama results.
 **Written to disk BEFORE the two missing cells (λ = 1, λ = 1.5) were computed.**

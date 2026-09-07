@@ -1,5 +1,7 @@
 # Pre-registration — are PubMedQA's punctuation tokens carrying the signal?
 
+> **Recorded outcome (added 2026-09-07):** run. The premise it was written to test was only weakly supported, so the causal reading that depended on it is stated as a hypothesis rather than as established.
+
 **Written 2026-08-02, BEFORE the ablation is run.** Registered in advance because it predicts that a
 premise the project has repeated for weeks is WRONG, and a prediction of that shape is worthless if
 produced after seeing the result.

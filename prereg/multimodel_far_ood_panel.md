@@ -1,5 +1,7 @@
 # Pre-registration — multi-model replication of the shrinkage effect under cross-task shift
 
+> **Recorded outcome (added 2026-09-07):** run. Two replication populations completed and were carried into the report; a third was withdrawn on a failed generation-validity gate before any performance number was computed.
+
 > **Filename note.** The planning document called this `M3_multimodel_far_ood.md`. `M3` and `M4` were
 > already taken in this directory (`split_rule_and_label_coverage.md`,
 > `qwen_coverage_divergence_prediction.md`), so it is registered as **M5**. Nothing else changed.

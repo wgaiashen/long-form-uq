@@ -1,5 +1,7 @@
 # Pre-registration — does attention flattening predict performance drop?
 
+> **Recorded outcome (added 2026-09-07):** run. A clean negative under the registered decision rule: the two correlation statistics disagree in sign and the rank statistic is wrong-signed, so this signal was not adopted.
+
 **Written 2026-07-31, BEFORE running the analysis.** Committed ahead of the run so the predictions are
 timestamped and cannot be retrofitted. Code repo HEAD at writing: see the commit that adds this file.
 

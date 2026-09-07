@@ -1,5 +1,7 @@
 # Pre-registration — pooling heads with different fixed recipes
 
+> **Recorded outcome (added 2026-09-07):** run. The fixed-recipe heads do not beat the single-head pooler.
+
 **Written 2026-08-06, BEFORE any cell of this arm has been run.** Committed with its numbers, because a
 pre-registration without thresholds is barely one.
 

@@ -1,5 +1,7 @@
 # M8 — Substituting a learned token weighting for the probability branch of the hybrid back-off
 
+> **Recorded outcome (added 2026-09-07):** run. Substituting the probability branch raises in-distribution PRR substantially and leaves the shifted settings close to the substituted score, because the gate gives the probe almost no weight there.
+
 Written 2026-08-24, before any prediction-rejection ratio for the modified estimator has been
 computed, inspected or interpreted.
 

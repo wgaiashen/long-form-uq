@@ -1,5 +1,7 @@
 # Pre-registration — is the selection law really about response length?
 
+> **Recorded outcome (added 2026-09-07):** run. The registered direction and thresholds were applied; the per-dataset record is in the result files.
+
 **Written 2026-08-07, BEFORE the driver was run.** Committed with its thresholds and its direction.
 
 ## The claim under test

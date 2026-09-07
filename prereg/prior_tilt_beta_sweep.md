@@ -1,5 +1,7 @@
 # Pre-registration — sweep the prior-tilt strength beta
 
+> **Recorded outcome (added 2026-09-07):** run. An interior optimum on every dataset, which overturned an earlier conclusion drawn from two in-distribution cells.
+
 **Written 2026-08-06, BEFORE any cell of this sweep has been run.** Committed with its thresholds.
 
 ## Why this exists

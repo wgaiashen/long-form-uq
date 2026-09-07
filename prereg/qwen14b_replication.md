@@ -1,5 +1,7 @@
 # Pre-registration — the Qwen2.5-14B replication of the ProbeDriftLong findings
 
+> **Recorded outcome (added 2026-09-07):** run. Two of the four registered claims replicate, one fails and one reverses. Scored independently on two clusters with the same committed scorer, giving identical numbers.
+
 ## 0. Provenance — read this first
 
 The thresholds below were fixed in the project's planning notes (a planning document kept outside this repo),

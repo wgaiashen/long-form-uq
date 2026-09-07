@@ -1,5 +1,7 @@
 # Pre-registration — implement hybrid back-off and validate it before using it as a baseline
 
+> **Recorded outcome (added 2026-09-07):** run. The reproduction was validated on its own terms before the method was used as a baseline anywhere.
+
 **Written 2026-08-03, BEFORE the implementation is scored.** Registered as a standalone step on the
 author's instruction (2026-08-02): *"if HBO is implemented AS R5's baseline, there is a pull toward
 specifying it in whatever form makes our comparison favourable."* So it is built and validated on its

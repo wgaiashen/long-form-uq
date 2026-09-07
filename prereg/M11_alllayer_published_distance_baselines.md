@@ -1,5 +1,7 @@
 # M11 - The published supervised distance family at its full layer set
 
+> **Recorded outcome (added 2026-09-07):** run. The reproduction completed at the full published layer set, 32 of 32 layers at 40 of 40 cells, with every gate passed. The registered prediction that the distance family's weakness under task shift is a property of the density signal rather than an artefact of using a single layer is confirmed.
+
 Written 2026-09-03, before any all-layer distance score has been computed, inspected or interpreted.
 
 ## 0. What this is

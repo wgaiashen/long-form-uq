@@ -1,5 +1,7 @@
 # Pre-registration — prompt-residual hidden-state probing
 
+> **Recorded outcome (added 2026-09-07):** run. Complete at 160 of 160 cells with both reproduction gates passing; the method did not clear its gate.
+
 **Date:** 2026-08-12. **Population:** `meta-llama/Meta-Llama-3.1-8B`, the canonical ProbeDriftLong
 grid (8 long evals × 5 rungs, seeds 1/2/3, layer 15, carve `legacy`, 1800-row supervised pools).
 **Committed BEFORE any `R1` or `R2` PRR existed.**

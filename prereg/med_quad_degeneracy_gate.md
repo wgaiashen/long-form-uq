@@ -1,5 +1,7 @@
 # Pre-registration — MedQuAD's degeneracy gate is different from the other three
 
+> **Recorded outcome (added 2026-09-07):** run. The predicted difference held, and the gate failure it anticipated was read as predicted rather than as a defect.
+
 **Written 2026-07-31, BEFORE med_quad is regenerated.** Registered in advance precisely because it
 predicts a gate *failure* that should not be read as a failure, and that is the kind of reasoning which
 is worthless if produced after seeing the result.

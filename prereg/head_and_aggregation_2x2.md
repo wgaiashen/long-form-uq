@@ -1,5 +1,7 @@
 # Pre-registration — the missing 2x2 cell: learned attention with an MLP head
 
+> **Recorded outcome (added 2026-09-07):** run. A clean negative: the apparent head effect that motivated it was a training-recipe artefact, and all four correctness gates passed.
+
 Written **before** any run of `scripts/checks/head_aggregation_2x2.py` (date: 2026-07-30, DoC).
 Mirrors the driver docstring. This file is a `results/` artifact, not a living doc.
 

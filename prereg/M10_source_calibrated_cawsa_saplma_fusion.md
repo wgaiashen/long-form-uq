@@ -1,5 +1,7 @@
 # M10 — Source-calibrated fusion of the learned token weighting and the hidden-state probe
 
+> **Recorded outcome (added 2026-09-07):** run. Complete on two populations at 40 of 40 cells, with all four registered gates passing exactly. The third population was excluded on a pre-specified admissibility check.
+
 Written 2026-08-24, before any fusion score has been computed, inspected or interpreted.
 
 ## 0. What motivated this, stated plainly

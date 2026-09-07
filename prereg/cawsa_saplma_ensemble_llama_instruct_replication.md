@@ -1,5 +1,7 @@
 # Pre-registration: does the CAWSA and SAPLMA complementarity result replicate on Llama-3.1-8B-Instruct?
 
+> **Recorded outcome (added 2026-09-07):** run and resolved. The result was not carried into the report, which does not evaluate this population.
+
 ## 0. Provenance
 
 Written and committed **before any Llama-3.1-8B-Instruct ensemble PRR has been computed or read.**

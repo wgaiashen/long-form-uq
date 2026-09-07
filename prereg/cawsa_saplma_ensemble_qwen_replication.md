@@ -1,5 +1,7 @@
 # Pre-registration — does the CAWSA + SAPLMA complementarity result replicate on Qwen2.5-14B?
 
+> **Recorded outcome (added 2026-09-07):** run. Replicates, and is the clearest dataset-level effect of the three populations.
+
 ## 0. Provenance
 
 Written and committed before any Qwen2.5-14B ensemble PRR has been computed or read. At the time of

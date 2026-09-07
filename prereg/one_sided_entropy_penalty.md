@@ -1,5 +1,7 @@
 # Pre-registration — the one-sided entropy penalty
 
+> **Recorded outcome (added 2026-09-07):** run. Negative, and the diagnosis that motivated it was itself shown to be wrong.
+
 **Written 2026-08-01, BEFORE any run.** Committed ahead of the run so the predictions and the stopping
 rule are timestamped rather than fitted afterwards.
 

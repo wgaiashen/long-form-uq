@@ -1,5 +1,7 @@
 # Pre-registration — is the regime taxonomy decidable from unlabelled data?
 
+> **Recorded outcome (added 2026-09-07):** run. Falsified: the taxonomy is not decidable from unlabelled data by the registered statistic, and plain response length separated the groups better.
+
 **Written 2026-08-03, BEFORE anything is fitted.** This is the gate on the whole regime-conditional
 programme: if the regime a dataset belongs to cannot be decided without looking at correctness labels,
 then the routing story is fitted to its own evaluation and every result downstream of it is circular.

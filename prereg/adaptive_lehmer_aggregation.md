@@ -1,5 +1,7 @@
 # Pre-registration — per-response adaptive Lehmer aggregation
 
+> **Recorded outcome (added 2026-09-07):** run. A registered negative: the primary claim fails its bar and the method loses to its own fixed-coefficient control.
+
 **Date:** 2026-08-10. **Population:** `meta-llama/Meta-Llama-3.1-8B`, the canonical ProbeDriftLong
 grid (8 long evals × 5 rungs, seeds 1/2/3, layer 15, carve `legacy`, 1800-row supervised pools).
 **Committed BEFORE any adaptive-Lehmer test PRR existed.** The driver's smoke mode prints no PRR

@@ -1,5 +1,7 @@
 # Pre-registration — the top-k surprisal prior
 
+> **Recorded outcome (added 2026-09-07):** run. Complete on the long grid; the prior did not carry.
+
 **Written 2026-08-05, before the builder was implemented and before any cell was run.**
 
 ---
