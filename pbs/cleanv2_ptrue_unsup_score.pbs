@@ -1,6 +1,9 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=4:mem=48gb
-#PBS -l walltime=6:00:00
+# Sized from the measured cost of the previous run, which used 9 seconds of CPU, 448 MB and 2m40s
+# of walltime. The earlier request of 4 cpus, 48 GB and 6 hours was about a hundred times the memory
+# and a hundred times the walltime actually needed, which only lengthens the queue wait.
+#PBS -l select=1:ncpus=1:mem=8gb
+#PBS -l walltime=00:20:00
 #PBS -N luq_cv2_ptunsup
 #PBS -j oe
 

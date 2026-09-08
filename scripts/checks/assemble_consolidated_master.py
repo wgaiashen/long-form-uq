@@ -15,6 +15,14 @@ its recomputed sequence-probability score matched the master's column exactly on
 Every row carries `source`, so a reader can always tell which file a number came from, and `family`,
 so the published baselines are never mistaken for our own methods.
 
+ONE MASTER MAY ARRIVE IN MORE THAN ONE FILE
+-------------------------------------------
+Where a population ran its ladder in more than one pass, the later passes wrote separate files so
+they could not overwrite the earlier one. Those files are still the same master: same driver, same
+seeds, same layer, same cache namespaces. A population declares them with `master_extra` and names
+the methods to take with `master_extra_methods`, and the assembler proves the passes agree on every
+method they share before merging them under one source label. It stops if they do not.
+
     python scripts/checks/assemble_consolidated_master.py
 """
 import csv as _csv
@@ -29,6 +37,13 @@ MODELS = {
     "meta-llama/Meta-Llama-3.1-8B": {
         "slug": "meta-llama_Meta-Llama-3.1-8B",
         "master": "results/cleanv2/pdl_cleanv2_master__meta-llama_Meta-Llama-3.1-8B.csv",
+        # The training-free verification score is not one of the ladder's methods and not one of its
+        # baselines, so it has always been written by its own driver into its own file rather than
+        # into the master. It is the same population: the same corrected-span namespace, the same
+        # evaluation rows, and a value read off the stored responses rather than fitted, so it has no
+        # training seeds. See the note in the README on why its seed count is one.
+        "master_extra": ["results/cleanv2/pdl_fam_ptrueunsup__meta-llama_Meta-Llama-3.1-8B.csv"],
+        "master_extra_methods": ["ptrue_unsup"],
     },
     "google/gemma-2-9b": {
         "slug": "google_gemma-2-9b",
@@ -45,6 +60,21 @@ MODELS = {
         # reproducibility REPORT rather than an identity assertion. It is not a widened tolerance:
         # the strict bar still applies wherever the probe was taken from the master rather than refit.
         "probe_refitted": True,
+        # The ladder for this population ran in two passes. The first wrote the ten methods in the
+        # master named above. The second scored the verification-state probe and the attention-ratio
+        # probe into their own per-dataset files, so that it could not overwrite the first. Both
+        # passes used the same driver, the same three training seeds, the same probed layer and the
+        # same cache namespaces, so the second pass is part of the same corrected-span master and is
+        # merged here rather than being labelled as an outside source.
+        #
+        # The methods taken from the second pass are named explicitly rather than merged wholesale.
+        # Those files also recompute five methods the master already owns, and those recomputations
+        # are used to verify that the two passes describe one population, not to add rows. Any other
+        # method they contain is left out and named in the log, so that a method present in the input
+        # and absent from the output is visible rather than silent.
+        "master_extra": ["results/analysis/pdl_qwenclean_baselines_*__Qwen_Qwen2.5-14B.csv",
+                         "results/pdl_fam_ptrueunsup__Qwen_Qwen2.5-14B.csv"],
+        "master_extra_methods": ["ptrue", "lookback", "ptrue_unsup"],
     },
 }
 
@@ -74,13 +104,21 @@ HYBRID_PREFERENCE = ["pdl_hybrids_unconstrained__{slug}.csv", "pdl_hybrids__{slu
 HYBRID_EXTRA = ["pdl_hybrids_rmd__{slug}.csv", "pdl_mdlayers_alllayer__{slug}.csv"]
 OVERLAP_TOL = 1e-6
 
+# The bar for the second-pass identity check, where a population declares `master_extra`. Both passes
+# store four decimals, so this is the resolution of the files being compared rather than room for a
+# real difference. The methods common to the two passes currently agree exactly, and the check is
+# fatal because a second pass that does not reproduce the first is a different population and its
+# rows must not be merged into the first pass under one source label.
+MASTER_EXTRA_TOL = 1e-4
+
 # Which family each method belongs to, so a published baseline is never read as one of ours.
 PUBLISHED = {"msp", "hbo", "satmd_mid", "satrmd_mid", "msp_satmd_mid", "msp_satrmd_mid",
              "huq_satmd_mid", "huq_satrmd_mid", "md_mean_mid", "rmd_mean_mid",
              # the reproductions at the published layer set
              "satmd_alllayer", "satrmd_alllayer", "msp_satmd_alllayer", "msp_satrmd_alllayer",
              "huq_satmd_alllayer", "huq_satrmd_alllayer"}
-BASELINE = {"floor_sum", "floor_ppl", "floor_min", "fair_floor", "saplma", "ptrue", "lookback"}
+BASELINE = {"floor_sum", "floor_ppl", "floor_min", "fair_floor", "saplma", "ptrue", "ptrue_unsup",
+            "lookback"}
 
 FIELDS = ["model", "eval", "rung", "train", "method", "family", "prr_mean", "prr_std",
           "n_seeds", "degenerate_seeds", "source", "method_cells", "complete_grid"]
@@ -89,6 +127,13 @@ FIELDS = ["model", "eval", "rung", "train", "method", "family", "prr_mean", "prr
 # A method present on fewer cells is not a smaller version of the same measurement, and a mean over
 # whatever cells happen to exist is not comparable to a mean over all of them.
 FULL_GRID_CELLS = 40
+
+# The five training settings that make up the grid. A driver may write rows outside it: the
+# training-free verification score is also evaluated long-to-short on two short-form datasets, which
+# are not part of this benchmark and are not comparable with anything else in the table. Those rows
+# are dropped and named in the log, because a method carrying 42 rows would be counted as off-grid
+# by the coverage rule below and reported as incomplete when it is in fact complete.
+GRID_RUNGS = ["ID", "SameTask-long", "LOO-long", "DiffTask-long", "1ds-Diff-long"]
 
 # Methods the baseline driver recomputes that the master already owns. They are NOT emitted twice:
 # the master's value is authoritative and the recomputation is used as a cross-check on it. `msp` is
@@ -130,27 +175,66 @@ def main():
                 break
         extra = [ROOT / "results" / "hybrids" / pat.format(slug=slug) for pat in HYBRID_EXTRA]
         extra = [e for e in extra if e.exists()]
+        mextra = []
+        for pat in cfg.get("master_extra", []):
+            mextra.extend(sorted(ROOT.glob(pat)))
+        mextra_allow = set(cfg.get("master_extra_methods", []))
         if not master.exists() or hybrid is None:
             print(f"{model}: missing input (master={master.exists()}, hybrid=None) -> SKIPPED")
             continue
         for e in extra:
             print(f"  {model}: also merging {e.name}")
+        if mextra:
+            print(f"  {model}: second master pass, {len(mextra)} file(s), taking "
+                  f"{', '.join(sorted(mextra_allow))}")
         if hybrid.name.startswith("pdl_hybrids__"):
             print(f"  {model}: WARNING -- using the PRE-CORRECTION hybrid file. Its supervised "
                   f"distance rows were produced with a positivity-constrained ridge the reference "
                   f"does not use and are superseded.")
         else:
             print(f"  {model}: using the corrected hybrid rows ({hybrid.name})")
-        before = {p: sha(p) for p in [master, hybrid] + extra}
+        before = {p: sha(p) for p in [master, hybrid] + extra + mextra}
 
         rows, seen, master_vals, agree = [], {}, {}, []
         overlap_ok, overlap_bad = 0, []
-        sources = [("corrected-span master", master), ("published baselines", hybrid)]
-        sources += [("published baselines", e) for e in extra]
-        for src, path in sources:
+        mextra_same, mextra_diff, mextra_left = {}, [], set()
+        mextra_offgrid = {}
+        # `allow` restricts a file to the named methods. It is None for a file taken whole. The
+        # second-pass files are the only restricted ones, because they overlap the first pass.
+        sources = [("corrected-span master", master, None)]
+        sources += [("corrected-span master", e, mextra_allow) for e in mextra]
+        sources += [("published baselines", hybrid, None)]
+        sources += [("published baselines", e, None) for e in extra]
+        for src, path, allow in sources:
             for r in _csv.DictReader(open(path)):
                 m = r.get("method", "")
                 if not m:
+                    continue
+                if allow is not None and r.get("rung") not in GRID_RUNGS:
+                    # Written by the same driver but outside this benchmark, so not comparable with
+                    # any other row here. Counted and named rather than dropped silently.
+                    mextra_offgrid[r.get("rung")] = mextra_offgrid.get(r.get("rung"), 0) + 1
+                    continue
+                if allow is not None and m not in allow:
+                    # Not a method this file was read for. If the first pass already owns the cell,
+                    # the two values must match, because that is what establishes the two passes as
+                    # one population. If it does not, the method is one the second pass adds and this
+                    # population was not configured to take; it is counted and named, never merged.
+                    key = (r.get("eval"), r.get("rung"), m)
+                    if key in seen:
+                        a, b = seen[key].get("prr_mean", ""), r.get("prr_mean", "")
+                        if (a == "") != (b == ""):
+                            mextra_diff.append(f"{key}: blank in one pass, {a or b} in the other")
+                        elif a == "":
+                            mextra_same[path.name] = mextra_same.get(path.name, 0) + 1
+                        else:
+                            d = abs(float(a) - float(b))
+                            if d > MASTER_EXTRA_TOL:
+                                mextra_diff.append(f"{key}: {a} vs {b} (|d| = {d:.3e})")
+                            else:
+                                mextra_same[path.name] = mextra_same.get(path.name, 0) + 1
+                    else:
+                        mextra_left.add(m)
                     continue
                 if src.startswith("corrected"):
                     master_vals[(r.get("eval"), r.get("rung"), m)] = r.get("prr_mean", "")
@@ -194,6 +278,30 @@ def main():
                     "n_seeds": r.get("n_seeds", ""),
                     "degenerate_seeds": r.get("degenerate_seeds", ""), "source": src})
 
+        if mextra_diff:
+            print(f"\n{model}: {len(mextra_diff)} cell(s) differ between the two master passes:")
+            for line in mextra_diff[:10]:
+                print(f"    {line}")
+            sys.exit(f"FATAL {model}: the second master pass does not reproduce the first, so the "
+                     f"two are not one population and must not be merged under one source.")
+        if mextra:
+            if mextra_offgrid:
+                off = ", ".join(f"{k} ({v} rows)" for k, v in sorted(mextra_offgrid.items()))
+                print(f"  {model}: dropped as outside the {len(GRID_RUNGS)}-setting grid: {off}")
+            for f in mextra:
+                n = mextra_same.get(f.name, 0)
+                if n:
+                    print(f"  {model}: {f.name} reproduces the first pass on {n} shared cell(s) "
+                          f"to within {MASTER_EXTRA_TOL:.0e}")
+                else:
+                    # No shared method means no way to check this file against the first pass from
+                    # inside the assembler. That is weaker provenance than the files that do share
+                    # methods, and it is stated rather than left to be inferred from a silent pass.
+                    print(f"  {model}: {f.name} shares NO method with the first pass, so it is "
+                          f"merged on its declared population and is NOT cross-checked here")
+            if mextra_left:
+                print(f"  {model}: present in the second pass and NOT merged, because this "
+                      f"population does not list them: {', '.join(sorted(mextra_left))}")
         if overlap_bad:
             print(f"\n{model}: {len(overlap_bad)} cell(s) disagree between published-baseline files:")
             for line in overlap_bad[:10]:
@@ -225,7 +333,7 @@ def main():
         with open(out, "w", newline="") as fh:
             w = _csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader(); w.writerows(rows)
 
-        after = {p: sha(p) for p in [master, hybrid] + extra}
+        after = {p: sha(p) for p in [master, hybrid] + extra + mextra}
         if before != after:
             sys.exit(f"FATAL: an input file changed while assembling {model}.")
         # Report the cross-check on the de-duplicated quantities, and fail if any disagrees.

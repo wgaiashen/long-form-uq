@@ -839,6 +839,46 @@ meta-llama/Meta-Llama-3.1-8B,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:best
 meta-llama/Meta-Llama-3.1-8B,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:bestw_vs_bestpooler,verdict,0.1859,,3,,corrected-span master,40,yes
 meta-llama/Meta-Llama-3.1-8B,factscore,1ds-Diff-long,pubmed_qa:1800,VERDICT:attention_vs_fairfloor,verdict,-0.1709,,3,,corrected-span master,40,yes
 meta-llama/Meta-Llama-3.1-8B,factscore,1ds-Diff-long,pubmed_qa:1800,wmsp_shrink1_5,this project,0.354350881000364,0.0053004861372272,3,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,pubmed_qa,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.2823,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,pubmed_qa,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2823,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,pubmed_qa,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2823,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,pubmed_qa,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2823,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,pubmed_qa,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2823,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,xsum,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.1814,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,xsum,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1814,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,xsum,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1814,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,xsum,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1814,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,xsum,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1814,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.2065,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2065,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2065,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2065,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.2065,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,med_quad,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.0053,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,med_quad,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.0053,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,med_quad,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.0053,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,med_quad,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.0053,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,med_quad,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.0053,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,samsum,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.1524,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,samsum,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1524,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,samsum,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1524,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,samsum,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1524,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,samsum,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.1524,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,expertqa,ID,(floor: eval set only),ptrue_unsup,reference baseline,-0.0502,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,expertqa,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.0502,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,expertqa,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.0502,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,expertqa,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.0502,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,expertqa,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.0502,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,asqa,ID,(floor: eval set only),ptrue_unsup,reference baseline,0.3793,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,asqa,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.3793,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,asqa,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,0.3793,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,asqa,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,0.3793,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,asqa,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,0.3793,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,factscore,ID,(floor: eval set only),ptrue_unsup,reference baseline,-0.1414,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,factscore,SameTask-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.1414,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,factscore,DiffTask-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.1414,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,factscore,LOO-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.1414,0.0,1,,corrected-span master,40,yes
+meta-llama/Meta-Llama-3.1-8B,factscore,1ds-Diff-long,(floor: eval set only),ptrue_unsup,reference baseline,-0.1414,0.0,1,,corrected-span master,40,yes
 meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,1ds-Diff-long,pubmed_qa,hbo,published baseline,-0.084844,0.0,3,0,published baselines,40,yes
 meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,1ds-Diff-long,pubmed_qa,huq_satmd_mid,published baseline,-0.006087,0.0,3,0,published baselines,40,yes
 meta-llama/Meta-Llama-3.1-8B,cnn_dailymail,1ds-Diff-long,pubmed_qa,md_mean_mid,published baseline,0.185614,0.0,3,0,published baselines,40,yes

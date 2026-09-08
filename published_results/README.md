@@ -14,7 +14,7 @@ supplementary comparisons, which are computed by their own drivers and are not r
 | `combination_per_model.csv` | the same, per population |
 | `density_all_layer_llama-3.1-8b.csv` | the published density and hybrid estimators at their full layer set, per cell, with the layer count and response window recorded per row |
 | `hybrid_backoff_llama-3.1-8b.csv`, `hybrid_backoff_gemma-2-9b.csv` | the back-off gate: the mean weight it gives its supervised branch per setting, and the paired comparisons for the substitution experiment |
-| `like_for_like_llama-3.1-8b.csv`, `like_for_like_qwen2.5-14b.csv`, `like_for_like_gemma-2-9b.csv` | the training-free probability comparators, including the relevance-weighted and answer-span variants, with the rate at which a span was located |
+| `token_probability_methods_llama-3.1-8b.csv`, `token_probability_methods_qwen2.5-14b.csv`, `token_probability_methods_gemma-2-9b.csv` | the token-probability comparison: the fixed aggregation rules, the relevance-weighted and answer-span variants, and the learned weighting scored on the same responses, with the rate at which an answer span was located |
 | `response_lengths.csv` | mean and median response length per population and dataset, over all labelled rows and over the held-out evaluation partition separately |
 
 The sections below describe the masters, which have the most involved schema.
@@ -40,7 +40,7 @@ even though the numbers are not.
 | `family` | the presentation grouping |
 | `prr_mean` | the Prediction-Rejection Ratio, averaged over the training seeds |
 | `prr_std` | the standard deviation across those seeds |
-| `n_seeds` | how many seeds contributed, normally 3 |
+| `n_seeds` | how many seeds contributed, normally 3, and 1 for a method that fits nothing (see below) |
 | `degenerate_seeds` | seeds excluded by the generation-validity gate, normally 0 |
 | `source` | which driver produced the row |
 | `method_cells`, `complete_grid` | coverage for that method across the grid |
@@ -72,6 +72,14 @@ share a window.
 The masters carry more methods than the report reports. The report presents a selected comparison;
 the master is the full grid that comparison was drawn from, including variants that were computed
 and not carried forward.
+
+`ptrue_unsup`, the training-free verification score, carries `n_seeds` of 1 and the literal `train`
+value `(floor: eval set only)`. Neither is a gap. The score is read off the stored response rather
+than fitted, so there is nothing for a training seed to vary and no labelled source it depends on,
+and its value is therefore identical across all five settings for a given target. Read its five rows
+per target as one measurement repeated, not as five observations: averaging them as though they were
+independent would count the same number five times. The same caution applies to the fixed
+probability aggregation rules, which do vary their `train` field but ignore it.
 
 Four methods in the Llama-3.1-8B file carry `complete_grid` set to `NO`: `msp_satmd_mid` and
 `msp_satrmd_mid` at 6 cells of 40, and `msp_satmd_alllayer` and `msp_satrmd_alllayer` at 15. These
