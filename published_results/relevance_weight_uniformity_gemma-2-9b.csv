@@ -1,0 +1,9 @@
+dataset,n_test,spearman_vs_mean_token_nll,median_normalised_weight_entropy,iqr_lo,iqr_hi,min_normalised_weight_entropy,median_n_tokens,relevance_cache
+pubmed_qa,2000,0.9869,0.9878,0.9585,0.9971,0.8185,18,google_gemma-2-9b__pubmed_qa__ID__sentence.npz
+xsum,2000,0.9992,1.0,1.0,1.0,0.9474,25,google_gemma-2-9b__xsum__ID__sentence.npz
+cnn_dailymail,2000,0.9993,1.0,1.0,1.0,0.9347,29,google_gemma-2-9b__cnn_dailymail__ID__sentence.npz
+med_quad,540,0.9795,0.9935,0.9869,0.9971,0.9422,128,google_gemma-2-9b__med_quad__ID__sentence.npz
+samsum,540,0.992,1.0,0.9999,1.0,0.9017,20,google_gemma-2-9b__samsum__ID__sentence.npz
+expertqa,496,0.9879,0.9966,0.993,0.999,0.9571,125,google_gemma-2-9b__expertqa__ID__sentence.npz
+asqa,284,0.9933,0.9988,0.9954,1.0,0.9456,70,google_gemma-2-9b__asqa__ID__sentence.npz
+factscore,143,0.9775,0.9971,0.9943,0.9985,0.9707,182,google_gemma-2-9b__factscore__ID__sentence.npz

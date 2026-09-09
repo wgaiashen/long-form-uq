@@ -61,8 +61,10 @@ A method is just a feature extractor plus an aggregation choice. The rest of the
 shared, so every method is scored by the identical harness on the identical population.
 
 **Models.** Three base models are evaluated on the full eight-dataset benchmark:
-`meta-llama/Meta-Llama-3.1-8B` at layer 15 of 32, `Qwen/Qwen2.5-14B` at layer 23 of 48, and
-`google/gemma-2-9b` at layer 20 of 42. The layer is fixed per model by a single rule and is never
+`meta-llama/Meta-Llama-3.1-8B` at the output of transformer block 15 of 32, `Qwen/Qwen2.5-14B` at
+block 23 of 48, and `google/gemma-2-9b` at block 20 of 42. These are hidden-state indices 15, 23 and
+20, where index 0 is the embedding output; the write-up numbers the same states 16, 24 and 21 by
+counting the embedding output as the first. The layer is fixed per model by a single rule and is never
 selected per target, because a target-specific layer would not be available under transfer. The
 three are never pooled into one table: each result is reported per population, and cross-model
 agreement is stated per claim. Llama-3.1-8B carries the widest method coverage and is the model
@@ -75,15 +77,18 @@ write-up.
 
 **Methods.** CAWSA is implemented as `wmsp_shrink2`, with its unconstrained control at lambda = 0
 as `wmsp_norm`. It is compared against three training-free probability aggregates (Minimum token
-probability `msp_min`, Mean token NLL `perplexity`, Sum NLL `msp_sum`), three hidden-state methods
-sharing the same features (SAPLMA, a mean-pooling control and learned attention pooling), and the
-combination of CAWSA with SAPLMA. Those form the panel evaluated on all three models.
+probability `msp_min`, Mean token NLL `perplexity`, Sum NLL `msp_sum`), the relevance-weighted
+TokenSAR aggregate and the two claim-span probability baselines, three hidden-state methods sharing
+the same features (SAPLMA, a mean-pooling control and learned attention pooling), Hybrid Back-Off,
+and the combination of CAWSA with SAPLMA. Those form the panel evaluated on all three models.
 
 Further comparators are evaluated on fewer models: P(True) in a training-free and a probe form, and
-Lookback Lens, on two; and on Llama-3.1-8B, TokenSAR, the answer-span probability baselines, the
-Mahalanobis and relative-Mahalanobis density estimators with their supervised and hybrid forms, and
-Hybrid Back-Off. `src/luq/method_names.py` maps every implementation key to the name used in the
-write-up.
+Lookback Lens, on two; and on Llama-3.1-8B, the Mahalanobis and relative-Mahalanobis density
+estimators with their supervised and hybrid forms, at the released full layer set.
+`src/luq/method_names.py` maps every implementation key to the name used in the write-up. The
+claim-span rows are the case where the two disagree most: the result files call them `answer-span`,
+after the extractor's original short-answer design, while on these eight long-form sets the
+extraction prompt asks for claim-bearing terms and the write-up names them accordingly.
 
 Alongside these the repository holds the method development that did not carry: hard token masks,
 sentence-level aggregation, probability-guided and multi-head pooling, and several weighting schemes
@@ -174,9 +179,9 @@ repository.
 Jobs run on either of two independent clusters. The Python pipeline is identical, only the
 submission wrapper and a few paths differ.
 
-- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (119 files).
+- **DoC GPU cluster** — Slurm, A100 80GB. Scripts in `slurm/` (117 job scripts).
 - **RCS HPC (CX3)** — PBSPro, a larger pool (default L40S 48GB, and its A100 is a 40GB card).
-  Scripts in `pbs/` (304 files).
+  Scripts in `pbs/` (299 job scripts).
 
 The two directories are **not** a one-for-one mirror. They accumulated per experiment and per
 cluster, so most jobs exist on one side only. Treat them as a record of what was actually

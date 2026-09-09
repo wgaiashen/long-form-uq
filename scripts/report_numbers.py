@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 """Recompute the reported numbers from the published result tables.
 
-Reads the per-population master tables and prints the quantities the write-up quotes, so that a
-reader can check them against the data rather than taking them on trust. Nothing is retyped: every
-figure below is computed from the files.
+Reads the per-population master tables and prints the main comparison and the quantities the
+write-up quotes from it, so that a reader can check them against the data rather than taking them on
+trust. Nothing is retyped: every figure below is computed from the files.
+
+WHAT THIS COVERS, AND WHAT IT DOES NOT. It prints the two comparisons the masters can support - the
+five methods of the main panel across the three populations, and the combination read from its own
+table - together with the paired dataset-level tests over those. It does NOT recompute the
+relevance-weighted and claim-span probability rows, the back-off gate weights, the substituted
+back-off, the published distance family at its full layer set, or the response lengths. Each of
+those has its own file in published_results/, named in that directory's README, and its own driver.
 
 Two conventions govern every number here, and both matter for reading the output.
 
@@ -113,7 +120,7 @@ def main():
                     help="filename pattern for the per-population masters within that directory")
     ap.add_argument("--ensemble", default=None,
                     help="the combination table. Defaults to combination_equal_model.csv inside "
-                         "--dir. Section 5.7 cannot be computed from the masters, which carry no "
+                         "--dir. The combination cannot be computed from the masters, which carry no "
                          "combination rows.")
     args = ap.parse_args()
 
@@ -179,8 +186,8 @@ def main():
     print("Section 5.2, CAWSA against SAPLMA at DiffTask, dataset as the unit")
     print(f"    mean {mean:+.4f}   CAWSA higher on {wins} of 8   exact Wilcoxon p = {p:.4f}\n")
 
-    # ---- Figure 5.4, the shrinkage gains --------------------------------------------------
-    print("Figure 5.4, shrinkage gain at DiffTask, lambda = 2 against the lambda = 0 control")
+    # ---- Figure 6.6, the shrinkage gains --------------------------------------------------
+    print("Figure 6.6, shrinkage gain at DiffTask, lambda = 2 against the lambda = 0 control")
     for pop in POPULATIONS:
         gain = cell(data[pop], "wmsp_shrink2", "DiffTask-long") \
                - cell(data[pop], "wmsp_norm", "DiffTask-long")
@@ -195,11 +202,11 @@ def main():
         print(f"  {rung.replace('-long',''):16s} {adv:+.4f}")
     print()
 
-    # ---- Section 5.7 and Table 5.3, the combination ---------------------------------------
+    # ---- Section 5.5 and the two-model block of Table 5.1, the combination -----------------
     # The combination is reported on the two populations whose corrected-span per-response scores
     # exist and are certified, so it is computed by its own driver rather than from the masters,
     # which carry no combination rows. `--ensemble` takes that driver's equal-model table.
-    print("Section 5.7 and Table 5.3, the combination, equal-model over the two clean populations")
+    print("Section 5.5 and the two-model block of Table 5.1, the combination, equal-model over\n  the two corrected-span populations")
     if not args.ensemble:
         print("  not computed. Pass --ensemble <ensemble_clean_equalmodel.csv>. The field is left\n"
               "  blank rather than filled from another source.")

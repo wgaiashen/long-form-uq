@@ -79,8 +79,12 @@ CANONICAL = {
     # keys; the published-baseline and combination drivers write report-style strings directly.
     # Both are mapped so a table built from either reads the same.
     "TokenSAR": "TokenSAR",
-    "answer-span mean NLL": "Answer-span mean NLL",
-    "answer-span sequence NLL": "Answer-span sequence NLL",
+    # The result files say "answer-span" because the extractor was originally written to locate a
+    # short exact answer. On the eight long-form sets it never does that: the extraction prompt asks
+    # for claim-bearing terms and spans, so the write-up calls these the claim-span baselines. The
+    # keys are left alone, because renaming them would break the provenance of committed tables.
+    "answer-span mean NLL": "Claim-span mean NLL",
+    "answer-span sequence NLL": "Claim-span sequence NLL",
     "mean token NLL": "Mean token NLL",
     "minimum token probability": "Minimum token probability",
     # the published Maximum Sequence Probability, which is the sum aggregate under another name
@@ -100,6 +104,26 @@ CANONICAL = {
     # ---- decompose-and-aggregate (per-sentence probe + aggregator) ----
     "seg_mean": "Seg-probe + mean", "seg_min": "Seg-probe + min",
     "seg_geomean": "Seg-probe + geomean", "seg_learned": "Seg-probe + learned alpha",
+
+    # ---- the published distance family at its full layer set ----
+    # These are the rows the write-up reports for this family. The `*_mid` keys above are the
+    # earlier single-middle-layer adaptations, which the full-layer reproduction supersedes: the
+    # published estimator combines information across depth, so restricting it to one layer changes
+    # the method rather than sampling it. Both are kept in the result tables, and only these are
+    # reported. The layer list is the released driver's own, `range(num_hidden_layers - 1) + [-1]`,
+    # which on a 32-block model is 32 features: hidden-state entries 0 to 30 plus entry 32.
+    "satmd_alllayer": "SATMD", "satrmd_alllayer": "SATRMD",
+    "huq_satmd_alllayer": "HUQ-SATMD", "huq_satrmd_alllayer": "HUQ-SATRMD",
+    # The two entropy-augmented variants never covered the grid: generation-time entropy was not
+    # available for two of the eight evaluation sets. The name carries the gap so a partial method
+    # cannot be averaged as though it were complete; `complete_grid` in the tables says the same.
+    "msp_satmd_alllayer": "MSP-SATMD (partial grid)",
+    "msp_satrmd_alllayer": "MSP-SATRMD (partial grid)",
+
+    # ---- further constrained-weighting arms present in the tables and not reported ----
+    "wmsp_shrink1_5": "CAWSA (lambda=1.5)",
+    "wmsp_seg_flat": "Activation-weighted, per-segment (flat)",
+    "wmsp_seg_softmax": "Activation-weighted, per-segment (softmax)",
 }
 
 FAMILY = {
@@ -117,7 +141,8 @@ FAMILY = {
     "Hierarchical: token-choice only": "3. Learned pooling",
     "Unconstrained activation weighting": "4. Activation-weighted surprisal", "Unconstrained activation weighting (unnormalised)": "4. Activation-weighted surprisal",
     "Activation-weighted +Blondel loss": "4. Activation-weighted surprisal", "CAWSA (lambda=2)": "4. Activation-weighted surprisal",
-    "CAWSA (lambda=10)": "4. Activation-weighted surprisal", "CAWSA (lambda=2) +Blondel loss": "4. Activation-weighted surprisal",
+    "CAWSA (lambda=10)": "4. Activation-weighted surprisal", "CAWSA (lambda=1.5)": "4. Activation-weighted surprisal",
+    "CAWSA (lambda=2) +Blondel loss": "4. Activation-weighted surprisal",
     "CAWSA (lambda=10) +Blondel loss": "4. Activation-weighted surprisal", "Activation-weighted, answer-span masked": "4. Activation-weighted surprisal",
     "Activation-weighted +KL penalty": "4. Activation-weighted surprisal", "Activation-weighted +entropy hinge": "4. Activation-weighted surprisal",
     "Activation-weighted, smoothed (n=3)": "4. Activation-weighted surprisal", "Activation-weighted, smoothed (n=5)": "4. Activation-weighted surprisal",
@@ -125,14 +150,19 @@ FAMILY = {
     "Activation-weighted keep=no-EOS+punct": "5. Activation-weighted token subsets",
     "Activation-weighted keep=content (no stop-words)": "5. Activation-weighted token subsets",
     "Activation-weighted, per-segment": "5. Activation-weighted token subsets",
+    "Activation-weighted, per-segment (flat)": "5. Activation-weighted token subsets",
+    "Activation-weighted, per-segment (softmax)": "5. Activation-weighted token subsets",
     "TokenSAR": "1. Training-free probability",
-    "Answer-span mean NLL": "1. Training-free probability",
-    "Answer-span sequence NLL": "1. Training-free probability",
+    "Claim-span mean NLL": "1. Training-free probability",
+    "Claim-span sequence NLL": "1. Training-free probability",
     "P(True), training-free": "1. Training-free probability",
     "P(True) verdict-state probe": "2. Hidden-state probe",
     "Raw MD, middle layer": "7. Density", "Raw RMD, middle layer": "7. Density",
     "SATMD-mid": "7. Density", "SATRMD-mid": "7. Density",
     "MSP-SATMD-mid": "7. Density", "MSP-SATRMD-mid": "7. Density",
+    "SATMD": "7. Density", "SATRMD": "7. Density",
+    "MSP-SATMD (partial grid)": "7. Density", "MSP-SATRMD (partial grid)": "7. Density",
+    "HUQ-SATMD": "8. Hybrid", "HUQ-SATRMD": "8. Hybrid",
     "HUQ-SATMD-mid": "8. Hybrid", "HUQ-SATRMD-mid": "8. Hybrid", "HBO": "8. Hybrid",
     "HBO with the CAWSA probability branch": "8. Hybrid",
     "CAWSA + SAPLMA, equal-rank average": "8. Hybrid",

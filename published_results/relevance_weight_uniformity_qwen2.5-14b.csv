@@ -1,0 +1,9 @@
+dataset,n_test,spearman_vs_mean_token_nll,median_normalised_weight_entropy,iqr_lo,iqr_hi,min_normalised_weight_entropy,median_n_tokens,relevance_cache
+pubmed_qa,2000,0.9929,0.9913,0.9785,0.9971,0.8709,37,Qwen_Qwen2.5-14B__pubmed_qa__ID__sentence.npz
+xsum,2000,0.9941,1.0,1.0,1.0,0.9542,46,Qwen_Qwen2.5-14B__xsum__ID__sentence.npz
+cnn_dailymail,2000,0.9444,0.9998,0.9952,1.0,0.9373,65,Qwen_Qwen2.5-14B__cnn_dailymail__ID__sentence.npz
+med_quad,540,0.9897,0.9938,0.9872,0.998,0.9001,117,Qwen_Qwen2.5-14B__med_quad__ID__sentence.npz
+samsum,540,0.9991,1.0,1.0,1.0,0.951,29,Qwen_Qwen2.5-14B__samsum__ID__sentence.npz
+expertqa,476,0.9844,0.9959,0.9903,0.9993,0.9457,126,Qwen_Qwen2.5-14B__expertqa__ID__sentence.npz
+asqa,284,0.9772,0.9916,0.9807,1.0,0.8949,69,Qwen_Qwen2.5-14B__asqa__ID__sentence.npz
+factscore,140,0.9898,0.996,0.9934,0.999,0.9759,170,Qwen_Qwen2.5-14B__factscore__ID__sentence.npz
