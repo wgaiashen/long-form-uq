@@ -88,3 +88,9 @@ benchmark because generation-time entropy was unavailable for two of the eight d
 left in the file rather than stripped, so the gap is visible rather than silent. Read the
 `complete_grid` column before aggregating anything: a mean taken over a partial method is not
 comparable with one taken over a complete method, and these four must not be read as results.
+
+## Acknowledgement of AI assistance
+
+Parts of this repository were written with the assistance of Claude Code (Anthropic). The
+scope of that assistance, the work it did not extend to, and the checks applied to it are set
+out in [ACKNOWLEDGEMENTS.md](../ACKNOWLEDGEMENTS.md).

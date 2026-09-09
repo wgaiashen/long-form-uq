@@ -1,4 +1,8 @@
 #!/bin/bash
+# AI assistance: the scheduler boilerplate in the job scripts that source this file, meaning
+# the PBS and Slurm resource directives, environment activation, log redirection and array
+# indexing, was drafted with Claude Code (Anthropic) and reviewed by the author. What each
+# job runs, and the parameters it runs with, are the author's own. See ACKNOWLEDGEMENTS.md.
 # Cluster-resolution layer for shell (sourced by every pbs/*.pbs script, and usable
 # from a login shell). It picks ONE set of cluster-specific paths so the same batch
 # script body runs on either cluster. Nothing below is RCS-only by construction:

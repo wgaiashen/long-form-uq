@@ -1,3 +1,6 @@
+# AI assistance: the rendering and layout code in this file was drafted with Claude Code
+# (Anthropic), then reviewed, corrected and tested by the author. The quantities displayed
+# and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Per-example visualiser for a cached run (Phase 1 of the post-3-July plan).
 
 WHAT THIS IS (in plain words)

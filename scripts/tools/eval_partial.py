@@ -1,3 +1,5 @@
+# AI assistance: this utility was drafted with Claude Code (Anthropic), then reviewed,
+# corrected and tested by the author. See ACKNOWLEDGEMENTS.md.
 """Preliminary eval on LABELLED records only (for a partially-judged dataset).
 
 If the judge didn't finish (e.g. ran out of OpenAI quota), this trains the probes on the labelled

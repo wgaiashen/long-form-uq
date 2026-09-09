@@ -1,3 +1,5 @@
+# AI assistance: this utility was drafted with Claude Code (Anthropic), then reviewed,
+# corrected and tested by the author. See ACKNOWLEDGEMENTS.md.
 """Emit per-dataset PRR tables for the deck, READ STRAIGHT from pdl_master (no recomputation).
 Rows = the 12 requested methods; columns = the 5 settings in Hidden-Failures order (ID, LOO, SameTask,
 DiffTask, 1D-DiffTask). Missing cells -> "—" (listed with reason). Flags any (eval,rung,method) that has

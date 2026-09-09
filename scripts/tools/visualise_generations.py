@@ -1,3 +1,6 @@
+# AI assistance: the rendering and layout code in this file was drafted with Claude Code
+# (Anthropic), then reviewed, corrected and tested by the author. The quantities displayed
+# and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Generation-QUALITY visualiser for a long-form run (gen vs gold, side by side).
 
 WHY THIS EXISTS (distinct from visualise_attention.py)

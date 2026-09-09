@@ -1,3 +1,6 @@
+# AI assistance: the rendering and layout code in this file was drafted with Claude Code
+# (Anthropic), then reviewed, corrected and tested by the author. The quantities displayed
+# and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Shared render engine for the per-token visualisers (attention family + weighted-MSP family).
 
 WHAT THIS IS (in plain words)

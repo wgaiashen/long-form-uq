@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# AI assistance: the plotting code in this file was drafted with Claude Code (Anthropic),
+# then reviewed, corrected and tested by the author. The figure design, the quantities
+# plotted and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Static report figure: learned wMSP token weights beside token surprisal, for three responses.
 
 Population discipline: the three responses are drawn ONLY from the deterministic A5 audit set

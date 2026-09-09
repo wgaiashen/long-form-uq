@@ -1,3 +1,5 @@
+# AI assistance: this utility was drafted with Claude Code (Anthropic), then reviewed,
+# corrected and tested by the author. See ACKNOWLEDGEMENTS.md.
 """Parallel long-form judge labelling (speed tool). Same labels as 02_label, concurrent.
 
 The GPT-5 judge is I/O-bound (each call waits seconds on the API), so issuing many at once

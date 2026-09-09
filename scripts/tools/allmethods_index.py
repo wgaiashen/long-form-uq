@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# AI assistance: this utility was drafted with Claude Code (Anthropic), then reviewed,
+# corrected and tested by the author. See ACKNOWLEDGEMENTS.md.
 """Build results/viz/ALLMETHODS_index.html linking every generated ALLMETHODS_<dataset>.html, with the
 track legend + the three eyeball checks + the taxonomy-family grouping. Light (no pertok); scans the dir."""
 import glob

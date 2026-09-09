@@ -1,3 +1,5 @@
+# AI assistance: this utility was drafted with Claude Code (Anthropic), then reviewed,
+# corrected and tested by the author. See ACKNOWLEDGEMENTS.md.
 """S1/P0 MIGRATION (2026-07-28): re-stamp the OOD attention sidecars whose rung label was STRIPPED of "-long".
 
 `dump_ood_attention.py` used to write `base_rung = rung.replace("-long","")`, so a sidecar trained on the

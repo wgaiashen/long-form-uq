@@ -1,4 +1,6 @@
 #!/bin/bash
+# AI assistance: this script was drafted with Claude Code (Anthropic), then reviewed and
+# tested by the author. See ACKNOWLEDGEMENTS.md.
 # Loud free-space preflight for the project cephfs volume (the 50GB byte-quota that silently
 # killed the first baseline runs when it filled mid-job). Call at the START of any sbatch that
 # writes sizeable features, so a shortfall aborts BEFORE the GPU work instead of crashing

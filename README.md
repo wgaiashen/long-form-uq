@@ -247,3 +247,9 @@ tables the reported numbers come from are in `published_results/`, with
 
 Several results are pre-registered negatives. `prereg/` records what was predicted before each run
 and `prereg/README.md` indexes them.
+
+## Acknowledgement of AI assistance
+
+Parts of this repository were written with the assistance of Claude Code (Anthropic). The
+scope of that assistance, the work it did not extend to, and the checks applied to it are set
+out in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).

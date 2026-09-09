@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# AI assistance: the plotting code in this file was drafted with Claude Code (Anthropic),
+# then reviewed, corrected and tested by the author. The figure design, the quantities
+# plotted and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Mechanism-chapter figures, rebuilt on the corrected-span population.
 
 Every plotted value is read from a result artifact and re-emitted as the figure's own data file, so

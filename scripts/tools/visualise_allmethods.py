@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# AI assistance: the rendering and layout code in this file was drafted with Claude Code
+# (Anthropic), then reviewed, corrected and tested by the author. The quantities displayed
+# and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """All-methods token overlay -- ONE browsable HTML per dataset with EVERY weighting method as a toggleable
 per-token track, on the SAME generations, so you can see by eye what each method looks at and where they differ.
 

@@ -1,3 +1,6 @@
+# AI assistance: the rendering and layout code in this file was drafted with Claude Code
+# (Anthropic), then reviewed, corrected and tested by the author. The quantities displayed
+# and their interpretation are the author's own. See ACKNOWLEDGEMENTS.md.
 """Per-dataset visualiser for the WEIGHTED-MSP family (where does each method put its per-token weight?).
 
 WHAT THIS IS (in plain words)
