@@ -1,6 +1,6 @@
 # `scripts/checks/` — the analysis and verification drivers
 
-254 scripts. This is the largest directory in the repository and it is a **research record**, not a
+309 scripts. This is the largest directory in the repository and it is a **research record**, not a
 library: one driver per experiment, kept as it was run. It is not a curated API and it is not meant
 to be read end to end. This file explains the conventions so you can find what you need.
 
